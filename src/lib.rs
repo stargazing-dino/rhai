@@ -265,9 +265,6 @@ pub type OptimizationLevel = ();
 
 // Expose internal data structures.
 
-#[cfg(feature = "metadata")]
-pub use api::definitions::Definitions;
-
 #[cfg(feature = "internals")]
 pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant};
 
@@ -311,6 +308,10 @@ pub use ast::FloatWrapper;
 
 #[cfg(feature = "internals")]
 pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeState};
+
+#[cfg(feature = "internals")]
+#[cfg(feature = "metadata")]
+pub use api::definitions::Definitions;
 
 /// Alias to [`smallvec::SmallVec<[T; 3]>`](https://crates.io/crates/smallvec), which is a
 /// specialized [`Vec`] backed by a small, inline, fixed-size array when there are ≤ 3 items stored.

@@ -7,11 +7,10 @@ use crate::module::FuncInfo;
 use crate::plugin::*;
 use crate::tokenizer::{is_valid_function_name, Token};
 use crate::{Engine, Module, Scope, INT};
-use core::fmt::Write;
 
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{any::type_name, borrow::Cow, cmp::Ordering, fmt};
+use std::{any::type_name, borrow::Cow, cmp::Ordering, fmt, fmt::Write};
 
 impl Engine {
     /// _(metadata, internals)_ Return [`Definitions`] that can be used to generate definition files
