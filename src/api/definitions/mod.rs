@@ -1,19 +1,21 @@
 //! Module that defines functions to output definition files for [`Engine`].
+//! Exported under the `internals` and `metadata` feature only.
+#![cfg(feature = "internals")]
 #![cfg(feature = "metadata")]
 
 use crate::module::FuncInfo;
 use crate::plugin::*;
-use crate::tokenizer::is_valid_function_name;
+use crate::tokenizer::{is_valid_function_name, Token};
 use crate::{Engine, Module, Scope, INT};
-use core::fmt::Write;
 
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{any::type_name, borrow::Cow, cmp::Ordering, fmt};
+use std::{any::type_name, borrow::Cow, cmp::Ordering, fmt, fmt::Write};
 
 impl Engine {
-    /// Return [`Definitions`] that can be used to generate definition files for the [`Engine`].
-    /// Exported under the `metadata` feature only.
+    /// _(metadata, internals)_ Return [`Definitions`] that can be used to generate definition files
+    /// for the [`Engine`].
+    /// Exported under the `internals` and `metadata` feature only.
     ///
     /// # Example
     ///
@@ -37,9 +39,9 @@ impl Engine {
         }
     }
 
-    /// Return [`Definitions`] that can be used to generate definition files for the [`Engine`] and
-    /// the given [`Scope`].
-    /// Exported under the `metadata` feature only.
+    /// _(metadata, internals)_ Return [`Definitions`] that can be used to generate definition files
+    /// for the [`Engine`] and the given [`Scope`].
+    /// Exported under the `internals` and `metadata` feature only.
     ///
     /// # Example
     ///
@@ -64,7 +66,9 @@ impl Engine {
     }
 }
 
-/// Definitions helper type to generate definition files based on the contents of an [`Engine`].
+/// _(metadata, internals)_ Definitions helper type to generate definition files based on the
+/// contents of an [`Engine`].
+/// Exported under the `internals` and `metadata` feature only.
 #[derive(Debug, Clone)]
 #[must_use]
 pub struct Definitions<'e> {
@@ -76,11 +80,11 @@ pub struct Definitions<'e> {
 }
 
 impl<'e> Definitions<'e> {
-    /// Whether to write `module ...` headers in separate definitions,
-    /// `false` by default.
+    /// Write `module ...` headers in separate definitions, default `false`.
     ///
-    /// Headers are always present in content
-    /// that is expected to be written to a file (`write_to*` and `*_file` methods).
+    /// Headers are always present in content that is expected to be written to a file
+    /// (i.e. `write_to*` and `*_file` methods).
+    #[inline(always)]
     pub fn with_headers(mut self, headers: bool) -> Self {
         self.config.write_headers = headers;
         self
@@ -93,6 +97,7 @@ impl<'e> Definitions<'e> {
     ///
     /// This function creates the directories and overrides any existing files if needed.
     #[cfg(all(not(feature = "no_std"), not(target_family = "wasm")))]
+    #[inline]
     pub fn write_to_dir(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
         use std::fs;
 
@@ -111,11 +116,14 @@ impl<'e> Definitions<'e> {
     ///
     /// The parent directory must exist but the file will be created or overwritten as needed.
     #[cfg(all(not(feature = "no_std"), not(target_family = "wasm")))]
+    #[inline(always)]
     pub fn write_to_file(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
         std::fs::write(path, self.single_file())
     }
 
     /// Return all definitions merged into a single file.
+    #[inline]
+    #[must_use]
     pub fn single_file(&self) -> String {
         let config = DefinitionsConfig {
             write_headers: false,
@@ -191,11 +199,14 @@ impl<'e> Definitions<'e> {
     }
 
     /// Return definitions for all builtin functions.
+    #[inline(always)]
     #[must_use]
     pub fn builtin_functions(&self) -> String {
         self.builtin_functions_impl(&self.config)
     }
 
+    /// Return definitions for all builtin functions.
+    #[must_use]
     fn builtin_functions_impl(&self, config: &DefinitionsConfig) -> String {
         let def = include_str!("builtin-functions.d.rhai");
 
@@ -207,11 +218,14 @@ impl<'e> Definitions<'e> {
     }
 
     /// Return definitions for all builtin operators.
+    #[inline(always)]
     #[must_use]
     pub fn builtin_functions_operators(&self) -> String {
         self.builtin_functions_operators_impl(&self.config)
     }
 
+    /// Return definitions for all builtin operators.
+    #[must_use]
     fn builtin_functions_operators_impl(&self, config: &DefinitionsConfig) -> String {
         let def = include_str!("builtin-operators.d.rhai");
 
@@ -222,13 +236,15 @@ impl<'e> Definitions<'e> {
         }
     }
 
-    /// Return definitions for all globally available functions
-    /// and constants.
+    /// Return definitions for all globally available functions and constants.
+    #[inline(always)]
     #[must_use]
     pub fn static_module(&self) -> String {
         self.static_module_impl(&self.config)
     }
 
+    /// Return definitions for all globally available functions and constants.
+    #[must_use]
     fn static_module_impl(&self, config: &DefinitionsConfig) -> String {
         let mut s = if config.write_headers {
             String::from("module static;\n\n")
@@ -249,11 +265,14 @@ impl<'e> Definitions<'e> {
     }
 
     /// Return definitions for all items inside the [`Scope`], if any.
+    #[inline(always)]
     #[must_use]
     pub fn scope(&self) -> String {
         self.scope_impl(&self.config)
     }
 
+    /// Return definitions for all items inside the [`Scope`], if any.
+    #[must_use]
     fn scope_impl(&self, config: &DefinitionsConfig) -> String {
         let mut s = if config.write_headers {
             String::from("module static;\n\n")
@@ -272,10 +291,12 @@ impl<'e> Definitions<'e> {
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
+    #[inline(always)]
     pub fn modules(&self) -> impl Iterator<Item = (String, String)> + '_ {
         self.modules_impl(&self.config)
     }
 
+    /// Return a (module name, definitions) pair for each registered static [module][Module].
     #[cfg(not(feature = "no_module"))]
     fn modules_impl(
         &self,
@@ -481,7 +502,7 @@ fn def_type_name<'a>(ty: &'a str, engine: &'a Engine) -> Cow<'a, str> {
 }
 
 impl Scope<'_> {
-    /// Return definitions for all items inside the [`Scope`].
+    /// _(metadata, internals)_ Return definitions for all items inside the [`Scope`].
     fn write_definition(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
         let mut first = true;
         for (name, constant, _) in self.iter_raw() {
@@ -490,7 +511,7 @@ impl Scope<'_> {
             }
             first = false;
 
-            let kw = if constant { "const" } else { "let" };
+            let kw = if constant { Token::Const } else { Token::Let };
 
             write!(writer, "{kw} {name};")?;
         }

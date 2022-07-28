@@ -182,9 +182,6 @@ pub use types::{
 #[cfg(not(feature = "no_custom_syntax"))]
 pub use api::custom_syntax::Expression;
 
-#[cfg(feature = "metadata")]
-pub use api::definitions::Definitions;
-
 /// _(debugging)_ Module containing types for debugging.
 /// Exported under the `debugging` feature only.
 #[cfg(feature = "debugging")]
@@ -311,6 +308,10 @@ pub use ast::FloatWrapper;
 
 #[cfg(feature = "internals")]
 pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeState};
+
+#[cfg(feature = "internals")]
+#[cfg(feature = "metadata")]
+pub use api::definitions::Definitions;
 
 /// Alias to [`smallvec::SmallVec<[T; 3]>`](https://crates.io/crates/smallvec), which is a
 /// specialized [`Vec`] backed by a small, inline, fixed-size array when there are ≤ 3 items stored.

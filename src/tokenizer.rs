@@ -575,6 +575,13 @@ pub enum Token {
     EOF,
 }
 
+impl fmt::Display for Token {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.syntax())
+    }
+}
+
 impl Token {
     /// Get the literal syntax of the token.
     #[must_use]
