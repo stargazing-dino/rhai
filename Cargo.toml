@@ -88,7 +88,7 @@ required-features = ["serde"]
 
 [[example]]
 name = "definitions"
-required-features = ["metadata"]
+required-features = ["metadata", "internals"]
 
 [profile.release]
 lto = "fat"

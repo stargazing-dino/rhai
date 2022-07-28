@@ -182,9 +182,6 @@ pub use types::{
 #[cfg(not(feature = "no_custom_syntax"))]
 pub use api::custom_syntax::Expression;
 
-#[cfg(feature = "metadata")]
-pub use api::definitions::Definitions;
-
 /// _(debugging)_ Module containing types for debugging.
 /// Exported under the `debugging` feature only.
 #[cfg(feature = "debugging")]
@@ -267,6 +264,9 @@ pub use optimizer::OptimizationLevel;
 pub type OptimizationLevel = ();
 
 // Expose internal data structures.
+
+#[cfg(feature = "metadata")]
+pub use api::definitions::Definitions;
 
 #[cfg(feature = "internals")]
 pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant};
