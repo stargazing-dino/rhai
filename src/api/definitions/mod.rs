@@ -1,5 +1,4 @@
 //! Module that defines functions to output definition files for [`Engine`].
-//! Exported under the `internals` and `metadata` feature only.
 #![cfg(feature = "internals")]
 #![cfg(feature = "metadata")]
 
@@ -66,6 +65,27 @@ impl Engine {
     }
 }
 
+/// Internal configuration for module generation.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[non_exhaustive]
+#[must_use]
+pub struct DefinitionsConfig {
+    /// Write `module ...` headers in definition files (default `false`).
+    pub write_headers: bool,
+    /// Include standard packages (default `true`).
+    pub include_standard_packages: bool,
+}
+
+impl Default for DefinitionsConfig {
+    #[inline(always)]
+    fn default() -> Self {
+        Self {
+            write_headers: false,
+            include_standard_packages: true,
+        }
+    }
+}
+
 /// _(metadata, internals)_ Definitions helper type to generate definition files based on the
 /// contents of an [`Engine`].
 /// Exported under the `internals` and `metadata` feature only.
@@ -79,7 +99,7 @@ pub struct Definitions<'e> {
     config: DefinitionsConfig,
 }
 
-impl<'e> Definitions<'e> {
+impl Definitions<'_> {
     /// Write `module ...` headers in separate definitions, default `false`.
     ///
     /// Headers are always present in content that is expected to be written to a file
@@ -89,9 +109,32 @@ impl<'e> Definitions<'e> {
         self.config.write_headers = headers;
         self
     }
+    /// Include standard packages when writing definition files.
+    #[inline(always)]
+    pub fn include_standard_packages(mut self, include_standard_packages: bool) -> Self {
+        self.config.include_standard_packages = include_standard_packages;
+        self
+    }
+    /// Get the [`Engine`].
+    #[inline(always)]
+    pub fn engine(&self) -> &Engine {
+        self.engine
+    }
+    /// Get the [`Scope`].
+    #[inline(always)]
+    #[must_use]
+    pub fn scope(&self) -> Option<&Scope> {
+        self.scope
+    }
+    /// Get the configuration.
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn config(&self) -> &DefinitionsConfig {
+        &self.config
+    }
 }
 
-impl<'e> Definitions<'e> {
+impl Definitions<'_> {
     /// Output all definition files returned from [`iter_files`][Definitions::iter_files] to a
     /// specified directory.
     ///
@@ -132,10 +175,12 @@ impl<'e> Definitions<'e> {
 
         let mut def_file = String::from("module static;\n\n");
 
-        def_file += &self.builtin_functions_operators_impl(&config);
-        def_file += "\n";
-        def_file += &self.builtin_functions_impl(&config);
-        def_file += "\n";
+        if config.include_standard_packages {
+            def_file += &self.builtin_functions_operators_impl(&config);
+            def_file += "\n";
+            def_file += &self.builtin_functions_impl(&config);
+            def_file += "\n";
+        }
         def_file += &self.static_module_impl(&config);
         def_file += "\n";
 
@@ -144,14 +189,16 @@ impl<'e> Definitions<'e> {
             for (module_name, module_def) in self.modules_impl(&config) {
                 write!(
                     &mut def_file,
-                    "module {module_name} {{\n\n{module_def}\n}}\n"
+                    "\nmodule {module_name} {{\n{module_def}\n}}\n"
                 )
                 .unwrap();
             }
             def_file += "\n";
         }
 
-        def_file += &self.scope_impl(&config);
+        def_file += &self.scope_items_impl(&config);
+
+        def_file += "\n";
 
         def_file
     }
@@ -166,25 +213,31 @@ impl<'e> Definitions<'e> {
             ..self.config
         };
 
-        IntoIterator::into_iter([
+        if config.include_standard_packages {
+            vec![
+                (
+                    "__builtin__.d.rhai".to_string(),
+                    self.builtin_functions_impl(&config),
+                ),
+                (
+                    "__builtin-operators__.d.rhai".to_string(),
+                    self.builtin_functions_operators_impl(&config),
+                ),
+            ]
+        } else {
+            vec![]
+        }
+        .into_iter()
+        .chain(std::iter::once((
+            "__static__.d.rhai".to_string(),
+            self.static_module_impl(&config),
+        )))
+        .chain(self.scope.iter().map(move |_| {
             (
-                "__builtin__.d.rhai".to_string(),
-                self.builtin_functions_impl(&config),
-            ),
-            (
-                "__builtin-operators__.d.rhai".to_string(),
-                self.builtin_functions_operators_impl(&config),
-            ),
-            (
-                "__static__.d.rhai".to_string(),
-                self.static_module_impl(&config),
-            ),
-        ])
-        .chain(
-            self.scope
-                .iter()
-                .map(move |_| ("__scope__.d.rhai".to_string(), self.scope_impl(&config))),
-        )
+                "__scope__.d.rhai".to_string(),
+                self.scope_items_impl(&config),
+            )
+        }))
         .chain(
             #[cfg(not(feature = "no_module"))]
             {
@@ -252,14 +305,17 @@ impl<'e> Definitions<'e> {
             String::new()
         };
 
-        let mut first = true;
-        for m in &self.engine.global_modules {
-            if !first {
-                s += "\n\n";
-            }
-            first = false;
-            m.write_definition(&mut s, self).unwrap();
-        }
+        self.engine
+            .global_modules
+            .iter()
+            .filter(|m| self.config.include_standard_packages || !m.standard)
+            .enumerate()
+            .for_each(|(i, m)| {
+                if i > 0 {
+                    s += "\n\n";
+                }
+                m.write_definition(&mut s, self).unwrap();
+            });
 
         s
     }
@@ -267,13 +323,13 @@ impl<'e> Definitions<'e> {
     /// Return definitions for all items inside the [`Scope`], if any.
     #[inline(always)]
     #[must_use]
-    pub fn scope(&self) -> String {
-        self.scope_impl(&self.config)
+    pub fn scope_items(&self) -> String {
+        self.scope_items_impl(&self.config)
     }
 
     /// Return definitions for all items inside the [`Scope`], if any.
     #[must_use]
-    fn scope_impl(&self, config: &DefinitionsConfig) -> String {
+    fn scope_items_impl(&self, config: &DefinitionsConfig) -> String {
         let mut s = if config.write_headers {
             String::from("module static;\n\n")
         } else {
@@ -322,14 +378,6 @@ impl<'e> Definitions<'e> {
 
         m.into_iter()
     }
-}
-
-/// Internal configuration for module generation.
-#[derive(Debug, Default, Clone, Copy)]
-#[non_exhaustive]
-struct DefinitionsConfig {
-    /// Whether to write `module ...` headers.
-    write_headers: bool,
 }
 
 impl Module {
