@@ -12,7 +12,7 @@ use crate::tokenizer::{Span, Token};
 use crate::types::dynamic::AccessMode;
 use crate::{
     calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Engine, FnPtr, Identifier,
-    Position, Scope, StaticVec, AST, INT, ImmutableString,
+    ImmutableString, Position, Scope, StaticVec, AST, INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
