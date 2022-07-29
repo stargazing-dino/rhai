@@ -13,11 +13,11 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
     // Disable 'while' and make sure it still works with custom syntax
     engine.disable_symbol("while");
     assert!(matches!(
-        *engine.compile("while false {}").expect_err("should error").0,
+        engine.compile("while false {}").expect_err("should error").err_type(),
         ParseErrorType::Reserved(err) if err == "while"
     ));
     assert!(matches!(
-        *engine.compile("let while = 0").expect_err("should error").0,
+        engine.compile("let while = 0").expect_err("should error").err_type(),
         ParseErrorType::Reserved(err) if err == "while"
     ));
 
@@ -157,7 +157,7 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
         *engine
             .register_custom_syntax(&["!"], false, |_, _| Ok(Dynamic::UNIT))
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::BadInput(LexError::ImproperSymbol(
             "!".to_string(),
             "Improper symbol for custom syntax at position #1: '!'".to_string()
@@ -261,7 +261,10 @@ fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
     );
     assert_eq!(engine.eval::<INT>("(hello kitty) + foo")?, 1041);
     assert_eq!(
-        *engine.compile("hello hey").expect_err("should error").0,
+        *engine
+            .compile("hello hey")
+            .expect_err("should error")
+            .err_type(),
         ParseErrorType::BadInput(LexError::ImproperSymbol("hey".to_string(), "".to_string()))
     );
 

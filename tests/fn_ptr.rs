@@ -65,12 +65,12 @@ fn test_fn_ptr() -> Result<(), Box<EvalAltResult>> {
         *engine
             .eval::<INT>(
                 r#"
-                fn foo(x) { this += x; }
+                    fn foo(x) { this += x; }
 
-                let f = Fn("foo");
-                call(f, 2);
-                x
-            "#
+                    let f = Fn("foo");
+                    call(f, 2);
+                    x
+                "#
             )
             .expect_err("should error"),
         EvalAltResult::ErrorInFunctionCall(fn_name, _, err, ..)

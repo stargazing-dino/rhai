@@ -30,7 +30,7 @@ fn test_loop() -> Result<(), Box<EvalAltResult>> {
         *engine
             .compile("let x = 0; break;")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::LoopBreak
     );
 
@@ -38,7 +38,7 @@ fn test_loop() -> Result<(), Box<EvalAltResult>> {
         *engine
             .compile("let x = 0; if x > 0 { continue; }")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::LoopBreak
     );
 

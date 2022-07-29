@@ -299,6 +299,21 @@ impl fmt::Display for ParseError {
     }
 }
 
+impl ParseError {
+    /// Get the [type][ParseErrorType] of this parse error.
+    #[inline(always)]
+    #[must_use]
+    pub fn err_type(&self) -> &ParseErrorType {
+        &self.0
+    }
+    /// Get the [position][Position] of this parse error.
+    #[inline(always)]
+    #[must_use]
+    pub fn position(&self) -> Position {
+        self.1
+    }
+}
+
 impl From<ParseErrorType> for RhaiError {
     #[inline(always)]
     fn from(err: ParseErrorType) -> Self {

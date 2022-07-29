@@ -233,7 +233,7 @@ fn test_var_def_filter() -> Result<(), Box<EvalAltResult>> {
     );
 
     assert!(matches!(
-        *engine.compile("let x = 42;").expect_err("should error").0,
+        engine.compile("let x = 42;").expect_err("should error").err_type(),
         ParseErrorType::ForbiddenVariable(s) if s == "x"
     ));
     assert!(matches!(

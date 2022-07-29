@@ -179,40 +179,43 @@ fn test_array_index_types() -> Result<(), Box<EvalAltResult>> {
     engine.compile("[1, 2, 3][0]['x']")?;
 
     assert!(matches!(
-        *engine
+        engine
             .compile("[1, 2, 3]['x']")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     #[cfg(not(feature = "no_float"))]
     assert!(matches!(
-        *engine
+        engine
             .compile("[1, 2, 3][123.456]")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     assert!(matches!(
-        *engine.compile("[1, 2, 3][()]").expect_err("should error").0,
+        engine
+            .compile("[1, 2, 3][()]")
+            .expect_err("should error")
+            .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     assert!(matches!(
-        *engine
+        engine
             .compile(r#"[1, 2, 3]["hello"]"#)
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     assert!(matches!(
-        *engine
+        engine
             .compile("[1, 2, 3][true && false]")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
