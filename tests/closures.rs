@@ -42,21 +42,35 @@ fn test_fn_ptr_curry_call() -> Result<(), Box<EvalAltResult>> {
 #[cfg(not(feature = "no_object"))]
 fn test_closures() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
+    let mut scope = Scope::new();
+
+    scope.push("x", 42 as INT);
 
     assert!(matches!(
-        *engine
-            .compile_expression("let f = |x| {};")
+        engine
+            .compile_expression("|x| {}")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::BadInput(..)
     ));
+
+    assert_eq!(
+        engine.eval_with_scope::<INT>(
+            &mut scope,
+            "
+                let f = || { x };
+                f.call()
+            ",
+        )?,
+        42
+    );
 
     assert_eq!(
         engine.eval::<INT>(
             "
                 let foo = #{ x: 42 };
                 let f = || { this.x };
-                foo.call(f)                
+                foo.call(f)
             ",
         )?,
         42
