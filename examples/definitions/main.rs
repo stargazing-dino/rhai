@@ -44,5 +44,21 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         .write_to_file("examples/definitions/.rhai/all_in_one.d.rhai")
         .unwrap();
 
+    // Skip standard packages if not needed (e.g. they are provided elsewhere).
+    engine
+        .definitions_with_scope(&scope)
+        .include_standard_packages(false)
+        .write_to_file("examples/definitions/.rhai/all_in_one_without_standard.d.rhai")
+        .unwrap();
+
+    // Write function definitions as JSON.
+    let json = engine
+        .definitions()
+        .include_standard_packages(false)
+        .json()
+        .unwrap();
+
+    std::fs::write("examples/definitions/.rhai/defs.json", json).unwrap();
+
     Ok(())
 }

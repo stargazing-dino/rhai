@@ -11,6 +11,12 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
+#[cfg(not(feature = "no_float"))]
+use crate::FLOAT;
+
+#[cfg(feature = "decimal")]
+use rust_decimal::Decimal;
+
 #[cfg(not(feature = "unchecked"))]
 #[inline(always)]
 fn std_add<T>(x: T, y: T) -> Option<T>
@@ -348,10 +354,10 @@ def_package! {
         }
 
         #[cfg(not(feature = "no_float"))]
-        reg_range!(lib | step(regular_add) "range" => crate::FLOAT);
+        reg_range!(lib | step(regular_add) "range" => FLOAT);
 
         #[cfg(feature = "decimal")]
-        reg_range!(lib | step "range" => rust_decimal::Decimal);
+        reg_range!(lib | step "range" => Decimal);
 
         // Register string iterator
         lib.set_iterator::<CharsStream>();
