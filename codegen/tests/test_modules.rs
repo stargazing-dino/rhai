@@ -64,10 +64,11 @@ fn one_fn_and_const_module_test() -> Result<(), Box<EvalAltResult>> {
 
     assert_eq!(
         engine.eval::<FLOAT>(
-            r#"
-            let m = Math::Advanced::MYSTIC_NUMBER;
-            let x = Math::Advanced::euclidean_distance(0.0, 1.0, 0.0, m);
-            x"#
+            "
+                let m = Math::Advanced::MYSTIC_NUMBER;
+                let x = Math::Advanced::euclidean_distance(0.0, 1.0, 0.0, m);
+                x
+            "
         )?,
         41.0
     );
@@ -146,12 +147,13 @@ fn mut_opaque_ref_test() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(
         engine.eval::<bool>(
             r#"
-            let success = "it worked";
-            let message1 = Host::Msg::new_message(true, success);
-            let ok1 = Host::Msg::write_out_message(message1);
-            let message2 = Host::Msg::new_os_message(true, 0);
-            let ok2 = Host::Msg::write_out_message(message2);
-            ok1 && ok2"#
+                let success = "it worked";
+                let message1 = Host::Msg::new_message(true, success);
+                let ok1 = Host::Msg::write_out_message(message1);
+                let message2 = Host::Msg::new_os_message(true, 0);
+                let ok2 = Host::Msg::write_out_message(message2);
+                ok1 && ok2
+            "#
         )?,
         true
     );
@@ -184,13 +186,13 @@ fn duplicate_fn_rename_test() -> Result<(), Box<EvalAltResult>> {
     engine.register_static_module("Math::Advanced", m.into());
 
     let output_array = engine.eval::<Array>(
-        r#"
-        let fx = get_mystic_number();
-        let fy = Math::Advanced::add(fx, 1.0);
-        let ix = 42;
-        let iy = Math::Advanced::add(ix, 1);
-        [fy, iy]
-        "#,
+        "
+            let fx = get_mystic_number();
+            let fy = Math::Advanced::add(fx, 1.0);
+            let ix = 42;
+            let iy = Math::Advanced::add(ix, 1);
+            [fy, iy]
+        ",
     )?;
     assert_eq!(&output_array[0].as_float().unwrap(), &43.0);
     assert_eq!(&output_array[1].as_int().unwrap(), &43);
@@ -235,21 +237,21 @@ fn multiple_fn_rename_test() -> Result<(), Box<EvalAltResult>> {
     engine.register_global_module(m.into());
 
     let output_array = engine.eval::<Array>(
-        r#"
-       let fx = get_mystic_number();
-       let fy1 = add(fx, 1.0);
-       let fy2 = add_together(fx, 1.0);
-       let fy3 = fx + 1.0;
-       let p1 = fx.prop;
-       let p2 = prop(fx);
-       let idx1 = fx[1];
-       let idx2 = idx(fx, 1);
-       let ix = 42;
-       let iy1 = add(ix, 1);
-       let iy2 = add_together(ix, 1);
-       let iy3 = ix + 1;
-       [fy1, fy2, fy3, iy1, iy2, iy3, p1, p2, idx1, idx2]
-       "#,
+        "
+            let fx = get_mystic_number();
+            let fy1 = add(fx, 1.0);
+            let fy2 = add_together(fx, 1.0);
+            let fy3 = fx + 1.0;
+            let p1 = fx.prop;
+            let p2 = prop(fx);
+            let idx1 = fx[1];
+            let idx2 = idx(fx, 1);
+            let ix = 42;
+            let iy1 = add(ix, 1);
+            let iy2 = add_together(ix, 1);
+            let iy3 = ix + 1;
+            [fy1, fy2, fy3, iy1, iy2, iy3, p1, p2, idx1, idx2]
+        ",
     )?;
     assert_eq!(&output_array[0].as_float().unwrap(), &44.0);
     assert_eq!(&output_array[1].as_float().unwrap(), &44.0);
@@ -307,15 +309,15 @@ fn export_by_prefix_test() -> Result<(), Box<EvalAltResult>> {
     engine.register_static_module("Math::Advanced", m.into());
 
     let output_array = engine.eval::<Array>(
-        r#"
-        let ex = 41.0;
-        let fx = Math::Advanced::foo_add_f(ex, 1.0);
-        let gx = Math::Advanced::foo_m(41.0, 1.0);
-        let ei = 41;
-        let fi = Math::Advanced::bar_add_i(ei, 1);
-        let gi = Math::Advanced::foo_n(41, 1);
-        [fx, gx, fi, gi]
-        "#,
+        "
+            let ex = 41.0;
+            let fx = Math::Advanced::foo_add_f(ex, 1.0);
+            let gx = Math::Advanced::foo_m(41.0, 1.0);
+            let ei = 41;
+            let fi = Math::Advanced::bar_add_i(ei, 1);
+            let gi = Math::Advanced::foo_n(41, 1);
+            [fx, gx, fi, gi]
+        ",
     )?;
     assert_eq!(&output_array[0].as_float().unwrap(), &42.0);
     assert_eq!(&output_array[1].as_float().unwrap(), &42.0);
@@ -329,8 +331,7 @@ fn export_by_prefix_test() -> Result<(), Box<EvalAltResult>> {
             fx
         ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(s, p)
-            if s == "Math::Advanced::foo_add_float2 (f64, f64)"
-            && p == rhai::Position::new(3, 34)));
+            if s == "Math::Advanced::foo_add_float2 (f64, f64)"));
 
     assert!(matches!(*engine.eval::<FLOAT>(
         "
@@ -339,8 +340,7 @@ fn export_by_prefix_test() -> Result<(), Box<EvalAltResult>> {
             fx
         ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(s, p)
-            if s == "Math::Advanced::bar_m (f64, f64)"
-            && p == rhai::Position::new(3, 34)));
+            if s == "Math::Advanced::bar_m (f64, f64)"));
 
     Ok(())
 }
@@ -389,15 +389,15 @@ fn export_all_test() -> Result<(), Box<EvalAltResult>> {
     engine.register_static_module("Math::Advanced", m.into());
 
     let output_array = engine.eval::<Array>(
-        r#"
-        let ex = 41.0;
-        let fx = Math::Advanced::foo_add_f(ex, 1.0);
-        let gx = Math::Advanced::foo_m(41.0, 1.0);
-        let ei = 41;
-        let fi = Math::Advanced::foo_add_i(ei, 1);
-        let gi = Math::Advanced::foo_n(41, 1);
-        [fx, gx, fi, gi]
-        "#,
+        "
+            let ex = 41.0;
+            let fx = Math::Advanced::foo_add_f(ex, 1.0);
+            let gx = Math::Advanced::foo_m(41.0, 1.0);
+            let ei = 41;
+            let fi = Math::Advanced::foo_add_i(ei, 1);
+            let gi = Math::Advanced::foo_n(41, 1);
+            [fx, gx, fi, gi]
+        ",
     )?;
     assert_eq!(&output_array[0].as_float().unwrap(), &42.0);
     assert_eq!(&output_array[1].as_float().unwrap(), &42.0);
@@ -411,8 +411,7 @@ fn export_all_test() -> Result<(), Box<EvalAltResult>> {
             fx
         ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(s, p)
-            if s == "Math::Advanced::foo_p (i64, i64)"
-            && p == rhai::Position::new(3, 34)));
+            if s == "Math::Advanced::foo_p (i64, i64)"));
 
     Ok(())
 }
