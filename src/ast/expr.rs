@@ -5,12 +5,16 @@ use crate::engine::{KEYWORD_FN_PTR, OP_EXCLUSIVE_RANGE, OP_INCLUSIVE_RANGE};
 use crate::func::hashing::ALT_ZERO_HASH;
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
-use crate::{calc_fn_hash, Dynamic, FnPtr, Identifier, ImmutableString, Position, StaticVec, INT};
+use crate::{
+    calc_fn_hash, Dynamic, FnPtr, Identifier, ImmutableString, Position, SmartString, StaticVec,
+    INT,
+};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
     collections::BTreeMap,
     fmt,
+    fmt::Write,
     hash::Hash,
     iter::once,
     num::{NonZeroU8, NonZeroUsize},
@@ -574,6 +578,16 @@ impl Expr {
                     *value_ref = v.get_literal_value().unwrap();
                     map
                 }))
+            }
+
+            // Interpolated string
+            Self::InterpolatedString(x, ..) if self.is_constant() => {
+                let mut s = SmartString::new_const();
+                for segment in x.iter() {
+                    let v = segment.get_literal_value().unwrap();
+                    write!(&mut s, "{}", v).unwrap();
+                }
+                s.into()
             }
 
             // Fn

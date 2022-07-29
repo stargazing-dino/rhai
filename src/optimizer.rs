@@ -12,7 +12,7 @@ use crate::tokenizer::{Span, Token};
 use crate::types::dynamic::AccessMode;
 use crate::{
     calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Engine, FnPtr, Identifier,
-    Position, Scope, StaticVec, AST, INT,
+    Position, Scope, StaticVec, AST, INT, ImmutableString,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -1052,10 +1052,10 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             state.set_dirty();
             *expr = Expr::StringConstant(state.engine.const_empty_string(), *pos);
         }
-        // `...`
-        Expr::InterpolatedString(x, ..) if x.len() == 1 && matches!(x[0], Expr::StringConstant(..)) => {
+        // `... ${const} ...`
+        Expr::InterpolatedString(..) if expr.is_constant() => {
             state.set_dirty();
-            *expr = mem::take(&mut x[0]);
+            *expr = Expr::StringConstant(expr.get_literal_value().unwrap().cast::<ImmutableString>(), expr.position());
         }
         // `... ${ ... } ...`
         Expr::InterpolatedString(x, ..) => {

@@ -12,6 +12,7 @@ Bug fixes
 * `switch` cases with conditions that evaluate to constant `()` no longer optimize to `false` (should raise a type error during runtime).
 * Fixes concatenation of BLOB's and strings, where the BLOB's should be interpreted as UTF-8 encoded strings.
 * Capturing an unknown variable in a closure no longer panics.
+* Fixes panic in interpolated strings with constant expressions.
 
 New features
 ------------

@@ -334,6 +334,8 @@ fn test_string_split() -> Result<(), Box<EvalAltResult>> {
 fn test_string_interpolated() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
 
+    assert_eq!(engine.eval::<String>("`${}`")?, "");
+
     assert_eq!(
         engine.eval::<String>(
             "
