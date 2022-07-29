@@ -30,7 +30,8 @@ fn test_mismatched_op_custom_type() -> Result<(), Box<EvalAltResult>> {
         .register_type_with_name::<TestStruct>("TestStruct")
         .register_fn("new_ts", TestStruct::new);
 
-    assert!(matches!(*engine.eval::<bool>("
+    assert!(matches!(*engine.eval::<bool>(
+        "
             let x = new_ts();
             let y = new_ts();
             x == y

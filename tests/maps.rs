@@ -132,43 +132,43 @@ fn test_map_index_types() -> Result<(), Box<EvalAltResult>> {
     engine.compile(r#"#{a:1, b:2, c:3}["a"]['x']"#)?;
 
     assert!(matches!(
-        *engine
+        engine
             .compile("#{a:1, b:2, c:3}['x']")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     assert!(matches!(
-        *engine
+        engine
             .compile("#{a:1, b:2, c:3}[1]")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     #[cfg(not(feature = "no_float"))]
     assert!(matches!(
-        *engine
+        engine
             .compile("#{a:1, b:2, c:3}[123.456]")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     assert!(matches!(
-        *engine
+        engine
             .compile("#{a:1, b:2, c:3}[()]")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     assert!(matches!(
-        *engine
+        engine
             .compile("#{a:1, b:2, c:3}[true && false]")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 

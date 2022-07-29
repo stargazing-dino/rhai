@@ -143,41 +143,41 @@ fn export_nested_by_prefix_test() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(&output_array[3].as_int().unwrap(), &42);
 
     assert!(matches!(*engine.eval::<FLOAT>(
-        r#"
-        let ex = 41.0;
-        let fx = Math::Advanced::foo_third_adders::add_float(ex, 1.0);
-        fx
-        "#).unwrap_err(),
+        "
+            let ex = 41.0;
+            let fx = Math::Advanced::foo_third_adders::add_float(ex, 1.0);
+            fx
+        ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(s, p)
             if s == "Math::Advanced::foo_third_adders::add_float (f64, f64)"
             && p == rhai::Position::new(3, 52)));
 
     assert!(matches!(*engine.eval::<FLOAT>(
-        r#"
-        let ex = 41;
-        let fx = Math::Advanced::foo_third_adders::add_int(ex, 1);
-        fx
-        "#).unwrap_err(),
+        "
+            let ex = 41;
+            let fx = Math::Advanced::foo_third_adders::add_int(ex, 1);
+            fx
+        ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(s, p)
             if s == "Math::Advanced::foo_third_adders::add_int (i64, i64)"
             && p == rhai::Position::new(3, 52)));
 
     assert!(matches!(*engine.eval::<FLOAT>(
-        r#"
-        let ex = 41;
-        let fx = Math::Advanced::bar_fourth_adders::add_int(ex, 1);
-        fx
-        "#).unwrap_err(),
+        "
+            let ex = 41;
+            let fx = Math::Advanced::bar_fourth_adders::add_int(ex, 1);
+            fx
+        ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(s, p)
             if s == "Math::Advanced::bar_fourth_adders::add_int (i64, i64)"
             && p == rhai::Position::new(3, 53)));
 
     assert!(matches!(*engine.eval::<FLOAT>(
-        r#"
-        let ex = 41.0;
-        let fx = Math::Advanced::bar_fourth_adders::add_float(ex, 1.0);
-        fx
-        "#).unwrap_err(),
+        "
+            let ex = 41.0;
+            let fx = Math::Advanced::bar_fourth_adders::add_float(ex, 1.0);
+            fx
+        ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(s, p)
             if s == "Math::Advanced::bar_fourth_adders::add_float (f64, f64)"
             && p == rhai::Position::new(3, 53)));

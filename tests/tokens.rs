@@ -7,10 +7,10 @@ fn test_tokens_disabled() {
     engine.disable_symbol("if"); // disable the 'if' keyword
 
     assert!(matches!(
-        *engine
+        engine
             .compile("let x = if true { 42 } else { 0 };")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::Reserved(err) if err == "if"
     ));
 
@@ -20,12 +20,12 @@ fn test_tokens_disabled() {
         *engine
             .compile("let x = 40 + 2; x += 1;")
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::UnknownOperator("+=".to_string())
     );
 
     assert!(matches!(
-        *engine.compile("let x = += 0;").expect_err("should error").0,
+        engine.compile("let x = += 0;").expect_err("should error").err_type(),
         ParseErrorType::Reserved(err) if err == "+="
     ));
 }

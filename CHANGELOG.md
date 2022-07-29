@@ -47,6 +47,7 @@ Enhancements
 * `Iterator<Item=T>` type for functions metadata is simplified to `Iterator<T>`.
 * `Scope::remove` is added to remove a variable from a `Scope`, returning its value.
 * The code base is cleaner by running it through Clippy.
+* `ParseError::err_type` and `ParseError::position` are added for convenience.
 
 
 Version 1.8.0

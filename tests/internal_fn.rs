@@ -110,7 +110,7 @@ fn test_internal_fn_overloading() -> Result<(), Box<EvalAltResult>> {
                 "
             )
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::FnDuplicatedDefinition("abc".to_string(), 1)
     );
 
@@ -125,8 +125,8 @@ fn test_internal_fn_params() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(
         *engine
             .compile("fn hello(x, x) { x }")
-            .expect_err("should be error")
-            .0,
+            .expect_err("should error")
+            .err_type(),
         ParseErrorType::FnDuplicatedParam("hello".to_string(), "x".to_string())
     );
 
@@ -236,7 +236,7 @@ fn test_internal_fn_bang() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_object"))]
     assert!(matches!(
-        *engine
+        engine
             .compile(
                 "
                     fn foo() { this += x; }
@@ -248,7 +248,7 @@ fn test_internal_fn_bang() -> Result<(), Box<EvalAltResult>> {
                 "
             )
             .expect_err("should error")
-            .0,
+            .err_type(),
         ParseErrorType::MalformedCapture(..)
     ));
 

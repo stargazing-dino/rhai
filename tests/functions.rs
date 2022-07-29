@@ -84,7 +84,8 @@ fn test_functions_global_module() -> Result<(), Box<EvalAltResult>> {
         42
     );
 
-    assert!(matches!(*engine.run("
+    assert!(matches!(*engine.run(
+        "
             fn foo() { global::ANSWER }
 
             {
@@ -104,7 +105,8 @@ fn test_functions_global_module() -> Result<(), Box<EvalAltResult>> {
     );
 
     #[cfg(not(feature = "no_closure"))]
-    assert!(matches!(*engine.run("
+    assert!(matches!(*engine.run(
+        "
             do_stuff(|| {
                 const LOCAL_VALUE = 42;
                 global::LOCAL_VALUE

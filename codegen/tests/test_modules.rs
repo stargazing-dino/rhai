@@ -323,21 +323,21 @@ fn export_by_prefix_test() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(&output_array[3].as_int().unwrap(), &42);
 
     assert!(matches!(*engine.eval::<FLOAT>(
-        r#"
-        let ex = 41.0;
-        let fx = Math::Advanced::foo_add_float2(ex, 1.0);
-        fx
-        "#).unwrap_err(),
+        "
+            let ex = 41.0;
+            let fx = Math::Advanced::foo_add_float2(ex, 1.0);
+            fx
+        ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(s, p)
             if s == "Math::Advanced::foo_add_float2 (f64, f64)"
             && p == rhai::Position::new(3, 34)));
 
     assert!(matches!(*engine.eval::<FLOAT>(
-        r#"
-        let ex = 41.0;
-        let fx = Math::Advanced::bar_m(ex, 1.0);
-        fx
-        "#).unwrap_err(),
+        "
+            let ex = 41.0;
+            let fx = Math::Advanced::bar_m(ex, 1.0);
+            fx
+        ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(s, p)
             if s == "Math::Advanced::bar_m (f64, f64)"
             && p == rhai::Position::new(3, 34)));
@@ -405,11 +405,11 @@ fn export_all_test() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(&output_array[3].as_int().unwrap(), &42);
 
     assert!(matches!(*engine.eval::<INT>(
-        r#"
-        let ex = 41;
-        let fx = Math::Advanced::foo_p(ex, 1);
-        fx
-        "#).unwrap_err(),
+        "
+            let ex = 41;
+            let fx = Math::Advanced::foo_p(ex, 1);
+            fx
+        ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(s, p)
             if s == "Math::Advanced::foo_p (i64, i64)"
             && p == rhai::Position::new(3, 34)));
