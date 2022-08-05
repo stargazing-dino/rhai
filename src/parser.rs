@@ -201,7 +201,7 @@ impl<'e> ParseState<'e> {
         } else {
             NonZeroUsize::new(index)
         };
-        
+
         (index, is_func)
     }
 
