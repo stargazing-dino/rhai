@@ -159,17 +159,34 @@ impl<'e> ParseState<'e> {
     /// The return value is the offset to be deducted from `ParseState::stack::len()`,
     /// i.e. the top element of [`ParseState`]'s variables stack is offset 1.
     ///
-    /// Return `None` when the variable name is not found in the `stack`.
+    /// # Return value: `(index, is_func)`
+    ///
+    /// * `index`: `None` when the variable name is not found in the `stack`,
+    ///            otherwise the index value.
+    ///
+    /// * `is_func`: `true` if the variable is actually the name of a function
+    ///              (in which case it will be converted into a function pointer).
     #[inline]
     #[must_use]
-    pub fn access_var(&mut self, name: &str, pos: Position) -> Option<NonZeroUsize> {
+    pub fn access_var(
+        &mut self,
+        name: &str,
+        lib: &FnLib,
+        pos: Position,
+    ) -> (Option<NonZeroUsize>, bool) {
         let _pos = pos;
 
         let (index, hit_barrier) = self.find_var(name);
 
+        #[cfg(not(feature = "no_function"))]
+        let is_func = lib.values().any(|f| f.name == name);
+
+        #[cfg(feature = "no_function")]
+        let is_func = false;
+
         #[cfg(not(feature = "no_closure"))]
         if self.allow_capture {
-            if index == 0 && !self.external_vars.iter().any(|v| v.as_str() == name) {
+            if !is_func && index == 0 && !self.external_vars.iter().any(|v| v.as_str() == name) {
                 self.external_vars.push(crate::ast::Ident {
                     name: name.into(),
                     pos: _pos,
@@ -179,11 +196,13 @@ impl<'e> ParseState<'e> {
             self.allow_capture = true;
         }
 
-        if hit_barrier {
+        let index = if hit_barrier {
             None
         } else {
             NonZeroUsize::new(index)
-        }
+        };
+        
+        (index, is_func)
     }
 
     /// Find a module by name in the [`ParseState`], searching in reverse.
@@ -1366,12 +1385,13 @@ impl Engine {
                 #[cfg(not(feature = "no_closure"))]
                 new_state.external_vars.iter().try_for_each(
                     |crate::ast::Ident { name, pos }| {
-                        let index = state.access_var(name, *pos);
+                        let (index, is_func) = state.access_var(name, lib, *pos);
 
                         if settings.options.contains(LangOptions::STRICT_VAR)
                             && !settings.is_closure_scope
                             && index.is_none()
                             && !state.scope.contains(name)
+                            && !is_func
                         {
                             // If the parent scope is not inside another capturing closure
                             // then we can conclude that the captured variable doesn't exist.
@@ -1512,11 +1532,12 @@ impl Engine {
                     }
                     // Normal variable access
                     _ => {
-                        let index = state.access_var(&s, settings.pos);
+                        let (index, is_func) = state.access_var(&s, lib, settings.pos);
 
                         if settings.options.contains(LangOptions::STRICT_VAR)
                             && index.is_none()
                             && !state.scope.contains(&s)
+                            && !is_func
                         {
                             return Err(
                                 PERR::VariableUndefined(s.to_string()).into_err(settings.pos)

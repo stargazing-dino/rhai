@@ -244,12 +244,12 @@ impl Engine {
         // We shouldn't do this for too many variants because, soon or later, the added comparisons
         // will cost more than the mis-predicted `match` branch.
         if let Stmt::Assignment(x, ..) = stmt {
+            let (op_info, BinaryExpr { lhs, rhs }) = &**x;
+
             #[cfg(not(feature = "unchecked"))]
             self.inc_operations(&mut global.num_operations, stmt.position())?;
 
-            let result = if x.1.lhs.is_variable_access(false) {
-                let (op_info, BinaryExpr { lhs, rhs }) = &**x;
-
+            let result = if let Expr::Variable(x, ..) = lhs {
                 let rhs_result = self
                     .eval_expr(scope, global, caches, lib, this_ptr, rhs, level)
                     .map(Dynamic::flatten);
@@ -261,7 +261,7 @@ impl Engine {
                     if let Ok(search_val) = search_result {
                         let (mut lhs_ptr, pos) = search_val;
 
-                        let var_name = lhs.get_variable_name(false).expect("`Expr::Variable`");
+                        let var_name = x.3.as_str();
 
                         #[cfg(not(feature = "no_closure"))]
                         // Also handle case where target is a `Dynamic` shared value

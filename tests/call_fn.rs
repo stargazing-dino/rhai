@@ -186,7 +186,7 @@ fn test_fn_ptr_raw() -> Result<(), Box<EvalAltResult>> {
                 fn foo(x) { this += x; }
 
                 let x = 41;
-                x.bar(Fn("foo"), 1);
+                x.bar(foo, 1);
                 x
             "#
         )?,

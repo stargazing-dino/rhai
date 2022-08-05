@@ -149,6 +149,18 @@ impl Engine {
             }
             _ if global.always_search_scope => (0, expr.start_position()),
             Expr::Variable(.., Some(i), pos) => (i.get() as usize, *pos),
+            // Scripted function with the same name
+            #[cfg(not(feature = "no_function"))]
+            Expr::Variable(v, None, pos)
+                if lib
+                    .iter()
+                    .flat_map(|&m| m.iter_script_fn())
+                    .any(|(_, _, f, ..)| f == v.3) =>
+            {
+                let val: Dynamic =
+                    crate::FnPtr::new_unchecked(v.3.as_str(), Default::default()).into();
+                return Ok((val.into(), *pos));
+            }
             Expr::Variable(v, None, pos) => (v.0.map_or(0, NonZeroUsize::get), *pos),
             _ => unreachable!("Expr::Variable expected but gets {:?}", expr),
         };

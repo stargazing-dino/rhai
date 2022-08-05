@@ -104,6 +104,11 @@ fn test_options_strict_var() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_function"))]
     {
+        assert_eq!(
+            engine
+                .eval_with_scope::<INT>(&mut scope, "fn foo(z) { y + z } let f = foo; f.call(x)")?,
+            42
+        );
         assert!(engine.compile("let f = |y| x * y;").is_err());
         #[cfg(not(feature = "no_closure"))]
         {
