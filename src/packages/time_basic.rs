@@ -26,6 +26,16 @@ def_package! {
 #[export_module]
 mod time_functions {
     /// Create a timestamp containing the current system time.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let now = timestamp();
+    ///
+    /// sleep(10.0);            // sleep for 10 seconds
+    ///
+    /// print(now.elapsed);     // prints 10.???
+    /// ```
     pub fn timestamp() -> Instant {
         Instant::now()
     }

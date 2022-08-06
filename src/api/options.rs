@@ -57,7 +57,6 @@ impl Engine {
     }
     /// Set whether `if`-expression is allowed.
     #[inline(always)]
-    #[must_use]
     pub fn set_allow_if_expression(&mut self, enable: bool) {
         self.options.set(LangOptions::IF_EXPR, enable);
     }

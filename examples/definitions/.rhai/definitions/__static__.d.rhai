@@ -5208,6 +5208,16 @@ fn tan(x: float) -> float;
 fn tanh(x: float) -> float;
 
 /// Create a timestamp containing the current system time.
+///
+/// # Example
+///
+/// ```rhai
+/// let now = timestamp();
+///
+/// sleep(10.0);            // sleep for 10 seconds
+///
+/// print(now.elapsed);     // prints 10.???
+/// ```
 fn timestamp() -> Instant;
 
 /// Convert the BLOB into an array of integers.

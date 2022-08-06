@@ -30,6 +30,10 @@ New features
 
 * An API is added to automatically generate definition files from a fully-configured `Engine`, for use with the Rhai Language Server.
 
+### Short-hand to function pointers
+
+* Using a script-defined function's name (in place of a variable) implicitly creates a function pointer to the function.
+
 Enhancements
 ------------
 

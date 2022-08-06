@@ -77,6 +77,20 @@ fn test_fn_ptr() -> Result<(), Box<EvalAltResult>> {
             if fn_name == "foo" && matches!(*err, EvalAltResult::ErrorUnboundThis(..))
     ));
 
+    #[cfg(not(feature = "no_function"))]
+    assert_eq!(
+        engine.eval::<INT>(
+            r#"
+                fn foo(x) { x + 1 }
+                let f = foo;
+                let g = 42;
+                g = foo;
+                call(f, 39) + call(g, 1)
+            "#
+        )?,
+        42
+    );
+
     Ok(())
 }
 
