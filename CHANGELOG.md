@@ -34,6 +34,10 @@ New features
 
 * Using a script-defined function's name (in place of a variable) implicitly creates a function pointer to the function.
 
+### Top-level functions
+
+* Crate-level functions `rhai::eval`, `rhai::run`, `rhai::eval_file`, `rhai::run_file` are added as convenient wrappers.
+
 Enhancements
 ------------
 
