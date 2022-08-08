@@ -6,7 +6,7 @@ use crate::Engine;
 /// # Example
 ///
 /// ```
-/// use rhai::{Engine, RhaiCustomType};
+/// use rhai::{Engine, CustomType};
 ///
 /// #[derive(Debug, Clone, Eq, PartialEq)]
 /// struct TestStruct {
@@ -22,7 +22,7 @@ use crate::Engine;
 ///     }
 /// }
 ///
-/// impl RhaiCustomType for TestStruct {
+/// impl CustomType for TestStruct {
 ///     fn build(engine: &mut Engine) {
 ///         engine
 ///             .register_type::<Self>()
