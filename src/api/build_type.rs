@@ -46,7 +46,7 @@ use crate::Engine;
 /// # Ok(())
 /// # }
 /// ```
-pub trait RhaiCustomType {
+pub trait CustomType {
     /// Builds the custom type for use with the [`Engine`].
     /// i.e. register the type, getters, setters, methods, etc...
     fn build(engine: &mut Engine);
@@ -59,7 +59,7 @@ impl Engine {
     /// See [`RhaiCustomType`].
     pub fn build_type<T>(&mut self) -> &mut Self
     where
-        T: RhaiCustomType,
+        T: CustomType,
     {
         T::build(self);
         self
