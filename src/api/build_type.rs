@@ -56,7 +56,7 @@ impl Engine {
     /// Build a custom type for use with the [`Engine`].
     /// i.e. register the type, getters, setters, methods, etc...
     ///
-    /// See [`RhaiCustomType`].
+    /// See [`CustomType`].
     pub fn build_type<T>(&mut self) -> &mut Self
     where
         T: CustomType,
