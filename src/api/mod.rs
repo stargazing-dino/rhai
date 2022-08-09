@@ -28,6 +28,8 @@ pub mod custom_syntax;
 
 pub mod deprecated;
 
+pub mod build_type;
+
 #[cfg(feature = "metadata")]
 pub mod definitions;
 
