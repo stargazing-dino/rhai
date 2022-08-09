@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// Trait to build a custom type for use with the [`Engine`].
-/// i.e. register the type, getters, setters, methods, etc...
+/// i.e. register the type and its getters, setters, methods, etc...
 ///
 /// # Example
 ///
@@ -73,7 +73,7 @@ pub trait CustomType: Variant + Clone {
 
 impl Engine {
     /// Build a custom type for use with the [`Engine`].
-    /// i.e. register the type, getters, setters, methods, etc...
+    /// i.e. register the type and its getters, setters, methods, etc...
     ///
     /// See [`CustomType`].
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
@@ -86,7 +86,14 @@ impl Engine {
     }
 }
 
-#[allow(missing_docs)] // TODO: add docs
+/// Builder to build a custom type i.e. register this type and its getters, setters, methods, etc...
+///
+/// The type is automatically registered when this builder is dropped.
+///
+/// ## Pretty name
+/// By default the type is registered with [`Engine::register_type`] i.e. without a pretty name.
+///
+/// To define a pretty name call `.with_name`, in this case [`Engine::register_type_with_name`] will be used.
 pub struct TypeBuilder<'a, T>
 where
     T: Variant + Clone,
@@ -109,17 +116,18 @@ where
     }
 }
 
-#[allow(missing_docs)] // TODO: add docs
 impl<'a, T> TypeBuilder<'a, T>
 where
     T: Variant + Clone,
 {
+    /// Sets a pretty-print name for the `type_of` function.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_name(&mut self, name: &'static str) -> &mut Self {
         self.name = Some(name);
         self
     }
 
+    /// Register a custom function.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_fn<N, A, F>(&mut self, name: N, method: F) -> &mut Self
     where
@@ -130,6 +138,7 @@ where
         self
     }
 
+    /// Register a custom fallible function.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_result_fn<N, A, F, R>(&mut self, name: N, method: F) -> &mut Self
     where
@@ -140,6 +149,11 @@ where
         self
     }
 
+    /// Register a getter function.
+    ///
+    /// The function signature must start with `&mut self` and not `&self`.
+    ///
+    /// Not available under `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_get<V: Variant + Clone>(
         &mut self,
@@ -150,6 +164,11 @@ where
         self
     }
 
+    /// Register a fallible getter function.
+    ///
+    /// The function signature must start with `&mut self` and not `&self`.
+    ///
+    /// Not available under `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_get_result<V: Variant + Clone>(
         &mut self,
@@ -160,6 +179,9 @@ where
         self
     }
 
+    /// Register a setter function.
+    ///
+    /// Not available under `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_set<V: Variant + Clone>(
         &mut self,
@@ -170,6 +192,9 @@ where
         self
     }
 
+    /// Register a fallible setter function.
+    ///
+    /// Not available under `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_set_result<V: Variant + Clone>(
         &mut self,
@@ -180,6 +205,11 @@ where
         self
     }
 
+    /// Short-hand for registering both getter and setter functions.
+    ///
+    /// All function signatures must start with `&mut self` and not `&self`.
+    ///
+    /// Not available under `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_get_set<V: Variant + Clone>(
         &mut self,
@@ -191,6 +221,11 @@ where
         self
     }
 
+    /// Register an index getter.
+    ///
+    /// The function signature must start with `&mut self` and not `&self`.
+    ///
+    /// Not available under both `no_index` and `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_indexer_get<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
@@ -200,6 +235,11 @@ where
         self
     }
 
+    /// Register an index getter.
+    ///
+    /// The function signature must start with `&mut self` and not `&self`.
+    ///
+    /// Not available under both `no_index` and `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_indexer_get_result<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
@@ -209,6 +249,9 @@ where
         self
     }
 
+    /// Register an index setter.
+    ///
+    /// Not available under both `no_index` and `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_indexer_set<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
@@ -218,6 +261,9 @@ where
         self
     }
 
+    /// Register an index setter.
+    ///
+    /// Not available under both `no_index` and `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_indexer_set_result<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
@@ -227,6 +273,9 @@ where
         self
     }
 
+    /// Short-hand for registering both index getter and setter functions.
+    ///
+    /// Not available under both `no_index` and `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_indexer_get_set<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
