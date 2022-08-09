@@ -38,8 +38,7 @@ use crate::{
 ///         builder
 ///             .with_name("TestStruct")
 ///             .with_fn("new_ts", Self::new)
-///             .with_fn("update", Self::update)
-///             .with_get_set("value", Self::get_value, Self::set_value);
+///             .with_fn("update", Self::update);
 ///     }
 /// }
 ///
@@ -57,11 +56,6 @@ use crate::{
 ///     TestStruct { field: 42 }
 /// );
 ///
-/// # #[cfg(not(feature = "no_object"))]
-/// assert_eq!(
-///     engine.eval::<TestStruct>("let x = new_ts(); x.value = 5 + x.value; x")?,
-///     TestStruct { field: 6 }
-/// );
 /// # Ok(())
 /// # }
 /// ```
