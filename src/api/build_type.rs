@@ -255,7 +255,7 @@ where
         self
     }
 
-    /// Register an index getter.
+    /// Register an fallible index getter.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
     ///
@@ -283,7 +283,7 @@ where
         self
     }
 
-    /// Register an index setter.
+    /// Register an fallible index setter.
     ///
     /// Not available under both `no_index` and `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
