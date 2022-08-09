@@ -76,6 +76,7 @@ impl Engine {
     /// i.e. register the type, getters, setters, methods, etc...
     ///
     /// See [`CustomType`].
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn build_type<T>(&mut self) -> &mut Self
     where
         T: CustomType,
@@ -108,11 +109,13 @@ where
         }
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_name(&mut self, name: &'static str) -> &mut Self {
         self.name = Some(name);
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_fn<N, A, F>(&mut self, name: N, method: F) -> &mut Self
     where
         N: AsRef<str> + Into<Identifier>,
@@ -122,6 +125,7 @@ where
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_result_fn<N, A, F, R>(&mut self, name: N, method: F) -> &mut Self
     where
         N: AsRef<str> + Into<Identifier>,
@@ -131,6 +135,7 @@ where
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_get<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -140,6 +145,7 @@ where
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_get_result<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -149,6 +155,7 @@ where
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_set<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -158,6 +165,7 @@ where
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_set_result<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -167,6 +175,7 @@ where
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_get_set<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -177,6 +186,7 @@ where
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_indexer_get<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         get_fn: impl Fn(&mut T, X) -> V + SendSync + 'static,
@@ -185,6 +195,7 @@ where
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_indexer_get_result<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         get_fn: impl Fn(&mut T, X) -> RhaiResultOf<V> + SendSync + 'static,
@@ -193,6 +204,7 @@ where
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_indexer_set<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         set_fn: impl Fn(&mut T, X, V) + SendSync + 'static,
@@ -201,6 +213,7 @@ where
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_indexer_set_result<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         set_fn: impl Fn(&mut T, X, V) -> RhaiResultOf<()> + SendSync + 'static,
@@ -209,6 +222,7 @@ where
         self
     }
 
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_indexer_get_set<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         get_fn: impl Fn(&mut T, X) -> V + SendSync + 'static,
