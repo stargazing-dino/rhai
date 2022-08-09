@@ -96,7 +96,6 @@ where
     _marker: PhantomData<T>,
 }
 
-#[allow(missing_docs)] // TODO: add docs
 impl<'a, T> TypeBuilder<'a, T>
 where
     T: Variant + Clone,
@@ -108,7 +107,13 @@ where
             _marker: PhantomData::default(),
         }
     }
+}
 
+#[allow(missing_docs)] // TODO: add docs
+impl<'a, T> TypeBuilder<'a, T>
+where
+    T: Variant + Clone,
+{
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     pub fn with_name(&mut self, name: &'static str) -> &mut Self {
         self.name = Some(name);
