@@ -148,7 +148,13 @@ where
         self.engine.register_result_fn(name, method);
         self
     }
+}
 
+#[cfg(not(feature = "no_object"))]
+impl<'a, T> TypeBuilder<'a, T>
+where
+    T: Variant + Clone,
+{
     /// Register a getter function.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
@@ -220,7 +226,13 @@ where
         self.engine.register_get_set(name, get_fn, set_fn);
         self
     }
+}
 
+#[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+impl<'a, T> TypeBuilder<'a, T>
+where
+    T: Variant + Clone,
+{
     /// Register an index getter.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
