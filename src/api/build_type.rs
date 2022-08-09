@@ -77,6 +77,7 @@ impl Engine {
     ///
     /// See [`CustomType`].
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn build_type<T>(&mut self) -> &mut Self
     where
         T: CustomType,
@@ -107,6 +108,7 @@ impl<'a, T> TypeBuilder<'a, T>
 where
     T: Variant + Clone,
 {
+    #[inline]
     fn new(engine: &'a mut Engine) -> Self {
         Self {
             engine,
@@ -161,6 +163,7 @@ where
     ///
     /// Not available under `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_get<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -176,6 +179,7 @@ where
     ///
     /// Not available under `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_get_result<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -189,6 +193,7 @@ where
     ///
     /// Not available under `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_set<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -202,6 +207,7 @@ where
     ///
     /// Not available under `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_set_result<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -217,6 +223,7 @@ where
     ///
     /// Not available under `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_get_set<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -239,6 +246,7 @@ where
     ///
     /// Not available under both `no_index` and `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_indexer_get<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         get_fn: impl Fn(&mut T, X) -> V + SendSync + 'static,
@@ -253,6 +261,7 @@ where
     ///
     /// Not available under both `no_index` and `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_indexer_get_result<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         get_fn: impl Fn(&mut T, X) -> RhaiResultOf<V> + SendSync + 'static,
@@ -265,6 +274,7 @@ where
     ///
     /// Not available under both `no_index` and `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_indexer_set<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         set_fn: impl Fn(&mut T, X, V) + SendSync + 'static,
@@ -277,6 +287,7 @@ where
     ///
     /// Not available under both `no_index` and `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_indexer_set_result<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         set_fn: impl Fn(&mut T, X, V) -> RhaiResultOf<()> + SendSync + 'static,
@@ -289,6 +300,7 @@ where
     ///
     /// Not available under both `no_index` and `no_object`.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_indexer_get_set<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         get_fn: impl Fn(&mut T, X) -> V + SendSync + 'static,
@@ -303,6 +315,7 @@ impl<'a, T> Drop for TypeBuilder<'a, T>
 where
     T: Variant + Clone,
 {
+    #[inline]
     fn drop(&mut self) {
         if let Some(name) = self.name {
             self.engine.register_type_with_name::<T>(name);
