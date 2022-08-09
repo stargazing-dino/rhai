@@ -100,7 +100,7 @@ impl<'a, T> TypeBuilder<'a, T>
 where
     T: Variant + Clone,
 {
-    pub(crate) fn new(engine: &'a mut Engine) -> Self {
+    fn new(engine: &'a mut Engine) -> Self {
         Self {
             engine,
             name: None,
