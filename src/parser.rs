@@ -72,6 +72,9 @@ pub struct ParseState<'e> {
     /// Encapsulates a local stack with imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
     pub imports: StaticVec<Identifier>,
+    /// List of globally-imported [module][crate::Module] names.
+    #[cfg(not(feature = "no_module"))]
+    pub global_imports: StaticVec<Identifier>,
     /// Maximum levels of expression nesting (0 for unlimited).
     #[cfg(not(feature = "unchecked"))]
     pub max_expr_depth: usize,
@@ -91,7 +94,8 @@ impl fmt::Debug for ParseState<'_> {
         f.field("external_vars", &self.external_vars)
             .field("allow_capture", &self.allow_capture);
         #[cfg(not(feature = "no_module"))]
-        f.field("imports", &self.imports);
+        f.field("imports", &self.imports)
+            .field("global_imports", &self.global_imports);
         #[cfg(not(feature = "unchecked"))]
         f.field("max_expr_depth", &self.max_expr_depth);
         f.finish()
@@ -117,6 +121,8 @@ impl<'e> ParseState<'e> {
             block_stack_len: 0,
             #[cfg(not(feature = "no_module"))]
             imports: StaticVec::new_const(),
+            #[cfg(not(feature = "no_module"))]
+            global_imports: StaticVec::new_const(),
             #[cfg(not(feature = "unchecked"))]
             max_expr_depth: engine.max_expr_depth(),
         }
@@ -557,6 +563,7 @@ impl Engine {
                     if settings.options.contains(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
+                        && !state.global_imports.iter().any(|m| m == root)
                         && !self.global_sub_modules.contains_key(root)
                     {
                         return Err(
@@ -624,6 +631,7 @@ impl Engine {
                         if settings.options.contains(LangOptions::STRICT_VAR)
                             && index.is_none()
                             && !is_global
+                            && !state.global_imports.iter().any(|m| m == root)
                             && !self.global_sub_modules.contains_key(root)
                         {
                             return Err(PERR::ModuleUndefined(root.to_string())
@@ -1351,7 +1359,10 @@ impl Engine {
                     ParseState::new(self, state.scope, state.tokenizer_control.clone());
 
                 #[cfg(not(feature = "no_module"))]
-                new_state.imports.clone_from(&state.imports);
+                {
+                    new_state.imports.clone_from(&state.imports);
+                    new_state.global_imports.clone_from(&state.global_imports);
+                }
 
                 #[cfg(not(feature = "unchecked"))]
                 {
@@ -1789,6 +1800,7 @@ impl Engine {
                     if settings.options.contains(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
+                        && !state.global_imports.iter().any(|m| m == root)
                         && !self.global_sub_modules.contains_key(root)
                     {
                         return Err(
@@ -3204,7 +3216,17 @@ impl Engine {
                             ParseState::new(self, state.scope, state.tokenizer_control.clone());
 
                         #[cfg(not(feature = "no_module"))]
-                        new_state.imports.clone_from(&state.imports);
+                        {
+                            // Do not allow storing an index to a globally-imported module
+                            // just in case the function is separated from this `AST`.
+                            //
+                            // Keep them in `global_imports` instead so that strict variables
+                            // mode will not complain.
+                            new_state.global_imports.clone_from(&state.global_imports);
+                            new_state
+                                .global_imports
+                                .extend(state.imports.iter().cloned());
+                        }
 
                         #[cfg(not(feature = "unchecked"))]
                         {
