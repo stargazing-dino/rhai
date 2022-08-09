@@ -1360,8 +1360,15 @@ impl Engine {
 
                 #[cfg(not(feature = "no_module"))]
                 {
-                    new_state.imports.clone_from(&state.imports);
+                    // Do not allow storing an index to a globally-imported module
+                    // just in case the function is separated from this `AST`.
+                    //
+                    // Keep them in `global_imports` instead so that strict variables
+                    // mode will not complain.
                     new_state.global_imports.clone_from(&state.global_imports);
+                    new_state
+                        .global_imports
+                        .extend(state.imports.iter().cloned());
                 }
 
                 #[cfg(not(feature = "unchecked"))]
