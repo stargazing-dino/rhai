@@ -166,15 +166,12 @@ type ExclusiveRange = std::ops::Range<INT>;
 /// An inclusive integer range.
 type InclusiveRange = std::ops::RangeInclusive<INT>;
 
+#[allow(deprecated)]
+pub use api::build_type::{CustomType, TypeBuilder};
 #[cfg(not(feature = "no_std"))]
 #[cfg(not(target_family = "wasm"))]
 pub use api::files::{eval_file, run_file};
-pub use api::{
-    build_type::{CustomType, TypeBuilder},
-    eval::eval,
-    events::VarDefInfo,
-    run::run,
-};
+pub use api::{eval::eval, events::VarDefInfo, run::run};
 pub use ast::{FnAccess, AST};
 pub use engine::{Engine, OP_CONTAINS, OP_EQUALS};
 pub use eval::EvalContext;

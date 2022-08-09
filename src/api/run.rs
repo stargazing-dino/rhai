@@ -17,7 +17,7 @@ impl Engine {
     ///
     /// let engine = Engine::new();
     ///
-    /// engine.run::<i64>("print(40 + 2);")?;
+    /// engine.run("print(40 + 2);")?;
     /// # Ok(())
     /// # }
     /// ```
@@ -49,7 +49,7 @@ impl Engine {
     /// engine.run_with_scope(&mut scope, "x += 2; print(x);")?;
     ///
     /// // The variable in the scope is modified
-    /// assert_eq!(scope.get_value::<i64>("x").expect("variable x should exist"), 44);
+    /// assert_eq!(scope.get_value::<i64>("x").expect("variable x should exist"), 42);
     /// # Ok(())
     /// # }
     /// ```
@@ -105,7 +105,7 @@ impl Engine {
     /// engine.run_ast_with_scope(&mut scope, &ast)?;
     ///
     /// // The variable in the scope is modified
-    /// assert_eq!(scope.get_value::<i64>("x").expect("variable x should exist"), 44);
+    /// assert_eq!(scope.get_value::<i64>("x").expect("variable x should exist"), 42);
     /// # Ok(())
     /// # }
     /// ```
