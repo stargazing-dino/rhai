@@ -1,12 +1,16 @@
-use core::marker::PhantomData;
+//! Trait to build a custom type for use with [`Engine`].
+#![allow(deprecated)]
 
 use crate::{
     func::SendSync, types::dynamic::Variant, Engine, Identifier, RegisterNativeFunction,
     RhaiResultOf,
 };
+use std::marker::PhantomData;
+#[cfg(feature = "no_std")]
+use std::prelude::v1::*;
 
-/// Trait to build a custom type for use with the [`Engine`].
-/// i.e. register the type and its getters, setters, methods, etc...
+/// Trait to build a custom type for use with an [`Engine`]
+/// (i.e. register the type and its getters, setters, methods, etc.).
 ///
 /// # Example
 ///
@@ -58,49 +62,44 @@ use crate::{
 /// # Ok(())
 /// # }
 /// ```
+#[deprecated = "This trait is NOT deprecated, but it is considered volatile and may change in the future."]
 pub trait CustomType: Variant + Clone {
     /// Builds the custom type for use with the [`Engine`].
-    /// i.e. register the type, getters, setters, methods, etc...
+    ///
+    /// Methods, property getters/setters, indexers etc. should be registered in this function.
     fn build(builder: TypeBuilder<Self>);
 }
 
 impl Engine {
     /// Build a custom type for use with the [`Engine`].
-    /// i.e. register the type and its getters, setters, methods, etc...
     ///
-    /// See [`CustomType`].
+    /// The custom type must implement [`CustomType`].
     #[inline]
-    pub fn build_type<T>(&mut self) -> &mut Self
-    where
-        T: CustomType,
-    {
+    pub fn build_type<T: CustomType>(&mut self) -> &mut Self {
         T::build(TypeBuilder::new(self));
         self
     }
 }
 
-/// Builder to build a custom type i.e. register this type and its getters, setters, methods, etc...
+/// Builder to build a custom type for use with an [`Engine`].
 ///
 /// The type is automatically registered when this builder is dropped.
 ///
 /// ## Pretty name
-/// By default the type is registered with [`Engine::register_type`] i.e. without a pretty name.
 ///
-/// To define a pretty name call `.with_name`, in this case [`Engine::register_type_with_name`] will be used.
-pub struct TypeBuilder<'a, T>
-where
-    T: Variant + Clone,
-{
+/// By default the type is registered with [`Engine::register_type`] (i.e. without a pretty name).
+///
+/// To define a pretty name, call [`with_name`][`TypeBuilder::with_name`],
+/// to use [`Engine::register_type_with_name`] instead.
+#[deprecated = "This type is NOT deprecated, but it is considered volatile and may change in the future."]
+pub struct TypeBuilder<'a, T: Variant + Clone> {
     engine: &'a mut Engine,
     name: Option<&'static str>,
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> TypeBuilder<'a, T>
-where
-    T: Variant + Clone,
-{
-    #[inline]
+impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
+    #[inline(always)]
     fn new(engine: &'a mut Engine) -> Self {
         Self {
             engine,
@@ -110,21 +109,16 @@ where
     }
 }
 
-impl<'a, T> TypeBuilder<'a, T>
-where
-    T: Variant + Clone,
-{
+impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// Sets a pretty-print name for the `type_of` function.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_name(&mut self, name: &'static str) -> &mut Self {
         self.name = Some(name);
         self
     }
 
     /// Register a custom function.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_fn<N, A, F>(&mut self, name: N, method: F) -> &mut Self
     where
         N: AsRef<str> + Into<Identifier>,
@@ -135,8 +129,7 @@ where
     }
 
     /// Register a custom fallible function.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_result_fn<N, A, F, R>(&mut self, name: N, method: F) -> &mut Self
     where
         N: AsRef<str> + Into<Identifier>,
@@ -148,17 +141,13 @@ where
 }
 
 #[cfg(not(feature = "no_object"))]
-impl<'a, T> TypeBuilder<'a, T>
-where
-    T: Variant + Clone,
-{
+impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// Register a getter function.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
     ///
     /// Not available under `no_object`.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_get<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -173,8 +162,7 @@ where
     /// The function signature must start with `&mut self` and not `&self`.
     ///
     /// Not available under `no_object`.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_get_result<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -187,8 +175,7 @@ where
     /// Register a setter function.
     ///
     /// Not available under `no_object`.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_set<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -201,8 +188,7 @@ where
     /// Register a fallible setter function.
     ///
     /// Not available under `no_object`.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_set_result<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -217,8 +203,7 @@ where
     /// All function signatures must start with `&mut self` and not `&self`.
     ///
     /// Not available under `no_object`.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_get_set<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
@@ -231,17 +216,13 @@ where
 }
 
 #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-impl<'a, T> TypeBuilder<'a, T>
-where
-    T: Variant + Clone,
-{
+impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// Register an index getter.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
     ///
     /// Not available under both `no_index` and `no_object`.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_indexer_get<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         get_fn: impl Fn(&mut T, X) -> V + SendSync + 'static,
@@ -255,8 +236,7 @@ where
     /// The function signature must start with `&mut self` and not `&self`.
     ///
     /// Not available under both `no_index` and `no_object`.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_indexer_get_result<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         get_fn: impl Fn(&mut T, X) -> RhaiResultOf<V> + SendSync + 'static,
@@ -268,8 +248,7 @@ where
     /// Register an index setter.
     ///
     /// Not available under both `no_index` and `no_object`.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_indexer_set<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         set_fn: impl Fn(&mut T, X, V) + SendSync + 'static,
@@ -281,8 +260,7 @@ where
     /// Register an fallible index setter.
     ///
     /// Not available under both `no_index` and `no_object`.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_indexer_set_result<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         set_fn: impl Fn(&mut T, X, V) -> RhaiResultOf<()> + SendSync + 'static,
@@ -294,8 +272,7 @@ where
     /// Short-hand for registering both index getter and setter functions.
     ///
     /// Not available under both `no_index` and `no_object`.
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
-    #[inline]
+    #[inline(always)]
     pub fn with_indexer_get_set<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
         get_fn: impl Fn(&mut T, X) -> V + SendSync + 'static,
@@ -306,10 +283,7 @@ where
     }
 }
 
-impl<'a, T> Drop for TypeBuilder<'a, T>
-where
-    T: Variant + Clone,
-{
+impl<'a, T: Variant + Clone> Drop for TypeBuilder<'a, T> {
     #[inline]
     fn drop(&mut self) {
         if let Some(name) = self.name {
