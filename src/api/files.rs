@@ -102,7 +102,7 @@ impl Engine {
     pub fn compile_file_with_scope(&self, scope: &Scope, path: PathBuf) -> RhaiResultOf<AST> {
         Self::read_file(path).and_then(|contents| Ok(self.compile_with_scope(scope, &contents)?))
     }
-    /// Evaluate a script file.
+    /// Evaluate a script file, returning the result value or an error.
     ///
     /// Not available under `no_std` or `WASM`.
     ///
@@ -123,7 +123,7 @@ impl Engine {
     pub fn eval_file<T: Variant + Clone>(&self, path: PathBuf) -> RhaiResultOf<T> {
         Self::read_file(path).and_then(|contents| self.eval::<T>(&contents))
     }
-    /// Evaluate a script file with own scope.
+    /// Evaluate a script file with own scope, returning the result value or an error.
     ///
     /// Not available under `no_std` or `WASM`.
     ///
@@ -159,14 +159,28 @@ impl Engine {
     ) -> RhaiResultOf<T> {
         Self::read_file(path).and_then(|contents| self.eval_with_scope(scope, &contents))
     }
-    /// Evaluate a file, returning any error (if any).
+    /// Evaluate a file.
     ///
     /// Not available under `no_std` or `WASM`.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
+    /// use rhai::Engine;
+    ///
+    /// let engine = Engine::new();
+    ///
+    /// // Notice that a PathBuf is required which can easily be constructed from a string.
+    /// engine.run_file("script.rhai".into())?;
+    /// # Ok(())
+    /// # }
+    /// ```
     #[inline]
     pub fn run_file(&self, path: PathBuf) -> RhaiResultOf<()> {
         Self::read_file(path).and_then(|contents| self.run(&contents))
     }
-    /// Evaluate a file with own scope, returning any error (if any).
+    /// Evaluate a file with own scope.
     ///
     /// Not available under `no_std` or `WASM`.
     ///
@@ -176,8 +190,66 @@ impl Engine {
     /// the scope are propagated throughout the script _including_ functions.
     ///
     /// This allows functions to be optimized based on dynamic global constants.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
+    /// use rhai::{Engine, Scope};
+    ///
+    /// let engine = Engine::new();
+    ///
+    /// // Create initialized scope
+    /// let mut scope = Scope::new();
+    /// scope.push("x", 42_i64);
+    ///
+    /// // Notice that a PathBuf is required which can easily be constructed from a string.
+    /// engine.run_file_with_scope(&mut scope, "script.rhai".into())?;
+    /// # Ok(())
+    /// # }
+    /// ```
     #[inline]
     pub fn run_file_with_scope(&self, scope: &mut Scope, path: PathBuf) -> RhaiResultOf<()> {
         Self::read_file(path).and_then(|contents| self.run_with_scope(scope, &contents))
     }
+}
+
+/// Evaluate a script file.
+///
+/// Not available under `no_std` or `WASM`.
+///
+/// # Example
+///
+/// ```no_run
+/// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
+/// // Notice that a PathBuf is required which can easily be constructed from a string.
+/// let result: i64 = rhai::eval_file("script.rhai".into())?;
+/// # Ok(())
+/// # }
+/// ```
+#[inline]
+pub fn eval_file<T: Variant + Clone>(path: PathBuf) -> RhaiResultOf<T> {
+    Engine::read_file(path).and_then(|contents| Engine::new().eval::<T>(&contents))
+}
+
+/// Evaluate a file.
+///
+/// Not available under `no_std` or `WASM`.
+///
+/// # Example
+///
+/// ```no_run
+/// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
+/// use rhai::Engine;
+///
+/// let engine = Engine::new();
+///
+/// // Notice that a PathBuf is required which can easily be constructed from a string.
+/// rhai::run_file("script.rhai".into())?;
+/// # Ok(())
+/// # }
+/// ```
+#[inline]
+pub fn run_file(path: PathBuf) -> RhaiResultOf<()> {
+    Engine::read_file(path).and_then(|contents| Engine::new().run(&contents))
 }

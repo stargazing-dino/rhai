@@ -11,7 +11,7 @@ use std::any::type_name;
 use std::prelude::v1::*;
 
 impl Engine {
-    /// Evaluate a string.
+    /// Evaluate a string as a script, returning the result value or an error.
     ///
     /// # Example
     ///
@@ -29,7 +29,7 @@ impl Engine {
     pub fn eval<T: Variant + Clone>(&self, script: &str) -> RhaiResultOf<T> {
         self.eval_with_scope(&mut Scope::new(), script)
     }
-    /// Evaluate a string with own scope.
+    /// Evaluate a string as a script with own scope, returning the result value or an error.
     ///
     /// ## Constants Propagation
     ///
@@ -71,7 +71,7 @@ impl Engine {
         )?;
         self.eval_ast_with_scope(scope, &ast)
     }
-    /// Evaluate a string containing an expression.
+    /// Evaluate a string containing an expression, returning the result value or an error.
     ///
     /// # Example
     ///
@@ -89,7 +89,7 @@ impl Engine {
     pub fn eval_expression<T: Variant + Clone>(&self, script: &str) -> RhaiResultOf<T> {
         self.eval_expression_with_scope(&mut Scope::new(), script)
     }
-    /// Evaluate a string containing an expression with own scope.
+    /// Evaluate a string containing an expression with own scope, returning the result value or an error.
     ///
     /// # Example
     ///
@@ -130,7 +130,7 @@ impl Engine {
 
         self.eval_ast_with_scope(scope, &ast)
     }
-    /// Evaluate an [`AST`].
+    /// Evaluate an [`AST`], returning the result value or an error.
     ///
     /// # Example
     ///
@@ -152,7 +152,7 @@ impl Engine {
     pub fn eval_ast<T: Variant + Clone>(&self, ast: &AST) -> RhaiResultOf<T> {
         self.eval_ast_with_scope(&mut Scope::new(), ast)
     }
-    /// Evaluate an [`AST`] with own scope.
+    /// Evaluate an [`AST`] with own scope, returning the result value or an error.
     ///
     /// # Example
     ///
@@ -161,9 +161,6 @@ impl Engine {
     /// use rhai::{Engine, Scope};
     ///
     /// let engine = Engine::new();
-    ///
-    /// // Compile a script to an AST and store it for later evaluation
-    /// let ast = engine.compile("x + 2")?;
     ///
     /// // Create initialized scope
     /// let mut scope = Scope::new();
@@ -209,7 +206,7 @@ impl Engine {
             ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
         })
     }
-    /// Evaluate an [`AST`] with own scope.
+    /// Evaluate an [`AST`] with own scope, returning the result value or an error.
     #[inline]
     pub(crate) fn eval_ast_with_scope_raw<'a>(
         &self,
@@ -273,4 +270,21 @@ impl Engine {
     ) -> RhaiResult {
         self.eval_global_statements(scope, global, caches, statements, lib, level)
     }
+}
+
+/// Evaluate a string as a script, returning the result value or an error.
+///
+/// # Example
+///
+/// ```
+/// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
+/// let result: i64 = rhai::eval("40 + 2")?;
+///
+/// assert_eq!(result, 42);
+/// # Ok(())
+/// # }
+/// ```
+#[inline(always)]
+pub fn eval<T: Variant + Clone>(script: &str) -> RhaiResultOf<T> {
+    Engine::new().eval(script)
 }
