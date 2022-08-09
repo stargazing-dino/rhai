@@ -124,6 +124,7 @@ where
 {
     /// Sets a pretty-print name for the `type_of` function.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_name(&mut self, name: &'static str) -> &mut Self {
         self.name = Some(name);
         self
@@ -131,6 +132,7 @@ where
 
     /// Register a custom function.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_fn<N, A, F>(&mut self, name: N, method: F) -> &mut Self
     where
         N: AsRef<str> + Into<Identifier>,
@@ -142,6 +144,7 @@ where
 
     /// Register a custom fallible function.
     #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
+    #[inline]
     pub fn with_result_fn<N, A, F, R>(&mut self, name: N, method: F) -> &mut Self
     where
         N: AsRef<str> + Into<Identifier>,
