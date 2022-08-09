@@ -76,7 +76,6 @@ impl Engine {
     /// i.e. register the type and its getters, setters, methods, etc...
     ///
     /// See [`CustomType`].
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     #[inline]
     pub fn build_type<T>(&mut self) -> &mut Self
     where
