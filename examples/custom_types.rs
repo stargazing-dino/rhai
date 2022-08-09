@@ -32,6 +32,15 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         }
     }
 
+    impl IntoIterator for TestStruct {
+        type Item = i64;
+        type IntoIter = std::vec::IntoIter<Self::Item>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            vec![self.x - 1, self.x, self.x + 1].into_iter()
+        }
+    }
+
     impl CustomType for TestStruct {
         fn build(mut builder: TypeBuilder<Self>) {
             #[allow(deprecated)] // The TypeBuilder api is volatile.
@@ -40,6 +49,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
                 .with_fn("new_ts", Self::new)
                 .with_fn("update", Self::update)
                 .with_fn("calc", Self::calculate)
+                .with_iterator()
                 .with_get_set("x", Self::get_x, Self::set_x);
         }
     }
@@ -63,8 +73,16 @@ fn main() -> Result<(), Box<EvalAltResult>> {
     let result = engine.eval::<i64>(
         "
             let x = new_ts();
+
             x.x = 42;
+
+            for n in x {
+                x.x += n;
+                print(`n = ${n}, total = ${x.x}`);
+            }
+
             x.update();
+
             x.calc(x.x)
         ",
     )?;
