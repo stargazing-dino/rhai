@@ -108,10 +108,6 @@ where
         }
     }
 
-    pub fn build(self) {
-        /* empty */
-    }
-
     pub fn with_name(&mut self, name: &'static str) -> &mut Self {
         self.name = Some(name);
         self
