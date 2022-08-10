@@ -19,7 +19,7 @@ categories = ["no-std", "embedded", "wasm", "parser-implementations"]
 
 [dependencies]
 smallvec = { version = "1.7", default-features = false, features = ["union", "const_new" ] }
-ahash = { version = "0.7", default-features = false }
+ahash = { version = "0.8", default-features = false }
 num-traits = { version = "0.2", default-features = false }
 bitflags = { version = "1", default-features = false }
 smartstring = { version = "1", default-features = false }
@@ -39,7 +39,8 @@ serde_bytes = "0.11"
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 
 [features]
-default = []
+default = ["std"]
+std = ["ahash/std", "ahash/runtime-rng", "num-traits/std", "smartstring/std"]
 unchecked = []                  # unchecked arithmetic
 sync = []                       # restrict to only types that implement Send + Sync
 no_position = []                # do not track position in the parser
