@@ -45,10 +45,21 @@ fn build_type() -> Result<(), Box<EvalAltResult>> {
         }
     }
 
+    impl IntoIterator for Vec3 {
+        type Item = INT;
+
+        type IntoIter = std::array::IntoIter<INT, 3>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            <[INT; 3] as IntoIterator>::into_iter([self.x, self.y, self.z])
+        }
+    }
+
     impl CustomType for Vec3 {
         fn build(mut builder: TypeBuilder<Self>) {
             builder
                 .with_name("Vec3")
+                .is_iterable()
                 .with_fn("vec3", Self::new)
                 .with_get_set("x", Self::get_x, Self::set_x)
                 .with_get_set("y", Self::get_y, Self::set_y)
@@ -116,6 +127,19 @@ fn build_type() -> Result<(), Box<EvalAltResult>> {
             ",
         )?,
         Vec3::new(5, 6, 7),
+    );
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let sum = 0;
+                let v = vec3(1, 2, 3);
+                for i in v {
+                    sum += i;
+                }
+                sum
+            ",
+        )?,
+        6,
     );
 
     Ok(())

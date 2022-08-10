@@ -283,6 +283,20 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     }
 }
 
+impl<'a, T> TypeBuilder<'a, T>
+where
+    T: Variant + Clone + IntoIterator,
+    <T as IntoIterator>::Item: Variant + Clone,
+{
+    /// Register an type iterator.
+    /// This is an advanced API.
+    #[inline(always)]
+    pub fn is_iterable(&mut self) -> &mut Self {
+        self.engine.register_iterator::<T>();
+        self
+    }
+}
+
 impl<'a, T: Variant + Clone> Drop for TypeBuilder<'a, T> {
     #[inline]
     fn drop(&mut self) {
