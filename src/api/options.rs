@@ -31,7 +31,7 @@ bitflags! {
 }
 
 impl LangOptions {
-    /// Create a new [`Options`] with default values.
+    /// Create a new [`LangOptions`] with default values.
     #[inline(always)]
     pub fn new() -> Self {
         Self::IF_EXPR | Self::SWITCH_EXPR | Self::STMT_EXPR | Self::LOOPING | Self::SHADOW | {

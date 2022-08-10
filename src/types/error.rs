@@ -527,7 +527,7 @@ impl EvalAltResult {
         self
     }
     /// Consume the current [`EvalAltResult`] and return a new one with the specified [`Position`]
-    /// if the current position is [`Position::None`].
+    /// if the current position is [`Position::NONE`].
     #[inline(never)]
     #[must_use]
     pub(crate) fn fill_position(mut self: Box<Self>, new_position: Position) -> Box<Self> {

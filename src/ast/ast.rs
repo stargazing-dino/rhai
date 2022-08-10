@@ -274,7 +274,7 @@ impl AST {
     pub fn shared_lib(&self) -> &crate::Shared<crate::Module> {
         &self.lib
     }
-    /// Get the embedded [module resolver][`ModuleResolver`].
+    /// Get the embedded [module resolver][crate::ModuleResolver].
     #[cfg(not(feature = "internals"))]
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
@@ -297,7 +297,7 @@ impl AST {
     ) -> Option<&crate::Shared<crate::module::resolvers::StaticModuleResolver>> {
         self.resolver.as_ref()
     }
-    /// Set the embedded [module resolver][`ModuleResolver`].
+    /// Set the embedded [module resolver][crate::ModuleResolver].
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     pub(crate) fn set_resolver(

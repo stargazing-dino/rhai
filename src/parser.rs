@@ -165,13 +165,13 @@ impl<'e> ParseState<'e> {
     /// The return value is the offset to be deducted from `ParseState::stack::len()`,
     /// i.e. the top element of [`ParseState`]'s variables stack is offset 1.
     ///
-    /// # Return value: `(index, is_func)`
+    /// # Return value: `(index, is_func_name)`
     ///
     /// * `index`: `None` when the variable name is not found in the `stack`,
     ///            otherwise the index value.
     ///
-    /// * `is_func`: `true` if the variable is actually the name of a function
-    ///              (in which case it will be converted into a function pointer).
+    /// * `is_func_name`: `true` if the variable is actually the name of a function
+    ///                   (in which case it will be converted into a function pointer).
     #[inline]
     #[must_use]
     pub fn access_var(
@@ -185,14 +185,15 @@ impl<'e> ParseState<'e> {
         let (index, hit_barrier) = self.find_var(name);
 
         #[cfg(not(feature = "no_function"))]
-        let is_func = lib.values().any(|f| f.name == name);
+        let is_func_name = lib.values().any(|f| f.name == name);
 
         #[cfg(feature = "no_function")]
-        let is_func = false;
+        let is_func_name = false;
 
         #[cfg(not(feature = "no_closure"))]
         if self.allow_capture {
-            if !is_func && index == 0 && !self.external_vars.iter().any(|v| v.as_str() == name) {
+            if !is_func_name && index == 0 && !self.external_vars.iter().any(|v| v.as_str() == name)
+            {
                 self.external_vars.push(crate::ast::Ident {
                     name: name.into(),
                     pos: _pos,
@@ -208,7 +209,7 @@ impl<'e> ParseState<'e> {
             NonZeroUsize::new(index)
         };
 
-        (index, is_func)
+        (index, is_func_name)
     }
 
     /// Find a module by name in the [`ParseState`], searching in reverse.
@@ -257,15 +258,15 @@ impl<'e> ParseState<'e> {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 struct ParseSettings {
     /// Is the construct being parsed located at global level?
-    is_global: bool,
-    /// Is the construct being parsed located at function definition level?
+    at_global_level: bool,
+    /// Is the construct being parsed located inside a function definition?
     #[cfg(not(feature = "no_function"))]
-    is_function_scope: bool,
-    /// Is the construct being parsed located inside a closure?
+    in_fn_scope: bool,
+    /// Is the construct being parsed located inside a closure definition?
     #[cfg(not(feature = "no_function"))]
     #[cfg(not(feature = "no_closure"))]
-    is_closure_scope: bool,
-    /// Is the current position inside a loop?
+    in_closure: bool,
+    /// Is the construct being parsed located inside a breakable loop?
     is_breakable: bool,
     /// Language options in effect (overrides Engine options).
     options: LangOptions,
@@ -1388,10 +1389,10 @@ impl Engine {
                 );
 
                 let new_settings = ParseSettings {
-                    is_global: false,
-                    is_function_scope: true,
+                    at_global_level: false,
+                    in_fn_scope: true,
                     #[cfg(not(feature = "no_closure"))]
-                    is_closure_scope: true,
+                    in_closure: true,
                     is_breakable: false,
                     level: 0,
                     options,
@@ -1406,7 +1407,7 @@ impl Engine {
                         let (index, is_func) = state.access_var(name, lib, *pos);
 
                         if settings.options.contains(LangOptions::STRICT_VAR)
-                            && !settings.is_closure_scope
+                            && !settings.in_closure
                             && index.is_none()
                             && !state.scope.contains(name)
                             && !is_func
@@ -1601,7 +1602,7 @@ impl Engine {
                     }
                     // Access to `this` as a variable is OK within a function scope
                     #[cfg(not(feature = "no_function"))]
-                    _ if &*s == KEYWORD_THIS && settings.is_function_scope => Expr::Variable(
+                    _ if &*s == KEYWORD_THIS && settings.in_fn_scope => Expr::Variable(
                         (None, ns, 0, state.get_identifier("", s)).into(),
                         None,
                         settings.pos,
@@ -3068,7 +3069,7 @@ impl Engine {
             }
 
             // Parse statements inside the block
-            settings.is_global = false;
+            settings.at_global_level = false;
 
             let stmt = self.parse_stmt(input, state, lib, settings.level_up())?;
 
@@ -3164,7 +3165,7 @@ impl Engine {
                     unreachable!("doc-comment expected but gets {:?}", comment);
                 }
 
-                if !settings.is_global {
+                if !settings.at_global_level {
                     return Err(PERR::WrongDocComment.into_err(comments_pos));
                 }
 
@@ -3206,7 +3207,9 @@ impl Engine {
 
             // fn ...
             #[cfg(not(feature = "no_function"))]
-            Token::Fn if !settings.is_global => Err(PERR::WrongFnDefinition.into_err(token_pos)),
+            Token::Fn if !settings.at_global_level => {
+                Err(PERR::WrongFnDefinition.into_err(token_pos))
+            }
 
             #[cfg(not(feature = "no_function"))]
             Token::Fn | Token::Private => {
@@ -3247,10 +3250,10 @@ impl Engine {
                         );
 
                         let new_settings = ParseSettings {
-                            is_global: false,
-                            is_function_scope: true,
+                            at_global_level: false,
+                            in_fn_scope: true,
                             #[cfg(not(feature = "no_closure"))]
-                            is_closure_scope: false,
+                            in_closure: false,
                             is_breakable: false,
                             level: 0,
                             options,
@@ -3335,7 +3338,7 @@ impl Engine {
                     // `return`/`throw` at <EOF>
                     (Token::EOF, ..) => Ok(Stmt::Return(None, return_type, token_pos)),
                     // `return`/`throw` at end of block
-                    (Token::RightBrace, ..) if !settings.is_global => {
+                    (Token::RightBrace, ..) if !settings.at_global_level => {
                         Ok(Stmt::Return(None, return_type, token_pos))
                     }
                     // `return;` or `throw;`
@@ -3357,7 +3360,9 @@ impl Engine {
             Token::Import => self.parse_import(input, state, lib, settings.level_up()),
 
             #[cfg(not(feature = "no_module"))]
-            Token::Export if !settings.is_global => Err(PERR::WrongExport.into_err(token_pos)),
+            Token::Export if !settings.at_global_level => {
+                Err(PERR::WrongExport.into_err(token_pos))
+            }
 
             #[cfg(not(feature = "no_module"))]
             Token::Export => self.parse_export(input, state, lib, settings.level_up()),
@@ -3717,12 +3722,12 @@ impl Engine {
         options.remove(LangOptions::ANON_FN);
 
         let settings = ParseSettings {
-            is_global: true,
+            at_global_level: true,
             #[cfg(not(feature = "no_function"))]
-            is_function_scope: false,
+            in_fn_scope: false,
             #[cfg(not(feature = "no_function"))]
             #[cfg(not(feature = "no_closure"))]
-            is_closure_scope: false,
+            in_closure: false,
             is_breakable: false,
             level: 0,
             options,
@@ -3772,12 +3777,12 @@ impl Engine {
 
         while !input.peek().expect(NEVER_ENDS).0.is_eof() {
             let settings = ParseSettings {
-                is_global: true,
+                at_global_level: true,
                 #[cfg(not(feature = "no_function"))]
-                is_function_scope: false,
+                in_fn_scope: false,
                 #[cfg(not(feature = "no_function"))]
                 #[cfg(not(feature = "no_closure"))]
-                is_closure_scope: false,
+                in_closure: false,
                 is_breakable: false,
                 options: self.options,
                 level: 0,
