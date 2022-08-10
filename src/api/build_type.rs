@@ -1,16 +1,17 @@
 //! Trait to build a custom type for use with [`Engine`].
 #![allow(deprecated)]
 
-use crate::{
-    func::SendSync, types::dynamic::Variant, Engine, Identifier, RegisterNativeFunction,
-    RhaiResultOf,
-};
+use crate::{types::dynamic::Variant, Engine, Identifier, RegisterNativeFunction, RhaiResultOf};
 use std::marker::PhantomData;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
-/// Trait to build a custom type for use with an [`Engine`]
+/// Trait to build the API of a custom type for use with an [`Engine`]
 /// (i.e. register the type and its getters, setters, methods, etc.).
+///
+/// # WARNING - Volatile Trait
+///
+/// This API is volatile and may change in the future.
 ///
 /// # Example
 ///
@@ -71,9 +72,13 @@ pub trait CustomType: Variant + Clone {
 }
 
 impl Engine {
-    /// Build a custom type for use with the [`Engine`].
+    /// Build the API of a custom type for use with the [`Engine`].
     ///
     /// The custom type must implement [`CustomType`].
+    ///
+    /// # WARNING - Unstable API
+    ///
+    /// This API is volatile and may change in the future.
     #[inline]
     pub fn build_type<T: CustomType>(&mut self) -> &mut Self {
         T::build(TypeBuilder::new(self));
@@ -81,15 +86,15 @@ impl Engine {
     }
 }
 
-/// Builder to build a custom type for use with an [`Engine`].
+/// Builder to build the API of a custom type for use with an [`Engine`].
 ///
 /// The type is automatically registered when this builder is dropped.
 ///
-/// ## Pretty name
+/// ## Pretty-Print Name
 ///
-/// By default the type is registered with [`Engine::register_type`] (i.e. without a pretty name).
+/// By default the type is registered with [`Engine::register_type`] (i.e. without a pretty-print name).
 ///
-/// To define a pretty name, call [`with_name`][`TypeBuilder::with_name`],
+/// To define a pretty-print name, call [`with_name`][`TypeBuilder::with_name`],
 /// to use [`Engine::register_type_with_name`] instead.
 #[deprecated = "This type is NOT deprecated, but it is considered volatile and may change in the future."]
 pub struct TypeBuilder<'a, T: Variant + Clone> {
@@ -99,6 +104,7 @@ pub struct TypeBuilder<'a, T: Variant + Clone> {
 }
 
 impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
+    /// Create a [`TypeBuilder`] linked to a particular [`Engine`] instance.
     #[inline(always)]
     fn new(engine: &'a mut Engine) -> Self {
         Self {
@@ -110,7 +116,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
 }
 
 impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
-    /// Sets a pretty-print name for the `type_of` function.
+    /// Set a pretty-print name for the `type_of` function.
     #[inline(always)]
     pub fn with_name(&mut self, name: &'static str) -> &mut Self {
         self.name = Some(name);
@@ -140,6 +146,20 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     }
 }
 
+impl<'a, T> TypeBuilder<'a, T>
+where
+    T: Variant + Clone + IntoIterator,
+    <T as IntoIterator>::Item: Variant + Clone,
+{
+    /// Register a type iterator.
+    /// This is an advanced API.
+    #[inline(always)]
+    pub fn is_iterable(&mut self) -> &mut Self {
+        self.engine.register_iterator::<T>();
+        self
+    }
+}
+
 #[cfg(not(feature = "no_object"))]
 impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// Register a getter function.
@@ -151,7 +171,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     pub fn with_get<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl Fn(&mut T) -> V + SendSync + 'static,
+        get_fn: impl Fn(&mut T) -> V + crate::func::SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_get(name, get_fn);
         self
@@ -166,7 +186,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     pub fn with_get_result<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl Fn(&mut T) -> RhaiResultOf<V> + SendSync + 'static,
+        get_fn: impl Fn(&mut T) -> RhaiResultOf<V> + crate::func::SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_get_result(name, get_fn);
         self
@@ -179,7 +199,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     pub fn with_set<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
-        set_fn: impl Fn(&mut T, V) + SendSync + 'static,
+        set_fn: impl Fn(&mut T, V) + crate::func::SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_set(name, set_fn);
         self
@@ -192,7 +212,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     pub fn with_set_result<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
-        set_fn: impl Fn(&mut T, V) -> RhaiResultOf<()> + SendSync + 'static,
+        set_fn: impl Fn(&mut T, V) -> RhaiResultOf<()> + crate::func::SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_set_result(name, set_fn);
         self
@@ -207,8 +227,8 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     pub fn with_get_set<V: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl Fn(&mut T) -> V + SendSync + 'static,
-        set_fn: impl Fn(&mut T, V) + SendSync + 'static,
+        get_fn: impl Fn(&mut T) -> V + crate::func::SendSync + 'static,
+        set_fn: impl Fn(&mut T, V) + crate::func::SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_get_set(name, get_fn, set_fn);
         self
@@ -225,7 +245,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     #[inline(always)]
     pub fn with_indexer_get<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
-        get_fn: impl Fn(&mut T, X) -> V + SendSync + 'static,
+        get_fn: impl Fn(&mut T, X) -> V + crate::func::SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_get(get_fn);
         self
@@ -239,7 +259,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     #[inline(always)]
     pub fn with_indexer_get_result<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
-        get_fn: impl Fn(&mut T, X) -> RhaiResultOf<V> + SendSync + 'static,
+        get_fn: impl Fn(&mut T, X) -> RhaiResultOf<V> + crate::func::SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_get_result(get_fn);
         self
@@ -251,7 +271,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     #[inline(always)]
     pub fn with_indexer_set<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
-        set_fn: impl Fn(&mut T, X, V) + SendSync + 'static,
+        set_fn: impl Fn(&mut T, X, V) + crate::func::SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_set(set_fn);
         self
@@ -263,7 +283,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     #[inline(always)]
     pub fn with_indexer_set_result<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
-        set_fn: impl Fn(&mut T, X, V) -> RhaiResultOf<()> + SendSync + 'static,
+        set_fn: impl Fn(&mut T, X, V) -> RhaiResultOf<()> + crate::func::SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_set_result(set_fn);
         self
@@ -275,24 +295,10 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     #[inline(always)]
     pub fn with_indexer_get_set<X: Variant + Clone, V: Variant + Clone>(
         &mut self,
-        get_fn: impl Fn(&mut T, X) -> V + SendSync + 'static,
-        set_fn: impl Fn(&mut T, X, V) + SendSync + 'static,
+        get_fn: impl Fn(&mut T, X) -> V + crate::func::SendSync + 'static,
+        set_fn: impl Fn(&mut T, X, V) + crate::func::SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_get_set(get_fn, set_fn);
-        self
-    }
-}
-
-impl<'a, T> TypeBuilder<'a, T>
-where
-    T: Variant + Clone + IntoIterator,
-    <T as IntoIterator>::Item: Variant + Clone,
-{
-    /// Register an type iterator.
-    /// This is an advanced API.
-    #[inline(always)]
-    pub fn is_iterable(&mut self) -> &mut Self {
-        self.engine.register_iterator::<T>();
         self
     }
 }

@@ -47,11 +47,10 @@ fn build_type() -> Result<(), Box<EvalAltResult>> {
 
     impl IntoIterator for Vec3 {
         type Item = INT;
-
-        type IntoIter = std::array::IntoIter<INT, 3>;
+        type IntoIter = std::vec::IntoIter<Self::Item>;
 
         fn into_iter(self) -> Self::IntoIter {
-            <[INT; 3] as IntoIterator>::into_iter([self.x, self.y, self.z])
+            vec![self.x, self.y, self.z].into_iter()
         }
     }
 
@@ -61,6 +60,7 @@ fn build_type() -> Result<(), Box<EvalAltResult>> {
                 .with_name("Vec3")
                 .is_iterable()
                 .with_fn("vec3", Self::new)
+                .is_iterable()
                 .with_get_set("x", Self::get_x, Self::set_x)
                 .with_get_set("y", Self::get_y, Self::set_y)
                 .with_get_set("z", Self::get_z, Self::set_z);

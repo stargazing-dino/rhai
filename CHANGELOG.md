@@ -13,6 +13,7 @@ Bug fixes
 * Fixes concatenation of BLOB's and strings, where the BLOB's should be interpreted as UTF-8 encoded strings.
 * Capturing an unknown variable in a closure no longer panics.
 * Fixes panic in interpolated strings with constant expressions.
+* Using `call_fn_raw` on a function without evaluating the AST no longer panics on namespace-qualified function calls due to `import` statements not run.
 
 New features
 ------------
@@ -37,6 +38,10 @@ New features
 ### Top-level functions
 
 * Crate-level functions `rhai::eval`, `rhai::run`, `rhai::eval_file`, `rhai::run_file` are added as convenient wrappers.
+
+### CustomType trait and TypeBuilder
+
+* A new volatile API, `Engine::build_type`, enables registration of the entire API of a custom type in one go, provided that the custom type implements the `CustomType` trait (which uses `TypeBuilder` to register the API functions).
 
 Enhancements
 ------------
