@@ -2,7 +2,7 @@
 
 /// Initialize user-provided state (shadows system-provided state, if any).
 fn init() {
-    // Add 'bool_state' and 'obj_state' as new state variables
+    // Add 'bool_state' and 'value' as new state variables
     let bool_state = false;
     let value = 0;
 
