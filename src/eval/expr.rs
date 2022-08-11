@@ -82,7 +82,7 @@ impl Engine {
                             let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
 
                             Err(ERR::ErrorVariableNotFound(
-                                format!("{}{}{}", namespace, sep, var_name),
+                                format!("{namespace}{sep}{var_name}"),
                                 namespace.position(),
                             )
                             .into())
@@ -106,7 +106,7 @@ impl Engine {
                         let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
 
                         return Err(ERR::ErrorVariableNotFound(
-                            format!("{}{}{}", namespace, sep, var_name),
+                            format!("{namespace}{sep}{var_name}"),
                             namespace.position(),
                         )
                         .into());
@@ -496,7 +496,7 @@ impl Engine {
                 // The key should exist, unless the AST is compiled in a different Engine
                 let custom_def = self.custom_syntax.get(key_token).ok_or_else(|| {
                     Box::new(ERR::ErrorCustomSyntax(
-                        format!("Invalid custom syntax prefix: {}", key_token),
+                        format!("Invalid custom syntax prefix: {key_token}"),
                         custom.tokens.iter().map(<_>::to_string).collect(),
                         *pos,
                     ))

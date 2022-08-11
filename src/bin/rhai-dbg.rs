@@ -20,7 +20,7 @@ fn print_source(lines: &[String], pos: Position, offset: usize, window: (usize, 
     let line = pos.line().unwrap() - 1;
     let start = if line >= window.0 { line - window.0 } else { 0 };
     let end = usize::min(line + window.1, lines.len() - 1);
-    let line_no_len = format!("{}", end).len();
+    let line_no_len = end.to_string().len();
 
     // Print error position
     if start >= end {

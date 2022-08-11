@@ -49,24 +49,21 @@ mod core_functions {
     /// ```
     #[rhai_fn(name = "set_tag", set = "tag", return_raw)]
     pub fn set_tag(value: &mut Dynamic, tag: INT) -> RhaiResultOf<()> {
-        if tag < Tag::MIN as INT {
+        const TAG_MIN: Tag = Tag::MIN;
+        const TAG_MAX: Tag = Tag::MAX;
+
+        if tag < TAG_MIN as INT {
             Err(ERR::ErrorArithmetic(
                 format!(
-                    "{} is too small to fit into a tag (must be between {} and {})",
-                    tag,
-                    Tag::MIN,
-                    Tag::MAX
+                    "{tag} is too small to fit into a tag (must be between {TAG_MIN} and {TAG_MAX})"
                 ),
                 Position::NONE,
             )
             .into())
-        } else if tag > Tag::MAX as INT {
+        } else if tag > TAG_MAX as INT {
             Err(ERR::ErrorArithmetic(
                 format!(
-                    "{} is too large to fit into a tag (must be between {} and {})",
-                    tag,
-                    Tag::MIN,
-                    Tag::MAX
+                    "{tag} is too large to fit into a tag (must be between {TAG_MIN} and {TAG_MAX})"
                 ),
                 Position::NONE,
             )
@@ -281,10 +278,8 @@ fn collect_fn_metadata(
                 .for_each(|(.., f)| list.push(make_metadata(dict, namespace.into(), f).into()));
             for (ns, m) in module.iter_sub_modules() {
                 let ns = format!(
-                    "{}{}{}",
-                    namespace,
-                    crate::tokenizer::Token::DoubleColon.literal_syntax(),
-                    ns
+                    "{namespace}{}{ns}",
+                    crate::tokenizer::Token::DoubleColon.literal_syntax()
                 );
                 scan_module(list, dict, &ns, &**m, filter);
             }

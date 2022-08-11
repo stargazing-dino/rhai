@@ -30,7 +30,7 @@ mod string_functions {
         if s.is_empty() {
             string.clone()
         } else {
-            format!("{}{}", string, s).into()
+            format!("{string}{s}").into()
         }
     }
     #[rhai_fn(name = "+=", name = "append")]
@@ -38,7 +38,7 @@ mod string_functions {
         let s = print_with_func(FUNC_TO_STRING, &ctx, &mut item);
 
         if !s.is_empty() {
-            *string = format!("{}{}", string, s).into();
+            *string = format!("{string}{s}").into();
         }
     }
     #[rhai_fn(name = "+", pure)]
@@ -68,7 +68,7 @@ mod string_functions {
     }
     #[rhai_fn(name = "+")]
     pub fn add_prepend_char(character: char, string: &str) -> ImmutableString {
-        format!("{}{}", character, string).into()
+        format!("{character}{string}").into()
     }
 
     #[rhai_fn(name = "+")]

@@ -2406,7 +2406,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 (.., true) => unreachable!("no custom operators"),
                 // Reserved keyword that is not custom and disabled.
                 (token, false) if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token) => {
-                    let msg = format!("reserved {} '{}' is disabled", if is_valid_identifier(token.chars()) { "keyword"} else {"symbol"}, token);
+                    let msg = format!("reserved {} '{token}' is disabled", if is_valid_identifier(token.chars()) { "keyword"} else {"symbol"});
                     Token::LexError(LERR::ImproperSymbol(s.to_string(), msg).into())
                 },
                 // Reserved keyword/operator that is not custom.

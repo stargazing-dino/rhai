@@ -45,7 +45,7 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
                     ">=" => count < max,
                     "==" => count != max,
                     "!=" => count == max,
-                    _ => return Err(format!("Unsupported operator: {}", op).into()),
+                    _ => return Err(format!("Unsupported operator: {op}").into()),
                 };
 
                 if done {
@@ -63,7 +63,7 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
 
                 context
                     .scope_mut()
-                    .push(format!("{}{}", var_name, count), count);
+                    .push(format!("{var_name}{count}"), count);
 
                 let stop = !context
                     .eval_expression_tree(condition)?
@@ -189,7 +189,7 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
                 context.scope_mut().set_value(var_name.to_string(), value);
                 Ok(Dynamic::UNIT)
             } else {
-                Err(format!("variable {} is constant", var_name).into())
+                Err(format!("variable {var_name} is constant").into())
             }
         },
     )?;

@@ -88,10 +88,7 @@ mod function_tests {
         };
 
         let err = syn::parse2::<ExportedFn>(input_tokens).unwrap_err();
-        assert_eq!(
-            format!("{}", err),
-            "Rhai functions cannot return references"
-        );
+        assert_eq!(format!("{err}"), "Rhai functions cannot return references");
     }
 
     #[test]
@@ -101,7 +98,7 @@ mod function_tests {
         };
 
         let err = syn::parse2::<ExportedFn>(input_tokens).unwrap_err();
-        assert_eq!(format!("{}", err), "Rhai functions cannot return pointers");
+        assert_eq!(format!("{err}"), "Rhai functions cannot return pointers");
     }
 
     #[test]
@@ -112,7 +109,7 @@ mod function_tests {
 
         let err = syn::parse2::<ExportedFn>(input_tokens).unwrap_err();
         assert_eq!(
-            format!("{}", err),
+            format!("{err}"),
             "references from Rhai in this position must be mutable"
         );
     }
@@ -125,7 +122,7 @@ mod function_tests {
 
         let err = syn::parse2::<ExportedFn>(input_tokens).unwrap_err();
         assert_eq!(
-            format!("{}", err),
+            format!("{err}"),
             "function parameters other than the first one cannot be passed by reference"
         );
     }
@@ -138,7 +135,7 @@ mod function_tests {
 
         let err = syn::parse2::<ExportedFn>(input_tokens).unwrap_err();
         assert_eq!(
-            format!("{}", err),
+            format!("{err}"),
             "function parameters other than the first one cannot be passed by reference"
         );
     }

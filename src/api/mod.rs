@@ -181,7 +181,7 @@ impl Engine {
                 if self.disabled_symbols.is_empty()
                     || !self.disabled_symbols.contains(&*token.syntax())
                 {
-                    return Err(format!("'{}' is a reserved keyword", keyword));
+                    return Err(format!("'{keyword}' is a reserved keyword"));
                 }
             }
             // Active standard symbols cannot be made custom
@@ -189,7 +189,7 @@ impl Engine {
                 if self.disabled_symbols.is_empty()
                     || !self.disabled_symbols.contains(&*token.syntax())
                 {
-                    return Err(format!("'{}' is a reserved operator", keyword));
+                    return Err(format!("'{keyword}' is a reserved operator"));
                 }
             }
             // Active standard symbols cannot be made custom
@@ -197,7 +197,7 @@ impl Engine {
                 if self.disabled_symbols.is_empty()
                     || !self.disabled_symbols.contains(&*token.syntax()) =>
             {
-                return Err(format!("'{}' is a reserved symbol", keyword))
+                return Err(format!("'{keyword}' is a reserved symbol"))
             }
             // Disabled symbols are OK
             Some(_) => (),

@@ -127,7 +127,7 @@ pub mod mut_opaque_ref_module {
             StatusMessage {
                 is_ok,
                 os_code: Some(os_code),
-                message: format!("OS Code {}", os_code),
+                message: format!("OS Code {os_code}"),
             }
         }
 

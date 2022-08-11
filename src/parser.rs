@@ -536,7 +536,7 @@ impl Engine {
             Token::EOF => {
                 return Err(PERR::MissingToken(
                     Token::RightParen.into(),
-                    format!("to close the arguments list of this function call '{}'", id),
+                    format!("to close the arguments list of this function call '{id}'"),
                 )
                 .into_err(*token_pos))
             }
@@ -677,7 +677,7 @@ impl Engine {
                 (Token::EOF, pos) => {
                     return Err(PERR::MissingToken(
                         Token::RightParen.into(),
-                        format!("to close the arguments list of this function call '{}'", id),
+                        format!("to close the arguments list of this function call '{id}'"),
                     )
                     .into_err(*pos))
                 }
@@ -687,7 +687,7 @@ impl Engine {
                 (.., pos) => {
                     return Err(PERR::MissingToken(
                         Token::Comma.into(),
-                        format!("to separate the arguments to function call '{}'", id),
+                        format!("to separate the arguments to function call '{id}'"),
                     )
                     .into_err(*pos))
                 }
@@ -1011,10 +1011,7 @@ impl Engine {
                 (.., pos) => {
                     return Err(PERR::MissingToken(
                         Token::Colon.into(),
-                        format!(
-                            "to follow the property '{}' in this object map literal",
-                            name
-                        ),
+                        format!("to follow the property '{name}' in this object map literal"),
                     )
                     .into_err(pos))
                 }
@@ -1609,7 +1606,7 @@ impl Engine {
                     ),
                     // Cannot access to `this` as a variable not in a function scope
                     _ if &*s == KEYWORD_THIS => {
-                        let msg = format!("'{}' can only be used in functions", s);
+                        let msg = format!("'{s}' can only be used in functions");
                         return Err(
                             LexError::ImproperSymbol(s.to_string(), msg).into_err(settings.pos)
                         );
@@ -1862,9 +1859,7 @@ impl Engine {
                             #[cfg(feature = "no_float")]
                             return None;
                         })
-                        .ok_or_else(|| {
-                            LexError::MalformedNumber(format!("-{}", num)).into_err(pos)
-                        }),
+                        .ok_or_else(|| LexError::MalformedNumber(format!("-{num}")).into_err(pos)),
 
                     // Negative float
                     #[cfg(not(feature = "no_float"))]
@@ -3479,7 +3474,7 @@ impl Engine {
         let mut params = StaticVec::new_const();
 
         if !no_params {
-            let sep_err = format!("to separate the parameters of function '{}'", name);
+            let sep_err = format!("to separate the parameters of function '{name}'");
 
             loop {
                 match input.next().expect(NEVER_ENDS) {
@@ -3497,7 +3492,7 @@ impl Engine {
                     (.., pos) => {
                         return Err(PERR::MissingToken(
                             Token::RightParen.into(),
-                            format!("to close the parameters list of function '{}'", name),
+                            format!("to close the parameters list of function '{name}'"),
                         )
                         .into_err(pos))
                     }

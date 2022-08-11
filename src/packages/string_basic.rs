@@ -69,7 +69,7 @@ mod print_debug_functions {
     /// Convert the value of the `item` into a string in debug format.
     #[rhai_fn(name = "to_debug", pure)]
     pub fn to_debug_generic(ctx: NativeCallContext, item: &mut Dynamic) -> ImmutableString {
-        ctx.engine().map_type_name(&format!("{:?}", item)).into()
+        ctx.engine().map_type_name(&format!("{item:?}")).into()
     }
 
     /// Return the empty string.
@@ -86,7 +86,7 @@ mod print_debug_functions {
     /// Convert the string into debug format.
     #[rhai_fn(name = "debug", name = "to_debug", pure)]
     pub fn debug_string(string: &mut ImmutableString) -> ImmutableString {
-        format!("{:?}", string).into()
+        format!("{string:?}").into()
     }
 
     /// Return the character into a string.
@@ -97,7 +97,7 @@ mod print_debug_functions {
     /// Convert the string into debug format.
     #[rhai_fn(name = "debug", name = "to_debug")]
     pub fn debug_char(character: char) -> ImmutableString {
-        format!("{:?}", character).into()
+        format!("{character:?}").into()
     }
 
     /// Convert the function pointer into a string in debug format.
@@ -109,12 +109,12 @@ mod print_debug_functions {
     /// Return the boolean value into a string.
     #[rhai_fn(name = "print", name = "to_string")]
     pub fn print_bool(value: bool) -> ImmutableString {
-        format!("{}", value).into()
+        value.to_string().into()
     }
     /// Convert the boolean value into a string in debug format.
     #[rhai_fn(name = "debug", name = "to_debug")]
     pub fn debug_bool(value: bool) -> ImmutableString {
-        format!("{:?}", value).into()
+        format!("{value:?}").into()
     }
 
     /// Return the empty string.
@@ -146,13 +146,15 @@ mod print_debug_functions {
     #[cfg(not(feature = "no_float"))]
     #[rhai_fn(name = "debug", name = "to_debug")]
     pub fn debug_f64(number: f64) -> ImmutableString {
-        format!("{:?}", crate::ast::FloatWrapper::new(number)).into()
+        let number = crate::ast::FloatWrapper::new(number);
+        format!("{number:?}").into()
     }
     /// Convert the value of `number` into a string.
     #[cfg(not(feature = "no_float"))]
     #[rhai_fn(name = "debug", name = "to_debug")]
     pub fn debug_f32(number: f32) -> ImmutableString {
-        format!("{:?}", crate::ast::FloatWrapper::new(number)).into()
+        let number = crate::ast::FloatWrapper::new(number);
+        format!("{number:?}").into()
     }
 
     /// Convert the array into a string.
@@ -215,13 +217,13 @@ mod print_debug_functions {
 #[export_module]
 mod number_formatting {
     fn to_hex<T: LowerHex>(value: T) -> ImmutableString {
-        format!("{:x}", value).into()
+        format!("{value:x}").into()
     }
     fn to_octal<T: Octal>(value: T) -> ImmutableString {
-        format!("{:o}", value).into()
+        format!("{value:o}").into()
     }
     fn to_binary<T: Binary>(value: T) -> ImmutableString {
-        format!("{:b}", value).into()
+        format!("{value:b}").into()
     }
 
     /// Convert the `value` into a string in hex format.

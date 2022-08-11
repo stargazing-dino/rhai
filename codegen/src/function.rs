@@ -57,10 +57,10 @@ impl FnSpecialAccess {
         match self {
             FnSpecialAccess::None => None,
             FnSpecialAccess::Property(Property::Get(ref g)) => {
-                Some((format!("{}{}", FN_GET, g), g.to_string(), g.span()))
+                Some((format!("{FN_GET}{g}"), g.to_string(), g.span()))
             }
             FnSpecialAccess::Property(Property::Set(ref s)) => {
-                Some((format!("{}{}", FN_SET, s), s.to_string(), s.span()))
+                Some((format!("{FN_SET}{s}"), s.to_string(), s.span()))
             }
             FnSpecialAccess::Index(Index::Get) => Some((
                 FN_IDX_GET.to_string(),
@@ -255,7 +255,7 @@ impl ExportedParams for ExportedFnParams {
                 (attr, ..) => {
                     return Err(syn::Error::new(
                         key.span(),
-                        format!("unknown attribute '{}'", attr),
+                        format!("unknown attribute '{attr}'"),
                     ))
                 }
             }
@@ -748,7 +748,7 @@ impl ExportedFn {
         let str_type_path = syn::parse2::<syn::Path>(quote! { str }).unwrap();
         let string_type_path = syn::parse2::<syn::Path>(quote! { String }).unwrap();
         for (i, arg) in self.arg_list().enumerate().skip(skip_first_arg as usize) {
-            let var = syn::Ident::new(&format!("arg{}", i), Span::call_site());
+            let var = syn::Ident::new(&format!("arg{i}"), Span::call_site());
             let is_string;
             let is_ref;
             match arg {

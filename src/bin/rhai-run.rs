@@ -5,7 +5,7 @@ use std::{env, fs::File, io::Read, path::Path, process::exit};
 fn eprint_error(input: &str, mut err: EvalAltResult) {
     fn eprint_line(lines: &[&str], pos: Position, err_msg: &str) {
         let line = pos.line().unwrap();
-        let line_no = format!("{}: ", line);
+        let line_no = format!("{line}: ");
 
         eprintln!("{}{}", line_no, lines[line - 1]);
         eprintln!(

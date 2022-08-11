@@ -81,21 +81,21 @@ fn test_optimizer_parse() -> Result<(), Box<EvalAltResult>> {
     let ast = engine.compile("{ const DECISION = false; if DECISION { 42 } else { 123 } }")?;
 
     assert_eq!(
-        format!("{:?}", ast),
+        format!("{ast:?}"),
         r#"AST { source: "", doc: "", resolver: None, body: [Expr(123 @ 1:53)] }"#
     );
 
     let ast = engine.compile("const DECISION = false; if DECISION { 42 } else { 123 }")?;
 
     assert_eq!(
-        format!("{:?}", ast),
+        format!("{ast:?}"),
         r#"AST { source: "", doc: "", resolver: None, body: [Var(("DECISION" @ 1:7, false @ 1:18, None), CONSTANT, 1:1), Expr(123 @ 1:51)] }"#
     );
 
     let ast = engine.compile("if 1 == 2 { 42 }")?;
 
     assert_eq!(
-        format!("{:?}", ast),
+        format!("{ast:?}"),
         r#"AST { source: "", doc: "", resolver: None, body: [] }"#
     );
 
@@ -104,14 +104,14 @@ fn test_optimizer_parse() -> Result<(), Box<EvalAltResult>> {
     let ast = engine.compile("abs(-42)")?;
 
     assert_eq!(
-        format!("{:?}", ast),
+        format!("{ast:?}"),
         r#"AST { source: "", doc: "", resolver: None, body: [Expr(42 @ 1:1)] }"#
     );
 
     let ast = engine.compile("NUMBER")?;
 
     assert_eq!(
-        format!("{:?}", ast),
+        format!("{ast:?}"),
         r#"AST { source: "", doc: "", resolver: None, body: [Expr(Variable(NUMBER) @ 1:1)] }"#
     );
 
@@ -123,7 +123,7 @@ fn test_optimizer_parse() -> Result<(), Box<EvalAltResult>> {
     let ast = engine.compile("NUMBER")?;
 
     assert_eq!(
-        format!("{:?}", ast),
+        format!("{ast:?}"),
         r#"AST { source: "", doc: "", resolver: None, body: [Expr(42 @ 1:1)] }"#
     );
 

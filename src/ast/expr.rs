@@ -476,7 +476,7 @@ impl fmt::Debug for Expr {
                     write!(f, "{}{}", x.1, Token::DoubleColon.literal_syntax())?;
                     let pos = x.1.position();
                     if !pos.is_none() {
-                        display_pos = format!(" @ {:?}", pos);
+                        display_pos = format!(" @ {pos:?}");
                     }
                 }
                 f.write_str(&x.3)?;
@@ -490,7 +490,7 @@ impl fmt::Debug for Expr {
             Self::Stmt(x) => {
                 let pos = x.span();
                 if !pos.is_none() {
-                    display_pos = format!(" @ {:?}", pos);
+                    display_pos = format!(" @ {pos:?}");
                 }
                 f.write_str("ExprStmtBlock")?;
                 f.debug_list().entries(x.iter()).finish()
@@ -498,7 +498,7 @@ impl fmt::Debug for Expr {
             Self::FnCall(x, ..) => fmt::Debug::fmt(x, f),
             Self::Index(x, options, pos) => {
                 if !pos.is_none() {
-                    display_pos = format!(" @ {:?}", pos);
+                    display_pos = format!(" @ {pos:?}");
                 }
 
                 let mut f = f.debug_struct("Index");
@@ -511,7 +511,7 @@ impl fmt::Debug for Expr {
             }
             Self::Dot(x, options, pos) => {
                 if !pos.is_none() {
-                    display_pos = format!(" @ {:?}", pos);
+                    display_pos = format!(" @ {pos:?}");
                 }
 
                 let mut f = f.debug_struct("Dot");
@@ -531,7 +531,7 @@ impl fmt::Debug for Expr {
                 };
 
                 if !pos.is_none() {
-                    display_pos = format!(" @ {:?}", pos);
+                    display_pos = format!(" @ {pos:?}");
                 }
 
                 f.debug_struct(op_name)

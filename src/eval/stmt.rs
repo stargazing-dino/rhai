@@ -642,7 +642,7 @@ impl Engine {
                                 #[cfg(not(feature = "unchecked"))]
                                 if x > INT::MAX as usize {
                                     loop_result = Err(ERR::ErrorArithmetic(
-                                        format!("for-loop counter overflow: {}", x),
+                                        format!("for-loop counter overflow: {x}"),
                                         counter.pos,
                                     )
                                     .into());

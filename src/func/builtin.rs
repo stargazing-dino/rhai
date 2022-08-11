@@ -212,7 +212,7 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
             "+" => Some(|_, args| {
                 let x = args[0].as_char().expect(BUILTIN);
                 let y = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
-                Ok(format!("{}{}", x, y).into())
+                Ok(format!("{x}{y}").into())
             }),
             "==" => Some(impl_op!(get_s1s2(==))),
             "!=" => Some(impl_op!(get_s1s2(!=))),
@@ -496,7 +496,7 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
             "+" => Some(|_, args| {
                 let x = args[0].as_char().expect(BUILTIN);
                 let y = args[1].as_char().expect(BUILTIN);
-                Ok(format!("{}{}", x, y).into())
+                Ok(format!("{x}{y}").into())
             }),
             "==" => Some(impl_op!(char => as_char == as_char)),
             "!=" => Some(impl_op!(char => as_char != as_char)),
@@ -809,8 +809,8 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
         return match op {
             "+=" => Some(|_, args| {
                 let y = args[1].as_char().expect(BUILTIN);
-                let mut x = args[0].write_lock::<Dynamic>().expect(BUILTIN);
-                Ok((*x = format!("{}{}", *x, y).into()).into())
+                let x = &mut *args[0].write_lock::<Dynamic>().expect(BUILTIN);
+                Ok((*x = format!("{x}{y}").into()).into())
             }),
             _ => None,
         };

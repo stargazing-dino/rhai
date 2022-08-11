@@ -118,7 +118,7 @@ pub fn ensure_no_data_race(
         .find(|(.., a)| a.is_locked())
     {
         return Err(ERR::ErrorDataRace(
-            format!("argument #{} of function '{}'", n + 1, fn_name),
+            format!("argument #{} of function '{fn_name}'", n + 1),
             Position::NONE,
         )
         .into());
@@ -150,10 +150,7 @@ impl Engine {
         let (ns, sep) = ("", "");
 
         format!(
-            "{}{}{} ({})",
-            ns,
-            sep,
-            fn_name,
+            "{ns}{sep}{fn_name} ({})",
             args.iter()
                 .map(|a| if a.is::<ImmutableString>() {
                     "&str | ImmutableString | String"
@@ -493,7 +490,7 @@ impl Engine {
                 let t0 = self.map_type_name(args[0].type_name());
                 let t1 = self.map_type_name(args[1].type_name());
 
-                Err(ERR::ErrorIndexingType(format!("{} [{}]", t0, t1), pos).into())
+                Err(ERR::ErrorIndexingType(format!("{t0} [{t1}]"), pos).into())
             }
 
             // index setter function not found?
@@ -505,7 +502,7 @@ impl Engine {
                 let t1 = self.map_type_name(args[1].type_name());
                 let t2 = self.map_type_name(args[2].type_name());
 
-                Err(ERR::ErrorIndexingType(format!("{} [{}] = {}", t0, t1, t2), pos).into())
+                Err(ERR::ErrorIndexingType(format!("{t0} [{t1}] = {t2}"), pos).into())
             }
 
             // Getter function not found?
@@ -518,8 +515,7 @@ impl Engine {
 
                 Err(ERR::ErrorDotExpr(
                     format!(
-                        "Unknown property '{}' - a getter is not registered for type '{}'",
-                        prop, t0
+                        "Unknown property '{prop}' - a getter is not registered for type '{t0}'"
                     ),
                     pos,
                 )
@@ -537,8 +533,7 @@ impl Engine {
 
                 Err(ERR::ErrorDotExpr(
                     format!(
-                        "No writable property '{}' - a setter is not registered for type '{}' to handle '{}'",
-                        prop, t0, t1
+                        "No writable property '{prop}' - a setter is not registered for type '{t0}' to handle '{t1}'"
                     ),
                     pos,
                 )
@@ -586,7 +581,7 @@ impl Engine {
     ) -> RhaiResultOf<(Dynamic, bool)> {
         fn no_method_err(name: &str, pos: Position) -> RhaiResultOf<(Dynamic, bool)> {
             Err(ERR::ErrorRuntime(
-                (format!("'{0}' should not be called this way. Try {0}(...);", name)).into(),
+                format!("'{name}' should not be called this way. Try {name}(...);").into(),
                 pos,
             )
             .into())

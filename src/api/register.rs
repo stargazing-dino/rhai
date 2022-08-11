@@ -1037,7 +1037,7 @@ impl Engine {
 
         #[cfg(not(feature = "no_module"))]
         for (name, m) in &self.global_sub_modules {
-            signatures.extend(m.gen_fn_signatures().map(|f| format!("{}::{}", name, f)));
+            signatures.extend(m.gen_fn_signatures().map(|f| format!("{name}::{f}")));
         }
 
         signatures.extend(

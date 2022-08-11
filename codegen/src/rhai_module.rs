@@ -319,11 +319,11 @@ pub fn check_rename_collisions(fns: &[ExportedFn]) -> Result<(), syn::Error> {
                 if let Some(other_span) = renames.insert(key, current_span) {
                     let mut err = syn::Error::new(
                         current_span,
-                        format!("duplicate Rhai signature for '{}'", fn_name),
+                        format!("duplicate Rhai signature for '{fn_name}'"),
                     );
                     err.combine(syn::Error::new(
                         other_span,
-                        format!("duplicated function renamed '{}'", fn_name),
+                        format!("duplicated function renamed '{fn_name}'"),
                     ));
                     return Err(err);
                 }
@@ -332,10 +332,10 @@ pub fn check_rename_collisions(fns: &[ExportedFn]) -> Result<(), syn::Error> {
             let ident = item_fn.name();
             if let Some(other_span) = fn_defs.insert(ident.to_string(), ident.span()) {
                 let mut err =
-                    syn::Error::new(ident.span(), format!("duplicate function '{}'", ident));
+                    syn::Error::new(ident.span(), format!("duplicate function '{ident}'"));
                 err.combine(syn::Error::new(
                     other_span,
-                    format!("duplicated function '{}'", ident),
+                    format!("duplicated function '{ident}'"),
                 ));
                 return Err(err);
             }
@@ -343,11 +343,11 @@ pub fn check_rename_collisions(fns: &[ExportedFn]) -> Result<(), syn::Error> {
             if let Some(fn_span) = renames.get(&key) {
                 let mut err = syn::Error::new(
                     ident.span(),
-                    format!("duplicate Rhai signature for '{}'", ident),
+                    format!("duplicate Rhai signature for '{ident}'"),
                 );
                 err.combine(syn::Error::new(
                     *fn_span,
-                    format!("duplicated function '{}'", ident),
+                    format!("duplicated function '{ident}'"),
                 ));
                 return Err(err);
             }
