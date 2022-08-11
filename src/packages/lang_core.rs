@@ -1,6 +1,6 @@
 use crate::def_package;
 use crate::plugin::*;
-use crate::types::dynamic::Tag;
+use crate::types::{dynamic::Tag, StringsInterner};
 use crate::{Dynamic, RhaiResultOf, ERR, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -130,54 +130,47 @@ fn collect_fn_metadata(
         + Copy,
 ) -> crate::Array {
     use crate::{ast::ScriptFnDef, Array, Identifier, Map};
-    use std::collections::BTreeSet;
 
     // Create a metadata record for a function.
     fn make_metadata(
-        dict: &BTreeSet<Identifier>,
+        dict: &mut StringsInterner,
         #[cfg(not(feature = "no_module"))] namespace: Identifier,
         func: &ScriptFnDef,
     ) -> Map {
-        const DICT: &str = "key exists";
-
         let mut map = Map::new();
 
         #[cfg(not(feature = "no_module"))]
         if !namespace.is_empty() {
-            map.insert(dict.get("namespace").expect(DICT).clone(), namespace.into());
+            map.insert("namespace".into(), dict.get(namespace).into());
         }
+        map.insert("name".into(), dict.get(&func.name).into());
         map.insert(
-            dict.get("name").expect(DICT).clone(),
-            func.name.clone().into(),
-        );
-        map.insert(
-            dict.get("access").expect(DICT).clone(),
-            match func.access {
-                FnAccess::Public => dict.get("public").expect(DICT).clone(),
-                FnAccess::Private => dict.get("private").expect(DICT).clone(),
-            }
+            "access".into(),
+            dict.get(match func.access {
+                FnAccess::Public => "public",
+                FnAccess::Private => "private",
+            })
             .into(),
         );
         map.insert(
-            dict.get("is_anonymous").expect(DICT).clone(),
+            "is_anonymous".into(),
             func.name.starts_with(crate::engine::FN_ANONYMOUS).into(),
         );
         map.insert(
-            dict.get("params").expect(DICT).clone(),
+            "params".into(),
             func.params
                 .iter()
-                .cloned()
-                .map(Into::into)
+                .map(|p| dict.get(p).into())
                 .collect::<Array>()
                 .into(),
         );
         #[cfg(feature = "metadata")]
         if !func.comments.is_empty() {
             map.insert(
-                dict.get("comments").expect(DICT).clone(),
+                "comments".into(),
                 func.comments
                     .iter()
-                    .map(|s| Into::into(&**s))
+                    .map(|s| dict.get(s).into())
                     .collect::<Array>()
                     .into(),
             );
@@ -186,23 +179,7 @@ fn collect_fn_metadata(
         map
     }
 
-    // Intern strings
-    let dict: BTreeSet<Identifier> = [
-        #[cfg(not(feature = "no_module"))]
-        "namespace",
-        "name",
-        "access",
-        "public",
-        "private",
-        "is_anonymous",
-        "params",
-        #[cfg(feature = "metadata")]
-        "comments",
-    ]
-    .iter()
-    .map(|&s| s.into())
-    .collect();
-
+    let dict = &mut StringsInterner::new();
     let mut list = Array::new();
 
     ctx.iter_namespaces()
@@ -211,7 +188,7 @@ fn collect_fn_metadata(
         .for_each(|(.., f)| {
             list.push(
                 make_metadata(
-                    &dict,
+                    dict,
                     #[cfg(not(feature = "no_module"))]
                     Identifier::new_const(),
                     f,
@@ -228,7 +205,7 @@ fn collect_fn_metadata(
         .for_each(|(.., f)| {
             list.push(
                 make_metadata(
-                    &dict,
+                    dict,
                     #[cfg(not(feature = "no_module"))]
                     Identifier::new_const(),
                     f,
@@ -246,7 +223,7 @@ fn collect_fn_metadata(
         .for_each(|(.., f)| {
             list.push(
                 make_metadata(
-                    &dict,
+                    dict,
                     #[cfg(not(feature = "no_module"))]
                     Identifier::new_const(),
                     f,
@@ -259,8 +236,8 @@ fn collect_fn_metadata(
     {
         // Recursively scan modules for script-defined functions.
         fn scan_module(
+            dict: &mut StringsInterner,
             list: &mut Array,
-            dict: &BTreeSet<Identifier>,
             namespace: &str,
             module: &Module,
             filter: impl Fn(
@@ -281,12 +258,12 @@ fn collect_fn_metadata(
                     "{namespace}{}{ns}",
                     crate::tokenizer::Token::DoubleColon.literal_syntax()
                 );
-                scan_module(list, dict, &ns, &**m, filter);
+                scan_module(dict, list, &ns, &**m, filter);
             }
         }
 
         for (ns, m) in ctx.iter_imports_raw() {
-            scan_module(&mut list, &dict, ns, &**m, filter);
+            scan_module(dict, &mut list, ns, &**m, filter);
         }
     }
 

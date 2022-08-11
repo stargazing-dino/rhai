@@ -36,6 +36,12 @@ impl StringsInterner<'_> {
         }
     }
     /// Get an identifier from a text string and prefix, adding it to the interner if necessary.
+    #[inline(always)]
+    #[must_use]
+    pub fn get(&mut self, text: impl AsRef<str>) -> ImmutableString {
+        self.get_with_prefix("", text)
+    }
+    /// Get an identifier from a text string and prefix, adding it to the interner if necessary.
     ///
     /// # Prefix
     ///
@@ -50,7 +56,11 @@ impl StringsInterner<'_> {
     /// Panics if the prefix is not recognized.
     #[inline]
     #[must_use]
-    pub fn get(&mut self, prefix: impl AsRef<str>, text: impl AsRef<str>) -> ImmutableString {
+    pub fn get_with_prefix(
+        &mut self,
+        prefix: impl AsRef<str>,
+        text: impl AsRef<str>,
+    ) -> ImmutableString {
         let prefix = prefix.as_ref();
         let text = text.as_ref();
 
