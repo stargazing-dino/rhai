@@ -35,7 +35,7 @@ impl From<&Expr> for ChainType {
 
 impl Engine {
     /// Chain-evaluate a dot/index chain.
-    /// [`Position`] in [`EvalAltResult`] may be [`NONE`][Position::NONE] and should be set afterwards.
+    /// [`Position`] in [`EvalAltResult`][crate::EvalAltResult] may be [`NONE`][Position::NONE] and should be set afterwards.
     fn eval_dot_index_chain_helper(
         &self,
         global: &mut GlobalRuntimeState,
@@ -641,9 +641,7 @@ impl Engine {
         .map_err(|err| err.fill_position(op_pos))
     }
 
-    /// Evaluate a chain of indexes and store the results in a [`StaticVec`].
-    /// [`StaticVec`] is used to avoid an allocation in the overwhelming cases of
-    /// just a few levels of indexing.
+    /// Evaluate a chain of indexes and store the results in a [`FnArgsVec`].
     fn eval_dot_index_chain_arguments(
         &self,
         scope: &mut Scope,
@@ -804,7 +802,7 @@ impl Engine {
     }
 
     /// Get the value at the indexed position of a base type.
-    /// [`Position`] in [`EvalAltResult`] may be [`NONE`][Position::NONE] and should be set afterwards.
+    /// [`Position`] in [`EvalAltResult`][crate::EvalAltResult] may be [`NONE`][Position::NONE] and should be set afterwards.
     fn get_indexed_mut<'t>(
         &self,
         global: &mut GlobalRuntimeState,

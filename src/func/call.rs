@@ -732,7 +732,7 @@ impl Engine {
     }
 
     /// Evaluate a list of statements with no `this` pointer.
-    /// This is commonly used to evaluate a list of statements in an [`AST`] or a script function body.
+    /// This is commonly used to evaluate a list of statements in an [`AST`][crate::AST] or a script function body.
     #[inline]
     pub(crate) fn eval_global_statements(
         &self,

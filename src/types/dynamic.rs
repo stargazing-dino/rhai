@@ -29,7 +29,7 @@ mod private {
     use crate::func::SendSync;
     use std::any::Any;
 
-    /// A sealed trait that prevents other crates from implementing [`Variant`].
+    /// A sealed trait that prevents other crates from implementing [`Variant`][super::Variant].
     pub trait Sealed {}
 
     impl<T: Any + Clone + SendSync> Sealed for T {}
