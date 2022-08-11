@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
                 .with_fn("new_ts", Self::new)
                 .with_fn("update", Self::update)
                 .with_fn("calc", Self::calculate)
-                .with_iterator()
+                .is_iterable()
                 .with_get_set("x", Self::get_x, Self::set_x);
         }
     }

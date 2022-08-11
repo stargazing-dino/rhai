@@ -154,7 +154,7 @@ where
     /// Register a type iterator.
     /// This is an advanced API.
     #[inline(always)]
-    pub fn with_iterator(&mut self) -> &mut Self {
+    pub fn is_iterable(&mut self) -> &mut Self {
         self.engine.register_iterator::<T>();
         self
     }

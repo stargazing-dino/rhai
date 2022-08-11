@@ -58,8 +58,9 @@ fn build_type() -> Result<(), Box<EvalAltResult>> {
         fn build(mut builder: TypeBuilder<Self>) {
             builder
                 .with_name("Vec3")
+                .is_iterable()
                 .with_fn("vec3", Self::new)
-                .with_iterator()
+                .is_iterable()
                 .with_get_set("x", Self::get_x, Self::set_x)
                 .with_get_set("y", Self::get_y, Self::set_y)
                 .with_get_set("z", Self::get_z, Self::set_z);
@@ -126,6 +127,19 @@ fn build_type() -> Result<(), Box<EvalAltResult>> {
             ",
         )?,
         Vec3::new(5, 6, 7),
+    );
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let sum = 0;
+                let v = vec3(1, 2, 3);
+                for i in v {
+                    sum += i;
+                }
+                sum
+            ",
+        )?,
+        6,
     );
 
     Ok(())
