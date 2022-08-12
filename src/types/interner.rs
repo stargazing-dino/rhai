@@ -136,8 +136,6 @@ impl StringsInterner<'_> {
 
         dict.insert(key, value.clone());
 
-        println!("Interning '{value}'");
-
         // If the interner is over capacity, remove the longest entry
         if self.strings.len() > self.max {
             // Leave some buffer to grow when shrinking the cache.
