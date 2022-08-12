@@ -1,7 +1,14 @@
+use crate::func::hashing::get_hasher;
 use crate::{Identifier, ImmutableString};
+
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{collections::BTreeMap, marker::PhantomData, ops::AddAssign};
+use std::{
+    collections::BTreeMap,
+    hash::{Hash, Hasher},
+    marker::PhantomData,
+    ops::AddAssign,
+};
 
 /// _(internals)_ A factory of identifiers from text strings.
 /// Exported under the `internals` feature only.
@@ -10,13 +17,13 @@ use std::{collections::BTreeMap, marker::PhantomData, ops::AddAssign};
 #[derive(Debug, Clone, Default, Hash)]
 pub struct StringsInterner<'a> {
     /// Normal strings.
-    strings: BTreeMap<Identifier, ImmutableString>,
+    strings: BTreeMap<u64, ImmutableString>,
     /// Property getters.
     #[cfg(not(feature = "no_object"))]
-    getters: BTreeMap<Identifier, ImmutableString>,
+    getters: BTreeMap<u64, ImmutableString>,
     /// Property setters.
     #[cfg(not(feature = "no_object"))]
-    setters: BTreeMap<Identifier, ImmutableString>,
+    setters: BTreeMap<u64, ImmutableString>,
     /// Take care of the lifetime parameter.
     dummy: PhantomData<&'a ()>,
 }
@@ -35,12 +42,14 @@ impl StringsInterner<'_> {
             dummy: PhantomData,
         }
     }
+
     /// Get an identifier from a text string and prefix, adding it to the interner if necessary.
     #[inline(always)]
     #[must_use]
     pub fn get(&mut self, text: impl AsRef<str>) -> ImmutableString {
         self.get_with_prefix("", text)
     }
+
     /// Get an identifier from a text string and prefix, adding it to the interner if necessary.
     ///
     /// # Prefix
@@ -75,13 +84,39 @@ impl StringsInterner<'_> {
             _ => unreachable!("unsupported prefix {}", prefix),
         };
 
-        if !dict.is_empty() && dict.contains_key(text) {
-            dict.get(text).unwrap().clone()
+        let hasher = &mut get_hasher();
+        text.hash(hasher);
+        let key = hasher.finish();
+
+        if !dict.is_empty() && dict.contains_key(&key) {
+            dict.get(&key).unwrap().clone()
         } else {
             let value: ImmutableString = mapper(text).into();
-            dict.insert(text.into(), value.clone());
+            dict.insert(key, value.clone());
             value
         }
+    }
+
+    /// Number of strings interned.
+    #[inline(always)]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        #[cfg(not(feature = "no_object"))]
+        return self.strings.len() + self.getters.len() + self.setters.len();
+
+        #[cfg(feature = "no_object")]
+        return self.strings.len();
+    }
+
+    /// Number of strings interned.
+    #[inline(always)]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        #[cfg(not(feature = "no_object"))]
+        return self.strings.is_empty() || self.getters.is_empty() || self.setters.is_empty();
+
+        #[cfg(feature = "no_object")]
+        return self.strings.is_empty();
     }
 }
 
