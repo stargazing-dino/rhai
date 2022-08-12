@@ -18,8 +18,9 @@ Bug fixes
 New features
 ------------
 
-### New feature flag
+### New feature flags
 
+* A new feature flag, `std`, which is enabled by default, is added due to requirements from dependency crates.
 * A new feature flag, `no_custom_syntax`, is added to remove custom syntax support from Rhai for applications that do not require it (which should be most).
 
 ### Module documentation
