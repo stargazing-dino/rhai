@@ -59,7 +59,10 @@ mod string_functions {
     // The following are needed in order to override the generic versions with `Dynamic` parameters.
 
     #[rhai_fn(name = "+", pure)]
-    pub fn add_append_str(string1: &mut ImmutableString, string2: &str) -> ImmutableString {
+    pub fn add_append_str(
+        string1: &mut ImmutableString,
+        string2: ImmutableString,
+    ) -> ImmutableString {
         &*string1 + string2
     }
     #[rhai_fn(name = "+", pure)]
@@ -79,6 +82,20 @@ mod string_functions {
     #[rhai_fn(name = "+")]
     pub fn add_prepend_unit(_item: (), string: ImmutableString) -> ImmutableString {
         string
+    }
+
+    #[rhai_fn(name = "+=")]
+    pub fn add_assign_append_str(string1: &mut ImmutableString, string2: ImmutableString) {
+        *string1 += string2
+    }
+    #[rhai_fn(name = "+=", pure)]
+    pub fn add_assign_append_char(string: &mut ImmutableString, character: char) {
+        *string += character
+    }
+    #[rhai_fn(name = "+=")]
+    pub fn add_assign_append_unit(string: &mut ImmutableString, item: ()) {
+        let _ = string;
+        let _ = item;
     }
 
     #[cfg(not(feature = "no_index"))]
@@ -320,7 +337,7 @@ mod string_functions {
         len: INT,
     ) -> ImmutableString {
         if string.is_empty() || len <= 0 {
-            return ctx.engine().const_empty_string();
+            return ctx.engine().get_interned_string("");
         }
 
         let mut chars = StaticVec::<char>::with_capacity(len as usize);
@@ -803,13 +820,13 @@ mod string_functions {
         len: INT,
     ) -> ImmutableString {
         if string.is_empty() {
-            return ctx.engine().const_empty_string();
+            return ctx.engine().get_interned_string("");
         }
 
         let mut chars = StaticVec::with_capacity(string.len());
 
         let offset = if string.is_empty() || len <= 0 {
-            return ctx.engine().const_empty_string();
+            return ctx.engine().get_interned_string("");
         } else if start < 0 {
             let abs_start = start.unsigned_abs() as usize;
             chars.extend(string.chars());
@@ -819,7 +836,7 @@ mod string_functions {
                 chars.len() - abs_start
             }
         } else if start as usize >= string.chars().count() {
-            return ctx.engine().const_empty_string();
+            return ctx.engine().get_interned_string("");
         } else {
             start as usize
         };
@@ -865,7 +882,7 @@ mod string_functions {
         start: INT,
     ) -> ImmutableString {
         if string.is_empty() {
-            ctx.engine().const_empty_string()
+            ctx.engine().get_interned_string("")
         } else {
             let len = string.len() as INT;
             sub_string(ctx, string, start, len)
@@ -1245,7 +1262,7 @@ mod string_functions {
                 let num_chars = string.chars().count();
                 if abs_index > num_chars {
                     vec![
-                        ctx.engine().const_empty_string().into(),
+                        ctx.engine().get_interned_string("").into(),
                         string.as_str().into(),
                     ]
                 } else {

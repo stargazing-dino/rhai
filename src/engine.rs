@@ -2,14 +2,15 @@
 
 use crate::api::options::LangOptions;
 use crate::func::native::{
-    OnDebugCallback, OnDefVarCallback, OnParseTokenCallback, OnPrintCallback, OnVarCallback,
+    locked_write, OnDebugCallback, OnDefVarCallback, OnParseTokenCallback, OnPrintCallback,
+    OnVarCallback,
 };
 use crate::packages::{Package, StandardPackage};
 use crate::tokenizer::Token;
-use crate::types::dynamic::Union;
+use crate::types::StringsInterner;
 use crate::{
-    Dynamic, Identifier, ImmutableString, Module, OptimizationLevel, Position, RhaiResult, Shared,
-    StaticVec,
+    Dynamic, Identifier, ImmutableString, Locked, Module, OptimizationLevel, Position, RhaiResult,
+    Shared, StaticVec,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -105,7 +106,7 @@ pub struct Engine {
     pub(crate) module_resolver: Box<dyn crate::ModuleResolver>,
 
     /// An empty [`ImmutableString`] for cloning purposes.
-    pub(crate) empty_string: ImmutableString,
+    pub(crate) interned_strings: Locked<StringsInterner<'static>>,
 
     /// A set of symbols to disable.
     pub(crate) disabled_symbols: BTreeSet<Identifier>,
@@ -269,7 +270,7 @@ impl Engine {
             #[cfg(not(feature = "no_module"))]
             module_resolver: Box::new(crate::module::resolvers::DummyModuleResolver::new()),
 
-            empty_string: ImmutableString::new(),
+            interned_strings: StringsInterner::new().into(),
             disabled_symbols: BTreeSet::new(),
             #[cfg(not(feature = "no_custom_syntax"))]
             custom_keywords: BTreeMap::new(),
@@ -310,30 +311,21 @@ impl Engine {
         engine
     }
 
-    /// Get an empty [`ImmutableString`].
-    ///
-    /// [`Engine`] keeps a single instance of an empty [`ImmutableString`] and uses this to create
-    /// shared instances for subsequent uses. This minimizes unnecessary allocations for empty strings.
-    #[inline(always)]
+    /// Get an interned string.
     #[must_use]
-    pub fn const_empty_string(&self) -> ImmutableString {
-        self.empty_string.clone()
+    #[inline(always)]
+    pub(crate) fn get_interned_string(
+        &self,
+        string: impl AsRef<str> + Into<ImmutableString>,
+    ) -> ImmutableString {
+        locked_write(&self.interned_strings).get(string).into()
     }
 
     /// Check a result to ensure that it is valid.
-    pub(crate) fn check_return_value(&self, mut result: RhaiResult, _pos: Position) -> RhaiResult {
-        if let Ok(ref mut r) = result {
-            // Concentrate all empty strings into one instance to save memory
-            if let Dynamic(Union::Str(s, ..)) = r {
-                if s.is_empty() {
-                    if !s.ptr_eq(&self.empty_string) {
-                        *s = self.const_empty_string();
-                    }
-                    return result;
-                }
-            }
-
-            #[cfg(not(feature = "unchecked"))]
+    #[inline]
+    pub(crate) fn check_return_value(&self, result: RhaiResult, _pos: Position) -> RhaiResult {
+        #[cfg(not(feature = "unchecked"))]
+        if let Ok(ref r) = result {
             self.check_data_size(r, _pos)?;
         }
 

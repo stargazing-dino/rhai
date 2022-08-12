@@ -7,7 +7,9 @@ use crate::ast::{
 };
 use crate::func::get_hasher;
 use crate::types::dynamic::{AccessMode, Union};
-use crate::{Dynamic, Engine, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR, INT};
+use crate::{
+    Dynamic, Engine, ImmutableString, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR, INT,
+};
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -137,23 +139,10 @@ impl Engine {
                 pos: op_pos,
             } = op_info;
 
-            let mut lock_guard;
-            let lhs_ptr_inner;
-
-            #[cfg(not(feature = "no_closure"))]
-            let target_is_shared = target.is_shared();
-            #[cfg(feature = "no_closure")]
-            let target_is_shared = false;
-
-            if target_is_shared {
-                lock_guard = target.write_lock::<Dynamic>().unwrap();
-                lhs_ptr_inner = &mut *lock_guard;
-            } else {
-                lhs_ptr_inner = &mut *target;
-            }
+            let mut lock_guard = target.write_lock::<Dynamic>().unwrap();
 
             let hash = hash_op_assign;
-            let args = &mut [lhs_ptr_inner, &mut new_val];
+            let args = &mut [&mut *lock_guard, &mut new_val];
             let level = level + 1;
 
             match self.call_native_fn(
@@ -181,21 +170,17 @@ impl Engine {
             }
         } else {
             // Normal assignment
+            *target.write_lock::<Dynamic>().unwrap() = new_val;
+        }
 
-            #[cfg(not(feature = "no_closure"))]
-            if target.is_shared() {
-                // Handle case where target is a `Dynamic` shared value
-                // (returned by a variable resolver, for example)
-                *target.write_lock::<Dynamic>().unwrap() = new_val;
-            } else {
-                *target.as_mut() = new_val;
-            }
-
-            #[cfg(feature = "no_closure")]
-            {
-                *target.as_mut() = new_val;
+        /*
+        if let Some(mut guard) = target.write_lock::<Dynamic>() {
+            if guard.is::<ImmutableString>() {
+                let s = std::mem::take(&mut *guard).cast::<ImmutableString>();
+                *guard = self.get_interned_string(s).into();
             }
         }
+        */
 
         target.propagate_changed_value(op_info.pos)
     }
@@ -301,6 +286,13 @@ impl Engine {
                     .map(Dynamic::flatten);
 
                 if let Ok(rhs_val) = rhs_result {
+                    let rhs_val = if rhs_val.is::<ImmutableString>() {
+                        self.get_interned_string(rhs_val.cast::<ImmutableString>())
+                            .into()
+                    } else {
+                        rhs_val
+                    };
+
                     let _new_val = Some((rhs_val, *op_info));
 
                     // Must be either `var[index] op= val` or `var.prop op= val`

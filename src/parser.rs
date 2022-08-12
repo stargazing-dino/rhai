@@ -106,7 +106,12 @@ impl<'e> ParseState<'e> {
     /// Create a new [`ParseState`].
     #[inline(always)]
     #[must_use]
-    pub fn new(engine: &Engine, scope: &'e Scope, tokenizer_control: TokenizerControl) -> Self {
+    pub fn new(
+        engine: &Engine,
+        scope: &'e Scope,
+        interned_strings: StringsInterner<'e>,
+        tokenizer_control: TokenizerControl,
+    ) -> Self {
         Self {
             tokenizer_control,
             expr_filter: |_| true,
@@ -114,7 +119,7 @@ impl<'e> ParseState<'e> {
             external_vars: Vec::new(),
             #[cfg(not(feature = "no_closure"))]
             allow_capture: true,
-            interned_strings: StringsInterner::new(),
+            interned_strings,
             scope,
             global: GlobalRuntimeState::new(engine),
             stack: Scope::new(),
@@ -237,7 +242,7 @@ impl<'e> ParseState<'e> {
     /// Get an interned identifier, creating one if it is not yet interned.
     #[inline(always)]
     #[must_use]
-    pub fn get_identifier(&mut self, text: impl AsRef<str>) -> Identifier {
+    pub fn get_identifier(&mut self, text: impl AsRef<str> + Into<ImmutableString>) -> Identifier {
         self.get_identifier_with_prefix("", text).into()
     }
 
@@ -247,7 +252,7 @@ impl<'e> ParseState<'e> {
     pub fn get_identifier_with_prefix(
         &mut self,
         prefix: impl AsRef<str>,
-        text: impl AsRef<str>,
+        text: impl AsRef<str> + Into<ImmutableString>,
     ) -> Identifier {
         self.interned_strings.get_with_prefix(prefix, text).into()
     }
@@ -256,7 +261,10 @@ impl<'e> ParseState<'e> {
     #[inline(always)]
     #[allow(dead_code)]
     #[must_use]
-    pub fn get_interned_string(&mut self, text: impl AsRef<str>) -> ImmutableString {
+    pub fn get_interned_string(
+        &mut self,
+        text: impl AsRef<str> + Into<ImmutableString>,
+    ) -> ImmutableString {
         self.get_interned_string_with_prefix("", text)
     }
 
@@ -267,7 +275,7 @@ impl<'e> ParseState<'e> {
     pub fn get_interned_string_with_prefix(
         &mut self,
         prefix: impl AsRef<str>,
-        text: impl AsRef<str>,
+        text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
         self.interned_strings.get_with_prefix(prefix, text)
     }
@@ -1372,8 +1380,14 @@ impl Engine {
             // | ...
             #[cfg(not(feature = "no_function"))]
             Token::Pipe | Token::Or if settings.options.contains(LangOptions::ANON_FN) => {
-                let mut new_state =
-                    ParseState::new(self, state.scope, state.tokenizer_control.clone());
+                let interned_strings = std::mem::take(&mut state.interned_strings);
+
+                let mut new_state = ParseState::new(
+                    self,
+                    state.scope,
+                    interned_strings,
+                    state.tokenizer_control.clone(),
+                );
 
                 #[cfg(not(feature = "no_module"))]
                 {
@@ -1415,7 +1429,11 @@ impl Engine {
                     ..settings
                 };
 
-                let (expr, func) = self.parse_anon_fn(input, &mut new_state, lib, new_settings)?;
+                let result = self.parse_anon_fn(input, &mut new_state, lib, new_settings);
+
+                state.interned_strings = new_state.interned_strings;
+
+                let (expr, func) = result?;
 
                 #[cfg(not(feature = "no_closure"))]
                 new_state.external_vars.iter().try_for_each(
@@ -2311,7 +2329,7 @@ impl Engine {
             let hash = calc_fn_hash(&op, 2);
 
             let op_base = FnCallExpr {
-                name: state.get_identifier(op),
+                name: state.get_identifier(op.as_ref()),
                 hashes: FnCallHashes::from_native(hash),
                 pos,
                 ..Default::default()
@@ -3233,8 +3251,14 @@ impl Engine {
 
                 match input.next().expect(NEVER_ENDS) {
                     (Token::Fn, pos) => {
-                        let mut new_state =
-                            ParseState::new(self, state.scope, state.tokenizer_control.clone());
+                        let interned_strings = std::mem::take(&mut state.interned_strings);
+
+                        let mut new_state = ParseState::new(
+                            self,
+                            state.scope,
+                            interned_strings,
+                            state.tokenizer_control.clone(),
+                        );
 
                         #[cfg(not(feature = "no_module"))]
                         {
@@ -3280,7 +3304,11 @@ impl Engine {
                             #[cfg(not(feature = "no_function"))]
                             #[cfg(feature = "metadata")]
                             comments,
-                        )?;
+                        );
+
+                        state.interned_strings = new_state.interned_strings;
+
+                        let func = func?;
 
                         let hash = calc_fn_hash(&func.name, func.params.len());
 

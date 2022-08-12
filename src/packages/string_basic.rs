@@ -75,7 +75,7 @@ mod print_debug_functions {
     /// Return the empty string.
     #[rhai_fn(name = "print", name = "debug")]
     pub fn print_empty_string(ctx: NativeCallContext) -> ImmutableString {
-        ctx.engine().const_empty_string()
+        ctx.engine().get_interned_string("")
     }
 
     /// Return the `string`.
@@ -121,7 +121,7 @@ mod print_debug_functions {
     #[rhai_fn(name = "print", name = "to_string")]
     pub fn print_unit(ctx: NativeCallContext, unit: ()) -> ImmutableString {
         let _ = unit;
-        ctx.engine().const_empty_string()
+        ctx.engine().get_interned_string("")
     }
     /// Convert the unit into a string in debug format.
     #[rhai_fn(name = "debug", name = "to_debug")]

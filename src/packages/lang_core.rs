@@ -170,7 +170,7 @@ fn collect_fn_metadata(
                 "comments".into(),
                 func.comments
                     .iter()
-                    .map(|s| dict.get(s).into())
+                    .map(|s| dict.get(s.as_ref()).into())
                     .collect::<Array>()
                     .into(),
             );

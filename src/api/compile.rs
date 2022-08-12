@@ -221,7 +221,7 @@ impl Engine {
             scripts.as_ref(),
             self.token_mapper.as_ref().map(<_>::as_ref),
         );
-        let mut state = ParseState::new(self, scope, tokenizer_control);
+        let mut state = ParseState::new(self, scope, Default::default(), tokenizer_control);
         let mut _ast = self.parse(&mut stream.peekable(), &mut state, optimization_level)?;
         #[cfg(feature = "metadata")]
         _ast.set_doc(state.tokenizer_control.borrow().global_comments.join("\n"));
@@ -294,7 +294,7 @@ impl Engine {
             self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
 
         let mut peekable = stream.peekable();
-        let mut state = ParseState::new(self, scope, tokenizer_control);
+        let mut state = ParseState::new(self, scope, Default::default(), tokenizer_control);
         self.parse_global_expr(&mut peekable, &mut state, self.optimization_level)
     }
 }

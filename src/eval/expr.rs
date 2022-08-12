@@ -328,7 +328,7 @@ impl Engine {
 
             // `... ${...} ...`
             Expr::InterpolatedString(x, _) => {
-                let mut concat = self.const_empty_string().into();
+                let mut concat = self.get_interned_string("").into();
                 let target = &mut concat;
                 let mut result = Ok(Dynamic::UNIT);
 
@@ -355,7 +355,10 @@ impl Engine {
                     }
                 }
 
-                result.map(|_| concat.take_or_clone())
+                self.check_return_value(
+                    result.map(|_| concat.take_or_clone()),
+                    expr.start_position(),
+                )
             }
 
             #[cfg(not(feature = "no_index"))]

@@ -820,14 +820,14 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
         return match op {
             "+=" => Some(|_, args| {
                 let (first, second) = args.split_first_mut().expect(BUILTIN);
-                let mut x = first.write_lock::<ImmutableString>().expect(BUILTIN);
-                let y = &*second[0].read_lock::<ImmutableString>().expect(BUILTIN);
+                let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
+                let y = std::mem::take(second[0]).cast::<ImmutableString>();
                 Ok((*x += y).into())
             }),
             "-=" => Some(|_, args| {
                 let (first, second) = args.split_first_mut().expect(BUILTIN);
-                let mut x = first.write_lock::<ImmutableString>().expect(BUILTIN);
-                let y = &*second[0].read_lock::<ImmutableString>().expect(BUILTIN);
+                let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
+                let y = std::mem::take(second[0]).cast::<ImmutableString>();
                 Ok((*x -= y).into())
             }),
             _ => None,
