@@ -379,7 +379,7 @@ impl Dynamic {
         if TypeId::of::<T>() == TypeId::of::<crate::Map>() {
             return matches!(self.0, Union::Map(..));
         }
-        #[cfg(not(feature = "decimal"))]
+        #[cfg(feature = "decimal")]
         if TypeId::of::<T>() == TypeId::of::<rust_decimal::Decimal>() {
             return matches!(self.0, Union::Decimal(..));
         }
