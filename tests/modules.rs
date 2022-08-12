@@ -279,7 +279,7 @@ fn test_module_resolver() -> Result<(), Box<EvalAltResult>> {
 
         assert!(engine.eval::<INT>(script).is_err());
 
-        let result: INT = engine.call_fn(&mut Scope::new(), &ast, "foo", (2 as INT,))?;
+        let result = engine.call_fn::<INT>(&mut Scope::new(), &ast, "foo", (2 as INT,))?;
 
         assert_eq!(result, 84);
 
@@ -296,7 +296,7 @@ fn test_module_resolver() -> Result<(), Box<EvalAltResult>> {
             assert_eq!(ast2.resolver().unwrap().len(), len);
         }
 
-        let result: INT = engine.call_fn(&mut Scope::new(), &ast2, "foo", (2 as INT,))?;
+        let result = engine.call_fn::<INT>(&mut Scope::new(), &ast2, "foo", (2 as INT,))?;
 
         assert_eq!(result, 84);
     }
