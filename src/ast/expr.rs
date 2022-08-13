@@ -60,7 +60,7 @@ pub struct CustomExpr {
     /// List of keywords.
     pub inputs: StaticVec<Expr>,
     /// List of tokens actually parsed.
-    pub tokens: StaticVec<Identifier>,
+    pub tokens: StaticVec<ImmutableString>,
     /// Is the current [`Scope`][crate::Scope] possibly modified by this custom statement
     /// (e.g. introducing a new variable)?
     pub scope_may_be_changed: bool,
@@ -183,7 +183,7 @@ pub struct FnCallExpr {
     #[cfg(not(feature = "no_module"))]
     pub namespace: super::Namespace,
     /// Function name.
-    pub name: Identifier,
+    pub name: ImmutableString,
     /// Pre-calculated hashes.
     pub hashes: FnCallHashes,
     /// List of function call argument expressions.
@@ -392,14 +392,18 @@ pub enum Expr {
     /// This is to avoid reading a pointer redirection during each variable access.
     Variable(
         #[cfg(not(feature = "no_module"))]
-        Box<(Option<NonZeroUsize>, super::Namespace, u64, Identifier)>,
-        #[cfg(feature = "no_module")] Box<(Option<NonZeroUsize>, (), u64, Identifier)>,
+        Box<(Option<NonZeroUsize>, super::Namespace, u64, ImmutableString)>,
+        #[cfg(feature = "no_module")] Box<(Option<NonZeroUsize>, (), u64, ImmutableString)>,
         Option<NonZeroU8>,
         Position,
     ),
     /// Property access - ((getter, hash), (setter, hash), prop)
     Property(
-        Box<((Identifier, u64), (Identifier, u64), ImmutableString)>,
+        Box<(
+            (ImmutableString, u64),
+            (ImmutableString, u64),
+            ImmutableString,
+        )>,
         Position,
     ),
     /// xxx `.` method `(` expr `,` ... `)`

@@ -594,7 +594,7 @@ pub enum Stmt {
     /// This variant does not map to any language structure.  It is currently only used only to
     /// convert a normal variable into a shared variable when the variable is _captured_ by a closure.
     #[cfg(not(feature = "no_closure"))]
-    Share(Box<crate::Identifier>, Position),
+    Share(crate::ImmutableString, Position),
 }
 
 impl Default for Stmt {

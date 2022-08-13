@@ -143,7 +143,7 @@ fn collect_fn_metadata(
         if !namespace.is_empty() {
             map.insert("namespace".into(), dict.get(namespace).into());
         }
-        map.insert("name".into(), dict.get(&func.name).into());
+        map.insert("name".into(), dict.get(func.name.as_str()).into());
         map.insert(
             "access".into(),
             dict.get(match func.access {
@@ -160,7 +160,7 @@ fn collect_fn_metadata(
             "params".into(),
             func.params
                 .iter()
-                .map(|p| dict.get(p).into())
+                .map(|p| dict.get(p.as_str()).into())
                 .collect::<Array>()
                 .into(),
         );

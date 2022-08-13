@@ -26,12 +26,6 @@ pub struct StringsInterner<'a> {
     max: usize,
     /// Normal strings.
     strings: BTreeMap<u64, ImmutableString>,
-    /// Property getters.
-    #[cfg(not(feature = "no_object"))]
-    getters: BTreeMap<u64, ImmutableString>,
-    /// Property setters.
-    #[cfg(not(feature = "no_object"))]
-    setters: BTreeMap<u64, ImmutableString>,
     /// Take care of the lifetime parameter.
     dummy: PhantomData<&'a ()>,
 }
@@ -51,70 +45,37 @@ impl StringsInterner<'_> {
         Self::new_with_capacity(MAX_INTERNED_STRINGS)
     }
 
-    /// Create a new [`StringsInterner`] with a maximum capacity.
+    /// Create a new [`StringsInterner`] with maximum capacity.
     #[inline]
     #[must_use]
     pub fn new_with_capacity(capacity: usize) -> Self {
         Self {
             max: capacity,
             strings: BTreeMap::new(),
-            #[cfg(not(feature = "no_object"))]
-            getters: BTreeMap::new(),
-            #[cfg(not(feature = "no_object"))]
-            setters: BTreeMap::new(),
             dummy: PhantomData,
         }
     }
-
-    /// Get an identifier from a text string and prefix, adding it to the interner if necessary.
+    /// Get an identifier from a text string, adding it to the interner if necessary.
     #[inline(always)]
     #[must_use]
-    pub fn get(&mut self, text: impl AsRef<str> + Into<ImmutableString>) -> ImmutableString {
-        self.get_with_prefix("", text)
+    pub fn get<T: AsRef<str> + Into<ImmutableString>>(&mut self, text: T) -> ImmutableString {
+        self.get_with_mapper(|s| s.into(), text)
     }
 
-    /// Get an identifier from a text string and prefix, adding it to the interner if necessary.
-    ///
-    /// # Prefix
-    ///
-    /// Currently recognized prefixes are:
-    ///
-    /// * `""` - None (normal string)
-    /// * `"get$"` - Property getter, not available under `no_object`
-    /// * `"set$"` - Property setter, not available under `no_object`
-    ///
-    /// # Panics
-    ///
-    /// Panics if the prefix is not recognized.
+    /// Get an identifier from a text string, adding it to the interner if necessary.
     #[inline]
     #[must_use]
-    pub fn get_with_prefix<T: AsRef<str> + Into<ImmutableString>>(
+    pub fn get_with_mapper<T: AsRef<str> + Into<ImmutableString>>(
         &mut self,
-        prefix: impl AsRef<str>,
+        mapper: fn(T) -> ImmutableString,
         text: T,
     ) -> ImmutableString {
-        let prefix = prefix.as_ref();
         let key = text.as_ref();
 
         // Do not intern numbers
-        if prefix == "" && key.bytes().all(|c| c == b'.' || (c >= b'0' && c <= b'9')) {
+        if key.bytes().all(|c| c == b'.' || (c >= b'0' && c <= b'9')) {
             return text.into();
         }
-
-        let (dict, mapper): (_, fn(T) -> ImmutableString) = match prefix {
-            "" => (&mut self.strings, |s| s.into()),
-
-            #[cfg(not(feature = "no_object"))]
-            crate::engine::FN_GET => (&mut self.getters, |s| {
-                crate::engine::make_getter(s.as_ref()).into()
-            }),
-            #[cfg(not(feature = "no_object"))]
-            crate::engine::FN_SET => (&mut self.setters, |s| {
-                crate::engine::make_setter(s.as_ref()).into()
-            }),
-
-            _ => unreachable!("unsupported prefix {}", prefix),
-        };
 
         if key.len() > MAX_STRING_LEN {
             return mapper(text);
@@ -124,8 +85,8 @@ impl StringsInterner<'_> {
         key.hash(hasher);
         let key = hasher.finish();
 
-        if !dict.is_empty() && dict.contains_key(&key) {
-            return dict.get(&key).unwrap().clone();
+        if !self.strings.is_empty() && self.strings.contains_key(&key) {
+            return self.strings.get(&key).unwrap().clone();
         }
 
         let value = mapper(text);
@@ -134,7 +95,7 @@ impl StringsInterner<'_> {
             return value;
         }
 
-        dict.insert(key, value.clone());
+        self.strings.insert(key, value.clone());
 
         // If the interner is over capacity, remove the longest entry
         if self.strings.len() > self.max {
@@ -160,37 +121,23 @@ impl StringsInterner<'_> {
     }
 
     /// Number of strings interned.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn len(&self) -> usize {
-        #[cfg(not(feature = "no_object"))]
-        return self.strings.len() + self.getters.len() + self.setters.len();
-
-        #[cfg(feature = "no_object")]
-        return self.strings.len();
+        self.strings.len()
     }
 
     /// Number of strings interned.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        #[cfg(not(feature = "no_object"))]
-        return self.strings.is_empty() || self.getters.is_empty() || self.setters.is_empty();
-
-        #[cfg(feature = "no_object")]
-        return self.strings.is_empty();
+        self.strings.is_empty()
     }
 
     /// Clear all interned strings.
     #[inline]
     pub fn clear(&mut self) {
         self.strings.clear();
-
-        #[cfg(not(feature = "no_object"))]
-        {
-            self.getters.clear();
-            self.setters.clear();
-        }
     }
 }
 
@@ -198,12 +145,6 @@ impl AddAssign<Self> for StringsInterner<'_> {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
         self.strings.extend(rhs.strings.into_iter());
-
-        #[cfg(not(feature = "no_object"))]
-        {
-            self.getters.extend(rhs.getters.into_iter());
-            self.setters.extend(rhs.setters.into_iter());
-        }
     }
 }
 
@@ -212,13 +153,5 @@ impl AddAssign<&Self> for StringsInterner<'_> {
     fn add_assign(&mut self, rhs: &Self) {
         self.strings
             .extend(rhs.strings.iter().map(|(&k, v)| (k, v.clone())));
-
-        #[cfg(not(feature = "no_object"))]
-        {
-            self.getters
-                .extend(rhs.getters.iter().map(|(&k, v)| (k, v.clone())));
-            self.setters
-                .extend(rhs.setters.iter().map(|(&k, v)| (k, v.clone())));
-        }
     }
 }

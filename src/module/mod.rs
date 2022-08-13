@@ -759,12 +759,12 @@ impl Module {
         let num_params = fn_def.params.len();
         let hash_script = crate::calc_fn_hash(&fn_def.name, num_params);
         #[cfg(feature = "metadata")]
-        let params_info = fn_def.params.iter().cloned().collect();
+        let params_info = fn_def.params.iter().map(Into::into).collect();
         self.functions.insert(
             hash_script,
             FuncInfo {
                 metadata: FnMetadata {
-                    name: fn_def.name.clone(),
+                    name: fn_def.name.as_str().into(),
                     namespace: FnNamespace::Internal,
                     access: fn_def.access,
                     params: num_params,

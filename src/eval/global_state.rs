@@ -1,6 +1,6 @@
 //! Global runtime state.
 
-use crate::{Dynamic, Engine, Identifier};
+use crate::{Dynamic, Engine, Identifier, ImmutableString};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{fmt, marker::PhantomData};
@@ -9,7 +9,7 @@ use std::{fmt, marker::PhantomData};
 #[cfg(not(feature = "no_module"))]
 #[cfg(not(feature = "no_function"))]
 pub type GlobalConstants =
-    crate::Shared<crate::Locked<std::collections::BTreeMap<Identifier, Dynamic>>>;
+    crate::Shared<crate::Locked<std::collections::BTreeMap<ImmutableString, Dynamic>>>;
 
 /// _(internals)_ Global runtime states.
 /// Exported under the `internals` feature only.

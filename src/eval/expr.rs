@@ -94,7 +94,7 @@ impl Engine {
                     if namespace.len() == 1 && namespace.root() == crate::engine::KEYWORD_GLOBAL {
                         if let Some(ref constants) = global.constants {
                             if let Some(value) =
-                                crate::func::locked_write(constants).get_mut(var_name)
+                                crate::func::locked_write(constants).get_mut(var_name.as_str())
                             {
                                 let mut target: Target = value.clone().into();
                                 // Module variables are constant
@@ -155,7 +155,7 @@ impl Engine {
                 if lib
                     .iter()
                     .flat_map(|&m| m.iter_script_fn())
-                    .any(|(_, _, f, ..)| f == v.3) =>
+                    .any(|(_, _, f, ..)| f == v.3.as_str()) =>
             {
                 let val: Dynamic =
                     crate::FnPtr::new_unchecked(v.3.as_str(), Default::default()).into();
@@ -497,7 +497,7 @@ impl Engine {
                 // The first token acts as the custom syntax's key
                 let key_token = custom.tokens.first().unwrap();
                 // The key should exist, unless the AST is compiled in a different Engine
-                let custom_def = self.custom_syntax.get(key_token).ok_or_else(|| {
+                let custom_def = self.custom_syntax.get(key_token.as_str()).ok_or_else(|| {
                     Box::new(ERR::ErrorCustomSyntax(
                         format!("Invalid custom syntax prefix: {key_token}"),
                         custom.tokens.iter().map(<_>::to_string).collect(),

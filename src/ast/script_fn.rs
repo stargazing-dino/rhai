@@ -2,7 +2,7 @@
 #![cfg(not(feature = "no_function"))]
 
 use super::{FnAccess, StmtBlock};
-use crate::{Identifier, SmartString, StaticVec};
+use crate::{Identifier, ImmutableString, StaticVec};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{fmt, hash::Hash};
@@ -38,11 +38,11 @@ pub struct ScriptFnDef {
     #[cfg(not(feature = "no_function"))]
     pub environ: Option<EncapsulatedEnviron>,
     /// Function name.
-    pub name: Identifier,
+    pub name: ImmutableString,
     /// Function access mode.
     pub access: FnAccess,
     /// Names of function parameters.
-    pub params: StaticVec<Identifier>,
+    pub params: StaticVec<ImmutableString>,
     /// _(metadata)_ Function doc-comments (if any).
     /// Exported under the `metadata` feature only.
     ///
@@ -71,7 +71,7 @@ impl fmt::Display for ScriptFnDef {
             self.name,
             self.params
                 .iter()
-                .map(SmartString::as_str)
+                .map(|s| s.as_str())
                 .collect::<StaticVec<_>>()
                 .join(", ")
         )
@@ -132,7 +132,7 @@ impl<'a> From<&'a ScriptFnDef> for ScriptFnMetadata<'a> {
     fn from(value: &'a ScriptFnDef) -> Self {
         Self {
             name: &value.name,
-            params: value.params.iter().map(SmartString::as_str).collect(),
+            params: value.params.iter().map(|s| s.as_str()).collect(),
             access: value.access,
             #[cfg(feature = "metadata")]
             comments: value.comments.iter().map(<_>::as_ref).collect(),

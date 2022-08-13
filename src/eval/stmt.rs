@@ -913,7 +913,7 @@ impl Engine {
 
                         #[cfg(not(feature = "no_module"))]
                         if let Some(alias) = _alias {
-                            scope.add_alias_by_index(scope.len() - 1, alias.name.clone());
+                            scope.add_alias_by_index(scope.len() - 1, alias.name.as_str().into());
                         }
 
                         Ok(Dynamic::UNIT)
@@ -995,11 +995,11 @@ impl Engine {
             // Export statement
             #[cfg(not(feature = "no_module"))]
             Stmt::Export(x, ..) => {
-                let (Ident { name, pos, .. }, alias) = &**x;
+                let (Ident { name, pos, .. }, Ident { name: alias, .. }) = &**x;
                 // Mark scope variables as public
                 if let Some((index, ..)) = scope.get_index(name) {
                     let alias = if alias.is_empty() { name } else { alias }.clone();
-                    scope.add_alias_by_index(index, alias);
+                    scope.add_alias_by_index(index, alias.into());
                     Ok(Dynamic::UNIT)
                 } else {
                     Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into())
