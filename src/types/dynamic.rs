@@ -346,11 +346,52 @@ impl Dynamic {
     #[inline]
     #[must_use]
     pub fn is<T: Any + Clone>(&self) -> bool {
-        if TypeId::of::<T>() == TypeId::of::<String>() {
-            self.type_id() == TypeId::of::<ImmutableString>()
-        } else {
-            self.type_id() == TypeId::of::<T>()
+        if TypeId::of::<T>() == TypeId::of::<()>() {
+            return matches!(self.0, Union::Unit(..));
         }
+        if TypeId::of::<T>() == TypeId::of::<bool>() {
+            return matches!(self.0, Union::Bool(..));
+        }
+        if TypeId::of::<T>() == TypeId::of::<char>() {
+            return matches!(self.0, Union::Char(..));
+        }
+        if TypeId::of::<T>() == TypeId::of::<INT>() {
+            return matches!(self.0, Union::Int(..));
+        }
+        #[cfg(not(feature = "no_float"))]
+        if TypeId::of::<T>() == TypeId::of::<crate::FLOAT>() {
+            return matches!(self.0, Union::Float(..));
+        }
+        if TypeId::of::<T>() == TypeId::of::<ImmutableString>()
+            || TypeId::of::<T>() == TypeId::of::<String>()
+        {
+            return matches!(self.0, Union::Str(..));
+        }
+        #[cfg(not(feature = "no_index"))]
+        if TypeId::of::<T>() == TypeId::of::<crate::Array>() {
+            return matches!(self.0, Union::Array(..));
+        }
+        #[cfg(not(feature = "no_index"))]
+        if TypeId::of::<T>() == TypeId::of::<crate::Blob>() {
+            return matches!(self.0, Union::Blob(..));
+        }
+        #[cfg(not(feature = "no_object"))]
+        if TypeId::of::<T>() == TypeId::of::<crate::Map>() {
+            return matches!(self.0, Union::Map(..));
+        }
+        #[cfg(feature = "decimal")]
+        if TypeId::of::<T>() == TypeId::of::<rust_decimal::Decimal>() {
+            return matches!(self.0, Union::Decimal(..));
+        }
+        if TypeId::of::<T>() == TypeId::of::<FnPtr>() {
+            return matches!(self.0, Union::FnPtr(..));
+        }
+        #[cfg(not(feature = "no_std"))]
+        if TypeId::of::<T>() == TypeId::of::<crate::Instant>() {
+            return matches!(self.0, Union::TimeStamp(..));
+        }
+
+        TypeId::of::<T>() == self.type_id()
     }
     /// Get the [`TypeId`] of the value held by this [`Dynamic`].
     ///

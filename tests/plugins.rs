@@ -70,7 +70,7 @@ macro_rules! reg_functions {
 }
 
 fn make_greeting(n: impl std::fmt::Display) -> String {
-    format!("{} kitties", n)
+    format!("{n} kitties")
 }
 
 gen_unary_functions!(greet = make_greeting(INT, bool, char) -> String);

@@ -260,7 +260,7 @@ mod sample_functions {
     /// print(result);      // prints "42 123"
     /// ```
     pub fn test(x: INT, y: INT) -> String {
-        format!("{} {}", x, y)
+        format!("{x} {y}")
     }
 
     /// This is a sample method for integers.

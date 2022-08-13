@@ -341,7 +341,7 @@ impl EvalAltResult {
     pub(crate) fn dump_fields(&self, map: &mut crate::Map) {
         map.insert(
             "error".into(),
-            format!("{:?}", self)
+            format!("{self:?}")
                 .split('(')
                 .next()
                 .expect("`ErrorXXX(...)`")

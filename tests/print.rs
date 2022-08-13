@@ -39,14 +39,12 @@ fn test_print_debug() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
 
     engine
-        .on_print(move |s| log1.write().unwrap().push(format!("entry: {}", s)))
+        .on_print(move |s| log1.write().unwrap().push(format!("entry: {s}")))
         .on_debug(move |s, src, pos| {
-            log2.write().unwrap().push(format!(
-                "DEBUG of {} at {:?}: {}",
-                src.unwrap_or("unknown"),
-                pos,
-                s
-            ))
+            let src = src.unwrap_or("unknown");
+            log2.write()
+                .unwrap()
+                .push(format!("DEBUG of {src} at {pos:?}: {s}"))
         });
 
     // Evaluate script

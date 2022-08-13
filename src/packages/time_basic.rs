@@ -66,8 +66,7 @@ mod time_functions {
 
             if cfg!(not(feature = "unchecked")) && seconds > (INT::MAX as u64) {
                 Err(make_arithmetic_err(format!(
-                    "Integer overflow for timestamp.elapsed: {}",
-                    seconds
+                    "Integer overflow for timestamp.elapsed: {seconds}"
                 )))
             } else if timestamp > Instant::now() {
                 Err(make_arithmetic_err("Time-stamp is later than now"))
@@ -94,8 +93,7 @@ mod time_functions {
 
             if cfg!(not(feature = "unchecked")) && seconds > (INT::MAX as u64) {
                 Err(make_arithmetic_err(format!(
-                    "Integer overflow for timestamp duration: -{}",
-                    seconds
+                    "Integer overflow for timestamp duration: -{seconds}"
                 )))
             } else {
                 Ok((-(seconds as INT)).into())
@@ -105,8 +103,7 @@ mod time_functions {
 
             if cfg!(not(feature = "unchecked")) && seconds > (INT::MAX as u64) {
                 Err(make_arithmetic_err(format!(
-                    "Integer overflow for timestamp duration: {}",
-                    seconds
+                    "Integer overflow for timestamp duration: {seconds}"
                 )))
             } else {
                 Ok((seconds as INT).into())
@@ -122,16 +119,14 @@ mod time_functions {
             } else if cfg!(not(feature = "unchecked")) {
                 if seconds > (INT::MAX as FLOAT) {
                     Err(make_arithmetic_err(format!(
-                        "Integer overflow for timestamp add: {}",
-                        seconds
+                        "Integer overflow for timestamp add: {seconds}"
                     )))
                 } else {
                     timestamp
                         .checked_add(Duration::from_millis((seconds * 1000.0) as u64))
                         .ok_or_else(|| {
                             make_arithmetic_err(format!(
-                                "Timestamp overflow when adding {} second(s)",
-                                seconds
+                                "Timestamp overflow when adding {seconds} second(s)"
                             ))
                         })
                 }
@@ -145,16 +140,14 @@ mod time_functions {
             } else if cfg!(not(feature = "unchecked")) {
                 if seconds > (INT::MAX as FLOAT) {
                     Err(make_arithmetic_err(format!(
-                        "Integer overflow for timestamp add: {}",
-                        seconds
+                        "Integer overflow for timestamp add: {seconds}"
                     )))
                 } else {
                     timestamp
                         .checked_sub(Duration::from_millis((seconds * 1000.0) as u64))
                         .ok_or_else(|| {
                             make_arithmetic_err(format!(
-                                "Timestamp overflow when adding {} second(s)",
-                                seconds
+                                "Timestamp overflow when adding {seconds} second(s)"
                             ))
                         })
                 }
@@ -195,8 +188,7 @@ mod time_functions {
                 .checked_add(Duration::from_secs(seconds as u64))
                 .ok_or_else(|| {
                     make_arithmetic_err(format!(
-                        "Timestamp overflow when adding {} second(s)",
-                        seconds
+                        "Timestamp overflow when adding {seconds} second(s)"
                     ))
                 })
         } else {
@@ -211,8 +203,7 @@ mod time_functions {
                 .checked_sub(Duration::from_secs(seconds as u64))
                 .ok_or_else(|| {
                     make_arithmetic_err(format!(
-                        "Timestamp overflow when adding {} second(s)",
-                        seconds
+                        "Timestamp overflow when adding {seconds} second(s)"
                     ))
                 })
         } else {

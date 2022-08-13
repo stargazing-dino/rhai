@@ -41,14 +41,14 @@ impl Engine {
     /// scope.push("foo", 42_i64);
     ///
     /// // Call the script-defined function
-    /// let result: i64 = engine.call_fn(&mut scope, &ast, "add", ( "abc", 123_i64 ) )?;
+    /// let result = engine.call_fn::<i64>(&mut scope, &ast, "add", ( "abc", 123_i64 ) )?;
     /// assert_eq!(result, 168);
     ///
-    /// let result: i64 = engine.call_fn(&mut scope, &ast, "add1", ( "abc", ) )?;
-    /// //                                                         ^^^^^^^^^^ tuple of one
+    /// let result = engine.call_fn::<i64>(&mut scope, &ast, "add1", ( "abc", ) )?;
+    /// //                                                           ^^^^^^^^^^ tuple of one
     /// assert_eq!(result, 46);
     ///
-    /// let result: i64 = engine.call_fn(&mut scope, &ast, "bar", () )?;
+    /// let result = engine.call_fn::<i64>(&mut scope, &ast, "bar", () )?;
     /// assert_eq!(result, 21);
     /// # }
     /// # Ok(())

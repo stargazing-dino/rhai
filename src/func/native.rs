@@ -235,7 +235,7 @@ impl<'a> NativeCallContext<'a> {
     #[inline]
     pub(crate) fn iter_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&crate::Identifier, &Shared<Module>)> {
+    ) -> impl Iterator<Item = (&crate::ImmutableString, &Shared<Module>)> {
         self.global.iter().flat_map(|&m| m.iter_imports_raw())
     }
     /// _(internals)_ The current [`GlobalRuntimeState`], if any.

@@ -68,11 +68,11 @@ fn test_native_overload() -> Result<(), Box<EvalAltResult>> {
         .register_fn(
             "+",
             |s1: ImmutableString, s2: ImmutableString| -> ImmutableString {
-                format!("{}***{}", s1, s2).into()
+                format!("{s1}***{s2}").into()
             },
         )
         .register_fn("+", |s1: ImmutableString, _: ()| -> ImmutableString {
-            format!("{} Foo!", s1).into()
+            format!("{s1} Foo!").into()
         });
 
     assert_eq!(

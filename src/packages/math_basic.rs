@@ -139,16 +139,14 @@ mod int_functions {
     #[rhai_fn(name = "parse_int", return_raw)]
     pub fn parse_int_radix(string: &str, radix: INT) -> RhaiResultOf<INT> {
         if !(2..=36).contains(&radix) {
-            return Err(ERR::ErrorArithmetic(
-                format!("Invalid radix: '{}'", radix),
-                Position::NONE,
-            )
-            .into());
+            return Err(
+                ERR::ErrorArithmetic(format!("Invalid radix: '{radix}'"), Position::NONE).into(),
+            );
         }
 
         INT::from_str_radix(string.trim(), radix as u32).map_err(|err| {
             ERR::ErrorArithmetic(
-                format!("Error parsing integer number '{}': {}", string, err),
+                format!("Error parsing integer number '{string}': {err}"),
                 Position::NONE,
             )
             .into()
@@ -316,7 +314,7 @@ mod float_functions {
     pub fn f32_to_int(x: f32) -> RhaiResultOf<INT> {
         if cfg!(not(feature = "unchecked")) && (x > (INT::MAX as f32) || x < (INT::MIN as f32)) {
             Err(
-                ERR::ErrorArithmetic(format!("Integer overflow: to_int({})", x), Position::NONE)
+                ERR::ErrorArithmetic(format!("Integer overflow: to_int({x})"), Position::NONE)
                     .into(),
             )
         } else {
@@ -328,7 +326,7 @@ mod float_functions {
     pub fn f64_to_int(x: f64) -> RhaiResultOf<INT> {
         if cfg!(not(feature = "unchecked")) && (x > (INT::MAX as f64) || x < (INT::MIN as f64)) {
             Err(
-                ERR::ErrorArithmetic(format!("Integer overflow: to_int({})", x), Position::NONE)
+                ERR::ErrorArithmetic(format!("Integer overflow: to_int({x})"), Position::NONE)
                     .into(),
             )
         } else {
@@ -348,7 +346,7 @@ mod float_functions {
     pub fn parse_float(string: &str) -> RhaiResultOf<FLOAT> {
         string.trim().parse::<FLOAT>().map_err(|err| {
             ERR::ErrorArithmetic(
-                format!("Error parsing floating-point number '{}': {}", string, err),
+                format!("Error parsing floating-point number '{string}': {err}"),
                 Position::NONE,
             )
             .into()
@@ -416,14 +414,14 @@ mod decimal_functions {
     #[rhai_fn(return_raw)]
     pub fn sqrt(x: Decimal) -> RhaiResultOf<Decimal> {
         x.sqrt()
-            .ok_or_else(|| make_err(format!("Error taking the square root of {}", x,)))
+            .ok_or_else(|| make_err(format!("Error taking the square root of {x}")))
     }
     /// Return the exponential of the decimal number.
     #[rhai_fn(return_raw)]
     pub fn exp(x: Decimal) -> RhaiResultOf<Decimal> {
         if cfg!(not(feature = "unchecked")) {
             x.checked_exp()
-                .ok_or_else(|| make_err(format!("Exponential overflow: e ** {}", x,)))
+                .ok_or_else(|| make_err(format!("Exponential overflow: e ** {x}")))
         } else {
             Ok(x.exp())
         }
@@ -433,7 +431,7 @@ mod decimal_functions {
     pub fn ln(x: Decimal) -> RhaiResultOf<Decimal> {
         if cfg!(not(feature = "unchecked")) {
             x.checked_ln()
-                .ok_or_else(|| make_err(format!("Error taking the natural log of {}", x)))
+                .ok_or_else(|| make_err(format!("Error taking the natural log of {x}")))
         } else {
             Ok(x.ln())
         }
@@ -443,7 +441,7 @@ mod decimal_functions {
     pub fn log10(x: Decimal) -> RhaiResultOf<Decimal> {
         if cfg!(not(feature = "unchecked")) {
             x.checked_log10()
-                .ok_or_else(|| make_err(format!("Error taking the log of {}", x)))
+                .ok_or_else(|| make_err(format!("Error taking the log of {x}")))
         } else {
             Ok(x.log10())
         }
@@ -471,8 +469,7 @@ mod decimal_functions {
         if cfg!(not(feature = "unchecked")) {
             if digits < 0 {
                 return Err(make_err(format!(
-                    "Invalid number of digits for rounding: {}",
-                    digits
+                    "Invalid number of digits for rounding: {digits}"
                 )));
             }
             if cfg!(not(feature = "only_i32")) && digits > (u32::MAX as INT) {
@@ -489,8 +486,7 @@ mod decimal_functions {
         if cfg!(not(feature = "unchecked")) {
             if digits < 0 {
                 return Err(make_err(format!(
-                    "Invalid number of digits for rounding: {}",
-                    digits
+                    "Invalid number of digits for rounding: {digits}"
                 )));
             }
             if cfg!(not(feature = "only_i32")) && digits > (u32::MAX as INT) {
@@ -507,8 +503,7 @@ mod decimal_functions {
         if cfg!(not(feature = "unchecked")) {
             if digits < 0 {
                 return Err(make_err(format!(
-                    "Invalid number of digits for rounding: {}",
-                    digits
+                    "Invalid number of digits for rounding: {digits}"
                 )));
             }
             if cfg!(not(feature = "only_i32")) && digits > (u32::MAX as INT) {
@@ -525,8 +520,7 @@ mod decimal_functions {
         if cfg!(not(feature = "unchecked")) {
             if digits < 0 {
                 return Err(make_err(format!(
-                    "Invalid number of digits for rounding: {}",
-                    digits
+                    "Invalid number of digits for rounding: {digits}"
                 )));
             }
             if cfg!(not(feature = "only_i32")) && digits > (u32::MAX as INT) {
@@ -543,8 +537,7 @@ mod decimal_functions {
         if cfg!(not(feature = "unchecked")) {
             if digits < 0 {
                 return Err(make_err(format!(
-                    "Invalid number of digits for rounding: {}",
-                    digits
+                    "Invalid number of digits for rounding: {digits}"
                 )));
             }
             if cfg!(not(feature = "only_i32")) && digits > (u32::MAX as INT) {
@@ -572,7 +565,7 @@ mod decimal_functions {
         match n {
             Some(n) => Ok(n),
             _ => Err(ERR::ErrorArithmetic(
-                format!("Integer overflow: to_int({})", x),
+                format!("Integer overflow: to_int({x})"),
                 Position::NONE,
             )
             .into()),
@@ -603,7 +596,7 @@ mod decimal_functions {
             .or_else(|_| Decimal::from_scientific(string))
             .map_err(|err| {
                 ERR::ErrorArithmetic(
-                    format!("Error parsing decimal number '{}': {}", string, err),
+                    format!("Error parsing decimal number '{string}': {err}"),
                     Position::NONE,
                 )
                 .into()
@@ -616,7 +609,7 @@ mod decimal_functions {
     pub fn f32_to_decimal(x: f32) -> RhaiResultOf<Decimal> {
         Decimal::try_from(x).map_err(|_| {
             ERR::ErrorArithmetic(
-                format!("Cannot convert to Decimal: to_decimal({})", x),
+                format!("Cannot convert to Decimal: to_decimal({x})"),
                 Position::NONE,
             )
             .into()
@@ -628,7 +621,7 @@ mod decimal_functions {
     pub fn f64_to_decimal(x: f64) -> RhaiResultOf<Decimal> {
         Decimal::try_from(x).map_err(|_| {
             ERR::ErrorArithmetic(
-                format!("Cannot convert to Decimal: to_decimal({})", x),
+                format!("Cannot convert to Decimal: to_decimal({x})"),
                 Position::NONE,
             )
             .into()
@@ -640,7 +633,7 @@ mod decimal_functions {
     pub fn to_float(x: Decimal) -> RhaiResultOf<FLOAT> {
         FLOAT::try_from(x).map_err(|_| {
             ERR::ErrorArithmetic(
-                format!("Cannot convert to floating-point: to_float({})", x),
+                format!("Cannot convert to floating-point: to_float({x})"),
                 Position::NONE,
             )
             .into()

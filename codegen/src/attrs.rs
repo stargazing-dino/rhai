@@ -131,7 +131,7 @@ pub fn inner_item_attributes<T: ExportedParams>(
         {
             return Err(syn::Error::new(
                 duplicate.span(),
-                format!("duplicated attribute '{}'", attr_name),
+                format!("duplicated attribute '{attr_name}'"),
             ));
         }
 

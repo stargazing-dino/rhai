@@ -72,7 +72,7 @@ impl ExportedParams for ExportedModParams {
                 (attr, ..) => {
                     return Err(syn::Error::new(
                         key.span(),
-                        format!("unknown attribute '{}'", attr),
+                        format!("unknown attribute '{attr}'"),
                     ))
                 }
             }

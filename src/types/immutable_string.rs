@@ -82,7 +82,7 @@ impl Borrow<SmartString> for ImmutableString {
 impl Borrow<str> for ImmutableString {
     #[inline(always)]
     fn borrow(&self) -> &str {
-        self.0.as_str()
+        self.as_str()
     }
 }
 
@@ -187,14 +187,14 @@ impl FromIterator<SmartString> for ImmutableString {
 impl fmt::Display for ImmutableString {
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self.0.as_str(), f)
+        fmt::Display::fmt(self.as_str(), f)
     }
 }
 
 impl fmt::Debug for ImmutableString {
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(self.0.as_str(), f)
+        fmt::Debug::fmt(self.as_str(), f)
     }
 }
 
@@ -208,7 +208,7 @@ impl Add for ImmutableString {
         } else if self.is_empty() {
             rhs
         } else {
-            self.make_mut().push_str(rhs.0.as_str());
+            self.make_mut().push_str(rhs.as_str());
             self
         }
     }
@@ -225,7 +225,40 @@ impl Add for &ImmutableString {
             rhs.clone()
         } else {
             let mut s = self.clone();
-            s.make_mut().push_str(rhs.0.as_str());
+            s.make_mut().push_str(rhs.as_str());
+            s
+        }
+    }
+}
+
+impl Add<&Self> for ImmutableString {
+    type Output = Self;
+
+    #[inline]
+    fn add(mut self, rhs: &Self) -> Self::Output {
+        if rhs.is_empty() {
+            self
+        } else if self.is_empty() {
+            rhs.clone()
+        } else {
+            self.make_mut().push_str(rhs.as_str());
+            self
+        }
+    }
+}
+
+impl Add<ImmutableString> for &ImmutableString {
+    type Output = ImmutableString;
+
+    #[inline]
+    fn add(self, rhs: ImmutableString) -> Self::Output {
+        if rhs.is_empty() {
+            self.clone()
+        } else if self.is_empty() {
+            rhs
+        } else {
+            let mut s = self.clone();
+            s.make_mut().push_str(rhs.as_str());
             s
         }
     }
@@ -238,7 +271,7 @@ impl AddAssign<&ImmutableString> for ImmutableString {
             if self.is_empty() {
                 self.0 = rhs.0.clone();
             } else {
-                self.make_mut().push_str(rhs.0.as_str());
+                self.make_mut().push_str(rhs.as_str());
             }
         }
     }
@@ -251,7 +284,7 @@ impl AddAssign<ImmutableString> for ImmutableString {
             if self.is_empty() {
                 self.0 = rhs.0;
             } else {
-                self.make_mut().push_str(rhs.0.as_str());
+                self.make_mut().push_str(rhs.as_str());
             }
         }
     }
@@ -579,6 +612,10 @@ impl ImmutableString {
     #[must_use]
     pub fn new() -> Self {
         Self(SmartString::new_const().into())
+    }
+    /// Strong count of references to the underlying string.
+    pub(crate) fn strong_count(&self) -> usize {
+        Shared::strong_count(&self.0)
     }
     /// Consume the [`ImmutableString`] and convert it into a [`String`].
     ///

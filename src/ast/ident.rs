@@ -1,6 +1,6 @@
 //! Module defining script identifiers.
 
-use crate::{Identifier, Position};
+use crate::{ImmutableString, Position};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -14,7 +14,7 @@ use std::{
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct Ident {
     /// Identifier name.
-    pub name: Identifier,
+    pub name: ImmutableString,
     /// Position.
     pub pos: Position,
 }
@@ -34,7 +34,7 @@ impl AsRef<str> for Ident {
 }
 
 impl Deref for Ident {
-    type Target = Identifier;
+    type Target = ImmutableString;
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
@@ -50,12 +50,6 @@ impl DerefMut for Ident {
 }
 
 impl Ident {
-    /// An empty [`Ident`].
-    pub const EMPTY: Self = Self {
-        name: Identifier::new_const(),
-        pos: Position::NONE,
-    };
-
     /// Get the name of the identifier as a string slice.
     #[inline(always)]
     #[must_use]

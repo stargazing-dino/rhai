@@ -135,7 +135,7 @@ impl FuncInfo {
             return if r == x {
                 typ.into()
             } else {
-                format!("&mut {}", r).into()
+                format!("&mut {r}").into()
             };
         }
 
@@ -202,7 +202,7 @@ impl FuncInfo {
                     };
                     let result: std::borrow::Cow<str> = match seg.next() {
                         Some(typ) => {
-                            format!("{}: {}", name, FuncInfo::format_type(typ, false)).into()
+                            format!("{name}: {}", FuncInfo::format_type(typ, false)).into()
                         }
                         None => name.into(),
                     };
@@ -759,12 +759,12 @@ impl Module {
         let num_params = fn_def.params.len();
         let hash_script = crate::calc_fn_hash(&fn_def.name, num_params);
         #[cfg(feature = "metadata")]
-        let params_info = fn_def.params.iter().cloned().collect();
+        let params_info = fn_def.params.iter().map(Into::into).collect();
         self.functions.insert(
             hash_script,
             FuncInfo {
                 metadata: FnMetadata {
-                    name: fn_def.name.clone(),
+                    name: fn_def.name.as_str().into(),
                     namespace: FnNamespace::Internal,
                     access: fn_def.access,
                     params: num_params,
@@ -2016,12 +2016,11 @@ impl Module {
                     return Err(crate::ERR::ErrorMismatchDataType(
                         "".to_string(),
                         if fn_ptr.is_anonymous() {
-                            format!("cannot export closure in variable {}", _name)
+                            format!("cannot export closure in variable {_name}")
                         } else {
                             format!(
-                                "cannot export function pointer to local function '{}' in variable {}",
-                                fn_ptr.fn_name(),
-                                _name
+                                "cannot export function pointer to local function '{}' in variable {_name}",
+                                fn_ptr.fn_name()
                             )
                         },
                         crate::Position::NONE,

@@ -82,7 +82,7 @@ impl Engine {
                             let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
 
                             Err(ERR::ErrorVariableNotFound(
-                                format!("{}{}{}", namespace, sep, var_name),
+                                format!("{namespace}{sep}{var_name}"),
                                 namespace.position(),
                             )
                             .into())
@@ -94,7 +94,7 @@ impl Engine {
                     if namespace.len() == 1 && namespace.root() == crate::engine::KEYWORD_GLOBAL {
                         if let Some(ref constants) = global.constants {
                             if let Some(value) =
-                                crate::func::locked_write(constants).get_mut(var_name)
+                                crate::func::locked_write(constants).get_mut(var_name.as_str())
                             {
                                 let mut target: Target = value.clone().into();
                                 // Module variables are constant
@@ -106,7 +106,7 @@ impl Engine {
                         let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
 
                         return Err(ERR::ErrorVariableNotFound(
-                            format!("{}{}{}", namespace, sep, var_name),
+                            format!("{namespace}{sep}{var_name}"),
                             namespace.position(),
                         )
                         .into());
@@ -155,7 +155,7 @@ impl Engine {
                 if lib
                     .iter()
                     .flat_map(|&m| m.iter_script_fn())
-                    .any(|(_, _, f, ..)| f == v.3) =>
+                    .any(|(_, _, f, ..)| f == v.3.as_str()) =>
             {
                 let val: Dynamic =
                     crate::FnPtr::new_unchecked(v.3.as_str(), Default::default()).into();
@@ -328,7 +328,7 @@ impl Engine {
 
             // `... ${...} ...`
             Expr::InterpolatedString(x, _) => {
-                let mut concat = self.const_empty_string().into();
+                let mut concat = self.get_interned_string("").into();
                 let target = &mut concat;
                 let mut result = Ok(Dynamic::UNIT);
 
@@ -355,7 +355,10 @@ impl Engine {
                     }
                 }
 
-                result.map(|_| concat.take_or_clone())
+                self.check_return_value(
+                    result.map(|_| concat.take_or_clone()),
+                    expr.start_position(),
+                )
             }
 
             #[cfg(not(feature = "no_index"))]
@@ -494,9 +497,9 @@ impl Engine {
                 // The first token acts as the custom syntax's key
                 let key_token = custom.tokens.first().unwrap();
                 // The key should exist, unless the AST is compiled in a different Engine
-                let custom_def = self.custom_syntax.get(key_token).ok_or_else(|| {
+                let custom_def = self.custom_syntax.get(key_token.as_str()).ok_or_else(|| {
                     Box::new(ERR::ErrorCustomSyntax(
-                        format!("Invalid custom syntax prefix: {}", key_token),
+                        format!("Invalid custom syntax prefix: {key_token}"),
                         custom.tokens.iter().map(<_>::to_string).collect(),
                         *pos,
                     ))

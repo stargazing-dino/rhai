@@ -24,7 +24,7 @@ macro_rules! gen_arithmetic_functions {
                 #[rhai_fn(name = "+", return_raw)]
                 pub fn add(x: $arg_type, y: $arg_type) -> RhaiResultOf<$arg_type> {
                     if cfg!(not(feature = "unchecked")) {
-                        x.checked_add(y).ok_or_else(|| make_err(format!("Addition overflow: {} + {}", x, y)))
+                        x.checked_add(y).ok_or_else(|| make_err(format!("Addition overflow: {x} + {y}")))
                     } else {
                         Ok(x + y)
                     }
@@ -32,7 +32,7 @@ macro_rules! gen_arithmetic_functions {
                 #[rhai_fn(name = "-", return_raw)]
                 pub fn subtract(x: $arg_type, y: $arg_type) -> RhaiResultOf<$arg_type> {
                     if cfg!(not(feature = "unchecked")) {
-                        x.checked_sub(y).ok_or_else(|| make_err(format!("Subtraction overflow: {} - {}", x, y)))
+                        x.checked_sub(y).ok_or_else(|| make_err(format!("Subtraction overflow: {x} - {y}")))
                     } else {
                         Ok(x - y)
                     }
@@ -40,7 +40,7 @@ macro_rules! gen_arithmetic_functions {
                 #[rhai_fn(name = "*", return_raw)]
                 pub fn multiply(x: $arg_type, y: $arg_type) -> RhaiResultOf<$arg_type> {
                     if cfg!(not(feature = "unchecked")) {
-                        x.checked_mul(y).ok_or_else(|| make_err(format!("Multiplication overflow: {} * {}", x, y)))
+                        x.checked_mul(y).ok_or_else(|| make_err(format!("Multiplication overflow: {x} * {y}")))
                     } else {
                         Ok(x * y)
                     }
@@ -50,9 +50,9 @@ macro_rules! gen_arithmetic_functions {
                     if cfg!(not(feature = "unchecked")) {
                         // Detect division by zero
                         if y == 0 {
-                            Err(make_err(format!("Division by zero: {} / {}", x, y)))
+                            Err(make_err(format!("Division by zero: {x} / {y}")))
                         } else {
-                            x.checked_div(y).ok_or_else(|| make_err(format!("Division overflow: {} / {}", x, y)))
+                            x.checked_div(y).ok_or_else(|| make_err(format!("Division overflow: {x} / {y}")))
                         }
                     } else {
                         Ok(x / y)
@@ -61,7 +61,7 @@ macro_rules! gen_arithmetic_functions {
                 #[rhai_fn(name = "%", return_raw)]
                 pub fn modulo(x: $arg_type, y: $arg_type) -> RhaiResultOf<$arg_type> {
                     if cfg!(not(feature = "unchecked")) {
-                        x.checked_rem(y).ok_or_else(|| make_err(format!("Modulo division by zero or overflow: {} % {}", x, y)))
+                        x.checked_rem(y).ok_or_else(|| make_err(format!("Modulo division by zero or overflow: {x} % {y}")))
                     } else {
                         Ok(x % y)
                     }
@@ -70,11 +70,11 @@ macro_rules! gen_arithmetic_functions {
                 pub fn power(x: $arg_type, y: INT) -> RhaiResultOf<$arg_type> {
                     if cfg!(not(feature = "unchecked")) {
                         if cfg!(not(feature = "only_i32")) && y > (u32::MAX as INT) {
-                            Err(make_err(format!("Integer raised to too large an index: {} ~ {}", x, y)))
+                            Err(make_err(format!("Integer raised to too large an index: {x} ** {y}")))
                         } else if y < 0 {
-                            Err(make_err(format!("Integer raised to a negative index: {} ~ {}", x, y)))
+                            Err(make_err(format!("Integer raised to a negative index: {x} ** {y}")))
                         } else {
-                            x.checked_pow(y as u32).ok_or_else(|| make_err(format!("Exponential overflow: {} ~ {}", x, y)))
+                            x.checked_pow(y as u32).ok_or_else(|| make_err(format!("Exponential overflow: {x} ** {y}")))
                         }
                     } else {
                         Ok(x.pow(y as u32))
@@ -85,11 +85,11 @@ macro_rules! gen_arithmetic_functions {
                 pub fn shift_left(x: $arg_type, y: INT) -> RhaiResultOf<$arg_type> {
                     if cfg!(not(feature = "unchecked")) {
                         if cfg!(not(feature = "only_i32")) && y > (u32::MAX as INT) {
-                            Err(make_err(format!("Left-shift by too many bits: {} << {}", x, y)))
+                            Err(make_err(format!("Left-shift by too many bits: {x} << {y}")))
                         } else if y < 0 {
-                            Err(make_err(format!("Left-shift by a negative number: {} << {}", x, y)))
+                            Err(make_err(format!("Left-shift by a negative number: {x} << {y}")))
                         } else {
-                            x.checked_shl(y as u32).ok_or_else(|| make_err(format!("Left-shift by too many bits: {} << {}", x, y)))
+                            x.checked_shl(y as u32).ok_or_else(|| make_err(format!("Left-shift by too many bits: {x} << {y}")))
                         }
                     } else {
                         Ok(x << y)
@@ -99,11 +99,11 @@ macro_rules! gen_arithmetic_functions {
                 pub fn shift_right(x: $arg_type, y: INT) -> RhaiResultOf<$arg_type> {
                     if cfg!(not(feature = "unchecked")) {
                         if cfg!(not(feature = "only_i32")) && y > (u32::MAX as INT) {
-                            Err(make_err(format!("Right-shift by too many bits: {} >> {}", x, y)))
+                            Err(make_err(format!("Right-shift by too many bits: {x} >> {y}")))
                         } else if y < 0 {
-                            Err(make_err(format!("Right-shift by a negative number: {} >> {}", x, y)))
+                            Err(make_err(format!("Right-shift by a negative number: {x} >> {y}")))
                         } else {
-                            x.checked_shr(y as u32).ok_or_else(|| make_err(format!("Right-shift by too many bits: {} >> {}", x, y)))
+                            x.checked_shr(y as u32).ok_or_else(|| make_err(format!("Right-shift by too many bits: {x} >> {y}")))
                         }
                     } else {
                         Ok(x >> y)
@@ -151,7 +151,7 @@ macro_rules! gen_signed_functions {
                 #[rhai_fn(name = "-", return_raw)]
                 pub fn neg(x: $arg_type) -> RhaiResultOf<$arg_type> {
                     if cfg!(not(feature = "unchecked")) {
-                        x.checked_neg().ok_or_else(|| make_err(format!("Negation overflow: -{}", x)))
+                        x.checked_neg().ok_or_else(|| make_err(format!("Negation overflow: -{x}")))
                     } else {
                         Ok(-x)
                     }
@@ -164,7 +164,7 @@ macro_rules! gen_signed_functions {
                 #[rhai_fn(return_raw)]
                 pub fn abs(x: $arg_type) -> RhaiResultOf<$arg_type> {
                     if cfg!(not(feature = "unchecked")) {
-                        x.checked_abs().ok_or_else(|| make_err(format!("Negation overflow: -{}", x)))
+                        x.checked_abs().ok_or_else(|| make_err(format!("Negation overflow: -{x}")))
                     } else {
                         Ok(x.abs())
                     }
@@ -372,8 +372,7 @@ mod f32_functions {
     pub fn pow_f_i(x: f32, y: INT) -> RhaiResultOf<f32> {
         if cfg!(not(feature = "unchecked")) && y > (i32::MAX as INT) {
             Err(make_err(format!(
-                "Number raised to too large an index: {} ~ {}",
-                x, y
+                "Number raised to too large an index: {x} ** {y}"
             )))
         } else {
             Ok(x.powi(y as i32))
@@ -495,7 +494,7 @@ pub mod decimal_functions {
     pub fn add(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
         if cfg!(not(feature = "unchecked")) {
             x.checked_add(y)
-                .ok_or_else(|| make_err(format!("Addition overflow: {} + {}", x, y)))
+                .ok_or_else(|| make_err(format!("Addition overflow: {x} + {y}")))
         } else {
             Ok(x + y)
         }
@@ -504,7 +503,7 @@ pub mod decimal_functions {
     pub fn subtract(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
         if cfg!(not(feature = "unchecked")) {
             x.checked_sub(y)
-                .ok_or_else(|| make_err(format!("Subtraction overflow: {} - {}", x, y)))
+                .ok_or_else(|| make_err(format!("Subtraction overflow: {x} - {y}")))
         } else {
             Ok(x - y)
         }
@@ -513,7 +512,7 @@ pub mod decimal_functions {
     pub fn multiply(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
         if cfg!(not(feature = "unchecked")) {
             x.checked_mul(y)
-                .ok_or_else(|| make_err(format!("Multiplication overflow: {} * {}", x, y)))
+                .ok_or_else(|| make_err(format!("Multiplication overflow: {x} * {y}")))
         } else {
             Ok(x * y)
         }
@@ -523,10 +522,10 @@ pub mod decimal_functions {
         if cfg!(not(feature = "unchecked")) {
             // Detect division by zero
             if y == Decimal::zero() {
-                Err(make_err(format!("Division by zero: {} / {}", x, y)))
+                Err(make_err(format!("Division by zero: {x} / {y}")))
             } else {
                 x.checked_div(y)
-                    .ok_or_else(|| make_err(format!("Division overflow: {} / {}", x, y)))
+                    .ok_or_else(|| make_err(format!("Division overflow: {x} / {y}")))
             }
         } else {
             Ok(x / y)
@@ -535,12 +534,8 @@ pub mod decimal_functions {
     #[rhai_fn(skip, return_raw)]
     pub fn modulo(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
         if cfg!(not(feature = "unchecked")) {
-            x.checked_rem(y).ok_or_else(|| {
-                make_err(format!(
-                    "Modulo division by zero or overflow: {} % {}",
-                    x, y
-                ))
-            })
+            x.checked_rem(y)
+                .ok_or_else(|| make_err(format!("Modulo division by zero or overflow: {x} % {y}")))
         } else {
             Ok(x % y)
         }
@@ -549,7 +544,7 @@ pub mod decimal_functions {
     pub fn power(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
         if cfg!(not(feature = "unchecked")) {
             x.checked_powd(y)
-                .ok_or_else(|| make_err(format!("Exponential overflow: {} + {}", x, y)))
+                .ok_or_else(|| make_err(format!("Exponential overflow: {x} ** {y}")))
         } else {
             Ok(x.pow(y))
         }

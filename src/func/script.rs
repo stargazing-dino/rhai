@@ -161,9 +161,9 @@ impl Engine {
                 // Error in sub function call
                 ERR::ErrorInFunctionCall(name, src, err, ..) => {
                     let fn_name = if src.is_empty() {
-                        format!("{} < {}", name, fn_def.name)
+                        format!("{name} < {}", fn_def.name)
                     } else {
-                        format!("{} @ '{}' < {}", name, src, fn_def.name)
+                        format!("{name} @ '{src}' < {}", fn_def.name)
                     };
                     make_error(fn_name, fn_def, global, err, pos)
                 }

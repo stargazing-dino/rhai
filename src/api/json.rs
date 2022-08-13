@@ -120,7 +120,7 @@ impl Engine {
         );
 
         let scope = Scope::new();
-        let mut state = ParseState::new(self, &scope, tokenizer_control);
+        let mut state = ParseState::new(self, &scope, Default::default(), tokenizer_control);
 
         let ast = self.parse_global_expr(
             &mut stream.peekable(),

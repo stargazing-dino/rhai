@@ -258,9 +258,8 @@ impl Engine {
                     return Err(LexError::ImproperSymbol(
                         s.to_string(),
                         format!(
-                            "Improper symbol for custom syntax at position #{}: '{}'",
+                            "Improper symbol for custom syntax at position #{}: '{s}'",
                             segments.len() + 1,
-                            s
                         ),
                     )
                     .into_err(Position::NONE));
@@ -282,9 +281,8 @@ impl Engine {
                     return Err(LexError::ImproperSymbol(
                         s.to_string(),
                         format!(
-                            "Improper symbol for custom syntax at position #{}: '{}'",
+                            "Improper symbol for custom syntax at position #{}: '{s}'",
                             segments.len() + 1,
-                            s
                         ),
                     )
                     .into_err(Position::NONE));

@@ -150,7 +150,7 @@ impl Engine {
             return if x == r {
                 name.into()
             } else {
-                format!("&mut {}", r).into()
+                format!("&mut {r}").into()
             };
         }
 

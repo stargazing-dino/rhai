@@ -744,7 +744,7 @@ fn test_serde_json() -> serde_json::Result<()> {
     let a = m.remove("b").unwrap().cast::<Array>();
 
     assert_eq!(a.len(), 3);
-    assert_eq!(format!("{:?}", a), "[1, 2, 3]");
+    assert_eq!(format!("{a:?}"), "[1, 2, 3]");
 
     Ok(())
 }

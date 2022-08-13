@@ -29,13 +29,13 @@ fn test_call_fn() -> Result<(), Box<EvalAltResult>> {
         ",
     )?;
 
-    let r: INT = engine.call_fn(&mut scope, &ast, "hello", (42 as INT, 123 as INT))?;
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "hello", (42 as INT, 123 as INT))?;
     assert_eq!(r, 165);
 
-    let r: INT = engine.call_fn(&mut scope, &ast, "hello", (123 as INT,))?;
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "hello", (123 as INT,))?;
     assert_eq!(r, 5166);
 
-    let r: INT = engine.call_fn(&mut scope, &ast, "hello", ())?;
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "hello", ())?;
     assert_eq!(r, 42);
 
     assert_eq!(
@@ -45,7 +45,7 @@ fn test_call_fn() -> Result<(), Box<EvalAltResult>> {
         1
     );
 
-    let r: INT = engine.call_fn(&mut scope, &ast, "define_var", (2 as INT,))?;
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "define_var", (2 as INT,))?;
     assert_eq!(r, 42);
 
     assert!(!scope.contains("bar"));
@@ -132,7 +132,7 @@ fn test_call_fn_args() -> Result<(), Box<EvalAltResult>> {
         ",
     )?;
 
-    let result: String = engine.call_fn(&mut scope, &ast, "hello", options)?;
+    let result = engine.call_fn::<String>(&mut scope, &ast, "hello", options)?;
 
     assert_eq!(result, "world42");
 
@@ -146,12 +146,12 @@ fn test_call_fn_private() -> Result<(), Box<EvalAltResult>> {
 
     let ast = engine.compile("fn add(x, n) { x + n }")?;
 
-    let r: INT = engine.call_fn(&mut scope, &ast, "add", (40 as INT, 2 as INT))?;
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "add", (40 as INT, 2 as INT))?;
     assert_eq!(r, 42);
 
     let ast = engine.compile("private fn add(x, n, ) { x + n }")?;
 
-    let r: INT = engine.call_fn(&mut scope, &ast, "add", (40 as INT, 2 as INT))?;
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "add", (40 as INT, 2 as INT))?;
     assert_eq!(r, 42);
 
     Ok(())

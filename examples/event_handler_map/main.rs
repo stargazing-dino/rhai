@@ -100,7 +100,7 @@ pub fn main() {
     println!();
 
     // Run the 'init' function to initialize the state, retaining variables.
-    let result: Result<(), _> = engine.call_fn(&mut scope, &ast, "init", ());
+    let result = engine.call_fn::<()>(&mut scope, &ast, "init", ());
 
     if let Err(err) = result {
         eprintln!("! {}", err)
@@ -138,7 +138,7 @@ pub fn main() {
                 let scope = &mut handler.scope;
                 let ast = &handler.ast;
 
-                let result: Result<(), _> = engine.call_fn(scope, ast, event, (arg.to_string(),));
+                let result = engine.call_fn::<()>(scope, ast, event, (arg.to_string(),));
 
                 if let Err(err) = result {
                     eprintln!("! {}", err)

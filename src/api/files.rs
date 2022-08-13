@@ -6,12 +6,18 @@ use crate::types::dynamic::Variant;
 use crate::{Engine, RhaiResultOf, Scope, AST, ERR};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{fs::File, io::Read, path::PathBuf};
+use std::{
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 impl Engine {
     /// Read the contents of a file into a string.
-    fn read_file(path: PathBuf) -> RhaiResultOf<String> {
-        let mut f = File::open(path.clone()).map_err(|err| {
+    fn read_file(path: impl AsRef<Path>) -> RhaiResultOf<String> {
+        let path = path.as_ref();
+
+        let mut f = File::open(path).map_err(|err| {
             ERR::ErrorSystem(
                 format!("Cannot open script file '{}'", path.to_string_lossy()),
                 err.into(),
@@ -214,7 +220,7 @@ impl Engine {
     }
 }
 
-/// Evaluate a script file.
+/// Evaluate a script file, returning the result value or an error.
 ///
 /// Not available under `no_std` or `WASM`.
 ///
@@ -222,13 +228,12 @@ impl Engine {
 ///
 /// ```no_run
 /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
-/// // Notice that a PathBuf is required which can easily be constructed from a string.
-/// let result: i64 = rhai::eval_file("script.rhai".into())?;
+/// let result = rhai::eval_file::<i64>("script.rhai")?;
 /// # Ok(())
 /// # }
 /// ```
 #[inline]
-pub fn eval_file<T: Variant + Clone>(path: PathBuf) -> RhaiResultOf<T> {
+pub fn eval_file<T: Variant + Clone>(path: impl AsRef<Path>) -> RhaiResultOf<T> {
     Engine::read_file(path).and_then(|contents| Engine::new().eval::<T>(&contents))
 }
 
@@ -240,16 +245,11 @@ pub fn eval_file<T: Variant + Clone>(path: PathBuf) -> RhaiResultOf<T> {
 ///
 /// ```no_run
 /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
-/// use rhai::Engine;
-///
-/// let engine = Engine::new();
-///
-/// // Notice that a PathBuf is required which can easily be constructed from a string.
-/// rhai::run_file("script.rhai".into())?;
+/// rhai::run_file("script.rhai")?;
 /// # Ok(())
 /// # }
 /// ```
 #[inline]
-pub fn run_file(path: PathBuf) -> RhaiResultOf<()> {
+pub fn run_file(path: impl AsRef<Path>) -> RhaiResultOf<()> {
     Engine::read_file(path).and_then(|contents| Engine::new().run(&contents))
 }

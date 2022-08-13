@@ -1050,7 +1050,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         // ``
         Expr::InterpolatedString(x, pos) if x.is_empty() => {
             state.set_dirty();
-            *expr = Expr::StringConstant(state.engine.const_empty_string(), *pos);
+            *expr = Expr::StringConstant(state.engine.get_interned_string(""), *pos);
         }
         // `... ${const} ...`
         Expr::InterpolatedString(..) if expr.is_constant() => {
