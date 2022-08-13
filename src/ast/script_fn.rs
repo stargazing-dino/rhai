@@ -2,7 +2,7 @@
 #![cfg(not(feature = "no_function"))]
 
 use super::{FnAccess, StmtBlock};
-use crate::{Identifier, ImmutableString, StaticVec};
+use crate::{ImmutableString, StaticVec};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{fmt, hash::Hash};
@@ -22,7 +22,7 @@ pub struct EncapsulatedEnviron {
     /// Functions defined within the same [`AST`][crate::AST].
     pub lib: crate::Shared<crate::Module>,
     /// Imported [modules][crate::Module].
-    pub imports: Box<[(Identifier, crate::Shared<crate::Module>)]>,
+    pub imports: Box<[(ImmutableString, crate::Shared<crate::Module>)]>,
     /// Globally-defined constants.
     pub constants: Option<crate::eval::GlobalConstants>,
 }

@@ -3,11 +3,8 @@ Cargo.lock
 .vscode/
 .cargo/
 benches/results
-.rhai-repl-history.txt
 clippy.toml
 Rhai.toml
-before*
-after*
 **/*.bat
 doc/rhai-sync.json
 doc/rhai.json
