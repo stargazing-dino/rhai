@@ -106,7 +106,11 @@ impl Engine {
     /// ```
     #[inline]
     pub fn compile_file_with_scope(&self, scope: &Scope, path: PathBuf) -> RhaiResultOf<AST> {
-        Self::read_file(path).and_then(|contents| Ok(self.compile_with_scope(scope, &contents)?))
+        Self::read_file(&path).and_then(|contents| {
+            let mut ast = self.compile_with_scope(scope, &contents)?;
+            ast.set_source(path.to_string_lossy());
+            Ok(ast)
+        })
     }
     /// Evaluate a script file, returning the result value or an error.
     ///
