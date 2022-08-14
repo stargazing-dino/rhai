@@ -63,23 +63,21 @@ impl StringsInterner<'_> {
     /// Get an identifier from a text string, adding it to the interner if necessary.
     #[inline(always)]
     #[must_use]
-    pub fn get<T: AsRef<str> + Into<ImmutableString>>(&mut self, text: T) -> ImmutableString {
+    pub fn get<S: AsRef<str> + Into<ImmutableString>>(&mut self, text: S) -> ImmutableString {
         self.get_with_mapper(|s| s.into(), text)
     }
 
     /// Get an identifier from a text string, adding it to the interner if necessary.
     #[inline]
     #[must_use]
-    pub fn get_with_mapper<T: AsRef<str> + Into<ImmutableString>>(
+    pub fn get_with_mapper<S: AsRef<str>>(
         &mut self,
-        mapper: fn(T) -> ImmutableString,
-        text: T,
+        mapper: fn(S) -> ImmutableString,
+        text: S,
     ) -> ImmutableString {
         let key = text.as_ref();
 
-        // Do not intern long strings or numbers
-        if key.len() > MAX_STRING_LEN || key.bytes().all(|c| c == b'.' || (c >= b'0' && c <= b'9'))
-        {
+        if key.len() > MAX_STRING_LEN {
             return mapper(text);
         }
 
@@ -133,7 +131,7 @@ impl StringsInterner<'_> {
         self.strings.len()
     }
 
-    /// Are there no interned strings?
+    /// Returns `true` if there are no interned strings.
     #[inline(always)]
     #[must_use]
     pub fn is_empty(&self) -> bool {

@@ -591,7 +591,7 @@ impl Module {
         self.custom_types.get(key)
     }
 
-    /// Is the [`Module`] empty?
+    /// Returns `true` if this [`Module`] contains no items.
     ///
     /// # Example
     ///

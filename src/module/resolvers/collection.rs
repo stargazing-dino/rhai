@@ -86,7 +86,7 @@ impl ModuleResolversCollection {
         self.0.clear();
         self
     }
-    /// Is this [`ModuleResolversCollection`] empty?
+    /// Returns `true` if this [`ModuleResolversCollection`] contains no module resolvers.
     #[inline(always)]
     #[must_use]
     pub fn is_empty(&self) -> bool {

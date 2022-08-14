@@ -214,7 +214,7 @@ impl Scope<'_> {
     pub fn len(&self) -> usize {
         self.values.len()
     }
-    /// Is the [`Scope`] empty?
+    /// Returns `true` if this [`Scope`] contains no variables.
     ///
     /// # Example
     ///
