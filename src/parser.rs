@@ -43,22 +43,17 @@ const NEVER_ENDS: &str = "`Token`";
 /// Unroll `switch` ranges no larger than this.
 const SMALL_SWITCH_RANGE: usize = 16;
 
-#[derive(Debug, Default, Clone)]
-pub struct InternedStrings<'e> {
-    pub main: StringsInterner<'e>,
-    #[cfg(not(feature = "no_object"))]
-    pub getters: StringsInterner<'e>,
-    #[cfg(not(feature = "no_object"))]
-    pub setters: StringsInterner<'e>,
-}
+const NUM_INTERNERS: usize = if cfg!(feature = "no_object") { 1 } else { 3 };
 
 /// _(internals)_ A type that encapsulates the current state of the parser.
 /// Exported under the `internals` feature only.
 pub struct ParseState<'e> {
     /// Input stream buffer containing the next character to read.
     pub tokenizer_control: TokenizerControl,
+    /// Controls whether parsing of an expression should stop given the next token.
+    pub expr_filter: fn(&Token) -> bool,
     /// String interners.
-    interned_strings: InternedStrings<'e>,
+    interned_strings: [StringsInterner<'e>; NUM_INTERNERS],
     /// External [scope][Scope] with constants.
     pub scope: &'e Scope<'e>,
     /// Global runtime state.
@@ -67,8 +62,6 @@ pub struct ParseState<'e> {
     pub stack: Scope<'e>,
     /// Size of the local variables stack upon entry of the current block scope.
     pub block_stack_len: usize,
-    /// Controls whether parsing of an expression should stop given the next token.
-    pub expr_filter: fn(&Token) -> bool,
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
     #[cfg(not(feature = "no_closure"))]
     pub external_vars: Vec<crate::ast::Ident>,
@@ -118,7 +111,7 @@ impl<'e> ParseState<'e> {
     pub fn new(
         engine: &Engine,
         scope: &'e Scope,
-        interners: InternedStrings<'e>,
+        interned_strings: [StringsInterner<'e>; NUM_INTERNERS],
         tokenizer_control: TokenizerControl,
     ) -> Self {
         Self {
@@ -128,7 +121,7 @@ impl<'e> ParseState<'e> {
             external_vars: Vec::new(),
             #[cfg(not(feature = "no_closure"))]
             allow_capture: true,
-            interned_strings: interners,
+            interned_strings,
             scope,
             global: GlobalRuntimeState::new(engine),
             stack: Scope::new(),
@@ -250,40 +243,35 @@ impl<'e> ParseState<'e> {
 
     /// Get an interned string, creating one if it is not yet interned.
     #[inline(always)]
-    #[allow(dead_code)]
     #[must_use]
     pub fn get_interned_string(
         &mut self,
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        self.interned_strings.main.get(text)
+        self.interned_strings[0].get(text)
     }
 
     /// Get an interned property getter, creating one if it is not yet interned.
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    #[allow(dead_code)]
     #[must_use]
     pub fn get_interned_getter(
         &mut self,
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        self.interned_strings
-            .getters
+        self.interned_strings[1]
             .get_with_mapper(|s| crate::engine::make_getter(s.as_ref()).into(), text)
     }
 
     /// Get an interned property setter, creating one if it is not yet interned.
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    #[allow(dead_code)]
     #[must_use]
     pub fn get_interned_setter(
         &mut self,
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        self.interned_strings
-            .setters
+        self.interned_strings[2]
             .get_with_mapper(|s| crate::engine::make_setter(s.as_ref()).into(), text)
     }
 }
@@ -1384,12 +1372,13 @@ impl Engine {
             // | ...
             #[cfg(not(feature = "no_function"))]
             Token::Pipe | Token::Or if settings.options.contains(LangOptions::ANON_FN) => {
-                let interners = std::mem::take(&mut state.interned_strings);
+                // Build new parse state
+                let interned_strings = std::mem::take(&mut state.interned_strings);
 
                 let mut new_state = ParseState::new(
                     self,
                     state.scope,
-                    interners,
+                    interned_strings,
                     state.tokenizer_control.clone(),
                 );
 
@@ -1435,6 +1424,7 @@ impl Engine {
 
                 let result = self.parse_anon_fn(input, &mut new_state, lib, new_settings);
 
+                // Restore parse state
                 state.interned_strings = new_state.interned_strings;
 
                 let (expr, func) = result?;
@@ -3259,12 +3249,13 @@ impl Engine {
 
                 match input.next().expect(NEVER_ENDS) {
                     (Token::Fn, pos) => {
-                        let interners = std::mem::take(&mut state.interned_strings);
+                        // Build new parse state
+                        let interned_strings = std::mem::take(&mut state.interned_strings);
 
                         let mut new_state = ParseState::new(
                             self,
                             state.scope,
-                            interners,
+                            interned_strings,
                             state.tokenizer_control.clone(),
                         );
 
@@ -3314,6 +3305,7 @@ impl Engine {
                             comments,
                         );
 
+                        // Restore parse state
                         state.interned_strings = new_state.interned_strings;
 
                         let func = func?;

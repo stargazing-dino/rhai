@@ -5,6 +5,7 @@ use crate::ImmutableString;
 use std::prelude::v1::*;
 use std::{
     collections::BTreeMap,
+    fmt,
     hash::{Hash, Hasher},
     marker::PhantomData,
     ops::AddAssign,
@@ -20,10 +21,12 @@ pub const MAX_STRING_LEN: usize = 24;
 /// Exported under the `internals` feature only.
 ///
 /// Normal identifiers, property getters and setters are interned separately.
-#[derive(Debug, Clone, Hash)]
+#[derive(Clone, Hash)]
 pub struct StringsInterner<'a> {
-    /// Maximum capacity.
-    max: usize,
+    /// Maximum number of strings interned.
+    pub capacity: usize,
+    /// Maximum string length.
+    pub max_string_len: usize,
     /// Normal strings.
     strings: BTreeMap<u64, ImmutableString>,
     /// Take care of the lifetime parameter.
@@ -37,24 +40,26 @@ impl Default for StringsInterner<'_> {
     }
 }
 
+impl fmt::Debug for StringsInterner<'_> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.strings.values()).finish()
+    }
+}
+
 impl StringsInterner<'_> {
     /// Create a new [`StringsInterner`].
     #[inline(always)]
     #[must_use]
     pub fn new() -> Self {
-        Self::new_with_capacity(MAX_INTERNED_STRINGS)
-    }
-
-    /// Create a new [`StringsInterner`] with maximum capacity.
-    #[inline]
-    #[must_use]
-    pub fn new_with_capacity(capacity: usize) -> Self {
         Self {
-            max: capacity,
+            capacity: MAX_INTERNED_STRINGS,
+            max_string_len: MAX_STRING_LEN,
             strings: BTreeMap::new(),
             dummy: PhantomData,
         }
     }
+
     /// Get an identifier from a text string, adding it to the interner if necessary.
     #[inline(always)]
     #[must_use]
@@ -72,12 +77,9 @@ impl StringsInterner<'_> {
     ) -> ImmutableString {
         let key = text.as_ref();
 
-        // Do not intern numbers
-        if key.bytes().all(|c| c == b'.' || (c >= b'0' && c <= b'9')) {
-            return text.into();
-        }
-
-        if key.len() > MAX_STRING_LEN {
+        // Do not intern long strings or numbers
+        if key.len() > MAX_STRING_LEN || key.bytes().all(|c| c == b'.' || (c >= b'0' && c <= b'9'))
+        {
             return mapper(text);
         }
 
@@ -98,11 +100,15 @@ impl StringsInterner<'_> {
         self.strings.insert(key, value.clone());
 
         // If the interner is over capacity, remove the longest entry
-        if self.strings.len() > self.max {
+        if self.strings.len() > self.capacity {
             // Leave some buffer to grow when shrinking the cache.
             // We leave at least two entries, one for the empty string, and one for the string
             // that has just been inserted.
-            let max = if self.max < 5 { 2 } else { self.max - 3 };
+            let max = if self.capacity < 5 {
+                2
+            } else {
+                self.capacity - 3
+            };
 
             while self.strings.len() > max {
                 let (_, n) = self.strings.iter().fold((0, 0), |(x, n), (&k, v)| {
@@ -127,7 +133,7 @@ impl StringsInterner<'_> {
         self.strings.len()
     }
 
-    /// Number of strings interned.
+    /// Are there no interned strings?
     #[inline(always)]
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -135,7 +141,7 @@ impl StringsInterner<'_> {
     }
 
     /// Clear all interned strings.
-    #[inline]
+    #[inline(always)]
     pub fn clear(&mut self) {
         self.strings.clear();
     }
