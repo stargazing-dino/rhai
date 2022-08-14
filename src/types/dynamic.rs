@@ -186,6 +186,9 @@ pub enum Union {
     TimeStamp(Box<Instant>, Tag, AccessMode),
 
     /// Any type as a trait object.
+    ///
+    /// An extra level of redirection is used in order to avoid bloating the size of [`Dynamic`]
+    /// because `Box<dyn Variant>` is a fat pointer.
     Variant(Box<Box<dyn Variant>>, Tag, AccessMode),
 
     /// A _shared_ value of any type.
