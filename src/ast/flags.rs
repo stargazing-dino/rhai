@@ -6,6 +6,8 @@ use std::prelude::v1::*;
 
 /// A type representing the access mode of a function.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize))]
+#[cfg_attr(feature = "metadata", serde(rename_all = "camelCase"))]
 #[non_exhaustive]
 pub enum FnAccess {
     /// Private function.

@@ -2,54 +2,20 @@
 #![cfg(feature = "metadata")]
 
 use crate::module::{calc_native_fn_hash, FuncInfo};
-use crate::{calc_fn_hash, Engine, SmartString, AST};
-use serde::{Deserialize, Serialize};
+use crate::{calc_fn_hash, Engine, FnAccess, FnNamespace, SmartString, StaticVec, AST};
+use serde::Serialize;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{borrow::Cow, cmp::Ordering, collections::BTreeMap};
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum FnType {
     Script,
     Native,
 }
 
-#[cfg(not(feature = "no_module"))]
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-enum FnNamespace {
-    Global,
-    Internal,
-}
-
-#[cfg(not(feature = "no_module"))]
-impl From<crate::FnNamespace> for FnNamespace {
-    fn from(value: crate::FnNamespace) -> Self {
-        match value {
-            crate::FnNamespace::Global => Self::Global,
-            crate::FnNamespace::Internal => Self::Internal,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-enum FnAccess {
-    Public,
-    Private,
-}
-
-impl From<crate::FnAccess> for FnAccess {
-    fn from(value: crate::FnAccess) -> Self {
-        match value {
-            crate::FnAccess::Public => Self::Public,
-            crate::FnAccess::Private => Self::Private,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FnParam<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -58,7 +24,7 @@ struct FnParam<'a> {
     pub typ: Option<Cow<'a, str>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FnMetadata<'a> {
     pub base_hash: u64,
@@ -66,20 +32,20 @@ struct FnMetadata<'a> {
     #[cfg(not(feature = "no_module"))]
     pub namespace: FnNamespace,
     pub access: FnAccess,
-    pub name: String,
+    pub name: &'a str,
     #[serde(rename = "type")]
     pub typ: FnType,
     pub num_params: usize,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub params: Vec<FnParam<'a>>,
+    #[serde(default, skip_serializing_if = "StaticVec::is_empty")]
+    pub params: StaticVec<FnParam<'a>>,
     // No idea why the following is needed otherwise serde comes back with a lifetime error
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub _dummy: Option<&'a str>,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub return_type: String,
-    pub signature: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub doc_comments: Vec<&'a str>,
+    #[serde(default, skip_serializing_if = "str::is_empty")]
+    pub return_type: Cow<'a, str>,
+    pub signature: SmartString,
+    #[serde(default, skip_serializing_if = "StaticVec::is_empty")]
+    pub doc_comments: StaticVec<&'a str>,
 }
 
 impl PartialOrd for FnMetadata<'_> {
@@ -115,7 +81,7 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
             #[cfg(not(feature = "no_module"))]
             namespace: info.metadata.namespace.into(),
             access: info.metadata.access.into(),
-            name: info.metadata.name.to_string(),
+            name: &info.metadata.name,
             typ,
             num_params: info.metadata.params,
             params: info
@@ -133,8 +99,8 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
                 })
                 .collect(),
             _dummy: None,
-            return_type: FuncInfo::format_type(&info.metadata.return_type, true).into_owned(),
-            signature: info.gen_signature(),
+            return_type: FuncInfo::format_type(&info.metadata.return_type, true),
+            signature: info.gen_signature().into(),
             doc_comments: if info.func.is_script() {
                 #[cfg(feature = "no_function")]
                 unreachable!("script-defined functions should not exist under no_function");
@@ -158,12 +124,12 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
 #[serde(rename_all = "camelCase")]
 struct ModuleMetadata<'a> {
     #[cfg(feature = "metadata")]
-    #[serde(skip_serializing_if = "SmartString::is_empty")]
-    pub doc: SmartString,
+    #[serde(skip_serializing_if = "str::is_empty")]
+    pub doc: &'a str,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub modules: BTreeMap<&'a str, Self>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub functions: Vec<FnMetadata<'a>>,
+    #[serde(skip_serializing_if = "StaticVec::is_empty")]
+    pub functions: StaticVec<FnMetadata<'a>>,
 }
 
 impl ModuleMetadata<'_> {
@@ -171,16 +137,16 @@ impl ModuleMetadata<'_> {
     pub fn new() -> Self {
         Self {
             #[cfg(feature = "metadata")]
-            doc: SmartString::new_const(),
+            doc: "",
             modules: BTreeMap::new(),
-            functions: Vec::new(),
+            functions: StaticVec::new_const(),
         }
     }
 }
 
 impl<'a> From<&'a crate::Module> for ModuleMetadata<'a> {
     fn from(module: &'a crate::Module) -> Self {
-        let mut functions: Vec<_> = module.iter_fn().map(Into::into).collect();
+        let mut functions: StaticVec<_> = module.iter_fn().map(Into::into).collect();
         functions.sort();
 
         Self {
