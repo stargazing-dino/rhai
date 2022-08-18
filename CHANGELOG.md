@@ -65,6 +65,7 @@ Enhancements
 * The code base is cleaner by running it through Clippy.
 * `ParseError::err_type` and `ParseError::position` are added for convenience.
 * The source of an `AST` compiled from a script file is set to the file's path.
+* `|>` and `<|` are now reserved symbols.
 
 
 Version 1.8.0

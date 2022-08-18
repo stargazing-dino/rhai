@@ -2036,6 +2036,10 @@ fn get_next_token_inner(
                     start_pos,
                 ));
             }
+            ('<', '|') => {
+                eat_next(stream, pos);
+                return Some((Token::Reserved("<|".into()), start_pos));
+            }
             ('<', ..) => return Some((Token::LessThan, start_pos)),
 
             ('>', '=') => {
@@ -2067,7 +2071,10 @@ fn get_next_token_inner(
 
                 return Some((Token::NotEqualsTo, start_pos));
             }
-            ('!', '.') => return Some((Token::Reserved("!.".into()), start_pos)),
+            ('!', '.') => {
+                eat_next(stream, pos);
+                return Some((Token::Reserved("!.".into()), start_pos));
+            }
             ('!', ..) => return Some((Token::Bang, start_pos)),
 
             ('|', '|') => {
@@ -2077,6 +2084,10 @@ fn get_next_token_inner(
             ('|', '=') => {
                 eat_next(stream, pos);
                 return Some((Token::OrAssign, start_pos));
+            }
+            ('|', '>') => {
+                eat_next(stream, pos);
+                return Some((Token::Reserved("|>".into()), start_pos));
             }
             ('|', ..) => return Some((Token::Pipe, start_pos)),
 
