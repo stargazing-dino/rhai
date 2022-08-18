@@ -1,18 +1,27 @@
-use rhai::packages::{Package, StandardPackage};
-use rhai::{Engine, EvalAltResult, Module, Scope, INT};
+use rhai::packages::{Package, StandardPackage as SSS};
+use rhai::{def_package, Engine, EvalAltResult, Module, Scope, INT};
+
+def_package! {
+    /// My custom package.
+    MyPackage(m) : SSS {
+        m.set_native_fn("hello", |x: INT| Ok(x + 1));
+        m.set_native_fn("@", |x: INT, y: INT| Ok(x * x + y * y));
+    } |> |engine| {
+        engine.register_custom_operator("@", 160).unwrap();
+    }
+}
 
 #[test]
 fn test_packages() -> Result<(), Box<EvalAltResult>> {
-    let engine = Engine::new();
-    let ast = engine.compile("x")?;
-    let std_pkg = StandardPackage::new();
+    let pkg = MyPackage::new();
 
     let make_call = |x: INT| -> Result<INT, Box<EvalAltResult>> {
         // Create a raw Engine - extremely cheap.
         let mut engine = Engine::new_raw();
 
         // Register packages - cheap.
-        engine.register_global_module(std_pkg.as_shared_module());
+        pkg.register_into_engine(&mut engine);
+        pkg.register_into_engine_as(&mut engine, "foo");
 
         // Create custom scope - cheap.
         let mut scope = Scope::new();
@@ -21,10 +30,10 @@ fn test_packages() -> Result<(), Box<EvalAltResult>> {
         scope.push("x", x);
 
         // Evaluate script.
-        engine.eval_ast_with_scope::<INT>(&mut scope, &ast)
+        engine.eval_with_scope::<INT>(&mut scope, "hello(x) @ foo::hello(x)")
     };
 
-    assert_eq!(make_call(42)?, 42);
+    assert_eq!(make_call(42)?, 3698);
 
     Ok(())
 }

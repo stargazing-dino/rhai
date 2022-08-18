@@ -1,6 +1,7 @@
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
+use super::*;
 use crate::def_package;
 
 def_package! {
@@ -17,21 +18,17 @@ def_package! {
     /// * [`BasicMapPackage`][super::BasicMapPackage]
     /// * [`BasicTimePackage`][super::BasicTimePackage]
     /// * [`MoreStringPackage`][super::MoreStringPackage]
-    pub StandardPackage(lib) {
+    pub StandardPackage(lib) :
+            CorePackage,
+            BitFieldPackage,
+            LogicPackage,
+            BasicMathPackage,
+            #[cfg(not(feature = "no_index"))] BasicArrayPackage,
+            #[cfg(not(feature = "no_index"))] BasicBlobPackage,
+            #[cfg(not(feature = "no_object"))] BasicMapPackage,
+            #[cfg(not(feature = "no_std"))] BasicTimePackage,
+            MoreStringPackage
+    {
         lib.standard = true;
-
-        super::CorePackage::init(lib);
-        super::BitFieldPackage::init(lib);
-        super::LogicPackage::init(lib);
-        super::BasicMathPackage::init(lib);
-        #[cfg(not(feature = "no_index"))]
-        super::BasicArrayPackage::init(lib);
-        #[cfg(not(feature = "no_index"))]
-        super::BasicBlobPackage::init(lib);
-        #[cfg(not(feature = "no_object"))]
-        super::BasicMapPackage::init(lib);
-        #[cfg(not(feature = "no_std"))]
-        super::BasicTimePackage::init(lib);
-        super::MoreStringPackage::init(lib);
     }
 }

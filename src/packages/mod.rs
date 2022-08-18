@@ -1,6 +1,6 @@
 //! Module containing all built-in _packages_ available to Rhai, plus facilities to define custom packages.
 
-use crate::{Module, Shared};
+use crate::{Engine, Module, Shared};
 
 pub(crate) mod arithmetic;
 pub(crate) mod array_basic;
@@ -47,6 +47,48 @@ pub trait Package {
     /// Functions should be registered into `module` here.
     fn init(module: &mut Module);
 
+    /// Initialize the package with an [`Engine`].
+    ///
+    /// Perform tasks such as registering custom operators/syntax.
+    #[allow(unused_variables)]
+    fn init_engine(engine: &mut Engine) {}
+
+    /// Register the package with an [`Engine`].
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use rhai::Engine;
+    /// # use rhai::packages::{Package, CorePackage};
+    /// let mut engine = Engine::new_raw();
+    /// let package = CorePackage::new();
+    ///
+    /// package.register_into_engine(&mut engine);
+    /// ```
+    fn register_into_engine(&self, engine: &mut Engine) -> &Self {
+        Self::init_engine(engine);
+        engine.register_global_module(self.as_shared_module());
+        self
+    }
+
+    /// Register the package with an [`Engine`] under a static namespace.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use rhai::Engine;
+    /// # use rhai::packages::{Package, CorePackage};
+    /// let mut engine = Engine::new_raw();
+    /// let package = CorePackage::new();
+    ///
+    /// package.register_into_engine_as(&mut engine, "core");
+    /// ```
+    fn register_into_engine_as(&self, engine: &mut Engine, name: &str) -> &Self {
+        Self::init_engine(engine);
+        engine.register_static_module(name, self.as_shared_module());
+        self
+    }
+
     /// Get a reference to a shared module from this package.
     #[must_use]
     fn as_shared_module(&self) -> Shared<Module>;
@@ -70,27 +112,49 @@ pub trait Package {
 /// def_package! {
 ///     /// My super-duper package.
 ///     pub MyPackage(module) {
-///         // Load a binary function with all value parameters.
+///         // Load a native Rust function.
 ///         module.set_native_fn("my_add", add);
 ///     }
 /// }
 /// ```
 #[macro_export]
 macro_rules! def_package {
-    ($($(#[$outer:meta])* $mod:vis $package:ident($lib:ident) $block:block)+) => { $(
+    ($($(#[$outer:meta])* $mod:vis $package:ident($lib:ident)
+                $( : $($(#[$base_meta:meta])* $base_pkg:ty),+ )?
+                $block:block
+                $( |> | $engine:ident | $init_engine:block )?
+    )+) => { $(
         $(#[$outer])*
         $mod struct $package($crate::Shared<$crate::Module>);
 
         impl $crate::packages::Package for $package {
+            #[inline(always)]
             fn as_shared_module(&self) -> $crate::Shared<$crate::Module> {
                 self.0.clone()
             }
+            #[inline]
             fn init($lib: &mut $crate::Module) {
+                $($(
+                    $(#[$base_meta])* { <$base_pkg>::init($lib); }
+                )*)*
+
                 $block
+            }
+            #[inline]
+            fn init_engine(_engine: &mut $crate::Engine) {
+                $($(
+                    $(#[$base_meta])* { <$base_pkg>::init_engine(_engine); }
+                )*)*
+
+                $(
+                    let $engine = _engine;
+                    $init_engine
+                )*
             }
         }
 
         impl Default for $package {
+            #[inline(always)]
             fn default() -> Self {
                 Self::new()
             }
@@ -98,6 +162,7 @@ macro_rules! def_package {
 
         impl $package {
             #[doc=concat!("Create a new `", stringify!($package), "`")]
+            #[inline]
             #[must_use]
             pub fn new() -> Self {
                 let mut module = $crate::Module::new();

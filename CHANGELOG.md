@@ -44,6 +44,11 @@ New features
 
 * A new volatile API, `Engine::build_type`, enables registration of the entire API of a custom type in one go, provided that the custom type implements the `CustomType` trait (which uses `TypeBuilder` to register the API functions).
 
+### Simpler Package API
+
+* It is now easier to register packages via the `Package::register_into_engine` and `Package::register_into_engine_as` API.
+* Defining a custom package with base packages is also much easier with a new syntax - put the new base packages after a colon.
+
 Enhancements
 ------------
 
