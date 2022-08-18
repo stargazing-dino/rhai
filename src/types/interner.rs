@@ -127,6 +127,7 @@ impl StringsInterner<'_> {
     /// Number of strings interned.
     #[inline(always)]
     #[must_use]
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.strings.len()
     }
@@ -134,12 +135,14 @@ impl StringsInterner<'_> {
     /// Returns `true` if there are no interned strings.
     #[inline(always)]
     #[must_use]
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.strings.is_empty()
     }
 
     /// Clear all interned strings.
     #[inline(always)]
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.strings.clear();
     }

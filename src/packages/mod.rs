@@ -83,6 +83,7 @@ pub trait Package {
     ///
     /// package.register_into_engine_as(&mut engine, "core");
     /// ```
+    #[cfg(not(feature = "no_module"))]
     fn register_into_engine_as(&self, engine: &mut Engine, name: &str) -> &Self {
         Self::init_engine(engine);
         engine.register_static_module(name, self.as_shared_module());

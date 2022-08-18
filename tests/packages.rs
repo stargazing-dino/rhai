@@ -7,6 +7,7 @@ def_package! {
         m.set_native_fn("hello", |x: INT| Ok(x + 1));
         m.set_native_fn("@", |x: INT, y: INT| Ok(x * x + y * y));
     } |> |engine| {
+        #[cfg(not(feature = "no_custom_syntax"))]
         engine.register_custom_operator("@", 160).unwrap();
     }
 }
@@ -30,10 +31,19 @@ fn test_packages() -> Result<(), Box<EvalAltResult>> {
         scope.push("x", x);
 
         // Evaluate script.
-        engine.eval_with_scope::<INT>(&mut scope, "hello(x) @ foo::hello(x)")
+
+        #[cfg(not(feature = "no_custom_syntax"))]
+        return engine.eval_with_scope::<INT>(&mut scope, "hello(x) @ foo::hello(x)");
+
+        #[cfg(feature = "no_custom_syntax")]
+        return engine.eval_with_scope::<INT>(&mut scope, "hello(x) + foo::hello(x)");
     };
 
+    #[cfg(not(feature = "no_custom_syntax"))]
     assert_eq!(make_call(42)?, 3698);
+
+    #[cfg(feature = "no_custom_syntax")]
+    assert_eq!(make_call(42)?, 86);
 
     Ok(())
 }

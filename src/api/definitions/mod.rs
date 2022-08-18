@@ -9,7 +9,7 @@ use crate::{Engine, Module, Scope, INT};
 
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{any::type_name, borrow::Cow, cmp::Ordering, fmt, fmt::Write};
+use std::{any::type_name, borrow::Cow, cmp::Ordering, fmt};
 
 impl Engine {
     /// _(metadata, internals)_ Return [`Definitions`] that can be used to generate definition files
@@ -186,6 +186,8 @@ impl Definitions<'_> {
 
         #[cfg(not(feature = "no_module"))]
         {
+            use std::fmt::Write;
+
             for (module_name, module_def) in self.modules_impl(&config) {
                 write!(
                     &mut def_file,
@@ -382,6 +384,7 @@ impl Definitions<'_> {
 
 impl Module {
     /// Return definitions for all items inside the [`Module`].
+    #[cfg(not(feature = "no_module"))]
     fn definition(&self, def: &Definitions) -> String {
         let mut s = String::new();
         self.write_definition(&mut s, def).unwrap();

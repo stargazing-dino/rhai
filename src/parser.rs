@@ -187,12 +187,13 @@ impl<'e> ParseState<'e> {
         lib: &FnLib,
         pos: Position,
     ) -> (Option<NonZeroUsize>, bool) {
+        let _lib = lib;
         let _pos = pos;
 
         let (index, hit_barrier) = self.find_var(name);
 
         #[cfg(not(feature = "no_function"))]
-        let is_func_name = lib.values().any(|f| f.name == name);
+        let is_func_name = _lib.values().any(|f| f.name == name);
 
         #[cfg(feature = "no_function")]
         let is_func_name = false;

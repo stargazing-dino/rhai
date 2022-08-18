@@ -2,7 +2,7 @@
 #![cfg(feature = "metadata")]
 
 use crate::module::{calc_native_fn_hash, FuncInfo};
-use crate::{calc_fn_hash, Engine, FnAccess, FnNamespace, SmartString, StaticVec, AST};
+use crate::{calc_fn_hash, Engine, FnAccess, SmartString, StaticVec, AST};
 use serde::Serialize;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -30,7 +30,7 @@ struct FnMetadata<'a> {
     pub base_hash: u64,
     pub full_hash: u64,
     #[cfg(not(feature = "no_module"))]
-    pub namespace: FnNamespace,
+    pub namespace: crate::FnNamespace,
     pub access: FnAccess,
     pub name: &'a str,
     #[serde(rename = "type")]
@@ -184,7 +184,7 @@ pub fn gen_metadata_to_json(
             let mut meta: FnMetadata = f.into();
             #[cfg(not(feature = "no_module"))]
             {
-                meta.namespace = FnNamespace::Global;
+                meta.namespace = crate::FnNamespace::Global;
             }
             global.functions.push(meta);
         });
@@ -196,7 +196,7 @@ pub fn gen_metadata_to_json(
             let mut meta: FnMetadata = f.into();
             #[cfg(not(feature = "no_module"))]
             {
-                meta.namespace = FnNamespace::Global;
+                meta.namespace = crate::FnNamespace::Global;
             }
             global.functions.push(meta);
         }

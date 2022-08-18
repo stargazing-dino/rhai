@@ -213,6 +213,7 @@ impl AST {
     #[cfg(feature = "metadata")]
     #[inline(always)]
     #[must_use]
+    #[allow(dead_code)]
     pub(crate) fn doc_mut(&mut self) -> &mut crate::SmartString {
         &mut self.doc
     }

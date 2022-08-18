@@ -14,11 +14,7 @@ use crate::{
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fmt,
-    num::NonZeroU8,
-};
+use std::{collections::BTreeSet, fmt, num::NonZeroU8};
 
 pub type Precedence = NonZeroU8;
 
@@ -99,7 +95,7 @@ pub struct Engine {
     pub(crate) global_modules: StaticVec<Shared<Module>>,
     /// A collection of all sub-modules directly loaded into the Engine.
     #[cfg(not(feature = "no_module"))]
-    pub(crate) global_sub_modules: BTreeMap<Identifier, Shared<Module>>,
+    pub(crate) global_sub_modules: std::collections::BTreeMap<Identifier, Shared<Module>>,
 
     /// A module resolution service.
     #[cfg(not(feature = "no_module"))]
@@ -112,10 +108,11 @@ pub struct Engine {
     pub(crate) disabled_symbols: BTreeSet<Identifier>,
     /// A map containing custom keywords and precedence to recognize.
     #[cfg(not(feature = "no_custom_syntax"))]
-    pub(crate) custom_keywords: BTreeMap<Identifier, Option<Precedence>>,
+    pub(crate) custom_keywords: std::collections::BTreeMap<Identifier, Option<Precedence>>,
     /// Custom syntax.
     #[cfg(not(feature = "no_custom_syntax"))]
-    pub(crate) custom_syntax: BTreeMap<Identifier, crate::api::custom_syntax::CustomSyntax>,
+    pub(crate) custom_syntax:
+        std::collections::BTreeMap<Identifier, crate::api::custom_syntax::CustomSyntax>,
     /// Callback closure for filtering variable definition.
     pub(crate) def_var_filter: Option<Box<OnDefVarCallback>>,
     /// Callback closure for resolving variable access.
@@ -265,7 +262,7 @@ impl Engine {
             global_modules: StaticVec::new_const(),
 
             #[cfg(not(feature = "no_module"))]
-            global_sub_modules: BTreeMap::new(),
+            global_sub_modules: std::collections::BTreeMap::new(),
 
             #[cfg(not(feature = "no_module"))]
             module_resolver: Box::new(crate::module::resolvers::DummyModuleResolver::new()),
@@ -273,9 +270,9 @@ impl Engine {
             interned_strings: StringsInterner::new().into(),
             disabled_symbols: BTreeSet::new(),
             #[cfg(not(feature = "no_custom_syntax"))]
-            custom_keywords: BTreeMap::new(),
+            custom_keywords: std::collections::BTreeMap::new(),
             #[cfg(not(feature = "no_custom_syntax"))]
-            custom_syntax: BTreeMap::new(),
+            custom_syntax: std::collections::BTreeMap::new(),
 
             def_var_filter: None,
             resolve_var: None,

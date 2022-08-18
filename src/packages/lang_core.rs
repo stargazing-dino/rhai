@@ -1,6 +1,6 @@
 use crate::def_package;
 use crate::plugin::*;
-use crate::types::{dynamic::Tag, StringsInterner};
+use crate::types::dynamic::Tag;
 use crate::{Dynamic, RhaiResultOf, ERR, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -129,12 +129,12 @@ fn collect_fn_metadata(
     filter: impl Fn(FnNamespace, FnAccess, &str, usize, &crate::Shared<crate::ast::ScriptFnDef>) -> bool
         + Copy,
 ) -> crate::Array {
-    use crate::{ast::ScriptFnDef, Array, Identifier, Map};
+    use crate::{ast::ScriptFnDef, Array, Map};
 
     // Create a metadata record for a function.
     fn make_metadata(
-        dict: &mut StringsInterner,
-        #[cfg(not(feature = "no_module"))] namespace: Identifier,
+        dict: &mut crate::types::StringsInterner,
+        #[cfg(not(feature = "no_module"))] namespace: crate::Identifier,
         func: &ScriptFnDef,
     ) -> Map {
         let mut map = Map::new();
@@ -179,7 +179,7 @@ fn collect_fn_metadata(
         map
     }
 
-    let dict = &mut StringsInterner::new();
+    let dict = &mut crate::types::StringsInterner::new();
     let mut list = Array::new();
 
     ctx.iter_namespaces()
@@ -190,7 +190,7 @@ fn collect_fn_metadata(
                 make_metadata(
                     dict,
                     #[cfg(not(feature = "no_module"))]
-                    Identifier::new_const(),
+                    crate::Identifier::new_const(),
                     f,
                 )
                 .into(),
@@ -207,7 +207,7 @@ fn collect_fn_metadata(
                 make_metadata(
                     dict,
                     #[cfg(not(feature = "no_module"))]
-                    Identifier::new_const(),
+                    crate::Identifier::new_const(),
                     f,
                 )
                 .into(),
@@ -225,7 +225,7 @@ fn collect_fn_metadata(
                 make_metadata(
                     dict,
                     #[cfg(not(feature = "no_module"))]
-                    Identifier::new_const(),
+                    crate::Identifier::new_const(),
                     f,
                 )
                 .into(),
@@ -236,7 +236,7 @@ fn collect_fn_metadata(
     {
         // Recursively scan modules for script-defined functions.
         fn scan_module(
-            dict: &mut StringsInterner,
+            dict: &mut crate::types::StringsInterner,
             list: &mut Array,
             namespace: &str,
             module: &Module,
