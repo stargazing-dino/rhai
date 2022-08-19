@@ -20,7 +20,7 @@ use std::{
 };
 
 /// _(internals)_ A type containing commands to control the tokenizer.
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Default, Hash)]
 pub struct TokenizerControlBlock {
     /// Is the current tokenizer position within an interpolated text string?
     /// This flag allows switching the tokenizer back to _text_ parsing after an interpolation stream.
@@ -1117,7 +1117,7 @@ impl From<Token> for String {
 
 /// _(internals)_ State of the tokenizer.
 /// Exported under the `internals` feature only.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct TokenizeState {
     /// Maximum length of a string.
     pub max_string_size: Option<NonZeroUsize>,

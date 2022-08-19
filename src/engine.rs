@@ -308,14 +308,37 @@ impl Engine {
         engine
     }
 
-    /// Get an interned string.
-    #[must_use]
+    /// Get an interned [string][ImmutableString].
+    #[cfg(not(feature = "internals"))]
     #[inline(always)]
+    #[must_use]
     pub(crate) fn get_interned_string(
         &self,
         string: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
         locked_write(&self.interned_strings).get(string).into()
+    }
+
+    /// _(internals)_ Get an interned [string][ImmutableString].
+    /// Exported under the `internals` feature only.
+    ///
+    /// [`Engine`] keeps a cache of [`ImmutableString`] instances and tries to avoid new allocations
+    /// when an existing instance is found.
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    #[must_use]
+    pub fn get_interned_string(
+        &self,
+        string: impl AsRef<str> + Into<ImmutableString>,
+    ) -> ImmutableString {
+        locked_write(&self.interned_strings).get(string).into()
+    }
+
+    /// Get an empty [`ImmutableString`] which refers to a shared instance.
+    #[inline(always)]
+    #[must_use]
+    pub fn const_empty_string(&self) -> ImmutableString {
+        self.get_interned_string("")
     }
 
     /// Check a result to ensure that it is valid.
