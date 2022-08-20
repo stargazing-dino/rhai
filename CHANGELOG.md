@@ -15,6 +15,11 @@ Bug fixes
 * Fixes panic in interpolated strings with constant expressions.
 * Using `call_fn_raw` on a function without evaluating the AST no longer panics on namespace-qualified function calls due to `import` statements not run.
 
+Breaking changes
+----------------
+
+* The first closure passed to `Engine::register_debugger` now takes a single parameter which is a reference to the current `Engine`.
+
 New features
 ------------
 

@@ -106,7 +106,7 @@ impl GlobalRuntimeState<'_> {
                     crate::eval::DebuggerStatus::CONTINUE
                 },
                 if let Some((ref init, ..)) = engine.debugger {
-                    init()
+                    init(engine)
                 } else {
                     Dynamic::UNIT
                 },
