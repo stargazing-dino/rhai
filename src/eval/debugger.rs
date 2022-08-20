@@ -10,10 +10,10 @@ use std::{fmt, iter::repeat, mem};
 
 /// Callback function to initialize the debugger.
 #[cfg(not(feature = "sync"))]
-pub type OnDebuggingInit = dyn Fn() -> Dynamic;
+pub type OnDebuggingInit = dyn Fn(&Engine) -> Dynamic;
 /// Callback function to initialize the debugger.
 #[cfg(feature = "sync")]
-pub type OnDebuggingInit = dyn Fn() -> Dynamic + Send + Sync;
+pub type OnDebuggingInit = dyn Fn(&Engine) -> Dynamic + Send + Sync;
 
 /// Callback function for debugging.
 #[cfg(not(feature = "sync"))]

@@ -98,7 +98,7 @@ impl StaticModuleResolver {
         self.0.clear();
         self
     }
-    /// Is this [`StaticModuleResolver`] empty?
+    /// Returns `true` if this [`StaticModuleResolver`] contains no module resolvers.
     #[inline(always)]
     #[must_use]
     pub fn is_empty(&self) -> bool {

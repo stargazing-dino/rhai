@@ -23,7 +23,7 @@ fn bench_engine_new_raw_core(bench: &mut Bencher) {
 
     bench.iter(|| {
         let mut engine = Engine::new_raw();
-        engine.register_global_module(package.as_shared_module());
+        package.register_into_engine(&mut engine);
     });
 }
 

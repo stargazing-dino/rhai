@@ -6,6 +6,7 @@ use crate::{Dynamic, Engine, Module, Scope};
 use std::prelude::v1::*;
 
 /// Context of a script evaluation process.
+#[derive(Debug)]
 #[allow(dead_code)]
 pub struct EvalContext<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> {
     /// The current [`Engine`].

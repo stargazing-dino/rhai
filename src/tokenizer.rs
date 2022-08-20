@@ -20,7 +20,7 @@ use std::{
 };
 
 /// _(internals)_ A type containing commands to control the tokenizer.
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Default, Hash)]
 pub struct TokenizerControlBlock {
     /// Is the current tokenizer position within an interpolated text string?
     /// This flag allows switching the tokenizer back to _text_ parsing after an interpolation stream.
@@ -333,22 +333,29 @@ impl Span {
 }
 
 impl fmt::Display for Span {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let _f = f;
+
+        #[cfg(not(feature = "no_position"))]
         match (self.start(), self.end()) {
-            (Position::NONE, Position::NONE) => write!(f, "{:?}", Position::NONE),
-            (Position::NONE, end) => write!(f, "..{:?}", end),
-            (start, Position::NONE) => write!(f, "{:?}", start),
+            (Position::NONE, Position::NONE) => write!(_f, "{:?}", Position::NONE),
+            (Position::NONE, end) => write!(_f, "..{:?}", end),
+            (start, Position::NONE) => write!(_f, "{:?}", start),
             (start, end) if start.line() != end.line() => {
-                write!(f, "{:?}-{:?}", start, end)
+                write!(_f, "{:?}-{:?}", start, end)
             }
             (start, end) => write!(
-                f,
+                _f,
                 "{}:{}-{}",
                 start.line().unwrap(),
                 start.position().unwrap_or(0),
                 end.position().unwrap_or(0)
             ),
         }
+
+        #[cfg(feature = "no_position")]
+        Ok(())
     }
 }
 
@@ -866,6 +873,11 @@ impl Token {
             "**" => PowerOf,
             "**=" => PowerOfAssign,
 
+            #[cfg(feature = "no_object")]
+            "?." => Reserved(syntax.into()),
+            #[cfg(feature = "no_index")]
+            "?[" => Reserved(syntax.into()),
+
             #[cfg(not(feature = "no_function"))]
             "fn" => Fn,
             #[cfg(not(feature = "no_function"))]
@@ -885,9 +897,8 @@ impl Token {
             "import" | "export" | "as" => Reserved(syntax.into()),
 
             // List of reserved operators
-            "===" | "!==" | "->" | "<-" | ":=" | "~" | "::<" | "(*" | "*)" | "#" | "#!" => {
-                Reserved(syntax.into())
-            }
+            "===" | "!==" | "->" | "<-" | "?" | ":=" | ":;" | "~" | "!." | "::<" | "(*" | "*)"
+            | "#" | "#!" | "@" | "$" | "++" | "--" | "..." | "<|" | "|>" => Reserved(syntax.into()),
 
             // List of reserved keywords
             "public" | "protected" | "super" | "new" | "use" | "module" | "package" | "var"
@@ -1110,7 +1121,7 @@ impl From<Token> for String {
 
 /// _(internals)_ State of the tokenizer.
 /// Exported under the `internals` feature only.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct TokenizeState {
     /// Maximum length of a string.
     pub max_string_size: Option<NonZeroUsize>,
@@ -2036,6 +2047,10 @@ fn get_next_token_inner(
                     start_pos,
                 ));
             }
+            ('<', '|') => {
+                eat_next(stream, pos);
+                return Some((Token::Reserved("<|".into()), start_pos));
+            }
             ('<', ..) => return Some((Token::LessThan, start_pos)),
 
             ('>', '=') => {
@@ -2067,7 +2082,10 @@ fn get_next_token_inner(
 
                 return Some((Token::NotEqualsTo, start_pos));
             }
-            ('!', '.') => return Some((Token::Reserved("!.".into()), start_pos)),
+            ('!', '.') => {
+                eat_next(stream, pos);
+                return Some((Token::Reserved("!.".into()), start_pos));
+            }
             ('!', ..) => return Some((Token::Bang, start_pos)),
 
             ('|', '|') => {
@@ -2077,6 +2095,10 @@ fn get_next_token_inner(
             ('|', '=') => {
                 eat_next(stream, pos);
                 return Some((Token::OrAssign, start_pos));
+            }
+            ('|', '>') => {
+                eat_next(stream, pos);
+                return Some((Token::Reserved("|>".into()), start_pos));
             }
             ('|', ..) => return Some((Token::Pipe, start_pos)),
 

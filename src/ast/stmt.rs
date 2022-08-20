@@ -216,7 +216,7 @@ impl IntoIterator for RangeCase {
 }
 
 impl RangeCase {
-    /// Is the range empty?
+    /// Returns `true` if the range contains no items.
     #[inline(always)]
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -356,7 +356,7 @@ impl StmtBlock {
             span: Span::new(pos, pos),
         }
     }
-    /// Is this statements block empty?
+    /// Returns `true` if this statements block contains no statements.
     #[inline(always)]
     #[must_use]
     pub fn is_empty(&self) -> bool {

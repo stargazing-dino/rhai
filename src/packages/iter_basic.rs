@@ -26,6 +26,7 @@ where
     x.checked_add(&y)
 }
 #[inline(always)]
+#[allow(dead_code)]
 fn regular_add<T>(x: T, y: T) -> Option<T>
 where
     T: Debug + Copy + PartialOrd + std::ops::Add<Output = T>,

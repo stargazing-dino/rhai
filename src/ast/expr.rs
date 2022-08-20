@@ -362,6 +362,8 @@ pub enum Expr {
     ///
     /// Used to hold complex constants such as [`Array`][crate::Array] or [`Map`][crate::Map] for quick cloning.
     /// Primitive data types should use the appropriate variants to avoid an allocation.
+    ///
+    /// The [`Dynamic`] value is boxed in order to avoid bloating the size of [`Expr`].
     DynamicConstant(Box<Dynamic>, Position),
     /// Boolean constant.
     BoolConstant(bool, Position),

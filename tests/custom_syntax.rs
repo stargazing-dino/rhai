@@ -21,8 +21,46 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
         ParseErrorType::Reserved(err) if err == "while"
     ));
 
+    // Implement ternary operator
     engine.register_custom_syntax(
-        &[
+        ["iff", "$expr$", "?", "$expr$", ":", "$expr$"],
+        false,
+        |context, inputs| match context.eval_expression_tree(&inputs[0])?.as_bool() {
+            Ok(true) => context.eval_expression_tree(&inputs[1]),
+            Ok(false) => context.eval_expression_tree(&inputs[2]),
+            Err(typ) => Err(Box::new(EvalAltResult::ErrorMismatchDataType(
+                "bool".to_string(),
+                typ.to_string(),
+                inputs[0].position(),
+            ))),
+        },
+    )?;
+
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let x = 42;
+                let y = iff x > 40 ? 0 : 123;
+                y
+            "
+        )?,
+        0
+    );
+
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let x = 42;
+                let y = iff x == 0 ? 0 : 123;
+                y
+            "
+        )?,
+        123
+    );
+
+    // Custom syntax
+    engine.register_custom_syntax(
+        [
             "exec", "[", "$ident$", "$symbol$", "$int$", "]", "->", "$block$", "while", "$expr$",
         ],
         true,
@@ -155,7 +193,7 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
     // The first symbol must be an identifier
     assert_eq!(
         *engine
-            .register_custom_syntax(&["!"], false, |_, _| Ok(Dynamic::UNIT))
+            .register_custom_syntax(["!"], false, |_, _| Ok(Dynamic::UNIT))
             .expect_err("should error")
             .err_type(),
         ParseErrorType::BadInput(LexError::ImproperSymbol(
@@ -166,9 +204,9 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
 
     // Check self-termination
     engine
-        .register_custom_syntax(&["test1", "$block$"], true, |_, _| Ok(Dynamic::UNIT))?
-        .register_custom_syntax(&["test2", "}"], true, |_, _| Ok(Dynamic::UNIT))?
-        .register_custom_syntax(&["test3", ";"], true, |_, _| Ok(Dynamic::UNIT))?;
+        .register_custom_syntax(["test1", "$block$"], true, |_, _| Ok(Dynamic::UNIT))?
+        .register_custom_syntax(["test2", "}"], true, |_, _| Ok(Dynamic::UNIT))?
+        .register_custom_syntax(["test3", ";"], true, |_, _| Ok(Dynamic::UNIT))?;
 
     assert_eq!(engine.eval::<INT>("test1 { x = y + z; } 42")?, 42);
     assert_eq!(engine.eval::<INT>("test2 } 42")?, 42);
@@ -176,7 +214,7 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
 
     // Register the custom syntax: var x = ???
     engine.register_custom_syntax(
-        &["var", "$ident$", "=", "$expr$"],
+        ["var", "$ident$", "=", "$expr$"],
         true,
         |context, inputs| {
             let var_name = inputs[0].get_string_value().unwrap();

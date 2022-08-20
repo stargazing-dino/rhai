@@ -14,6 +14,12 @@ Bug fixes
 * Capturing an unknown variable in a closure no longer panics.
 * Fixes panic in interpolated strings with constant expressions.
 * Using `call_fn_raw` on a function without evaluating the AST no longer panics on namespace-qualified function calls due to `import` statements not run.
+* Some reserved tokens (such as "?", "++") cannot be used in custom syntax; this is now fixed.
+
+Breaking changes
+----------------
+
+* The first closure passed to `Engine::register_debugger` now takes a single parameter which is a reference to the current `Engine`.
 
 New features
 ------------
@@ -44,6 +50,11 @@ New features
 
 * A new volatile API, `Engine::build_type`, enables registration of the entire API of a custom type in one go, provided that the custom type implements the `CustomType` trait (which uses `TypeBuilder` to register the API functions).
 
+### Simpler Package API
+
+* It is now easier to register packages via the `Package::register_into_engine` and `Package::register_into_engine_as` API.
+* Defining a custom package with base packages is also much easier with a new syntax - put the new base packages after a colon.
+
 Enhancements
 ------------
 
@@ -64,6 +75,8 @@ Enhancements
 * `Scope::remove` is added to remove a variable from a `Scope`, returning its value.
 * The code base is cleaner by running it through Clippy.
 * `ParseError::err_type` and `ParseError::position` are added for convenience.
+* The source of an `AST` compiled from a script file is set to the file's path.
+* `|>` and `<|` are now reserved symbols.
 
 
 Version 1.8.0

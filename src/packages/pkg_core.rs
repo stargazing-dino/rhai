@@ -1,6 +1,7 @@
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
+use super::*;
 use crate::def_package;
 
 def_package! {
@@ -14,15 +15,14 @@ def_package! {
     /// * [`BasicIteratorPackage`][super::BasicIteratorPackage]
     /// * [`BasicFnPackage`][super::BasicFnPackage]
     /// * [`DebuggingPackage`][super::DebuggingPackage]
-    pub CorePackage(lib) {
+    pub CorePackage(lib) :
+            LanguageCorePackage,
+            ArithmeticPackage,
+            BasicStringPackage,
+            BasicIteratorPackage,
+            BasicFnPackage,
+            #[cfg(feature = "debugging")] DebuggingPackage
+        {
         lib.standard = true;
-
-        super::LanguageCorePackage::init(lib);
-        super::ArithmeticPackage::init(lib);
-        super::BasicStringPackage::init(lib);
-        super::BasicIteratorPackage::init(lib);
-        super::BasicFnPackage::init(lib);
-        #[cfg(feature = "debugging")]
-        super::DebuggingPackage::init(lib);
     }
 }

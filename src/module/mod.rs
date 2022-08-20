@@ -22,6 +22,8 @@ use std::{
 
 /// A type representing the namespace of a function.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "metadata", derive(serde::Serialize))]
+#[cfg_attr(feature = "metadata", serde(rename_all = "camelCase"))]
 #[non_exhaustive]
 pub enum FnNamespace {
     /// Module namespace only.
@@ -589,7 +591,7 @@ impl Module {
         self.custom_types.get(key)
     }
 
-    /// Is the [`Module`] empty?
+    /// Returns `true` if this [`Module`] contains no items.
     ///
     /// # Example
     ///
