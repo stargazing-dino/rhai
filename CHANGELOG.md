@@ -14,6 +14,7 @@ Bug fixes
 * Capturing an unknown variable in a closure no longer panics.
 * Fixes panic in interpolated strings with constant expressions.
 * Using `call_fn_raw` on a function without evaluating the AST no longer panics on namespace-qualified function calls due to `import` statements not run.
+* Some reserved tokens (such as "?", "++") cannot be used in custom syntax; this is now fixed.
 
 Breaking changes
 ----------------

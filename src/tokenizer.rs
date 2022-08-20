@@ -873,6 +873,11 @@ impl Token {
             "**" => PowerOf,
             "**=" => PowerOfAssign,
 
+            #[cfg(feature = "no_object")]
+            "?." => Reserved(syntax.into()),
+            #[cfg(feature = "no_index")]
+            "?[" => Reserved(syntax.into()),
+
             #[cfg(not(feature = "no_function"))]
             "fn" => Fn,
             #[cfg(not(feature = "no_function"))]
@@ -892,9 +897,8 @@ impl Token {
             "import" | "export" | "as" => Reserved(syntax.into()),
 
             // List of reserved operators
-            "===" | "!==" | "->" | "<-" | ":=" | "~" | "::<" | "(*" | "*)" | "#" | "#!" => {
-                Reserved(syntax.into())
-            }
+            "===" | "!==" | "->" | "<-" | "?" | ":=" | ":;" | "~" | "!." | "::<" | "(*" | "*)"
+            | "#" | "#!" | "@" | "$" | "++" | "--" | "..." | "<|" | "|>" => Reserved(syntax.into()),
 
             // List of reserved keywords
             "public" | "protected" | "super" | "new" | "use" | "module" | "package" | "var"
