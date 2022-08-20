@@ -193,7 +193,7 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
     // The first symbol must be an identifier
     assert_eq!(
         *engine
-            .register_custom_syntax(&["!"], false, |_, _| Ok(Dynamic::UNIT))
+            .register_custom_syntax(["!"], false, |_, _| Ok(Dynamic::UNIT))
             .expect_err("should error")
             .err_type(),
         ParseErrorType::BadInput(LexError::ImproperSymbol(
@@ -204,9 +204,9 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
 
     // Check self-termination
     engine
-        .register_custom_syntax(&["test1", "$block$"], true, |_, _| Ok(Dynamic::UNIT))?
-        .register_custom_syntax(&["test2", "}"], true, |_, _| Ok(Dynamic::UNIT))?
-        .register_custom_syntax(&["test3", ";"], true, |_, _| Ok(Dynamic::UNIT))?;
+        .register_custom_syntax(["test1", "$block$"], true, |_, _| Ok(Dynamic::UNIT))?
+        .register_custom_syntax(["test2", "}"], true, |_, _| Ok(Dynamic::UNIT))?
+        .register_custom_syntax(["test3", ";"], true, |_, _| Ok(Dynamic::UNIT))?;
 
     assert_eq!(engine.eval::<INT>("test1 { x = y + z; } 42")?, 42);
     assert_eq!(engine.eval::<INT>("test2 } 42")?, 42);
@@ -214,7 +214,7 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
 
     // Register the custom syntax: var x = ???
     engine.register_custom_syntax(
-        &["var", "$ident$", "=", "$expr$"],
+        ["var", "$ident$", "=", "$expr$"],
         true,
         |context, inputs| {
             let var_name = inputs[0].get_string_value().unwrap();

@@ -12,7 +12,7 @@ fn test_debugging() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
 
     engine.register_debugger(
-        || Dynamic::UNIT,
+        |_| Dynamic::UNIT,
         |_, _, _, _, _| Ok(rhai::debugger::DebuggerCommand::Continue),
     );
 
@@ -47,7 +47,7 @@ fn test_debugger_state() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
 
     engine.register_debugger(
-        || {
+        |_| {
             // Say, use an object map for the debugger state
             let mut state = Map::new();
             // Initialize properties
