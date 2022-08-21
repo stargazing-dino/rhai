@@ -1368,11 +1368,11 @@ impl Module {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn set_setter_fn<A, B, F, S>(&mut self, name: impl AsRef<str>, func: F) -> u64
+    pub fn set_setter_fn<A, T, F, S>(&mut self, name: impl AsRef<str>, func: F) -> u64
     where
         A: Variant + Clone,
-        B: Variant + Clone,
-        F: RegisterNativeFunction<(Mut<A>, B), (), RhaiResultOf<S>> + SendSync + 'static,
+        T: Variant + Clone,
+        F: RegisterNativeFunction<(Mut<A>, T), (), RhaiResultOf<S>> + SendSync + 'static,
     {
         self.set_fn(
             crate::engine::make_setter(name.as_ref()).as_str(),
@@ -1381,6 +1381,48 @@ impl Module {
             None,
             &F::param_types(),
             func.into_callable_function(),
+        )
+    }
+
+    /// Set a pair of Rust getter and setter functions into the [`Module`], returning both non-zero hash keys.
+    /// This is a short-hand for [`set_getter_fn`][Module::set_getter_fn] and [`set_setter_fn`][Module::set_setter_fn].
+    ///
+    /// These function are automatically exposed to the global namespace.
+    ///
+    /// If there are similar existing Rust functions, they are replaced.
+    ///
+    /// # Function Metadata
+    ///
+    /// No metadata for the function is registered.
+    /// Use [`update_fn_metadata`][Module::update_fn_metadata] to add metadata.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rhai::{Module, ImmutableString};
+    ///
+    /// let mut module = Module::new();
+    /// let (hash_get, hash_set) = module.set_getter_setter_fn("value",
+    ///                                 |x: &mut i64| { Ok(x.to_string().into()) },
+    ///                                 |x: &mut i64, y: ImmutableString| {
+    ///                                     *x = y.len() as i64;
+    ///                                     Ok(())
+    ///                                 }
+    /// );
+    /// assert!(module.contains_fn(hash_get));
+    /// assert!(module.contains_fn(hash_set));
+    /// ```
+    #[cfg(not(feature = "no_object"))]
+    #[inline(always)]
+    pub fn set_getter_setter_fn<A: Variant + Clone, T: Variant + Clone, S1, S2>(
+        &mut self,
+        name: impl AsRef<str>,
+        getter: impl RegisterNativeFunction<(Mut<A>,), T, RhaiResultOf<S1>> + SendSync + 'static,
+        setter: impl RegisterNativeFunction<(Mut<A>, T), (), RhaiResultOf<S2>> + SendSync + 'static,
+    ) -> (u64, u64) {
+        (
+            self.set_getter_fn(name.as_ref(), getter),
+            self.set_setter_fn(name.as_ref(), setter),
         )
     }
 
@@ -1506,9 +1548,11 @@ impl Module {
         )
     }
 
-    /// Set a pair of Rust index getter and setter functions, returning both non-zero hash keys.
+    /// Set a pair of Rust index getter and setter functions into the [`Module`], returning both non-zero hash keys.
     /// This is a short-hand for [`set_indexer_get_fn`][Module::set_indexer_get_fn] and
     /// [`set_indexer_set_fn`][Module::set_indexer_set_fn].
+    ///
+    /// These functions are automatically exposed to the global namespace.
     ///
     /// If there are similar existing Rust functions, they are replaced.
     ///
@@ -1541,10 +1585,10 @@ impl Module {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline(always)]
-    pub fn set_indexer_get_set_fn<A, B, T, S>(
+    pub fn set_indexer_get_set_fn<A, B, T, S1, S2>(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<A>, B), T, RhaiResultOf<S>> + SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<A>, B, T), (), RhaiResultOf<S>> + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<A>, B), T, RhaiResultOf<S1>> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<A>, B, T), (), RhaiResultOf<S2>> + SendSync + 'static,
     ) -> (u64, u64)
     where
         A: Variant + Clone,

@@ -549,11 +549,11 @@ impl Engine {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn register_get_set<T: Variant + Clone, V: Variant + Clone, S>(
+    pub fn register_get_set<T: Variant + Clone, V: Variant + Clone, S1, S2>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl RegisterNativeFunction<(Mut<T>,), V, S> + SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, V), (), S> + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>,), V, S1> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, V), (), S2> + SendSync + 'static,
     ) -> &mut Self {
         self.register_get(&name, get_fn).register_set(&name, set_fn)
     }
@@ -924,11 +924,12 @@ impl Engine {
         T: Variant + Clone,
         X: Variant + Clone,
         V: Variant + Clone,
-        S,
+        S1,
+        S2,
     >(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<T>, X), V, S> + SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), (), S> + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>, X), V, S1> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), (), S2> + SendSync + 'static,
     ) -> &mut Self {
         self.register_indexer_get(get_fn)
             .register_indexer_set(set_fn)
