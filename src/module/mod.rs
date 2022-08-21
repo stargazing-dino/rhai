@@ -2016,7 +2016,7 @@ impl Module {
             if let Some(fn_ptr) = value.downcast_ref::<crate::FnPtr>() {
                 if ast.iter_fn_def().any(|f| f.name == fn_ptr.fn_name()) {
                     return Err(crate::ERR::ErrorMismatchDataType(
-                        "".to_string(),
+                        String::new(),
                         if fn_ptr.is_anonymous() {
                             format!("cannot export closure in variable {_name}")
                         } else {
