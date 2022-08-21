@@ -125,10 +125,10 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
 
     /// Register a custom function.
     #[inline(always)]
-    pub fn with_fn<N, A, F>(&mut self, name: N, method: F) -> &mut Self
+    pub fn with_fn<N, A, F, R, S>(&mut self, name: N, method: F) -> &mut Self
     where
         N: AsRef<str> + Into<Identifier>,
-        F: RegisterNativeFunction<A, ()>,
+        F: RegisterNativeFunction<A, R, S>,
     {
         self.engine.register_fn(name, method);
         self
@@ -136,10 +136,10 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
 
     /// Register a custom fallible function.
     #[inline(always)]
-    pub fn with_result_fn<N, A, F, R>(&mut self, name: N, method: F) -> &mut Self
+    pub fn with_result_fn<N, A, F, R, S>(&mut self, name: N, method: F) -> &mut Self
     where
         N: AsRef<str> + Into<Identifier>,
-        F: RegisterNativeFunction<A, RhaiResultOf<R>>,
+        F: RegisterNativeFunction<A, R, RhaiResultOf<S>>,
     {
         self.engine.register_result_fn(name, method);
         self

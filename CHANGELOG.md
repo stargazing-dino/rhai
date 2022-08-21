@@ -1,6 +1,15 @@
 Rhai Release Notes
 ==================
 
+Version 1.10.0
+==============
+
+Bug fixes
+---------
+
+* API for registering property getters/setters and indexers to an `Engine` now works with functions that take a first parameter of `NativeCallContext`.
+
+
 Version 1.9.0
 =============
 

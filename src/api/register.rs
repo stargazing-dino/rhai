@@ -1,5 +1,6 @@
 //! Module that defines the public function/module registration API of [`Engine`].
 
+use crate::func::register::Mut;
 use crate::func::{FnCallArgs, RegisterNativeFunction, SendSync};
 use crate::types::dynamic::Variant;
 use crate::{
@@ -50,10 +51,10 @@ impl Engine {
     /// # }
     /// ```
     #[inline]
-    pub fn register_fn<N, A, F>(&mut self, name: N, func: F) -> &mut Self
+    pub fn register_fn<N, A, F, R, S>(&mut self, name: N, func: F) -> &mut Self
     where
         N: AsRef<str> + Into<Identifier>,
-        F: RegisterNativeFunction<A, ()>,
+        F: RegisterNativeFunction<A, R, S>,
     {
         let param_types = F::param_types();
 
@@ -112,10 +113,10 @@ impl Engine {
     ///       .expect_err("expecting division by zero error!");
     /// ```
     #[inline]
-    pub fn register_result_fn<N, A, F, R>(&mut self, name: N, func: F) -> &mut Self
+    pub fn register_result_fn<N, A, F, R, S>(&mut self, name: N, func: F) -> &mut Self
     where
         N: AsRef<str> + Into<Identifier>,
-        F: RegisterNativeFunction<A, RhaiResultOf<R>>,
+        F: RegisterNativeFunction<A, R, RhaiResultOf<S>>,
     {
         let param_types = F::param_types();
 
@@ -344,10 +345,10 @@ impl Engine {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn register_get<T: Variant + Clone, V: Variant + Clone>(
+    pub fn register_get<T: Variant + Clone, V: Variant + Clone, S>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl Fn(&mut T) -> V + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>,), V, S> + SendSync + 'static,
     ) -> &mut Self {
         self.register_fn(crate::engine::make_getter(name.as_ref()).as_str(), get_fn)
     }
@@ -393,10 +394,10 @@ impl Engine {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn register_get_result<T: Variant + Clone, V: Variant + Clone>(
+    pub fn register_get_result<T: Variant + Clone, V: Variant + Clone, S>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl Fn(&mut T) -> RhaiResultOf<V> + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>,), V, RhaiResultOf<S>> + SendSync + 'static,
     ) -> &mut Self {
         self.register_result_fn(crate::engine::make_getter(name.as_ref()).as_str(), get_fn)
     }
@@ -443,10 +444,10 @@ impl Engine {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn register_set<T: Variant + Clone, V: Variant + Clone>(
+    pub fn register_set<T: Variant + Clone, V: Variant + Clone, S>(
         &mut self,
         name: impl AsRef<str>,
-        set_fn: impl Fn(&mut T, V) + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, V), (), S> + SendSync + 'static,
     ) -> &mut Self {
         self.register_fn(crate::engine::make_setter(name.as_ref()).as_str(), set_fn)
     }
@@ -494,10 +495,10 @@ impl Engine {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn register_set_result<T: Variant + Clone, V: Variant + Clone>(
+    pub fn register_set_result<T: Variant + Clone, V: Variant + Clone, S>(
         &mut self,
         name: impl AsRef<str>,
-        set_fn: impl Fn(&mut T, V) -> RhaiResultOf<()> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, V), (), RhaiResultOf<S>> + SendSync + 'static,
     ) -> &mut Self {
         self.register_result_fn(crate::engine::make_setter(name.as_ref()).as_str(), set_fn)
     }
@@ -548,11 +549,11 @@ impl Engine {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn register_get_set<T: Variant + Clone, V: Variant + Clone>(
+    pub fn register_get_set<T: Variant + Clone, V: Variant + Clone, S>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl Fn(&mut T) -> V + SendSync + 'static,
-        set_fn: impl Fn(&mut T, V) + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>,), V, S> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, V), (), S> + SendSync + 'static,
     ) -> &mut Self {
         self.register_get(&name, get_fn).register_set(&name, set_fn)
     }
@@ -607,9 +608,9 @@ impl Engine {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline]
-    pub fn register_indexer_get<T: Variant + Clone, X: Variant + Clone, V: Variant + Clone>(
+    pub fn register_indexer_get<T: Variant + Clone, X: Variant + Clone, V: Variant + Clone, S>(
         &mut self,
-        get_fn: impl Fn(&mut T, X) -> V + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>, X), V, S> + SendSync + 'static,
     ) -> &mut Self {
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<T>() == TypeId::of::<crate::Array>() {
@@ -686,9 +687,10 @@ impl Engine {
         T: Variant + Clone,
         X: Variant + Clone,
         V: Variant + Clone,
+        S,
     >(
         &mut self,
-        get_fn: impl Fn(&mut T, X) -> RhaiResultOf<V> + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>, X), V, RhaiResultOf<S>> + SendSync + 'static,
     ) -> &mut Self {
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<T>() == TypeId::of::<crate::Array>() {
@@ -761,9 +763,9 @@ impl Engine {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline]
-    pub fn register_indexer_set<T: Variant + Clone, X: Variant + Clone, V: Variant + Clone>(
+    pub fn register_indexer_set<T: Variant + Clone, X: Variant + Clone, V: Variant + Clone, S>(
         &mut self,
-        set_fn: impl Fn(&mut T, X, V) + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), (), S> + SendSync + 'static,
     ) -> &mut Self {
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<T>() == TypeId::of::<crate::Array>() {
@@ -841,9 +843,10 @@ impl Engine {
         T: Variant + Clone,
         X: Variant + Clone,
         V: Variant + Clone,
+        S,
     >(
         &mut self,
-        set_fn: impl Fn(&mut T, X, V) -> RhaiResultOf<()> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), (), RhaiResultOf<S>> + SendSync + 'static,
     ) -> &mut Self {
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<T>() == TypeId::of::<crate::Array>() {
@@ -917,10 +920,15 @@ impl Engine {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline(always)]
-    pub fn register_indexer_get_set<T: Variant + Clone, X: Variant + Clone, V: Variant + Clone>(
+    pub fn register_indexer_get_set<
+        T: Variant + Clone,
+        X: Variant + Clone,
+        V: Variant + Clone,
+        S,
+    >(
         &mut self,
-        get_fn: impl Fn(&mut T, X) -> V + SendSync + 'static,
-        set_fn: impl Fn(&mut T, X, V) + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>, X), V, S> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), (), S> + SendSync + 'static,
     ) -> &mut Self {
         self.register_indexer_get(get_fn)
             .register_indexer_set(set_fn)

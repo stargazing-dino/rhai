@@ -60,7 +60,7 @@ pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
 }
 
 /// Trait to register custom Rust functions.
-pub trait RegisterNativeFunction<Args, Result> {
+pub trait RegisterNativeFunction<ARGS, RET, RESULT> {
     /// Convert this function into a [`CallableFunction`].
     #[must_use]
     fn into_callable_function(self) -> CallableFunction;
@@ -128,7 +128,7 @@ macro_rules! def_register {
             FN: Fn($($param),*) -> RET + SendSync + 'static,
             $($par: Variant + Clone,)*
             RET: Variant + Clone
-        > RegisterNativeFunction<($($mark,)*), ()> for FN {
+        > RegisterNativeFunction<($($mark,)*), RET, ()> for FN {
             #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
@@ -154,7 +154,7 @@ macro_rules! def_register {
             FN: for<'a> Fn(NativeCallContext<'a>, $($param),*) -> RET + SendSync + 'static,
             $($par: Variant + Clone,)*
             RET: Variant + Clone
-        > RegisterNativeFunction<(NativeCallContext<'static>, $($mark,)*), ()> for FN {
+        > RegisterNativeFunction<($($mark,)*), RET, NativeCallContext<'static>> for FN {
             #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
@@ -180,7 +180,7 @@ macro_rules! def_register {
             FN: Fn($($param),*) -> RhaiResultOf<RET> + SendSync + 'static,
             $($par: Variant + Clone,)*
             RET: Variant + Clone
-        > RegisterNativeFunction<($($mark,)*), RhaiResultOf<RET>> for FN {
+        > RegisterNativeFunction<($($mark,)*), RET, RhaiResultOf<()>> for FN {
             #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }
@@ -203,7 +203,7 @@ macro_rules! def_register {
             FN: for<'a> Fn(NativeCallContext<'a>, $($param),*) -> RhaiResultOf<RET> + SendSync + 'static,
             $($par: Variant + Clone,)*
             RET: Variant + Clone
-        > RegisterNativeFunction<(NativeCallContext<'static>, $($mark,)*), RhaiResultOf<RET>> for FN {
+        > RegisterNativeFunction<($($mark,)*), RET, RhaiResultOf<NativeCallContext<'static>>> for FN {
             #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }

@@ -1,6 +1,7 @@
 //! Module defining external-loaded modules for Rhai.
 
 use crate::ast::FnAccess;
+use crate::func::register::Mut;
 use crate::func::{
     shared_take_or_clone, CallableFunction, FnCallArgs, IteratorFn, RegisterNativeFunction,
     SendSync,
@@ -1290,11 +1291,11 @@ impl Module {
     /// assert!(module.contains_fn(hash));
     /// ```
     #[inline(always)]
-    pub fn set_native_fn<ARGS, N, T, F>(&mut self, name: N, func: F) -> u64
+    pub fn set_native_fn<ARGS, N, T, F, S>(&mut self, name: N, func: F) -> u64
     where
         N: AsRef<str> + Into<Identifier>,
         T: Variant + Clone,
-        F: RegisterNativeFunction<ARGS, RhaiResultOf<T>>,
+        F: RegisterNativeFunction<ARGS, T, RhaiResultOf<S>>,
     {
         self.set_fn(
             name,
@@ -1326,14 +1327,11 @@ impl Module {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn set_getter_fn<ARGS, A, T, F>(&mut self, name: impl AsRef<str>, func: F) -> u64
+    pub fn set_getter_fn<A, T, F, S>(&mut self, name: impl AsRef<str>, func: F) -> u64
     where
         A: Variant + Clone,
         T: Variant + Clone,
-        F: RegisterNativeFunction<ARGS, RhaiResultOf<T>>
-            + Fn(&mut A) -> RhaiResultOf<T>
-            + SendSync
-            + 'static,
+        F: RegisterNativeFunction<(Mut<A>,), T, RhaiResultOf<S>> + SendSync + 'static,
     {
         self.set_fn(
             crate::engine::make_getter(name.as_ref()).as_str(),
@@ -1370,14 +1368,11 @@ impl Module {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn set_setter_fn<ARGS, A, B, F>(&mut self, name: impl AsRef<str>, func: F) -> u64
+    pub fn set_setter_fn<A, B, F, S>(&mut self, name: impl AsRef<str>, func: F) -> u64
     where
         A: Variant + Clone,
         B: Variant + Clone,
-        F: RegisterNativeFunction<ARGS, RhaiResultOf<()>>
-            + Fn(&mut A, B) -> RhaiResultOf<()>
-            + SendSync
-            + 'static,
+        F: RegisterNativeFunction<(Mut<A>, B), (), RhaiResultOf<S>> + SendSync + 'static,
     {
         self.set_fn(
             crate::engine::make_setter(name.as_ref()).as_str(),
@@ -1418,15 +1413,12 @@ impl Module {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline]
-    pub fn set_indexer_get_fn<ARGS, A, B, T, F>(&mut self, func: F) -> u64
+    pub fn set_indexer_get_fn<A, B, T, F, S>(&mut self, func: F) -> u64
     where
         A: Variant + Clone,
         B: Variant + Clone,
         T: Variant + Clone,
-        F: RegisterNativeFunction<ARGS, RhaiResultOf<T>>
-            + Fn(&mut A, B) -> RhaiResultOf<T>
-            + SendSync
-            + 'static,
+        F: RegisterNativeFunction<(Mut<A>, B), T, RhaiResultOf<S>> + SendSync + 'static,
     {
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<A>() == TypeId::of::<crate::Array>() {
@@ -1482,15 +1474,12 @@ impl Module {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline]
-    pub fn set_indexer_set_fn<ARGS, A, B, C, F>(&mut self, func: F) -> u64
+    pub fn set_indexer_set_fn<A, B, T, F, S>(&mut self, func: F) -> u64
     where
         A: Variant + Clone,
         B: Variant + Clone,
-        C: Variant + Clone,
-        F: RegisterNativeFunction<ARGS, RhaiResultOf<()>>
-            + Fn(&mut A, B, C) -> RhaiResultOf<()>
-            + SendSync
-            + 'static,
+        T: Variant + Clone,
+        F: RegisterNativeFunction<(Mut<A>, B, T), (), RhaiResultOf<S>> + SendSync + 'static,
     {
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<A>() == TypeId::of::<crate::Array>() {
@@ -1552,10 +1541,10 @@ impl Module {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline(always)]
-    pub fn set_indexer_get_set_fn<A, B, T>(
+    pub fn set_indexer_get_set_fn<A, B, T, S>(
         &mut self,
-        get_fn: impl Fn(&mut A, B) -> RhaiResultOf<T> + SendSync + 'static,
-        set_fn: impl Fn(&mut A, B, T) -> RhaiResultOf<()> + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<A>, B), T, RhaiResultOf<S>> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<A>, B, T), (), RhaiResultOf<S>> + SendSync + 'static,
     ) -> (u64, u64)
     where
         A: Variant + Clone,
