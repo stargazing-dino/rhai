@@ -1,6 +1,6 @@
 #![cfg(not(feature = "no_object"))]
 
-use rhai::{Engine, EvalAltResult, Scope, INT};
+use rhai::{Engine, EvalAltResult, NativeCallContext, Scope, INT};
 
 #[test]
 fn test_get_set() -> Result<(), Box<EvalAltResult>> {
@@ -217,12 +217,14 @@ fn test_get_set_chain_without_write_back() -> Result<(), Box<EvalAltResult>> {
         .register_get_set(
             "value",
             |t: &mut Inner| t.value,
-            |_: &mut Inner, new: INT| panic!("Inner::value setter called with {}", new),
+            |_: NativeCallContext, _: &mut Inner, new: INT| {
+                panic!("Inner::value setter called with {}", new)
+            },
         )
         .register_type::<Outer>()
         .register_get_set(
             "inner",
-            |t: &mut Outer| t.inner.clone(),
+            |_: NativeCallContext, t: &mut Outer| t.inner.clone(),
             |_: &mut Outer, new: Inner| panic!("Outer::inner setter called with {:?}", new),
         );
 

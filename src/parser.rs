@@ -2051,12 +2051,12 @@ impl Engine {
                                 Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
                             }
                             // expr[???] = rhs, expr.??? = rhs
-                            ref expr => Err(PERR::AssignmentToInvalidLHS("".to_string())
+                            ref expr => Err(PERR::AssignmentToInvalidLHS(String::new())
                                 .into_err(expr.position())),
                         }
                     }
                     Some(err_pos) => {
-                        Err(PERR::AssignmentToInvalidLHS("".to_string()).into_err(err_pos))
+                        Err(PERR::AssignmentToInvalidLHS(String::new()).into_err(err_pos))
                     }
                 }
             }
@@ -2067,7 +2067,7 @@ impl Engine {
             )
             .into_err(op_pos)),
             // expr = rhs
-            _ => Err(PERR::AssignmentToInvalidLHS("".to_string()).into_err(lhs.position())),
+            _ => Err(PERR::AssignmentToInvalidLHS(String::new()).into_err(lhs.position())),
         }
     }
 
@@ -3665,8 +3665,9 @@ impl Engine {
                     (Token::Pipe, ..) => break,
                     (Token::Identifier(s), pos) => {
                         if params_list.iter().any(|p| p.as_str() == &*s) {
-                            return Err(PERR::FnDuplicatedParam("".to_string(), s.to_string())
-                                .into_err(pos));
+                            return Err(
+                                PERR::FnDuplicatedParam(String::new(), s.to_string()).into_err(pos)
+                            );
                         }
                         let s = state.get_interned_string(s);
                         state.stack.push(s.clone(), ());

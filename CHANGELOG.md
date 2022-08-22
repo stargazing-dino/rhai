@@ -1,6 +1,24 @@
 Rhai Release Notes
 ==================
 
+Version 1.10.0
+==============
+
+Bug fixes
+---------
+
+* API for registering property getters/setters and indexers to an `Engine` now works with functions that take a first parameter of `NativeCallContext`.
+* Missing API function `Module::set_getter_setter_fn` is added.
+
+New features
+------------
+
+Fallible type iterators
+-----------------------
+
+* For very special needs, the ability to register fallible type iterators is added.
+
+
 Version 1.9.0
 =============
 
