@@ -586,10 +586,10 @@ impl Module {
     ///
     /// assert_eq!(module.get_custom_type(name), Some("MyType"));
     /// ```
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn get_custom_type(&self, key: &str) -> Option<&str> {
-        self.custom_types.get(key)
+        self.custom_types.get(key).map(|t| t.display_name.as_str())
     }
 
     /// Returns `true` if this [`Module`] contains no items.
