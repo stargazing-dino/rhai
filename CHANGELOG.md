@@ -10,11 +10,15 @@ Bug fixes
 * API for registering property getters/setters and indexers to an `Engine` now works with functions that take a first parameter of `NativeCallContext`.
 * Missing API function `Module::set_getter_setter_fn` is added.
 
+Deprecated API
+--------------
+
+* All versions of the `Engine::register_XXX_result` API that register a function returning `Result<T, Box<EvalAltResult>>` are now deprecated. The regular, non-`result` versions handle all functions correctly.
+
 New features
 ------------
 
-Fallible type iterators
------------------------
+### Fallible type iterators
 
 * For very special needs, the ability to register fallible type iterators is added.
 

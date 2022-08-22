@@ -1,7 +1,6 @@
 //! Module defining external-loaded modules for Rhai.
 
 use crate::ast::FnAccess;
-use crate::func::register::Mut;
 use crate::func::{
     shared_take_or_clone, CallableFunction, FnCallArgs, IteratorFn, RegisterNativeFunction,
     SendSync,
@@ -20,6 +19,9 @@ use std::{
     fmt,
     ops::{Add, AddAssign},
 };
+
+#[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+use crate::func::register::Mut;
 
 /// A type representing the namespace of a function.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -586,10 +588,10 @@ impl Module {
     ///
     /// assert_eq!(module.get_custom_type(name), Some("MyType"));
     /// ```
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn get_custom_type(&self, key: &str) -> Option<&str> {
-        self.custom_types.get(key)
+        self.custom_types.get(key).map(|t| t.display_name.as_str())
     }
 
     /// Returns `true` if this [`Module`] contains no items.

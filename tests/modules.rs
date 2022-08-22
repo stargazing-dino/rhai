@@ -598,7 +598,7 @@ fn test_module_dynamic() -> Result<(), Box<EvalAltResult>> {
     let mut static_modules = rhai::module_resolvers::StaticModuleResolver::new();
     static_modules.insert("test", module);
     engine.set_module_resolver(static_modules);
-    engine.register_result_fn("test2", test_fn);
+    engine.register_fn("test2", test_fn);
 
     assert_eq!(engine.eval::<INT>(r#"test2("test", 38);"#)?, 42);
 
