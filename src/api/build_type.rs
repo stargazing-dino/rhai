@@ -1,11 +1,13 @@
 //! Trait to build a custom type for use with [`Engine`].
 #![allow(deprecated)]
 
-use crate::func::register::Mut;
 use crate::{types::dynamic::Variant, Engine, Identifier, RegisterNativeFunction};
 use std::marker::PhantomData;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+
+#[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+use crate::func::register::Mut;
 
 /// Trait to build the API of a custom type for use with an [`Engine`]
 /// (i.e. register the type and its getters, setters, methods, etc.).

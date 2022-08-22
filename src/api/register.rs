@@ -1,6 +1,5 @@
 //! Module that defines the public function/module registration API of [`Engine`].
 
-use crate::func::register::Mut;
 use crate::func::{FnCallArgs, RegisterNativeFunction, SendSync};
 use crate::types::dynamic::Variant;
 use crate::{
@@ -9,6 +8,9 @@ use crate::{
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+
+#[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+use crate::func::register::Mut;
 
 impl Engine {
     /// Get the global namespace module (which is the fist module in `global_modules`).

@@ -1,7 +1,6 @@
 //! Module defining external-loaded modules for Rhai.
 
 use crate::ast::FnAccess;
-use crate::func::register::Mut;
 use crate::func::{
     shared_take_or_clone, CallableFunction, FnCallArgs, IteratorFn, RegisterNativeFunction,
     SendSync,
@@ -20,6 +19,9 @@ use std::{
     fmt,
     ops::{Add, AddAssign},
 };
+
+#[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+use crate::func::register::Mut;
 
 /// A type representing the namespace of a function.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
