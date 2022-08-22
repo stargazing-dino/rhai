@@ -2251,11 +2251,24 @@ impl Module {
 
     /// Set a type iterator into the [`Module`].
     #[cfg(not(feature = "sync"))]
-    #[inline]
+    #[inline(always)]
     pub fn set_iter(
         &mut self,
         type_id: TypeId,
         func: impl Fn(Dynamic) -> Box<dyn Iterator<Item = Dynamic>> + 'static,
+    ) -> &mut Self {
+        self.set_iter_result(type_id, move |x| {
+            Box::new(func(x).map(Ok)) as Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>>
+        })
+    }
+
+    /// Set a fallible type iterator into the [`Module`].
+    #[cfg(not(feature = "sync"))]
+    #[inline]
+    pub fn set_iter_result(
+        &mut self,
+        type_id: TypeId,
+        func: impl Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>> + 'static,
     ) -> &mut Self {
         let func = Shared::new(func);
         if self.indexed {

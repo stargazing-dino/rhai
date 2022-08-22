@@ -426,10 +426,11 @@ pub type FnBuiltin = fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult;
 
 /// Function that gets an iterator from a type.
 #[cfg(not(feature = "sync"))]
-pub type IteratorFn = dyn Fn(Dynamic) -> Box<dyn Iterator<Item = Dynamic>>;
+pub type IteratorFn = dyn Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>>;
 /// Function that gets an iterator from a type.
 #[cfg(feature = "sync")]
-pub type IteratorFn = dyn Fn(Dynamic) -> Box<dyn Iterator<Item = Dynamic>> + Send + Sync;
+pub type IteratorFn =
+    dyn Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>> + Send + Sync;
 
 #[cfg(not(feature = "sync"))]
 pub type FnPlugin = dyn PluginFunction;
