@@ -2250,12 +2250,11 @@ impl Module {
     }
 
     /// Set a type iterator into the [`Module`].
-    #[cfg(not(feature = "sync"))]
     #[inline(always)]
     pub fn set_iter(
         &mut self,
         type_id: TypeId,
-        func: impl Fn(Dynamic) -> Box<dyn Iterator<Item = Dynamic>> + 'static,
+        func: impl Fn(Dynamic) -> Box<dyn Iterator<Item = Dynamic>> + SendSync + 'static,
     ) -> &mut Self {
         self.set_iter_result(type_id, move |x| {
             Box::new(func(x).map(Ok)) as Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>>
@@ -2263,12 +2262,11 @@ impl Module {
     }
 
     /// Set a fallible type iterator into the [`Module`].
-    #[cfg(not(feature = "sync"))]
     #[inline]
     pub fn set_iter_result(
         &mut self,
         type_id: TypeId,
-        func: impl Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>> + 'static,
+        func: impl Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>> + SendSync + 'static,
     ) -> &mut Self {
         let func = Shared::new(func);
         if self.indexed {
@@ -2280,24 +2278,7 @@ impl Module {
     }
 
     /// Set a type iterator into the [`Module`].
-    #[cfg(feature = "sync")]
-    #[inline]
-    pub fn set_iter(
-        &mut self,
-        type_id: TypeId,
-        func: impl Fn(Dynamic) -> Box<dyn Iterator<Item = Dynamic>> + SendSync + 'static,
-    ) -> &mut Self {
-        let func = Shared::new(func);
-        if self.indexed {
-            self.all_type_iterators.insert(type_id, func.clone());
-            self.contains_indexed_global_functions = true;
-        }
-        self.type_iterators.insert(type_id, func);
-        self
-    }
-
-    /// Set a type iterator into the [`Module`].
-    #[inline]
+    #[inline(always)]
     pub fn set_iterable<T>(&mut self) -> &mut Self
     where
         T: Variant + Clone + IntoIterator,
@@ -2308,8 +2289,20 @@ impl Module {
         })
     }
 
+    /// Set a fallible type iterator into the [`Module`].
+    #[inline(always)]
+    pub fn set_iterable_result<T, X>(&mut self) -> &mut Self
+    where
+        T: Variant + Clone + IntoIterator<Item = RhaiResultOf<X>>,
+        X: Variant + Clone,
+    {
+        self.set_iter_result(TypeId::of::<T>(), |obj: Dynamic| {
+            Box::new(obj.cast::<T>().into_iter().map(|v| v.map(Dynamic::from)))
+        })
+    }
+
     /// Set an iterator type into the [`Module`] as a type iterator.
-    #[inline]
+    #[inline(always)]
     pub fn set_iterator<T>(&mut self) -> &mut Self
     where
         T: Variant + Clone + Iterator,
@@ -2317,6 +2310,18 @@ impl Module {
     {
         self.set_iter(TypeId::of::<T>(), |obj: Dynamic| {
             Box::new(obj.cast::<T>().map(Dynamic::from))
+        })
+    }
+
+    /// Set a iterator type into the [`Module`] as a fallible type iterator.
+    #[inline(always)]
+    pub fn set_iterator_result<T, X>(&mut self) -> &mut Self
+    where
+        T: Variant + Clone + Iterator<Item = RhaiResultOf<X>>,
+        X: Variant + Clone,
+    {
+        self.set_iter_result(TypeId::of::<T>(), |obj: Dynamic| {
+            Box::new(obj.cast::<T>().map(|v| v.map(Dynamic::from)))
         })
     }
 

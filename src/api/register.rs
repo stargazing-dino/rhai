@@ -292,7 +292,7 @@ impl Engine {
             .set_custom_type_raw(fully_qualified_type_path, name);
         self
     }
-    /// Register an type iterator for an iterable type with the [`Engine`].
+    /// Register a type iterator for an iterable type with the [`Engine`].
     /// This is an advanced API.
     #[inline(always)]
     pub fn register_iterator<T>(&mut self) -> &mut Self
@@ -301,6 +301,17 @@ impl Engine {
         <T as IntoIterator>::Item: Variant + Clone,
     {
         self.global_namespace_mut().set_iterable::<T>();
+        self
+    }
+    /// Register a fallible type iterator for an iterable type with the [`Engine`].
+    /// This is an advanced API.
+    #[inline(always)]
+    pub fn register_iterator_result<T, X>(&mut self) -> &mut Self
+    where
+        T: Variant + Clone + IntoIterator<Item = RhaiResultOf<X>>,
+        X: Variant + Clone,
+    {
+        self.global_namespace_mut().set_iterable_result::<T, X>();
         self
     }
     /// Register a getter function for a member of a registered type with the [`Engine`].
