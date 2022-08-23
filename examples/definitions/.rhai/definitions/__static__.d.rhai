@@ -1973,6 +1973,9 @@ fn get is_zero(x: u8) -> bool;
 /// Number of elements in the array.
 fn get len(array: Array) -> int;
 
+/// Return true if the array is empty.
+fn get empty(array: Array) -> bool;
+
 /// Return the length of the BLOB.
 ///
 /// # Example
