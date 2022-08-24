@@ -22,6 +22,11 @@ New features
 
 * For very special needs, the ability to register fallible type iterators is added.
 
+Enhancements
+------------
+
+* `is_empty` method is added to arrays, BLOB's, object maps, strings and ranges.
+
 
 Version 1.9.0
 =============

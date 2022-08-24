@@ -666,7 +666,7 @@ mod range_functions {
         let _ = range;
         true
     }
-    /// Returns true if the range contains no items.
+    /// Return true if the range contains no items.
     #[rhai_fn(get = "is_empty", name = "is_empty", pure)]
     pub fn is_empty_exclusive(range: &mut ExclusiveRange) -> bool {
         range.is_empty()
@@ -693,7 +693,7 @@ mod range_functions {
         let _ = range;
         false
     }
-    /// Returns true if the range contains no items.
+    /// Return true if the range contains no items.
     #[rhai_fn(get = "is_empty", name = "is_empty", pure)]
     pub fn is_empty_inclusive(range: &mut InclusiveRange) -> bool {
         range.is_empty()

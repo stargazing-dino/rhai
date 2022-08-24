@@ -140,7 +140,7 @@ pub mod blob_functions {
     pub fn len(blob: &mut Blob) -> INT {
         blob.len() as INT
     }
-    /// Return true if the blob is empty.
+    /// Return true if the BLOB is empty.
     #[rhai_fn(name = "is_empty", get = "is_empty", pure)]
     pub fn is_empty(blob: &mut Blob) -> bool {
         blob.len() == 0
