@@ -2086,6 +2086,12 @@ impl Module {
         // Non-private functions defined become module functions
         #[cfg(not(feature = "no_function"))]
         {
+            let environ = Shared::new(crate::ast::EncapsulatedEnviron {
+                lib: ast.shared_lib().clone(),
+                imports: imports.clone().into_boxed_slice(),
+                constants: constants.clone(),
+            });
+
             ast.shared_lib()
                 .iter_fn()
                 .filter(|&f| match f.metadata.access {
@@ -2102,11 +2108,7 @@ impl Module {
                         .clone();
 
                     // Encapsulate AST environment
-                    func.environ = Some(crate::ast::EncapsulatedEnviron {
-                        lib: ast.shared_lib().clone(),
-                        imports: imports.clone().into_boxed_slice(),
-                        constants: constants.clone(),
-                    });
+                    func.environ = Some(environ.clone());
 
                     module.set_script_fn(func);
                 });
