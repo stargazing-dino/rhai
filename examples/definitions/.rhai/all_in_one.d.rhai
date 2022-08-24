@@ -3047,6 +3047,9 @@ fn keys(map: Map) -> Array;
 /// Number of elements in the array.
 fn len(array: Array) -> int;
 
+/// Return true if the array is empty.
+fn is_empty(array: Array) -> bool;
+
 /// Return the length of the BLOB.
 ///
 /// # Example
@@ -3060,8 +3063,14 @@ fn len(array: Array) -> int;
 /// ```
 fn len(blob: Blob) -> int;
 
+/// Return true if the blob is empty.
+fn is_empty(blob: Blob) -> bool;
+
 /// Return the number of properties in the object map.
 fn len(map: Map) -> int;
+
+/// Return true if the map is empty.
+fn is_empty(map: Map) -> bool;
 
 /// Return the length of the string, in number of characters.
 ///
@@ -3073,6 +3082,9 @@ fn len(map: Map) -> int;
 /// print(text.len);        // prints 17
 /// ```
 fn len(string: String) -> int;
+
+/// Return true if the string is empty.
+fn is_empty(string: String) -> bool;
 
 /// Return the natural log of the decimal number.
 fn ln(x: Decimal) -> Decimal;
