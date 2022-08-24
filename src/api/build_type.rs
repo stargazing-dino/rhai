@@ -128,11 +128,11 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
 
     /// Register a custom function.
     #[inline(always)]
-    pub fn with_fn<N, A, F, R, S>(&mut self, name: N, method: F) -> &mut Self
-    where
-        N: AsRef<str> + Into<Identifier>,
-        F: RegisterNativeFunction<A, R, S>,
-    {
+    pub fn with_fn<A, R, S>(
+        &mut self,
+        name: impl AsRef<str> + Into<Identifier>,
+        method: impl RegisterNativeFunction<A, R, S>,
+    ) -> &mut Self {
         self.engine.register_fn(name, method);
         self
     }

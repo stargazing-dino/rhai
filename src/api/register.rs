@@ -53,11 +53,11 @@ impl Engine {
     /// # }
     /// ```
     #[inline]
-    pub fn register_fn<N, A, F, R, S>(&mut self, name: N, func: F) -> &mut Self
-    where
-        N: AsRef<str> + Into<Identifier>,
-        F: RegisterNativeFunction<A, R, S>,
-    {
+    pub fn register_fn<A, R, S, F: RegisterNativeFunction<A, R, S>>(
+        &mut self,
+        name: impl AsRef<str> + Into<Identifier>,
+        func: F,
+    ) -> &mut Self {
         let param_types = F::param_types();
 
         #[cfg(feature = "metadata")]
@@ -109,16 +109,12 @@ impl Engine {
     ///
     /// To access the first mutable parameter, use `args.get_mut(0).unwrap()`
     #[inline(always)]
-    pub fn register_raw_fn<N, T>(
+    pub fn register_raw_fn<T: Variant + Clone>(
         &mut self,
-        name: N,
+        name: impl AsRef<str> + Into<Identifier>,
         arg_types: impl AsRef<[TypeId]>,
         func: impl Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResultOf<T> + SendSync + 'static,
-    ) -> &mut Self
-    where
-        N: AsRef<str> + Into<Identifier>,
-        T: Variant + Clone,
-    {
+    ) -> &mut Self {
         self.global_namespace_mut().set_raw_fn(
             name,
             FnNamespace::Global,

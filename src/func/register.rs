@@ -11,20 +11,23 @@ use crate::{reify, Dynamic, NativeCallContext, RhaiResultOf};
 use std::prelude::v1::*;
 use std::{any::TypeId, mem};
 
-// These types are used to build a unique _marker_ tuple type for each combination
-// of function parameter types in order to make each trait implementation unique.
-// That is because stable Rust currently does not allow distinguishing implementations
-// based purely on parameter types of traits (`Fn`, `FnOnce` and `FnMut`).
-//
-// For example:
-//
-// `NativeFunction<(Mut<A>, B, Ref<C>), R>`
-//
-// will have the function prototype constraint to:
-//
-// `FN: (&mut A, B, &C) -> R`
-//
-// These types are not actually used anywhere.
+/// These types are used to build a unique _marker_ tuple type for each combination
+/// of function parameter types in order to make each trait implementation unique.
+///
+/// That is because stable Rust currently does not allow distinguishing implementations
+/// based purely on parameter types of traits (`Fn`, `FnOnce` and `FnMut`).
+///
+/// # Examples
+///
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), R, ()>` = `Fn(&mut A, B, &C) -> R`
+///
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), R, NativeCallContext>` = `Fn(NativeCallContext, &mut A, B, &C) -> R`
+///
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), R, RhaiResultOf<()>>` = `Fn(&mut A, B, &C) -> Result<R, Box<EvalAltResult>>`
+///
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), R, RhaiResultOf<NativeCallContext>>` = `Fn(NativeCallContext, &mut A, B, &C) -> Result<R, Box<EvalAltResult>>`
+///
+/// These types are not actually used anywhere.
 pub struct Mut<T>(T);
 //pub struct Ref<T>(T);
 
@@ -60,6 +63,11 @@ pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
 }
 
 /// Trait to register custom Rust functions.
+///
+/// # Type Parameters
+///
+/// * `ARGS` - a tuple containing parameter types, with `&mut T` represented by [`Mut<T>`].
+/// * `RET` - return type of the function; if the function returns `Result`, it is the unwrapped inner value type.
 pub trait RegisterNativeFunction<ARGS, RET, RESULT> {
     /// Convert this function into a [`CallableFunction`].
     #[must_use]

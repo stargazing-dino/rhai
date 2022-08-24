@@ -143,11 +143,11 @@ impl Engine {
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `register_fn` instead")]
     #[inline(always)]
-    pub fn register_result_fn<N, A, F, R, S>(&mut self, name: N, func: F) -> &mut Self
-    where
-        N: AsRef<str> + Into<Identifier>,
-        F: RegisterNativeFunction<A, R, RhaiResultOf<S>>,
-    {
+    pub fn register_result_fn<A, R, S>(
+        &mut self,
+        name: impl AsRef<str> + Into<Identifier>,
+        func: impl RegisterNativeFunction<A, R, RhaiResultOf<S>>,
+    ) -> &mut Self {
         self.register_fn(name, func)
     }
     /// Register a getter function for a member of a registered type with the [`Engine`].

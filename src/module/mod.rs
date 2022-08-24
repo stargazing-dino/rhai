@@ -1245,18 +1245,14 @@ impl Module {
     /// assert!(module.contains_fn(hash));
     /// ```
     #[inline(always)]
-    pub fn set_raw_fn<T, F>(
+    pub fn set_raw_fn<T: Variant + Clone>(
         &mut self,
         name: impl AsRef<str>,
         namespace: FnNamespace,
         access: FnAccess,
         arg_types: impl AsRef<[TypeId]>,
-        func: F,
-    ) -> u64
-    where
-        T: Variant + Clone,
-        F: Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResultOf<T> + SendSync + 'static,
-    {
+        func: impl Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResultOf<T> + SendSync + 'static,
+    ) -> u64 {
         let f =
             move |ctx: NativeCallContext, args: &mut FnCallArgs| func(ctx, args).map(Dynamic::from);
 
@@ -1293,11 +1289,14 @@ impl Module {
     /// assert!(module.contains_fn(hash));
     /// ```
     #[inline(always)]
-    pub fn set_native_fn<ARGS, N, T, F, S>(&mut self, name: N, func: F) -> u64
+    pub fn set_native_fn<A, T, F, S>(
+        &mut self,
+        name: impl AsRef<str> + Into<Identifier>,
+        func: F,
+    ) -> u64
     where
-        N: AsRef<str> + Into<Identifier>,
         T: Variant + Clone,
-        F: RegisterNativeFunction<ARGS, T, RhaiResultOf<S>>,
+        F: RegisterNativeFunction<A, T, RhaiResultOf<S>>,
     {
         self.set_fn(
             name,
@@ -1587,16 +1586,17 @@ impl Module {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline(always)]
-    pub fn set_indexer_get_set_fn<A, B, T, S1, S2>(
-        &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<A>, B), T, RhaiResultOf<S1>> + SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<A>, B, T), (), RhaiResultOf<S2>> + SendSync + 'static,
-    ) -> (u64, u64)
-    where
+    pub fn set_indexer_get_set_fn<
         A: Variant + Clone,
         B: Variant + Clone,
         T: Variant + Clone,
-    {
+        S1,
+        S2,
+    >(
+        &mut self,
+        get_fn: impl RegisterNativeFunction<(Mut<A>, B), T, RhaiResultOf<S1>> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<A>, B, T), (), RhaiResultOf<S2>> + SendSync + 'static,
+    ) -> (u64, u64) {
         (
             self.set_indexer_get_fn(get_fn),
             self.set_indexer_set_fn(set_fn),
