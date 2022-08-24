@@ -31,8 +31,8 @@ pub mod array_functions {
         array.len() as INT
     }
     /// Return true if the array is empty.
-    #[rhai_fn(name = "empty", get = "empty", pure)]
-    pub fn empty(array: &mut Array) -> bool {
+    #[rhai_fn(name = "is_empty", get = "is_empty", pure)]
+    pub fn is_empty(array: &mut Array) -> bool {
         array.len() == 0
     }
     /// Get a copy of the element at the `index` position in the array.
