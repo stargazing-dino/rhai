@@ -26,6 +26,7 @@ Enhancements
 ------------
 
 * `is_empty` method is added to arrays, BLOB's, object maps, strings and ranges.
+* `StaticModuleResolver` now stores the path in the module's `id` field.
 
 
 Version 1.9.0
