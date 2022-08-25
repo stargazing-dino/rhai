@@ -26,7 +26,7 @@ mod map_functions {
         map.len() as INT
     }
     /// Return true if the map is empty.
-    #[rhai_fn(name = "is_empty", get = "is_empty", pure)]
+    #[rhai_fn(pure)]
     pub fn is_empty(map: &mut Map) -> bool {
         map.len() == 0
     }

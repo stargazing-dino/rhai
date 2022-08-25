@@ -785,6 +785,12 @@ op +(u8, u8) -> u8;
 /// ```
 op +=(Map, Map) -> ();
 
+op +=(String, String) -> ();
+
+op +=(String, char) -> ();
+
+op +=(String, ()) -> ();
+
 op +=(String, ?) -> ();
 
 op +=(String, Blob) -> ();
@@ -2368,6 +2374,21 @@ fn get int(x: float) -> float;
 /// ```
 fn get is_anonymous(fn_ptr: FnPtr) -> bool;
 
+/// Return true if the array is empty.
+fn get is_empty(array: Array) -> bool;
+
+/// Return true if the BLOB is empty.
+fn get is_empty(blob: Blob) -> bool;
+
+/// Return true if the range contains no items.
+fn get is_empty(range: ExclusiveRange) -> bool;
+
+/// Return true if the range contains no items.
+fn get is_empty(range: InclusiveRange) -> bool;
+
+/// Return true if the string is empty.
+fn get is_empty(string: String) -> bool;
+
 /// Return true if the number is even.
 fn get is_even(x: int) -> bool;
 
@@ -2913,6 +2934,24 @@ fn int(x: float) -> float;
 /// ```
 fn is_anonymous(fn_ptr: FnPtr) -> bool;
 
+/// Return true if the array is empty.
+fn is_empty(array: Array) -> bool;
+
+/// Return true if the BLOB is empty.
+fn is_empty(blob: Blob) -> bool;
+
+/// Return true if the map is empty.
+fn is_empty(map: Map) -> bool;
+
+/// Return true if the range contains no items.
+fn is_empty(range: ExclusiveRange) -> bool;
+
+/// Return true if the range contains no items.
+fn is_empty(range: InclusiveRange) -> bool;
+
+/// Return true if the string is empty.
+fn is_empty(string: String) -> bool;
+
 /// Return true if the number is even.
 fn is_even(x: int) -> bool;
 
@@ -3047,9 +3086,6 @@ fn keys(map: Map) -> Array;
 /// Number of elements in the array.
 fn len(array: Array) -> int;
 
-/// Return true if the array is empty.
-fn is_empty(array: Array) -> bool;
-
 /// Return the length of the BLOB.
 ///
 /// # Example
@@ -3063,14 +3099,8 @@ fn is_empty(array: Array) -> bool;
 /// ```
 fn len(blob: Blob) -> int;
 
-/// Return true if the blob is empty.
-fn is_empty(blob: Blob) -> bool;
-
 /// Return the number of properties in the object map.
 fn len(map: Map) -> int;
-
-/// Return true if the map is empty.
-fn is_empty(map: Map) -> bool;
 
 /// Return the length of the string, in number of characters.
 ///
@@ -3082,9 +3112,6 @@ fn is_empty(map: Map) -> bool;
 /// print(text.len);        // prints 17
 /// ```
 fn len(string: String) -> int;
-
-/// Return true if the string is empty.
-fn is_empty(string: String) -> bool;
 
 /// Return the natural log of the decimal number.
 fn ln(x: Decimal) -> Decimal;
@@ -5738,6 +5765,16 @@ fn tan(x: float) -> float;
 fn tanh(x: float) -> float;
 
 /// Create a timestamp containing the current system time.
+///
+/// # Example
+///
+/// ```rhai
+/// let now = timestamp();
+///
+/// sleep(10.0);            // sleep for 10 seconds
+///
+/// print(now.elapsed);     // prints 10.???
+/// ```
 fn timestamp() -> Instant;
 
 /// Convert the BLOB into an array of integers.
