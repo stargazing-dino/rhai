@@ -2088,8 +2088,8 @@ impl Module {
         {
             let environ = Shared::new(crate::ast::EncapsulatedEnviron {
                 lib: ast.shared_lib().clone(),
-                imports: imports.clone().into_boxed_slice(),
-                constants: constants.clone(),
+                imports: imports.into_boxed_slice(),
+                constants,
             });
 
             ast.shared_lib()
