@@ -291,6 +291,8 @@ struct ParseSettings {
     in_closure: bool,
     /// Is the construct being parsed located inside a breakable loop?
     is_breakable: bool,
+    /// Allow statements in blocks?
+    allow_statements: bool,
     /// Language options in effect (overrides Engine options).
     options: LangOptions,
     /// Current expression nesting level.
@@ -1193,12 +1195,21 @@ impl Engine {
                 }
             };
 
-            let stmt = self.parse_stmt(input, state, lib, settings.level_up())?;
-            let need_comma = !stmt.is_self_terminated();
+            let (action_expr, need_comma) = if settings.allow_statements {
+                let stmt = self.parse_stmt(input, state, lib, settings.level_up())?;
+                let need_comma = !stmt.is_self_terminated();
+
+                let stmt_block: StmtBlock = stmt.into();
+                (Expr::Stmt(stmt_block.into()), need_comma)
+            } else {
+                (
+                    self.parse_expr(input, state, lib, settings.level_up())?,
+                    true,
+                )
+            };
             let has_condition = !matches!(condition, Expr::BoolConstant(true, ..));
 
-            let stmt_block: StmtBlock = stmt.into();
-            expressions.push((condition, Expr::Stmt(stmt_block.into())).into());
+            expressions.push((condition, action_expr).into());
             let index = expressions.len() - 1;
 
             if case_expr_list.is_empty() {
@@ -3076,6 +3087,22 @@ impl Engine {
 
         let mut statements = StaticVec::new_const();
 
+        if !settings.allow_statements {
+            let stmt = self.parse_expr_stmt(input, state, lib, settings.level_up())?;
+            statements.push(stmt);
+
+            // Must end with }
+            return match input.next().expect(NEVER_ENDS) {
+                (Token::RightBrace, pos) => Ok((statements, settings.pos, pos).into()),
+                (Token::LexError(err), pos) => Err(err.into_err(pos)),
+                (.., pos) => Err(PERR::MissingToken(
+                    Token::LeftBrace.into(),
+                    "to start a statement block".into(),
+                )
+                .into_err(pos)),
+            };
+        }
+
         let prev_entry_stack_len = state.block_stack_len;
         state.block_stack_len = state.stack.len();
 
@@ -3290,6 +3317,7 @@ impl Engine {
                             #[cfg(not(feature = "no_closure"))]
                             in_closure: false,
                             is_breakable: false,
+                            allow_statements: true,
                             level: 0,
                             options,
                             pos,
@@ -3761,7 +3789,7 @@ impl Engine {
         let mut functions = BTreeMap::new();
 
         let mut options = self.options;
-        options.remove(LangOptions::IF_EXPR | LangOptions::SWITCH_EXPR | LangOptions::STMT_EXPR);
+        options.remove(LangOptions::STMT_EXPR);
         #[cfg(not(feature = "no_function"))]
         options.remove(LangOptions::ANON_FN);
 
@@ -3773,6 +3801,7 @@ impl Engine {
             #[cfg(not(feature = "no_closure"))]
             in_closure: false,
             is_breakable: false,
+            allow_statements: false,
             level: 0,
             options,
             pos: Position::NONE,
@@ -3828,6 +3857,7 @@ impl Engine {
                 #[cfg(not(feature = "no_closure"))]
                 in_closure: false,
                 is_breakable: false,
+                allow_statements: true,
                 options: self.options,
                 level: 0,
                 pos: Position::NONE,

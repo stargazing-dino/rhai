@@ -23,6 +23,11 @@ New features
 
 * For very special needs, the ability to register fallible type iterators is added.
 
+### Expressions
+
+* `if`-expressions are allowed in `Engine::eval_expression` and `Engine::compile_expression` provided that both statement blocks each contain at most a single expression.
+* `switch`-expressions are allowed in `Engine::eval_expression` and `Engine::compile_expression` provided that match actions are expressions only.
+
 Enhancements
 ------------
 
