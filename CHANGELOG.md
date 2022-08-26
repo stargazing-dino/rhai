@@ -9,6 +9,7 @@ Bug fixes
 
 * API for registering property getters/setters and indexers to an `Engine` now works with functions that take a first parameter of `NativeCallContext`.
 * Missing API function `Module::set_getter_setter_fn` is added.
+* To avoid subtle errors, simple optimization is used for `rhai-run`; previous it was full optimization.
 
 Deprecated API
 --------------
