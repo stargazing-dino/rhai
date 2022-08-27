@@ -4,6 +4,8 @@ Rhai Release Notes
 Version 1.10.0
 ==============
 
+The minimum Rust version is now `1.61.0` in order to use some `const` generics.
+
 Bug fixes
 ---------
 
