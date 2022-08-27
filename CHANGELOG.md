@@ -9,6 +9,7 @@ Bug fixes
 
 * API for registering property getters/setters and indexers to an `Engine` now works with functions that take a first parameter of `NativeCallContext`.
 * Missing API function `Module::set_getter_setter_fn` is added.
+* To avoid subtle errors, simple optimization is used for `rhai-run`; previous it was full optimization.
 
 Deprecated API
 --------------
@@ -22,10 +23,17 @@ New features
 
 * For very special needs, the ability to register fallible type iterators is added.
 
+### Expressions
+
+* `if`-expressions are allowed in `Engine::eval_expression` and `Engine::compile_expression` provided that both statement blocks each contain at most a single expression.
+* `switch`-expressions are allowed in `Engine::eval_expression` and `Engine::compile_expression` provided that match actions are expressions only.
+
 Enhancements
 ------------
 
 * `is_empty` method is added to arrays, BLOB's, object maps, strings and ranges.
+* `StaticModuleResolver` now stores the path in the module's `id` field.
+* `Engine::module_resolver` is added to grant access to the `Engine`'s module resolver.
 
 
 Version 1.9.0

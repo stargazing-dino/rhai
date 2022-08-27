@@ -1960,9 +1960,6 @@ impl Module {
     /// The entire [`AST`][crate::AST] is encapsulated into each function, allowing functions to
     /// cross-call each other.
     ///
-    /// Functions in the global namespace, plus all functions defined in the [`Module`], are
-    /// _merged_ into a _unified_ namespace. Therefore, all functions will be found.
-    ///
     /// # Example
     ///
     /// ```
@@ -1992,9 +1989,6 @@ impl Module {
     ///
     /// The entire [`AST`][crate::AST] is encapsulated into each function, allowing functions to
     /// cross-call each other.
-    ///
-    /// Functions in the global namespace, plus all functions defined in the [`Module`], are
-    /// _merged_ into a _unified_ namespace. Therefore, all functions will be found.
     ///
     /// # WARNING - Low Level API
     ///
