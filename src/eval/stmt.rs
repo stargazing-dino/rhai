@@ -631,8 +631,12 @@ impl Engine {
                         for (x, iter_value) in func(iter_obj).enumerate() {
                             // Increment counter
                             if counter_index < usize::MAX {
+                                // As the variable increments from 0, this should always work
+                                // since any overflow will first be caught below.
+                                let index_value = x as INT;
+
                                 #[cfg(not(feature = "unchecked"))]
-                                if x > INT::MAX as usize {
+                                if index_value > crate::MAX_USIZE_INT {
                                     loop_result = Err(ERR::ErrorArithmetic(
                                         format!("for-loop counter overflow: {x}"),
                                         counter.pos,
@@ -641,10 +645,8 @@ impl Engine {
                                     break;
                                 }
 
-                                let index_value = Dynamic::from(x as INT);
-
                                 *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
-                                    index_value;
+                                    Dynamic::from_int(index_value);
                             }
 
                             let value = match iter_value {

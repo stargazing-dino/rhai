@@ -338,17 +338,7 @@ impl<F: Float> FloatWrapper<F> {
     /// Create a new [`FloatWrapper`].
     #[inline(always)]
     #[must_use]
-    pub fn new(value: F) -> Self {
-        Self(value)
-    }
-}
-
-#[cfg(not(feature = "no_float"))]
-impl FloatWrapper<crate::FLOAT> {
-    /// Create a new [`FloatWrapper`].
-    #[inline(always)]
-    #[must_use]
-    pub const fn new_const(value: crate::FLOAT) -> Self {
+    pub const fn new(value: F) -> Self {
         Self(value)
     }
 }
@@ -600,7 +590,7 @@ impl Expr {
             Self::FnCall(ref x, ..)
                 if !x.is_qualified() && x.args.len() == 1 && x.name == KEYWORD_FN_PTR =>
             {
-                if let Expr::StringConstant(ref s, ..) = x.args[0] {
+                if let Self::StringConstant(ref s, ..) = x.args[0] {
                     FnPtr::new(s).ok()?.into()
                 } else {
                     return None;
@@ -612,8 +602,8 @@ impl Expr {
                 match x.name.as_str() {
                     // x..y
                     OP_EXCLUSIVE_RANGE => {
-                        if let Expr::IntegerConstant(ref start, ..) = x.args[0] {
-                            if let Expr::IntegerConstant(ref end, ..) = x.args[1] {
+                        if let Self::IntegerConstant(ref start, ..) = x.args[0] {
+                            if let Self::IntegerConstant(ref end, ..) = x.args[1] {
                                 (*start..*end).into()
                             } else {
                                 return None;
@@ -624,8 +614,8 @@ impl Expr {
                     }
                     // x..=y
                     OP_INCLUSIVE_RANGE => {
-                        if let Expr::IntegerConstant(ref start, ..) = x.args[0] {
-                            if let Expr::IntegerConstant(ref end, ..) = x.args[1] {
+                        if let Self::IntegerConstant(ref start, ..) = x.args[0] {
+                            if let Self::IntegerConstant(ref end, ..) = x.args[1] {
                                 (*start..=*end).into()
                             } else {
                                 return None;
@@ -940,9 +930,9 @@ impl Expr {
             }
             Self::Index(x, ..)
             | Self::Dot(x, ..)
-            | Expr::And(x, ..)
-            | Expr::Or(x, ..)
-            | Expr::Coalesce(x, ..) => {
+            | Self::And(x, ..)
+            | Self::Or(x, ..)
+            | Self::Coalesce(x, ..) => {
                 if !x.lhs.walk(path, on_node) {
                     return false;
                 }

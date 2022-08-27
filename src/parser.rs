@@ -34,6 +34,10 @@ pub type ParseResult<T> = Result<T, ParseError>;
 
 type FnLib = BTreeMap<u64, Shared<ScriptFnDef>>;
 
+const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
+
+const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
+
 /// Invalid variable name that acts as a search barrier in a [`Scope`].
 const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 
@@ -41,8 +45,9 @@ const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 const NEVER_ENDS: &str = "`Token`";
 
 /// Unroll `switch` ranges no larger than this.
-const SMALL_SWITCH_RANGE: usize = 16;
+const SMALL_SWITCH_RANGE: INT = 16;
 
+/// Number of string interners used: two additional for property getters/setters if not `no_object`
 const NUM_INTERNERS: usize = if cfg!(feature = "no_object") { 1 } else { 3 };
 
 /// _(internals)_ A type that encapsulates the current state of the parser.
@@ -899,13 +904,13 @@ impl Engine {
         let mut settings = settings;
         settings.pos = eat_token(input, Token::LeftBracket);
 
-        let mut arr = StaticVec::new_const();
+        let mut array = StaticVec::new_const();
 
         loop {
             const MISSING_RBRACKET: &str = "to end this array literal";
 
             #[cfg(not(feature = "unchecked"))]
-            if self.max_array_size() > 0 && arr.len() >= self.max_array_size() {
+            if self.max_array_size() > 0 && array.len() >= self.max_array_size() {
                 return Err(PERR::LiteralTooLarge(
                     "Size of array literal".to_string(),
                     self.max_array_size(),
@@ -927,7 +932,7 @@ impl Engine {
                 }
                 _ => {
                     let expr = self.parse_expr(input, state, lib, settings.level_up())?;
-                    arr.push(expr);
+                    array.push(expr);
                 }
             }
 
@@ -954,9 +959,9 @@ impl Engine {
             };
         }
 
-        arr.shrink_to_fit();
+        array.shrink_to_fit();
 
-        Ok(Expr::Array(arr.into(), settings.pos))
+        Ok(Expr::Array(array.into(), settings.pos))
     }
 
     /// Parse a map literal.
@@ -2010,7 +2015,7 @@ impl Engine {
             }
         }
 
-        let op_info = if let Some(op) = op {
+        let op_info = if let Some(ref op) = op {
             OpAssignment::new_op_assignment_from_token(op, op_pos)
         } else {
             OpAssignment::new_assignment(op_pos)
@@ -2605,9 +2610,6 @@ impl Engine {
         inputs.shrink_to_fit();
         tokens.shrink_to_fit();
 
-        const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
-        const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
-
         let self_terminated = matches!(
             required_token.as_str(),
             // It is self-terminating if the last symbol is a block
@@ -2912,7 +2914,7 @@ impl Engine {
                 Ok(true) => (),
                 Ok(false) => return Err(PERR::ForbiddenVariable(name.to_string()).into_err(pos)),
                 Err(err) => match *err {
-                    EvalAltResult::ErrorParsing(perr, pos) => return Err(perr.into_err(pos)),
+                    EvalAltResult::ErrorParsing(e, pos) => return Err(e.into_err(pos)),
                     _ => return Err(PERR::ForbiddenVariable(name.to_string()).into_err(pos)),
                 },
             }

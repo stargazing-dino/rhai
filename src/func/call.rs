@@ -68,7 +68,7 @@ impl<'a> ArgBackup<'a> {
         // Replace the first reference with a reference to the clone, force-casting the lifetime.
         // Must remember to restore it later with `restore_first_arg`.
         //
-        // # Safety
+        // SAFETY:
         //
         // Blindly casting a reference to another lifetime saves allocation and string cloning,
         // but must be used with the utmost care.
@@ -608,7 +608,7 @@ impl Engine {
                 let num_params = args[1].as_int().expect("`INT`");
 
                 return Ok((
-                    if num_params < 0 {
+                    if num_params < 0 || num_params > crate::MAX_USIZE_INT {
                         false
                     } else {
                         let hash_script = calc_fn_hash(fn_name.as_str(), num_params as usize);
@@ -1100,7 +1100,7 @@ impl Engine {
                     .as_int()
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
 
-                return Ok(if num_params < 0 {
+                return Ok(if num_params < 0 || num_params > crate::MAX_USIZE_INT {
                     false
                 } else {
                     let hash_script = calc_fn_hash(&fn_name, num_params as usize);

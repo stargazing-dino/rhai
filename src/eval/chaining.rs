@@ -152,14 +152,14 @@ impl Engine {
                                 if let Ok(val) =
                                     self.call_indexer_get(global, caches, lib, target, idx, level)
                                 {
-                                    let mut res = val.into();
+                                    let mut val = val.into();
                                     // Run the op-assignment
                                     self.eval_op_assignment(
-                                        global, caches, lib, op_info, &mut res, root, new_val,
+                                        global, caches, lib, op_info, &mut val, root, new_val,
                                         level,
                                     )?;
                                     // Replace new value
-                                    new_val = res.take_or_clone();
+                                    new_val = val.take_or_clone();
                                     #[cfg(not(feature = "unchecked"))]
                                     self.check_data_size(&new_val, op_info.pos)?;
                                 }
@@ -864,13 +864,16 @@ impl Engine {
                     map.insert(index.clone().into(), Dynamic::UNIT);
                 }
 
-                if let Some(value) = map.get_mut(index.as_str()) {
-                    Ok(Target::from(value))
-                } else if self.fail_on_invalid_map_property() {
-                    Err(ERR::ErrorPropertyNotFound(index.to_string(), idx_pos).into())
-                } else {
-                    Ok(Target::from(Dynamic::UNIT))
-                }
+                map.get_mut(index.as_str()).map_or_else(
+                    || {
+                        if self.fail_on_invalid_map_property() {
+                            Err(ERR::ErrorPropertyNotFound(index.to_string(), idx_pos).into())
+                        } else {
+                            Ok(Target::from(Dynamic::UNIT))
+                        }
+                    },
+                    |value| Ok(Target::from(value)),
+                )
             }
 
             #[cfg(not(feature = "no_index"))]
@@ -970,21 +973,33 @@ impl Engine {
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
 
                 let (ch, offset) = if index >= 0 {
+                    if index >= crate::MAX_USIZE_INT {
+                        return Err(
+                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
+                        );
+                    }
+
                     let offset = index as usize;
                     (
                         s.chars().nth(offset).ok_or_else(|| {
-                            let chars_len = s.chars().count();
-                            ERR::ErrorStringBounds(chars_len, index, idx_pos)
+                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos)
                         })?,
                         offset,
                     )
                 } else {
-                    let offset = index.unsigned_abs() as usize;
+                    let abs_index = index.unsigned_abs();
+
+                    if abs_index as u64 >= usize::MAX as u64 {
+                        return Err(
+                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
+                        );
+                    }
+
+                    let offset = abs_index as usize;
                     (
                         // Count from end if negative
                         s.chars().rev().nth(offset - 1).ok_or_else(|| {
-                            let chars_len = s.chars().count();
-                            ERR::ErrorStringBounds(chars_len, index, idx_pos)
+                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos)
                         })?,
                         offset,
                     )

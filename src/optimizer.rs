@@ -301,21 +301,20 @@ fn optimize_stmt_block(
         while index < statements.len() {
             if preserve_result && index >= statements.len() - 1 {
                 break;
-            } else {
-                match statements[index] {
-                    ref stmt if is_pure(stmt) && index >= first_non_constant => {
-                        state.set_dirty();
-                        statements.remove(index);
-                    }
-                    ref stmt if stmt.is_pure() => {
-                        state.set_dirty();
-                        if index < first_non_constant {
-                            first_non_constant -= 1;
-                        }
-                        statements.remove(index);
-                    }
-                    _ => index += 1,
+            }
+            match statements[index] {
+                ref stmt if is_pure(stmt) && index >= first_non_constant => {
+                    state.set_dirty();
+                    statements.remove(index);
                 }
+                ref stmt if stmt.is_pure() => {
+                    state.set_dirty();
+                    if index < first_non_constant {
+                        first_non_constant -= 1;
+                    }
+                    statements.remove(index);
+                }
+                _ => index += 1,
             }
         }
 

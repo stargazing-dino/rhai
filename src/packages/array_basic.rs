@@ -5,7 +5,7 @@ use crate::eval::{calc_index, calc_offset_len};
 use crate::plugin::*;
 use crate::{
     def_package, Array, Dynamic, ExclusiveRange, FnPtr, InclusiveRange, NativeCallContext,
-    Position, RhaiResultOf, StaticVec, ERR, INT,
+    Position, RhaiResultOf, StaticVec, ERR, INT, MAX_USIZE_INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -217,6 +217,8 @@ pub mod array_functions {
         len: INT,
         item: Dynamic,
     ) -> RhaiResultOf<()> {
+        let len = len.min(MAX_USIZE_INT);
+
         if len <= 0 || (len as usize) <= array.len() {
             return Ok(());
         }
@@ -369,6 +371,8 @@ pub mod array_functions {
     /// ```
     pub fn truncate(array: &mut Array, len: INT) {
         if !array.is_empty() {
+            let len = len.min(MAX_USIZE_INT);
+
             if len > 0 {
                 array.truncate(len as usize);
             } else {
@@ -396,6 +400,8 @@ pub mod array_functions {
     /// ```
     pub fn chop(array: &mut Array, len: INT) {
         if !array.is_empty() {
+            let len = len.min(MAX_USIZE_INT);
+
             if len <= 0 {
                 array.clear();
             } else if (len as usize) < array.len() {

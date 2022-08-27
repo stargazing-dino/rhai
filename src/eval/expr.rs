@@ -74,19 +74,22 @@ impl Engine {
                 (_, namespace, hash_var, var_name) => {
                     // foo:bar::baz::VARIABLE
                     if let Some(module) = self.search_imports(global, namespace) {
-                        return if let Some(mut target) = module.get_qualified_var(*hash_var) {
-                            // Module variables are constant
-                            target.set_access_mode(AccessMode::ReadOnly);
-                            Ok((target.into(), *_var_pos))
-                        } else {
-                            let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
+                        return module.get_qualified_var(*hash_var).map_or_else(
+                            || {
+                                let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
 
-                            Err(ERR::ErrorVariableNotFound(
-                                format!("{namespace}{sep}{var_name}"),
-                                namespace.position(),
-                            )
-                            .into())
-                        };
+                                Err(ERR::ErrorVariableNotFound(
+                                    format!("{namespace}{sep}{var_name}"),
+                                    namespace.position(),
+                                )
+                                .into())
+                            },
+                            |mut target| {
+                                // Module variables are constant
+                                target.set_access_mode(AccessMode::ReadOnly);
+                                Ok((target.into(), *_var_pos))
+                            },
+                        );
                     }
 
                     // global::VARIABLE
@@ -363,7 +366,7 @@ impl Engine {
 
             #[cfg(not(feature = "no_index"))]
             Expr::Array(x, ..) => {
-                let mut arr = crate::Array::with_capacity(x.len());
+                let mut array = crate::Array::with_capacity(x.len());
                 let mut result = Ok(Dynamic::UNIT);
 
                 #[cfg(not(feature = "unchecked"))]
@@ -383,7 +386,7 @@ impl Engine {
                     #[cfg(not(feature = "unchecked"))]
                     let val_sizes = Self::calc_data_sizes(&value, true);
 
-                    arr.push(value);
+                    array.push(value);
 
                     #[cfg(not(feature = "unchecked"))]
                     if self.has_data_size_limit() {
@@ -396,7 +399,7 @@ impl Engine {
                     }
                 }
 
-                result.map(|_| arr.into())
+                result.map(|_| array.into())
             }
 
             #[cfg(not(feature = "no_object"))]

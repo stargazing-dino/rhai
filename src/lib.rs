@@ -58,7 +58,18 @@
 
 #![cfg_attr(feature = "no_std", no_std)]
 #![deny(missing_docs)]
+#![warn(clippy::all)]
+#![warn(clippy::pedantic)]
+#![warn(clippy::nursery)]
+#![warn(clippy::cargo)]
+#![warn(clippy::undocumented_unsafe_blocks)]
 #![allow(clippy::unit_arg)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::used_underscore_binding)]
+#![allow(clippy::inline_always)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::negative_feature_names)]
+#![allow(clippy::module_inception)]
 
 #[cfg(feature = "no_std")]
 extern crate alloc;
@@ -122,6 +133,20 @@ type UNSIGNED_INT = u64;
 #[cfg(feature = "only_i32")]
 #[allow(non_camel_case_types)]
 type UNSIGNED_INT = u32;
+
+/// The maximum integer that can fit into a [`usize`].
+#[cfg(not(target_pointer_width = "32"))]
+const MAX_USIZE_INT: INT = INT::MAX;
+
+/// The maximum integer that can fit into a [`usize`].
+#[cfg(not(feature = "only_i32"))]
+#[cfg(target_pointer_width = "32")]
+const MAX_USIZE_INT: INT = usize::MAX as INT;
+
+/// The maximum integer that can fit into a [`usize`].
+#[cfg(feature = "only_i32")]
+#[cfg(target_pointer_width = "32")]
+const MAX_USIZE_INT: INT = INT::MAX;
 
 /// Number of bits in [`INT`].
 ///

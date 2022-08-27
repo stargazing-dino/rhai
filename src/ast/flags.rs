@@ -20,7 +20,7 @@ impl FnAccess {
     /// Is this function private?
     #[inline(always)]
     #[must_use]
-    pub fn is_private(self) -> bool {
+    pub const fn is_private(self) -> bool {
         match self {
             Self::Private => true,
             Self::Public => false,
@@ -29,7 +29,7 @@ impl FnAccess {
     /// Is this function public?
     #[inline(always)]
     #[must_use]
-    pub fn is_public(self) -> bool {
+    pub const fn is_public(self) -> bool {
         match self {
             Self::Private => false,
             Self::Public => true,

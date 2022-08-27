@@ -2315,13 +2315,13 @@ impl InputStream for MultiInputsStream<'_> {
             if self.index >= self.streams.len() {
                 // No more streams
                 return None;
-            } else if let Some(ch) = self.streams[self.index].next() {
+            }
+            if let Some(ch) = self.streams[self.index].next() {
                 // Next character in current stream
                 return Some(ch);
-            } else {
-                // Jump to the next stream
-                self.index += 1;
             }
+            // Jump to the next stream
+            self.index += 1;
         }
     }
     fn peek_next(&mut self) -> Option<char> {
@@ -2333,13 +2333,13 @@ impl InputStream for MultiInputsStream<'_> {
             if self.index >= self.streams.len() {
                 // No more streams
                 return None;
-            } else if let Some(&ch) = self.streams[self.index].peek() {
+            }
+            if let Some(&ch) = self.streams[self.index].peek() {
                 // Next character in current stream
                 return Some(ch);
-            } else {
-                // Jump to the next stream
-                self.index += 1;
             }
+            // Jump to the next stream
+            self.index += 1;
         }
     }
 }

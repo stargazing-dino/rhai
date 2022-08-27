@@ -102,11 +102,8 @@ fn map_std_type_name(name: &str, shorthands: bool) -> &str {
         };
     }
 
-    if let Some(stripped) = name.strip_prefix("rhai::") {
-        map_std_type_name(stripped, shorthands)
-    } else {
-        name
-    }
+    name.strip_prefix("rhai::")
+        .map_or(name, |s| map_std_type_name(s, shorthands))
 }
 
 impl Engine {

@@ -936,7 +936,7 @@ impl Dynamic {
     #[must_use]
     pub const fn from_float(value: crate::FLOAT) -> Self {
         Self(Union::Float(
-            crate::ast::FloatWrapper::new_const(value),
+            crate::ast::FloatWrapper::new(value),
             DEFAULT_TAG_VALUE,
             ReadWrite,
         ))

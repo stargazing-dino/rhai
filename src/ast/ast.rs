@@ -167,7 +167,7 @@ impl AST {
     /// Get a reference to the source.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn source_raw(&self) -> &Identifier {
+    pub(crate) const fn source_raw(&self) -> &Identifier {
         &self.source
     }
     /// Set the source.
@@ -261,7 +261,7 @@ impl AST {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn shared_lib(&self) -> &crate::Shared<crate::Module> {
+    pub(crate) const fn shared_lib(&self) -> &crate::Shared<crate::Module> {
         &self.lib
     }
     /// _(internals)_ Get the internal shared [`Module`][crate::Module] containing all script-defined functions.
@@ -272,7 +272,7 @@ impl AST {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub fn shared_lib(&self) -> &crate::Shared<crate::Module> {
+    pub const fn shared_lib(&self) -> &crate::Shared<crate::Module> {
         &self.lib
     }
     /// Get the embedded [module resolver][crate::ModuleResolver].
@@ -280,7 +280,7 @@ impl AST {
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn resolver(
+    pub(crate) const fn resolver(
         &self,
     ) -> Option<&crate::Shared<crate::module::resolvers::StaticModuleResolver>> {
         self.resolver.as_ref()
@@ -293,7 +293,7 @@ impl AST {
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     #[must_use]
-    pub fn resolver(
+    pub const fn resolver(
         &self,
     ) -> Option<&crate::Shared<crate::module::resolvers::StaticModuleResolver>> {
         self.resolver.as_ref()
@@ -910,7 +910,7 @@ impl<A: AsRef<AST>> Add<A> for &AST {
     }
 }
 
-impl<A: Into<AST>> AddAssign<A> for AST {
+impl<A: Into<Self>> AddAssign<A> for AST {
     #[inline(always)]
     fn add_assign(&mut self, rhs: A) {
         self.combine(rhs.into());

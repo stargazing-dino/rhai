@@ -3,9 +3,8 @@
 #![cfg(feature = "metadata")]
 
 use crate::module::FuncInfo;
-use crate::plugin::*;
 use crate::tokenizer::{is_valid_function_name, Token};
-use crate::{Engine, Module, Scope, INT};
+use crate::{Engine, FnAccess, Module, Scope, INT};
 
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -117,19 +116,20 @@ impl Definitions<'_> {
     }
     /// Get the [`Engine`].
     #[inline(always)]
-    pub fn engine(&self) -> &Engine {
+    #[must_use]
+    pub const fn engine(&self) -> &Engine {
         self.engine
     }
     /// Get the [`Scope`].
     #[inline(always)]
     #[must_use]
-    pub fn scope(&self) -> Option<&Scope> {
+    pub const fn scope(&self) -> Option<&Scope> {
         self.scope
     }
     /// Get the configuration.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn config(&self) -> &DefinitionsConfig {
+    pub(crate) const fn config(&self) -> &DefinitionsConfig {
         &self.config
     }
 }
