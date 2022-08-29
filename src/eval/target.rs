@@ -15,7 +15,12 @@ use std::prelude::v1::*;
 #[allow(dead_code)]
 pub fn calc_offset_len(length: usize, start: crate::INT, len: crate::INT) -> (usize, usize) {
     let start = if start < 0 {
-        length - usize::min(start.unsigned_abs() as usize, length)
+        let abs_start = start.unsigned_abs();
+        if abs_start as u64 > crate::MAX_USIZE_INT as u64 {
+            0
+        } else {
+            length - usize::min(abs_start as usize, length)
+        }
     } else if start > crate::MAX_USIZE_INT || start as usize >= length {
         return (length, 0);
     } else {

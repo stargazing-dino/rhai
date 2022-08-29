@@ -397,7 +397,7 @@ impl Debugger {
     /// Get the custom state.
     #[inline(always)]
     #[must_use]
-    pub fn state(&self) -> &Dynamic {
+    pub const fn state(&self) -> &Dynamic {
         &self.state
     }
     /// Get a mutable reference to the custom state.

@@ -56,7 +56,7 @@ impl PartialOrd for FnMetadata<'_> {
 
 impl Ord for FnMetadata<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self.name.cmp(&other.name) {
+        match self.name.cmp(other.name) {
             Ordering::Equal => self.num_params.cmp(&other.num_params),
             cmp => cmp,
         }
@@ -79,8 +79,8 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
             base_hash,
             full_hash,
             #[cfg(not(feature = "no_module"))]
-            namespace: info.metadata.namespace.into(),
-            access: info.metadata.access.into(),
+            namespace: info.metadata.namespace,
+            access: info.metadata.access,
             name: &info.metadata.name,
             typ,
             num_params: info.metadata.params,
@@ -150,7 +150,7 @@ impl<'a> From<&'a crate::Module> for ModuleMetadata<'a> {
         functions.sort();
 
         Self {
-            doc: module.doc().into(),
+            doc: module.doc(),
             modules: module
                 .iter_sub_modules()
                 .map(|(name, m)| (name, m.as_ref().into()))
@@ -206,7 +206,7 @@ pub fn gen_metadata_to_json(
 
     #[cfg(feature = "metadata")]
     if let Some(ast) = _ast {
-        global.doc = ast.doc().into();
+        global.doc = ast.doc();
     }
 
     serde_json::to_string_pretty(&global)

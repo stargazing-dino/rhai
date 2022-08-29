@@ -302,13 +302,13 @@ impl ParseError {
     /// Get the [type][ParseErrorType] of this parse error.
     #[inline(always)]
     #[must_use]
-    pub fn err_type(&self) -> &ParseErrorType {
+    pub const fn err_type(&self) -> &ParseErrorType {
         &self.0
     }
     /// Get the [position][Position] of this parse error.
     #[inline(always)]
     #[must_use]
-    pub fn position(&self) -> Position {
+    pub const fn position(&self) -> Position {
         self.1
     }
 }
@@ -323,7 +323,7 @@ impl From<ParseErrorType> for RhaiError {
 impl From<ParseErrorType> for ERR {
     #[inline(always)]
     fn from(err: ParseErrorType) -> Self {
-        ERR::ErrorParsing(err, Position::NONE)
+        Self::ErrorParsing(err, Position::NONE)
     }
 }
 
@@ -337,6 +337,6 @@ impl From<ParseError> for RhaiError {
 impl From<ParseError> for ERR {
     #[inline(always)]
     fn from(err: ParseError) -> Self {
-        ERR::ErrorParsing(*err.0, err.1)
+        Self::ErrorParsing(*err.0, err.1)
     }
 }

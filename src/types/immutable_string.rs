@@ -264,9 +264,9 @@ impl Add<ImmutableString> for &ImmutableString {
     }
 }
 
-impl AddAssign<&ImmutableString> for ImmutableString {
+impl AddAssign<&Self> for ImmutableString {
     #[inline]
-    fn add_assign(&mut self, rhs: &ImmutableString) {
+    fn add_assign(&mut self, rhs: &Self) {
         if !rhs.is_empty() {
             if self.is_empty() {
                 self.0 = rhs.0.clone();
@@ -277,9 +277,9 @@ impl AddAssign<&ImmutableString> for ImmutableString {
     }
 }
 
-impl AddAssign<ImmutableString> for ImmutableString {
+impl AddAssign<Self> for ImmutableString {
     #[inline]
-    fn add_assign(&mut self, rhs: ImmutableString) {
+    fn add_assign(&mut self, rhs: Self) {
         if !rhs.is_empty() {
             if self.is_empty() {
                 self.0 = rhs.0;
@@ -431,9 +431,9 @@ impl Sub for &ImmutableString {
     }
 }
 
-impl SubAssign<&ImmutableString> for ImmutableString {
+impl SubAssign<&Self> for ImmutableString {
     #[inline]
-    fn sub_assign(&mut self, rhs: &ImmutableString) {
+    fn sub_assign(&mut self, rhs: &Self) {
         if !rhs.is_empty() {
             if self.is_empty() {
                 self.0 = rhs.0.clone();
@@ -445,9 +445,9 @@ impl SubAssign<&ImmutableString> for ImmutableString {
     }
 }
 
-impl SubAssign<ImmutableString> for ImmutableString {
+impl SubAssign<Self> for ImmutableString {
     #[inline]
-    fn sub_assign(&mut self, rhs: ImmutableString) {
+    fn sub_assign(&mut self, rhs: Self) {
         if !rhs.is_empty() {
             if self.is_empty() {
                 self.0 = rhs.0;

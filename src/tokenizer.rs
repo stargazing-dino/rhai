@@ -1701,11 +1701,11 @@ fn get_next_token_inner(
             // letter or underscore ...
             #[cfg(not(feature = "unicode-xid-ident"))]
             ('a'..='z' | '_' | 'A'..='Z', ..) => {
-                return get_identifier(stream, pos, start_pos, c);
+                return Some(get_identifier(stream, pos, start_pos, c));
             }
             #[cfg(feature = "unicode-xid-ident")]
             (ch, ..) if unicode_xid::UnicodeXID::is_xid_start(ch) || ch == '_' => {
-                return get_identifier(stream, pos, start_pos, c);
+                return Some(get_identifier(stream, pos, start_pos, c));
             }
 
             // " - string literal
@@ -2178,7 +2178,7 @@ fn get_identifier(
     pos: &mut Position,
     start_pos: Position,
     first_char: char,
-) -> Option<(Token, Position)> {
+) -> (Token, Position) {
     let mut result = smallvec::SmallVec::<[char; 8]>::new();
     result.push(first_char);
 
@@ -2197,17 +2197,17 @@ fn get_identifier(
     let identifier: String = result.into_iter().collect();
 
     if let Some(token) = Token::lookup_from_syntax(&identifier) {
-        return Some((token, start_pos));
+        return (token, start_pos);
     }
 
     if !is_valid_identifier {
-        return Some((
+        return (
             Token::LexError(LERR::MalformedIdentifier(identifier).into()),
             start_pos,
-        ));
+        );
     }
 
-    Some((Token::Identifier(identifier.into()), start_pos))
+    (Token::Identifier(identifier.into()), start_pos)
 }
 
 /// Is a keyword allowed as a function?
@@ -2272,7 +2272,7 @@ pub fn is_id_continue(x: char) -> bool {
 #[cfg(not(feature = "unicode-xid-ident"))]
 #[inline(always)]
 #[must_use]
-pub fn is_id_first_alphabetic(x: char) -> bool {
+pub const fn is_id_first_alphabetic(x: char) -> bool {
     x.is_ascii_alphabetic()
 }
 
@@ -2280,7 +2280,7 @@ pub fn is_id_first_alphabetic(x: char) -> bool {
 #[cfg(not(feature = "unicode-xid-ident"))]
 #[inline(always)]
 #[must_use]
-pub fn is_id_continue(x: char) -> bool {
+pub const fn is_id_continue(x: char) -> bool {
     x.is_ascii_alphanumeric() || x == '_'
 }
 

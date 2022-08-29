@@ -22,7 +22,7 @@ impl<'de> DynamicDeserializer<'de> {
     /// The reference is necessary because the deserialized type may hold references
     /// (especially `&str`) to the source [`Dynamic`][crate::Dynamic].
     #[must_use]
-    pub fn from_dynamic(value: &'de Dynamic) -> Self {
+    pub const fn from_dynamic(value: &'de Dynamic) -> Self {
         Self { value }
     }
     /// Shortcut for a type conversion error.
@@ -449,21 +449,22 @@ impl<'de> Deserializer<'de> for &mut DynamicDeserializer<'de> {
             visitor.visit_enum(s.as_str().into_deserializer())
         } else {
             #[cfg(not(feature = "no_object"))]
-            if let Some(map) = self.value.downcast_ref::<crate::Map>() {
-                let mut iter = map.iter();
-                let first = iter.next();
-                let second = iter.next();
-                if let (Some((key, value)), None) = (first, second) {
-                    visitor.visit_enum(EnumDeserializer {
-                        tag: key,
-                        content: DynamicDeserializer::from_dynamic(value),
-                    })
-                } else {
-                    self.type_error()
-                }
-            } else {
-                self.type_error()
-            }
+            return self.value.downcast_ref::<crate::Map>().map_or_else(
+                || self.type_error(),
+                |map| {
+                    let mut iter = map.iter();
+                    let first = iter.next();
+                    let second = iter.next();
+                    if let (Some((key, value)), None) = (first, second) {
+                        visitor.visit_enum(EnumDeserializer {
+                            tag: key,
+                            content: DynamicDeserializer::from_dynamic(value),
+                        })
+                    } else {
+                        self.type_error()
+                    }
+                },
+            );
             #[cfg(feature = "no_object")]
             return self.type_error();
         }
@@ -488,7 +489,7 @@ struct IterateDynamicArray<'a, ITER: Iterator<Item = &'a Dynamic>> {
 #[cfg(not(feature = "no_index"))]
 impl<'a, ITER: Iterator<Item = &'a Dynamic>> IterateDynamicArray<'a, ITER> {
     #[must_use]
-    pub fn new(iter: ITER) -> Self {
+    pub const fn new(iter: ITER) -> Self {
         Self { iter }
     }
 }
@@ -525,7 +526,7 @@ struct IterateMap<'a, K: Iterator<Item = &'a str>, V: Iterator<Item = &'a Dynami
 #[cfg(not(feature = "no_object"))]
 impl<'a, K: Iterator<Item = &'a str>, V: Iterator<Item = &'a Dynamic>> IterateMap<'a, K, V> {
     #[must_use]
-    pub fn new(keys: K, values: V) -> Self {
+    pub const fn new(keys: K, values: V) -> Self {
         Self { keys, values }
     }
 }

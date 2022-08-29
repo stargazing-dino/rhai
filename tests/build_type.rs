@@ -3,7 +3,7 @@ use rhai::{CustomType, Engine, EvalAltResult, Position, TypeBuilder, INT};
 
 #[test]
 fn build_type() -> Result<(), Box<EvalAltResult>> {
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
     struct Vec3 {
         x: INT,
         y: INT,
@@ -60,7 +60,8 @@ fn build_type() -> Result<(), Box<EvalAltResult>> {
                 .with_name("Vec3")
                 .is_iterable()
                 .with_fn("vec3", Self::new)
-                .is_iterable()
+                .with_fn("==", |x: &mut Vec3, y: Vec3| *x == y)
+                .with_fn("!=", |x: &mut Vec3, y: Vec3| *x != y)
                 .with_get_set("x", Self::get_x, Self::set_x)
                 .with_get_set("y", Self::get_y, Self::set_y)
                 .with_get_set("z", Self::get_z, Self::set_z);

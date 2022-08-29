@@ -484,12 +484,10 @@ impl Engine {
                         self.eval_expr(scope, global, caches, lib, this_ptr, expr, level)
                     } else if let Ok(None) = expr_result {
                         // Default match clause
-                        if let Some(index) = def_case {
-                            let def_expr = &expressions[*index].expr;
+                        def_case.as_ref().map_or(Ok(Dynamic::UNIT), |&index| {
+                            let def_expr = &expressions[index].expr;
                             self.eval_expr(scope, global, caches, lib, this_ptr, def_expr, level)
-                        } else {
-                            Ok(Dynamic::UNIT)
-                        }
+                        })
                     } else {
                         expr_result.map(|_| Dynamic::UNIT)
                     }

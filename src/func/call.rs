@@ -1228,13 +1228,11 @@ impl Engine {
 
                 if target_is_shared || target.is_temp_value() {
                     arg_values.insert(0, target.take_or_clone().flatten());
-                    args.extend(arg_values.iter_mut());
                 } else {
                     // Turn it into a method call only if the object is not shared and not a simple value
                     is_ref_mut = true;
                     let obj_ref = target.take_ref().expect("ref");
                     args.push(obj_ref);
-                    args.extend(arg_values.iter_mut());
                 }
             } else {
                 // func(..., ...)
@@ -1246,8 +1244,9 @@ impl Engine {
                             .map(|(value, ..)| arg_values.push(value.flatten()))
                     })?;
                 args.extend(curry.iter_mut());
-                args.extend(arg_values.iter_mut());
             }
+
+            args.extend(arg_values.iter_mut());
         }
 
         self.exec_fn_call(

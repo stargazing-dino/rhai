@@ -144,11 +144,10 @@ impl Engine {
         let (index, var_pos) = match expr {
             // Check if the variable is `this`
             Expr::Variable(v, None, pos) if v.0.is_none() && v.3 == KEYWORD_THIS => {
-                return if let Some(val) = this_ptr {
-                    Ok(((*val).into(), *pos))
-                } else {
-                    Err(ERR::ErrorUnboundThis(*pos).into())
-                }
+                return this_ptr.as_mut().map_or_else(
+                    || Err(ERR::ErrorUnboundThis(*pos).into()),
+                    |val| Ok(((*val).into(), *pos)),
+                )
             }
             _ if global.always_search_scope => (0, expr.start_position()),
             Expr::Variable(.., Some(i), pos) => (i.get() as usize, *pos),
