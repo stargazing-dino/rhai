@@ -38,6 +38,14 @@ Enhancements
 * `Engine::module_resolver` is added to grant access to the `Engine`'s module resolver.
 
 
+Version 1.9.1
+=============
+
+This is a bug-fix version that fixes a bug.
+
+Accessing properties in _Strict Variables Mode_ no longer generates a _variable not found_ error.
+
+
 Version 1.9.0
 =============
 
