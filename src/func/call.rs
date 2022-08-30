@@ -68,7 +68,7 @@ impl<'a> ArgBackup<'a> {
         // Replace the first reference with a reference to the clone, force-casting the lifetime.
         // Must remember to restore it later with `restore_first_arg`.
         //
-        // # Safety
+        // SAFETY:
         //
         // Blindly casting a reference to another lifetime saves allocation and string cloning,
         // but must be used with the utmost care.
@@ -608,7 +608,7 @@ impl Engine {
                 let num_params = args[1].as_int().expect("`INT`");
 
                 return Ok((
-                    if num_params < 0 {
+                    if num_params < 0 || num_params > crate::MAX_USIZE_INT {
                         false
                     } else {
                         let hash_script = calc_fn_hash(fn_name.as_str(), num_params as usize);
@@ -1100,7 +1100,7 @@ impl Engine {
                     .as_int()
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
 
-                return Ok(if num_params < 0 {
+                return Ok(if num_params < 0 || num_params > crate::MAX_USIZE_INT {
                     false
                 } else {
                     let hash_script = calc_fn_hash(&fn_name, num_params as usize);
@@ -1228,13 +1228,11 @@ impl Engine {
 
                 if target_is_shared || target.is_temp_value() {
                     arg_values.insert(0, target.take_or_clone().flatten());
-                    args.extend(arg_values.iter_mut());
                 } else {
                     // Turn it into a method call only if the object is not shared and not a simple value
                     is_ref_mut = true;
                     let obj_ref = target.take_ref().expect("ref");
                     args.push(obj_ref);
-                    args.extend(arg_values.iter_mut());
                 }
             } else {
                 // func(..., ...)
@@ -1246,8 +1244,9 @@ impl Engine {
                             .map(|(value, ..)| arg_values.push(value.flatten()))
                     })?;
                 args.extend(curry.iter_mut());
-                args.extend(arg_values.iter_mut());
             }
+
+            args.extend(arg_values.iter_mut());
         }
 
         self.exec_fn_call(

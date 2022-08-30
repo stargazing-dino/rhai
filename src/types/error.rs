@@ -368,9 +368,6 @@ impl EvalAltResult {
                 map.insert("function".into(), f.into());
                 map.insert("source".into(), s.into());
             }
-            Self::ErrorInModule(m, ..) => {
-                map.insert("module".into(), m.into());
-            }
             Self::ErrorMismatchDataType(r, a, ..) | Self::ErrorMismatchOutputType(r, a, ..) => {
                 map.insert("requested".into(), r.into());
                 map.insert("actual".into(), a.into());
@@ -380,9 +377,6 @@ impl EvalAltResult {
             | Self::ErrorBitFieldBounds(n, i, ..) => {
                 map.insert("length".into(), (*n as INT).into());
                 map.insert("index".into(), (*i as INT).into());
-            }
-            Self::ErrorIndexingType(t, ..) => {
-                map.insert("type".into(), t.into());
             }
             Self::ErrorVariableExists(v, ..)
             | Self::ErrorForbiddenVariable(v, ..)
@@ -395,14 +389,14 @@ impl EvalAltResult {
             Self::ErrorIndexNotFound(v, ..) => {
                 map.insert("index".into(), v.clone());
             }
-            Self::ErrorModuleNotFound(m, ..) => {
+            Self::ErrorInModule(m, ..) | Self::ErrorModuleNotFound(m, ..) => {
                 map.insert("module".into(), m.into());
             }
             Self::ErrorDotExpr(p, ..) => {
                 map.insert("property".into(), p.into());
             }
 
-            Self::ErrorDataTooLarge(t, ..) => {
+            Self::ErrorIndexingType(t, ..) | Self::ErrorDataTooLarge(t, ..) => {
                 map.insert("type".into(), t.into());
             }
             Self::ErrorTerminated(t, ..) => {

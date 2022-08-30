@@ -4,7 +4,7 @@ use crate::eval::{calc_index, calc_offset_len};
 use crate::plugin::*;
 use crate::{
     def_package, Array, Blob, Dynamic, ExclusiveRange, InclusiveRange, NativeCallContext, Position,
-    RhaiResultOf, INT, INT_BYTES,
+    RhaiResultOf, INT, INT_BYTES, MAX_USIZE_INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -74,6 +74,7 @@ pub mod blob_functions {
         len: INT,
         value: INT,
     ) -> RhaiResultOf<Blob> {
+        let len = len.min(MAX_USIZE_INT);
         let len = if len < 0 { 0 } else { len as usize };
         let _ctx = ctx;
 
@@ -342,20 +343,21 @@ pub mod blob_functions {
         if len <= 0 {
             return Ok(());
         }
+        let len = len.min(MAX_USIZE_INT) as usize;
 
         let value = (value & 0x0000_00ff) as u8;
         let _ctx = ctx;
 
         // Check if blob will be over max size limit
         #[cfg(not(feature = "unchecked"))]
-        if _ctx.engine().max_array_size() > 0 && (len as usize) > _ctx.engine().max_array_size() {
+        if _ctx.engine().max_array_size() > 0 && len > _ctx.engine().max_array_size() {
             return Err(
                 crate::ERR::ErrorDataTooLarge("Size of BLOB".to_string(), Position::NONE).into(),
             );
         }
 
-        if len as usize > blob.len() {
-            blob.resize(len as usize, value);
+        if len > blob.len() {
+            blob.resize(len, value);
         }
 
         Ok(())
@@ -461,7 +463,9 @@ pub mod blob_functions {
     /// ```
     pub fn truncate(blob: &mut Blob, len: INT) {
         if !blob.is_empty() {
-            if len >= 0 {
+            let len = len.min(MAX_USIZE_INT);
+
+            if len > 0 {
                 blob.truncate(len as usize);
             } else {
                 blob.clear();

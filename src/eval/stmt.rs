@@ -484,12 +484,10 @@ impl Engine {
                         self.eval_expr(scope, global, caches, lib, this_ptr, expr, level)
                     } else if let Ok(None) = expr_result {
                         // Default match clause
-                        if let Some(index) = def_case {
-                            let def_expr = &expressions[*index].expr;
+                        def_case.as_ref().map_or(Ok(Dynamic::UNIT), |&index| {
+                            let def_expr = &expressions[index].expr;
                             self.eval_expr(scope, global, caches, lib, this_ptr, def_expr, level)
-                        } else {
-                            Ok(Dynamic::UNIT)
-                        }
+                        })
                     } else {
                         expr_result.map(|_| Dynamic::UNIT)
                     }
@@ -631,8 +629,12 @@ impl Engine {
                         for (x, iter_value) in func(iter_obj).enumerate() {
                             // Increment counter
                             if counter_index < usize::MAX {
+                                // As the variable increments from 0, this should always work
+                                // since any overflow will first be caught below.
+                                let index_value = x as INT;
+
                                 #[cfg(not(feature = "unchecked"))]
-                                if x > INT::MAX as usize {
+                                if index_value > crate::MAX_USIZE_INT {
                                     loop_result = Err(ERR::ErrorArithmetic(
                                         format!("for-loop counter overflow: {x}"),
                                         counter.pos,
@@ -641,10 +643,8 @@ impl Engine {
                                     break;
                                 }
 
-                                let index_value = Dynamic::from(x as INT);
-
                                 *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
-                                    index_value;
+                                    Dynamic::from_int(index_value);
                             }
 
                             let value = match iter_value {

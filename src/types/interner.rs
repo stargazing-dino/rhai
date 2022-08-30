@@ -64,7 +64,7 @@ impl StringsInterner<'_> {
     #[inline(always)]
     #[must_use]
     pub fn get<S: AsRef<str> + Into<ImmutableString>>(&mut self, text: S) -> ImmutableString {
-        self.get_with_mapper(|s| s.into(), text)
+        self.get_with_mapper(Into::into, text)
     }
 
     /// Get an identifier from a text string, adding it to the interner if necessary.

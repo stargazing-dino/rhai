@@ -41,7 +41,7 @@ impl FnNamespace {
     /// Is this a module namespace?
     #[inline(always)]
     #[must_use]
-    pub fn is_module_namespace(self) -> bool {
+    pub const fn is_module_namespace(self) -> bool {
         match self {
             Self::Internal => true,
             Self::Global => false,
@@ -50,7 +50,7 @@ impl FnNamespace {
     /// Is this a global namespace?
     #[inline(always)]
     #[must_use]
-    pub fn is_global_namespace(self) -> bool {
+    pub const fn is_global_namespace(self) -> bool {
         match self {
             Self::Internal => false,
             Self::Global => true,
@@ -193,7 +193,6 @@ impl FuncInfo {
                     sig.push_str(", ");
                 }
             }
-            sig.push(')');
         } else {
             let params: StaticVec<_> = self
                 .metadata
@@ -215,8 +214,8 @@ impl FuncInfo {
                 })
                 .collect();
             sig.push_str(&params.join(", "));
-            sig.push(')');
         }
+        sig.push(')');
 
         if !self.func.is_script() && !return_type.is_empty() {
             sig.push_str(" -> ");

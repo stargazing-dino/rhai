@@ -1,5 +1,8 @@
 use crate::plugin::*;
-use crate::{def_package, Dynamic, ExclusiveRange, InclusiveRange, RhaiResultOf, StaticVec, INT};
+use crate::{
+    def_package, Dynamic, ExclusiveRange, InclusiveRange, RhaiResultOf, StaticVec, INT,
+    MAX_USIZE_INT,
+};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{any::TypeId, mem};
@@ -263,10 +266,11 @@ mod string_functions {
     /// ```
     pub fn truncate(string: &mut ImmutableString, len: INT) {
         if len > 0 {
+            let len = len.min(MAX_USIZE_INT) as usize;
             let chars: StaticVec<_> = string.chars().collect();
             let copy = string.make_mut();
             copy.clear();
-            copy.extend(chars.into_iter().take(len as usize));
+            copy.extend(chars.into_iter().take(len));
         } else {
             clear(string);
         }
@@ -344,8 +348,9 @@ mod string_functions {
         if string.is_empty() || len <= 0 {
             return ctx.engine().get_interned_string("");
         }
+        let len = len.min(MAX_USIZE_INT) as usize;
 
-        let mut chars = StaticVec::<char>::with_capacity(len as usize);
+        let mut chars = StaticVec::<char>::with_capacity(len);
 
         for _ in 0..len {
             match string.make_mut().pop() {
@@ -556,7 +561,13 @@ mod string_functions {
         }
 
         let start = if start < 0 {
-            let abs_start = start.unsigned_abs() as usize;
+            let abs_start = start.unsigned_abs();
+
+            if abs_start as u64 > MAX_USIZE_INT as u64 {
+                return -1 as INT;
+            }
+
+            let abs_start = abs_start as usize;
             let chars: Vec<_> = string.chars().collect();
             let num_chars = chars.len();
             if abs_start > num_chars {
@@ -570,7 +581,7 @@ mod string_functions {
             }
         } else if start == 0 {
             0
-        } else if start as usize >= string.chars().count() {
+        } else if start > MAX_USIZE_INT || start as usize >= string.chars().count() {
             return -1 as INT;
         } else {
             string
@@ -632,7 +643,13 @@ mod string_functions {
         }
 
         let start = if start < 0 {
-            let abs_start = start.unsigned_abs() as usize;
+            let abs_start = start.unsigned_abs();
+
+            if abs_start as u64 > MAX_USIZE_INT as u64 {
+                return -1 as INT;
+            }
+
+            let abs_start = abs_start as usize;
             let chars = string.chars().collect::<Vec<_>>();
             let num_chars = chars.len();
             if abs_start > num_chars {
@@ -646,7 +663,7 @@ mod string_functions {
             }
         } else if start == 0 {
             0
-        } else if start as usize >= string.chars().count() {
+        } else if start > MAX_USIZE_INT || start as usize >= string.chars().count() {
             return -1 as INT;
         } else {
             string
@@ -704,16 +721,26 @@ mod string_functions {
     /// ```
     pub fn get(string: &str, index: INT) -> Dynamic {
         if index >= 0 {
+            if index > MAX_USIZE_INT {
+                return Dynamic::UNIT;
+            }
+
             string
                 .chars()
                 .nth(index as usize)
                 .map_or_else(|| Dynamic::UNIT, Into::into)
         } else {
             // Count from end if negative
+            let abs_index = index.unsigned_abs();
+
+            if abs_index as u64 > MAX_USIZE_INT as u64 {
+                return Dynamic::UNIT;
+            }
+
             string
                 .chars()
                 .rev()
-                .nth((index.unsigned_abs() as usize) - 1)
+                .nth((abs_index as usize) - 1)
                 .map_or_else(|| Dynamic::UNIT, Into::into)
         }
     }
@@ -742,14 +769,25 @@ mod string_functions {
     /// ```
     pub fn set(string: &mut ImmutableString, index: INT, character: char) {
         if index >= 0 {
+            if index > MAX_USIZE_INT {
+                return;
+            }
+
             let index = index as usize;
+
             *string = string
                 .chars()
                 .enumerate()
                 .map(|(i, ch)| if i == index { character } else { ch })
                 .collect();
         } else {
-            let abs_index = index.unsigned_abs() as usize;
+            let abs_index = index.unsigned_abs();
+
+            if abs_index as u64 > MAX_USIZE_INT as u64 {
+                return;
+            }
+
+            let abs_index = abs_index as usize;
             let string_len = string.chars().count();
 
             if abs_index <= string_len {
@@ -833,14 +871,20 @@ mod string_functions {
         let offset = if string.is_empty() || len <= 0 {
             return ctx.engine().get_interned_string("");
         } else if start < 0 {
-            let abs_start = start.unsigned_abs() as usize;
+            let abs_start = start.unsigned_abs();
+
+            if abs_start as u64 > MAX_USIZE_INT as u64 {
+                return ctx.engine().get_interned_string("");
+            }
+
+            let abs_start = abs_start as usize;
             chars.extend(string.chars());
             if abs_start > chars.len() {
                 0
             } else {
                 chars.len() - abs_start
             }
-        } else if start as usize >= string.chars().count() {
+        } else if start > MAX_USIZE_INT || start as usize >= string.chars().count() {
             return ctx.engine().get_interned_string("");
         } else {
             start as usize
@@ -962,14 +1006,20 @@ mod string_functions {
             string.make_mut().clear();
             return;
         } else if start < 0 {
-            let abs_start = start.unsigned_abs() as usize;
+            let abs_start = start.unsigned_abs();
+
+            if abs_start as u64 > MAX_USIZE_INT as u64 {
+                return;
+            }
+
+            let abs_start = abs_start as usize;
             chars.extend(string.chars());
             if abs_start > chars.len() {
                 0
             } else {
                 chars.len() - abs_start
             }
-        } else if start as usize >= string.chars().count() {
+        } else if start > MAX_USIZE_INT || start as usize >= string.chars().count() {
             string.make_mut().clear();
             return;
         } else {
@@ -1131,11 +1181,12 @@ mod string_functions {
         if len <= 0 {
             return Ok(());
         }
+        let len = len.min(MAX_USIZE_INT) as usize;
         let _ctx = ctx;
 
         // Check if string will be over max size limit
         #[cfg(not(feature = "unchecked"))]
-        if _ctx.engine().max_string_size() > 0 && len as usize > _ctx.engine().max_string_size() {
+        if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
             return Err(crate::ERR::ErrorDataTooLarge(
                 "Length of string".to_string(),
                 crate::Position::NONE,
@@ -1145,10 +1196,10 @@ mod string_functions {
 
         let orig_len = string.chars().count();
 
-        if len as usize > orig_len {
+        if len > orig_len {
             let p = string.make_mut();
 
-            for _ in 0..(len as usize - orig_len) {
+            for _ in 0..(len - orig_len) {
                 p.push(character);
             }
 
@@ -1192,11 +1243,12 @@ mod string_functions {
         if len <= 0 {
             return Ok(());
         }
+        let len = len.min(MAX_USIZE_INT) as usize;
         let _ctx = ctx;
 
         // Check if string will be over max size limit
         #[cfg(not(feature = "unchecked"))]
-        if _ctx.engine().max_string_size() > 0 && len as usize > _ctx.engine().max_string_size() {
+        if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
             return Err(crate::ERR::ErrorDataTooLarge(
                 "Length of string".to_string(),
                 crate::Position::NONE,
@@ -1207,16 +1259,16 @@ mod string_functions {
         let mut str_len = string.chars().count();
         let padding_len = padding.chars().count();
 
-        if len as usize > str_len {
+        if len > str_len {
             let p = string.make_mut();
 
-            while str_len < len as usize {
-                if str_len + padding_len <= len as usize {
+            while str_len < len {
+                if str_len + padding_len <= len {
                     p.push_str(padding);
                     str_len += padding_len;
                 } else {
-                    p.extend(padding.chars().take(len as usize - str_len));
-                    str_len = len as usize;
+                    p.extend(padding.chars().take(len - str_len));
+                    str_len = len;
                 }
             }
 
@@ -1263,7 +1315,16 @@ mod string_functions {
         #[rhai_fn(name = "split")]
         pub fn split_at(ctx: NativeCallContext, string: &mut ImmutableString, index: INT) -> Array {
             if index <= 0 {
-                let abs_index = index.unsigned_abs() as usize;
+                let abs_index = index.unsigned_abs();
+
+                if abs_index as u64 > MAX_USIZE_INT as u64 {
+                    return vec![
+                        ctx.engine().get_interned_string("").into(),
+                        string.as_str().into(),
+                    ];
+                }
+
+                let abs_index = abs_index as usize;
                 let num_chars = string.chars().count();
                 if abs_index > num_chars {
                     vec![
@@ -1275,6 +1336,11 @@ mod string_functions {
                     let prefix_len = prefix.len();
                     vec![prefix.into(), string[prefix_len..].into()]
                 }
+            } else if index > MAX_USIZE_INT {
+                vec![
+                    string.as_str().into(),
+                    ctx.engine().get_interned_string("").into(),
+                ]
             } else {
                 let prefix: String = string.chars().take(index as usize).collect();
                 let prefix_len = prefix.len();
@@ -1341,7 +1407,8 @@ mod string_functions {
         /// ```
         #[rhai_fn(name = "split")]
         pub fn splitn(string: &str, delimiter: &str, segments: INT) -> Array {
-            let pieces: usize = if segments < 1 { 1 } else { segments as usize };
+            let segments = segments.min(MAX_USIZE_INT) as usize;
+            let pieces: usize = if segments < 1 { 1 } else { segments };
             string.splitn(pieces, delimiter).map(Into::into).collect()
         }
         /// Split the string into segments based on a `delimiter` character, returning an array of the segments.
@@ -1371,7 +1438,8 @@ mod string_functions {
         /// ```
         #[rhai_fn(name = "split")]
         pub fn splitn_char(string: &str, delimiter: char, segments: INT) -> Array {
-            let pieces: usize = if segments < 1 { 1 } else { segments as usize };
+            let segments = segments.min(MAX_USIZE_INT) as usize;
+            let pieces: usize = if segments < 1 { 1 } else { segments };
             string.splitn(pieces, delimiter).map(Into::into).collect()
         }
         /// Split the string into segments based on a `delimiter` string, returning an array of the
@@ -1402,7 +1470,8 @@ mod string_functions {
         /// ```
         #[rhai_fn(name = "split_rev")]
         pub fn rsplitn(string: &str, delimiter: &str, segments: INT) -> Array {
-            let pieces: usize = if segments < 1 { 1 } else { segments as usize };
+            let segments = segments.min(MAX_USIZE_INT) as usize;
+            let pieces: usize = if segments < 1 { 1 } else { segments };
             string.rsplitn(pieces, delimiter).map(Into::into).collect()
         }
         /// Split the string into segments based on a `delimiter` character, returning an array of
@@ -1433,7 +1502,8 @@ mod string_functions {
         /// ```
         #[rhai_fn(name = "split_rev")]
         pub fn rsplitn_char(string: &str, delimiter: char, segments: INT) -> Array {
-            let pieces: usize = if segments < 1 { 1 } else { segments as usize };
+            let segments = segments.min(MAX_USIZE_INT) as usize;
+            let pieces: usize = if segments < 1 { 1 } else { segments };
             string.rsplitn(pieces, delimiter).map(Into::into).collect()
         }
     }

@@ -1,6 +1,8 @@
 use crate::eval::calc_index;
 use crate::plugin::*;
-use crate::{def_package, ExclusiveRange, InclusiveRange, RhaiResultOf, INT, INT_BITS};
+use crate::{
+    def_package, ExclusiveRange, InclusiveRange, RhaiResultOf, INT, INT_BITS, MAX_USIZE_INT,
+};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -173,18 +175,13 @@ pub struct CharsStream(Vec<char>, usize);
 
 impl CharsStream {
     pub fn new(string: &str, from: INT, len: INT) -> Self {
-        if len <= 0 {
+        if len <= 0 || from > MAX_USIZE_INT {
             return Self(Vec::new(), 0);
         }
+        let len = len.min(MAX_USIZE_INT) as usize;
+
         if from >= 0 {
-            return Self(
-                string
-                    .chars()
-                    .skip(from as usize)
-                    .take(len as usize)
-                    .collect(),
-                0,
-            );
+            return Self(string.chars().skip(from as usize).take(len).collect(), 0);
         }
 
         let abs_from = from.unsigned_abs() as usize;
@@ -194,7 +191,7 @@ impl CharsStream {
         } else {
             num_chars - abs_from
         };
-        Self(string.chars().skip(offset).take(len as usize).collect(), 0)
+        Self(string.chars().skip(offset).take(len).collect(), 0)
     }
 }
 

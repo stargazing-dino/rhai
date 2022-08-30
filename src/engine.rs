@@ -237,13 +237,16 @@ impl Engine {
         {
             engine.print = Box::new(|s| println!("{}", s));
             engine.debug = Box::new(|s, source, pos| {
-                if let Some(source) = source {
-                    println!("{} @ {:?} | {}", source, pos, s);
-                } else if pos.is_none() {
-                    println!("{}", s);
-                } else {
-                    println!("{:?} | {}", pos, s);
-                }
+                source.map_or_else(
+                    || {
+                        if pos.is_none() {
+                            println!("{}", s);
+                        } else {
+                            println!("{:?} | {}", pos, s);
+                        }
+                    },
+                    |source| println!("{} @ {:?} | {}", source, pos, s),
+                )
             });
         }
 
@@ -316,7 +319,7 @@ impl Engine {
         &self,
         string: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        locked_write(&self.interned_strings).get(string).into()
+        locked_write(&self.interned_strings).get(string)
     }
 
     /// _(internals)_ Get an interned [string][ImmutableString].
@@ -331,7 +334,7 @@ impl Engine {
         &self,
         string: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        locked_write(&self.interned_strings).get(string).into()
+        locked_write(&self.interned_strings).get(string)
     }
 
     /// Get an empty [`ImmutableString`] which refers to a shared instance.

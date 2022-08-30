@@ -34,6 +34,10 @@ pub type ParseResult<T> = Result<T, ParseError>;
 
 type FnLib = BTreeMap<u64, Shared<ScriptFnDef>>;
 
+const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
+
+const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
+
 /// Invalid variable name that acts as a search barrier in a [`Scope`].
 const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 
@@ -41,8 +45,9 @@ const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 const NEVER_ENDS: &str = "`Token`";
 
 /// Unroll `switch` ranges no larger than this.
-const SMALL_SWITCH_RANGE: usize = 16;
+const SMALL_SWITCH_RANGE: INT = 16;
 
+/// Number of string interners used: two additional for property getters/setters if not `no_object`
 const NUM_INTERNERS: usize = if cfg!(feature = "no_object") { 1 } else { 3 };
 
 /// _(internals)_ A type that encapsulates the current state of the parser.
@@ -899,13 +904,13 @@ impl Engine {
         let mut settings = settings;
         settings.pos = eat_token(input, Token::LeftBracket);
 
-        let mut arr = StaticVec::new_const();
+        let mut array = StaticVec::new_const();
 
         loop {
             const MISSING_RBRACKET: &str = "to end this array literal";
 
             #[cfg(not(feature = "unchecked"))]
-            if self.max_array_size() > 0 && arr.len() >= self.max_array_size() {
+            if self.max_array_size() > 0 && array.len() >= self.max_array_size() {
                 return Err(PERR::LiteralTooLarge(
                     "Size of array literal".to_string(),
                     self.max_array_size(),
@@ -927,7 +932,7 @@ impl Engine {
                 }
                 _ => {
                     let expr = self.parse_expr(input, state, lib, settings.level_up())?;
-                    arr.push(expr);
+                    array.push(expr);
                 }
             }
 
@@ -954,9 +959,9 @@ impl Engine {
             };
         }
 
-        arr.shrink_to_fit();
+        array.shrink_to_fit();
 
-        Ok(Expr::Array(arr.into(), settings.pos))
+        Ok(Expr::Array(array.into(), settings.pos))
     }
 
     /// Parse a map literal.
@@ -1306,6 +1311,7 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
+        is_property: bool,
         settings: ParseSettings,
     ) -> ParseResult<Expr> {
         #[cfg(not(feature = "unchecked"))]
@@ -1446,11 +1452,11 @@ impl Engine {
                     |crate::ast::Ident { name, pos }| {
                         let (index, is_func) = state.access_var(name, lib, *pos);
 
-                        if settings.options.contains(LangOptions::STRICT_VAR)
-                            && !settings.in_closure
+                        if !is_func
                             && index.is_none()
+                            && !settings.in_closure
+                            && settings.options.contains(LangOptions::STRICT_VAR)
                             && !state.scope.contains(name)
-                            && !is_func
                         {
                             // If the parent scope is not inside another capturing closure
                             // then we can conclude that the captured variable doesn't exist.
@@ -1583,20 +1589,18 @@ impl Engine {
                             // Once the identifier consumed we must enable next variables capturing
                             state.allow_capture = true;
                         }
-                        Expr::Variable(
-                            (None, ns, 0, state.get_interned_string(s)).into(),
-                            None,
-                            settings.pos,
-                        )
+                        let name = state.get_interned_string(s);
+                        Expr::Variable((None, ns, 0, name).into(), None, settings.pos)
                     }
                     // Normal variable access
                     _ => {
                         let (index, is_func) = state.access_var(&s, lib, settings.pos);
 
-                        if settings.options.contains(LangOptions::STRICT_VAR)
-                            && index.is_none()
-                            && !state.scope.contains(&s)
+                        if !is_property
                             && !is_func
+                            && index.is_none()
+                            && settings.options.contains(LangOptions::STRICT_VAR)
+                            && !state.scope.contains(&s)
                         {
                             return Err(
                                 PERR::VariableUndefined(s.to_string()).into_err(settings.pos)
@@ -1610,11 +1614,8 @@ impl Engine {
                                 None
                             }
                         });
-                        Expr::Variable(
-                            (index, ns, 0, state.get_interned_string(s)).into(),
-                            short_index,
-                            settings.pos,
-                        )
+                        let name = state.get_interned_string(s);
+                        Expr::Variable((index, ns, 0, name).into(), short_index, settings.pos)
                     }
                 }
             }
@@ -1801,7 +1802,7 @@ impl Engine {
                         (.., pos) => return Err(PERR::PropertyExpected.into_err(*pos)),
                     }
 
-                    let rhs = self.parse_primary(input, state, lib, settings.level_up())?;
+                    let rhs = self.parse_primary(input, state, lib, true, settings.level_up())?;
                     let op_flags = match op {
                         Token::Period => ASTFlags::NONE,
                         Token::Elvis => ASTFlags::NEGATED,
@@ -1971,7 +1972,7 @@ impl Engine {
             // <EOF>
             Token::EOF => Err(PERR::UnexpectedEOF.into_err(settings.pos)),
             // All other tokens
-            _ => self.parse_primary(input, state, lib, settings.level_up()),
+            _ => self.parse_primary(input, state, lib, false, settings.level_up()),
         }
     }
 
@@ -2010,7 +2011,7 @@ impl Engine {
             }
         }
 
-        let op_info = if let Some(op) = op {
+        let op_info = if let Some(ref op) = op {
             OpAssignment::new_op_assignment_from_token(op, op_pos)
         } else {
             OpAssignment::new_assignment(op_pos)
@@ -2605,9 +2606,6 @@ impl Engine {
         inputs.shrink_to_fit();
         tokens.shrink_to_fit();
 
-        const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
-        const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
-
         let self_terminated = matches!(
             required_token.as_str(),
             // It is self-terminating if the last symbol is a block
@@ -2912,7 +2910,7 @@ impl Engine {
                 Ok(true) => (),
                 Ok(false) => return Err(PERR::ForbiddenVariable(name.to_string()).into_err(pos)),
                 Err(err) => match *err {
-                    EvalAltResult::ErrorParsing(perr, pos) => return Err(perr.into_err(pos)),
+                    EvalAltResult::ErrorParsing(e, pos) => return Err(e.into_err(pos)),
                     _ => return Err(PERR::ForbiddenVariable(name.to_string()).into_err(pos)),
                 },
             }

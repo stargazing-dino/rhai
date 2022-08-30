@@ -20,7 +20,7 @@ struct DynamicSerializer {
 impl DynamicSerializer {
     /// Create a [`DynamicSerializer`] from a [`Dynamic`][crate::Dynamic] value.
     #[must_use]
-    pub fn new(_value: Dynamic) -> Self {
+    pub const fn new(_value: Dynamic) -> Self {
         Self {
             _key: Dynamic::UNIT,
             _value,

@@ -936,7 +936,7 @@ impl Dynamic {
     #[must_use]
     pub const fn from_float(value: crate::FLOAT) -> Self {
         Self(Union::Float(
-            crate::ast::FloatWrapper::new_const(value),
+            crate::ast::FloatWrapper::new(value),
             DEFAULT_TAG_VALUE,
             ReadWrite,
         ))
@@ -1166,7 +1166,7 @@ impl Dynamic {
         #[cfg(not(feature = "no_index"))]
         reify!(value, |v: crate::Blob| {
             // don't use blob.into() because it'll be converted into an Array
-            return Dynamic::from_blob(v);
+            return Self::from_blob(v);
         });
         #[cfg(not(feature = "no_object"))]
         reify!(value, |v: crate::Map| return v.into());
@@ -1175,7 +1175,7 @@ impl Dynamic {
         #[cfg(not(feature = "no_std"))]
         reify!(value, |v: Instant| return v.into());
         #[cfg(not(feature = "no_closure"))]
-        reify!(value, |v: crate::Shared<crate::Locked<Dynamic>>| return v
+        reify!(value, |v: crate::Shared<crate::Locked<Self>>| return v
             .into());
 
         Self(Union::Variant(
@@ -1444,7 +1444,7 @@ impl Dynamic {
                 let value = crate::func::locked_read(cell);
 
                 return if (*value).type_id() != TypeId::of::<T>()
-                    && TypeId::of::<Dynamic>() != TypeId::of::<T>()
+                    && TypeId::of::<Self>() != TypeId::of::<T>()
                 {
                     None
                 } else {
@@ -1476,7 +1476,7 @@ impl Dynamic {
                 let guard = crate::func::locked_write(cell);
 
                 return if (*guard).type_id() != TypeId::of::<T>()
-                    && TypeId::of::<Dynamic>() != TypeId::of::<T>()
+                    && TypeId::of::<Self>() != TypeId::of::<T>()
                 {
                     None
                 } else {
@@ -1577,7 +1577,7 @@ impl Dynamic {
                 _ => None,
             };
         }
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+        if TypeId::of::<T>() == TypeId::of::<Self>() {
             return self.as_any().downcast_ref::<T>();
         }
 
@@ -1675,7 +1675,7 @@ impl Dynamic {
                 _ => None,
             };
         }
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+        if TypeId::of::<T>() == TypeId::of::<Self>() {
             return self.as_any_mut().downcast_mut::<T>();
         }
 
@@ -1962,7 +1962,7 @@ impl<T: Variant + Clone> From<Vec<T>> for Dynamic {
     #[inline]
     fn from(value: Vec<T>) -> Self {
         Self(Union::Array(
-            Box::new(value.into_iter().map(Dynamic::from).collect()),
+            Box::new(value.into_iter().map(Self::from).collect()),
             DEFAULT_TAG_VALUE,
             ReadWrite,
         ))
@@ -1973,7 +1973,7 @@ impl<T: Variant + Clone> From<&[T]> for Dynamic {
     #[inline]
     fn from(value: &[T]) -> Self {
         Self(Union::Array(
-            Box::new(value.iter().cloned().map(Dynamic::from).collect()),
+            Box::new(value.iter().cloned().map(Self::from).collect()),
             DEFAULT_TAG_VALUE,
             ReadWrite,
         ))
@@ -1984,7 +1984,7 @@ impl<T: Variant + Clone> std::iter::FromIterator<T> for Dynamic {
     #[inline]
     fn from_iter<X: IntoIterator<Item = T>>(iter: X) -> Self {
         Self(Union::Array(
-            Box::new(iter.into_iter().map(Dynamic::from).collect()),
+            Box::new(iter.into_iter().map(Self::from).collect()),
             DEFAULT_TAG_VALUE,
             ReadWrite,
         ))
@@ -2001,7 +2001,7 @@ impl<K: Into<crate::Identifier>, T: Variant + Clone> From<std::collections::Hash
             Box::new(
                 value
                     .into_iter()
-                    .map(|(k, v)| (k.into(), Dynamic::from(v)))
+                    .map(|(k, v)| (k.into(), Self::from(v)))
                     .collect(),
             ),
             DEFAULT_TAG_VALUE,
@@ -2015,12 +2015,7 @@ impl<K: Into<crate::Identifier>> From<std::collections::HashSet<K>> for Dynamic 
     #[inline]
     fn from(value: std::collections::HashSet<K>) -> Self {
         Self(Union::Map(
-            Box::new(
-                value
-                    .into_iter()
-                    .map(|k| (k.into(), Dynamic::UNIT))
-                    .collect(),
-            ),
+            Box::new(value.into_iter().map(|k| (k.into(), Self::UNIT)).collect()),
             DEFAULT_TAG_VALUE,
             ReadWrite,
         ))
@@ -2036,7 +2031,7 @@ impl<K: Into<crate::Identifier>, T: Variant + Clone> From<std::collections::BTre
             Box::new(
                 value
                     .into_iter()
-                    .map(|(k, v)| (k.into(), Dynamic::from(v)))
+                    .map(|(k, v)| (k.into(), Self::from(v)))
                     .collect(),
             ),
             DEFAULT_TAG_VALUE,
@@ -2049,12 +2044,7 @@ impl<K: Into<crate::Identifier>> From<std::collections::BTreeSet<K>> for Dynamic
     #[inline]
     fn from(value: std::collections::BTreeSet<K>) -> Self {
         Self(Union::Map(
-            Box::new(
-                value
-                    .into_iter()
-                    .map(|k| (k.into(), Dynamic::UNIT))
-                    .collect(),
-            ),
+            Box::new(value.into_iter().map(|k| (k.into(), Self::UNIT)).collect()),
             DEFAULT_TAG_VALUE,
             ReadWrite,
         ))
@@ -2074,7 +2064,7 @@ impl From<Instant> for Dynamic {
     }
 }
 #[cfg(not(feature = "no_closure"))]
-impl From<crate::Shared<crate::Locked<Dynamic>>> for Dynamic {
+impl From<crate::Shared<crate::Locked<Self>>> for Dynamic {
     #[inline(always)]
     fn from(value: crate::Shared<crate::Locked<Self>>) -> Self {
         Self(Union::Shared(value, DEFAULT_TAG_VALUE, ReadWrite))
@@ -2084,12 +2074,12 @@ impl From<crate::Shared<crate::Locked<Dynamic>>> for Dynamic {
 impl From<ExclusiveRange> for Dynamic {
     #[inline(always)]
     fn from(value: ExclusiveRange) -> Self {
-        Dynamic::from(value)
+        Self::from(value)
     }
 }
 impl From<InclusiveRange> for Dynamic {
     #[inline(always)]
     fn from(value: InclusiveRange) -> Self {
-        Dynamic::from(value)
+        Self::from(value)
     }
 }

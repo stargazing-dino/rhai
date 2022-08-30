@@ -11,6 +11,7 @@
 #[macro_export]
 macro_rules! reify {
     ($old:ident, |$new:ident : $t:ty| $code:expr, || $fallback:expr) => {{
+        #[allow(clippy::redundant_else)]
         if std::any::TypeId::of::<$t>() == std::any::Any::type_id(&$old) {
             // SAFETY: This is safe because we already checked to make sure the two types
             // are actually the same.

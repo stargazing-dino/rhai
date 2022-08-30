@@ -5,7 +5,7 @@ use crate::eval::{calc_index, calc_offset_len};
 use crate::plugin::*;
 use crate::{
     def_package, Array, Dynamic, ExclusiveRange, FnPtr, InclusiveRange, NativeCallContext,
-    Position, RhaiResultOf, StaticVec, ERR, INT,
+    Position, RhaiResultOf, StaticVec, ERR, INT, MAX_USIZE_INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -217,6 +217,8 @@ pub mod array_functions {
         len: INT,
         item: Dynamic,
     ) -> RhaiResultOf<()> {
+        let len = len.min(MAX_USIZE_INT);
+
         if len <= 0 || (len as usize) <= array.len() {
             return Ok(());
         }
@@ -369,6 +371,8 @@ pub mod array_functions {
     /// ```
     pub fn truncate(array: &mut Array, len: INT) {
         if !array.is_empty() {
+            let len = len.min(MAX_USIZE_INT);
+
             if len > 0 {
                 array.truncate(len as usize);
             } else {
@@ -396,6 +400,8 @@ pub mod array_functions {
     /// ```
     pub fn chop(array: &mut Array, len: INT) {
         if !array.is_empty() {
+            let len = len.min(MAX_USIZE_INT);
+
             if len <= 0 {
                 array.clear();
             } else if (len as usize) < array.len() {
@@ -1306,8 +1312,7 @@ pub mod array_functions {
     ///
     /// print(x);       // prints "[1, 2, 3, 4, 3, 2, 1]"
     /// ```
-    #[rhai_fn(return_raw)]
-    pub fn dedup(ctx: NativeCallContext, array: &mut Array) -> RhaiResultOf<()> {
+    pub fn dedup(ctx: NativeCallContext, array: &mut Array) {
         let comparer = FnPtr::new_unchecked(OP_EQUALS, StaticVec::new_const());
         dedup_by_comparer(ctx, array, comparer)
     }
@@ -1334,14 +1339,10 @@ pub mod array_functions {
     ///
     /// print(x);       // prints "[1, 2, 3, 4]"
     /// ```
-    #[rhai_fn(name = "dedup", return_raw)]
-    pub fn dedup_by_comparer(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        comparer: FnPtr,
-    ) -> RhaiResultOf<()> {
+    #[rhai_fn(name = "dedup")]
+    pub fn dedup_by_comparer(ctx: NativeCallContext, array: &mut Array, comparer: FnPtr) {
         if array.is_empty() {
-            return Ok(());
+            return;
         }
 
         array.dedup_by(|x, y| {
@@ -1351,8 +1352,6 @@ pub mod array_functions {
                 .as_bool()
                 .unwrap_or(false)
         });
-
-        Ok(())
     }
     /// Remove duplicated _consecutive_ elements from the array that return `true` when applied a
     /// function named by `comparer`.
@@ -1385,7 +1384,7 @@ pub mod array_functions {
         array: &mut Array,
         comparer: &str,
     ) -> RhaiResultOf<()> {
-        dedup_by_comparer(ctx, array, FnPtr::new(comparer)?)
+        Ok(dedup_by_comparer(ctx, array, FnPtr::new(comparer)?))
     }
     /// Reduce an array by iterating through all elements while applying the `reducer` function.
     ///

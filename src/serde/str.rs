@@ -14,7 +14,7 @@ pub struct StringSliceDeserializer<'a> {
 impl<'a> StringSliceDeserializer<'a> {
     /// Create an `ImmutableStringDeserializer` from an `&str` reference.
     #[must_use]
-    pub fn from_str(value: &'a str) -> Self {
+    pub const fn from_str(value: &'a str) -> Self {
         Self { value }
     }
     /// Shortcut for a type conversion error.

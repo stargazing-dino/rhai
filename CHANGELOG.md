@@ -4,6 +4,8 @@ Rhai Release Notes
 Version 1.10.0
 ==============
 
+The minimum Rust version is now `1.61.0` in order to use some `const` generics.
+
 Bug fixes
 ---------
 
@@ -34,6 +36,14 @@ Enhancements
 * `is_empty` method is added to arrays, BLOB's, object maps, strings and ranges.
 * `StaticModuleResolver` now stores the path in the module's `id` field.
 * `Engine::module_resolver` is added to grant access to the `Engine`'s module resolver.
+
+
+Version 1.9.1
+=============
+
+This is a bug-fix version that fixes a bug.
+
+Accessing properties in _Strict Variables Mode_ no longer generates a _variable not found_ error.
 
 
 Version 1.9.0

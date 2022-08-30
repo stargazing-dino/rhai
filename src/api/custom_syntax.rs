@@ -134,10 +134,7 @@ impl Expression<'_> {
 
             Expr::CharConstant(x, ..) => reify!(*x => Option<T>),
             Expr::StringConstant(x, ..) => reify!(x.clone() => Option<T>),
-            Expr::Variable(x, ..) => {
-                let x: ImmutableString = x.3.clone().into();
-                reify!(x => Option<T>)
-            }
+            Expr::Variable(x, ..) => reify!(x.3.clone() => Option<T>),
             Expr::BoolConstant(x, ..) => reify!(*x => Option<T>),
             Expr::Unit(..) => reify!(() => Option<T>),
 

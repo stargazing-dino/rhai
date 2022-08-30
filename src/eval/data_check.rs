@@ -72,7 +72,7 @@ impl Engine {
 
     /// Is there a data size limit set?
     #[cfg(not(feature = "unchecked"))]
-    pub(crate) fn has_data_size_limit(&self) -> bool {
+    pub(crate) const fn has_data_size_limit(&self) -> bool {
         let mut _limited = self.limits.max_string_size.is_some();
 
         #[cfg(not(feature = "no_index"))]

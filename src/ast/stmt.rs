@@ -60,7 +60,7 @@ impl OpAssignment {
     #[must_use]
     #[inline(always)]
     pub fn new_op_assignment(name: &str, pos: Position) -> Self {
-        Self::new_op_assignment_from_token(Token::lookup_from_syntax(name).expect("operator"), pos)
+        Self::new_op_assignment_from_token(&Token::lookup_from_syntax(name).expect("operator"), pos)
     }
     /// Create a new [`OpAssignment`] from a [`Token`].
     ///
@@ -68,7 +68,7 @@ impl OpAssignment {
     ///
     /// Panics if the token is not an op-assignment operator.
     #[must_use]
-    pub fn new_op_assignment_from_token(op: Token, pos: Position) -> Self {
+    pub fn new_op_assignment_from_token(op: &Token, pos: Position) -> Self {
         let op_raw = op
             .get_base_op_from_assignment()
             .expect("op-assignment operator")
@@ -90,7 +90,7 @@ impl OpAssignment {
     #[inline(always)]
     pub fn new_op_assignment_from_base(name: &str, pos: Position) -> Self {
         Self::new_op_assignment_from_base_token(
-            Token::lookup_from_syntax(name).expect("operator"),
+            &Token::lookup_from_syntax(name).expect("operator"),
             pos,
         )
     }
@@ -101,8 +101,8 @@ impl OpAssignment {
     /// Panics if the token is cannot be converted into an op-assignment operator.
     #[inline(always)]
     #[must_use]
-    pub fn new_op_assignment_from_base_token(op: Token, pos: Position) -> Self {
-        Self::new_op_assignment_from_token(op.convert_to_op_assignment().expect("operator"), pos)
+    pub fn new_op_assignment_from_base_token(op: &Token, pos: Position) -> Self {
+        Self::new_op_assignment_from_token(&op.convert_to_op_assignment().expect("operator"), pos)
     }
 }
 
@@ -157,13 +157,13 @@ impl ConditionalExpr {
     /// Is the condition always `true`?
     #[inline(always)]
     #[must_use]
-    pub fn is_always_true(&self) -> bool {
+    pub const fn is_always_true(&self) -> bool {
         matches!(self.condition, Expr::BoolConstant(true, ..))
     }
     /// Is the condition always `false`?
     #[inline(always)]
     #[must_use]
-    pub fn is_always_false(&self) -> bool {
+    pub const fn is_always_false(&self) -> bool {
         matches!(self.condition, Expr::BoolConstant(false, ..))
     }
 }
@@ -228,12 +228,12 @@ impl RangeCase {
     /// Size of the range.
     #[inline(always)]
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> INT {
         match self {
             Self::ExclusiveInt(r, ..) if r.is_empty() => 0,
-            Self::ExclusiveInt(r, ..) => (r.end - r.start) as usize,
+            Self::ExclusiveInt(r, ..) => r.end - r.start,
             Self::InclusiveInt(r, ..) if r.is_empty() => 0,
-            Self::InclusiveInt(r, ..) => (*r.end() - *r.start()) as usize,
+            Self::InclusiveInt(r, ..) => *r.end() - *r.start() + 1,
         }
     }
     /// Is the specified number within this range?
@@ -248,7 +248,7 @@ impl RangeCase {
     /// Is the specified range inclusive?
     #[inline(always)]
     #[must_use]
-    pub fn is_inclusive(&self) -> bool {
+    pub const fn is_inclusive(&self) -> bool {
         match self {
             Self::ExclusiveInt(..) => false,
             Self::InclusiveInt(..) => true,
@@ -257,7 +257,7 @@ impl RangeCase {
     /// Get the index to the [`ConditionalExpr`].
     #[inline(always)]
     #[must_use]
-    pub fn index(&self) -> usize {
+    pub const fn index(&self) -> usize {
         match self {
             Self::ExclusiveInt(.., n) | Self::InclusiveInt(.., n) => *n,
         }
@@ -611,14 +611,14 @@ impl From<StmtBlock> for Stmt {
     }
 }
 
-impl<T: IntoIterator<Item = Stmt>> From<(T, Position, Position)> for Stmt {
+impl<T: IntoIterator<Item = Self>> From<(T, Position, Position)> for Stmt {
     #[inline(always)]
     fn from(value: (T, Position, Position)) -> Self {
         StmtBlock::new(value.0, value.1, value.2).into()
     }
 }
 
-impl<T: IntoIterator<Item = Stmt>> From<(T, Span)> for Stmt {
+impl<T: IntoIterator<Item = Self>> From<(T, Span)> for Stmt {
     #[inline(always)]
     fn from(value: (T, Span)) -> Self {
         StmtBlock::new_with_span(value.0, value.1).into()
@@ -765,7 +765,7 @@ impl Stmt {
             Self::Noop(..) => true,
             Self::Expr(expr) => expr.is_pure(),
             Self::If(x, ..) => {
-                x.0.is_pure() && x.1.iter().all(Stmt::is_pure) && x.2.iter().all(Stmt::is_pure)
+                x.0.is_pure() && x.1.iter().all(Self::is_pure) && x.2.iter().all(Self::is_pure)
             }
             Self::Switch(x, ..) => {
                 let (expr, sw) = &**x;
@@ -786,7 +786,7 @@ impl Stmt {
             Self::While(x, ..) if matches!(x.0, Expr::BoolConstant(false, ..)) => true,
             Self::Do(x, options, ..) if matches!(x.0, Expr::BoolConstant(..)) => match x.0 {
                 Expr::BoolConstant(cond, ..) if cond == options.contains(ASTFlags::NEGATED) => {
-                    x.1.iter().all(Stmt::is_pure)
+                    x.1.iter().all(Self::is_pure)
                 }
                 _ => false,
             },
@@ -796,13 +796,13 @@ impl Stmt {
 
             // For loops can be pure because if the iterable is pure, it is finite,
             // so infinite loops can never occur.
-            Self::For(x, ..) => x.2.is_pure() && x.3.iter().all(Stmt::is_pure),
+            Self::For(x, ..) => x.2.is_pure() && x.3.iter().all(Self::is_pure),
 
             Self::Var(..) | Self::Assignment(..) | Self::FnCall(..) => false,
-            Self::Block(block, ..) => block.iter().all(Stmt::is_pure),
+            Self::Block(block, ..) => block.iter().all(Self::is_pure),
             Self::BreakLoop(..) | Self::Return(..) => false,
             Self::TryCatch(x, ..) => {
-                x.try_block.iter().all(Stmt::is_pure) && x.catch_block.iter().all(Stmt::is_pure)
+                x.try_block.iter().all(Self::is_pure) && x.catch_block.iter().all(Self::is_pure)
             }
 
             #[cfg(not(feature = "no_module"))]
@@ -828,7 +828,7 @@ impl Stmt {
             Self::Var(..) => true,
 
             Self::Expr(e) => match &**e {
-                Expr::Stmt(s) => s.iter().all(Stmt::is_block_dependent),
+                Expr::Stmt(s) => s.iter().all(Self::is_block_dependent),
                 Expr::FnCall(x, ..) => !x.is_qualified() && x.name == KEYWORD_EVAL,
                 _ => false,
             },
@@ -854,7 +854,7 @@ impl Stmt {
             Self::Var(x, ..) => x.1.is_pure(),
 
             Self::Expr(e) => match &**e {
-                Expr::Stmt(s) => s.iter().all(Stmt::is_internally_pure),
+                Expr::Stmt(s) => s.iter().all(Self::is_internally_pure),
                 _ => self.is_pure(),
             },
 

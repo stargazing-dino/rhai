@@ -700,16 +700,15 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
                 }),
                 _ => None,
             };
-        } else {
-            return match op {
-                "+=" => Some(|_, args| {
-                    let x = std::mem::take(args[1]);
-                    let array = &mut *args[0].write_lock::<Array>().expect(BUILTIN);
-                    Ok(push(array, x).into())
-                }),
-                _ => None,
-            };
         }
+        return match op {
+            "+=" => Some(|_, args| {
+                let x = std::mem::take(args[1]);
+                let array = &mut *args[0].write_lock::<Array>().expect(BUILTIN);
+                Ok(push(array, x).into())
+            }),
+            _ => None,
+        };
     }
 
     #[cfg(not(feature = "no_index"))]
