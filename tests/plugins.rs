@@ -75,12 +75,35 @@ fn make_greeting(n: impl std::fmt::Display) -> String {
 
 gen_unary_functions!(greet = make_greeting(INT, bool, char) -> String);
 
+macro_rules! expand_enum {
+    ($module:ident : $typ:ty => $($variant:ident),+) => {
+        #[export_module]
+        pub mod $module {
+            $(
+                pub const $variant: $typ = <$typ>::$variant;
+            )*
+        }
+    };
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum MyEnum {
+    Foo,
+    Bar,
+    Baz,
+    Hello,
+    World,
+}
+
+expand_enum! { my_enum_module: MyEnum => Foo, Bar, Baz, Hello, World }
+
 #[test]
 fn test_plugins_package() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
 
     let mut m = Module::new();
     combine_with_exported_module!(&mut m, "test", test::special_array_package);
+    combine_with_exported_module!(&mut m, "enum", my_enum_module);
     engine.register_global_module(m.into());
 
     reg_functions!(engine += greet::single(INT, bool, char));
