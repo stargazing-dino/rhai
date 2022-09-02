@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - fast-ops
 
 jobs:
   benchmark:

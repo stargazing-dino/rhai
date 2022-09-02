@@ -49,21 +49,24 @@ fn test_optimizer_run() -> Result<(), Box<EvalAltResult>> {
     run_test(&mut engine)?;
 
     // Override == operator
-    engine.register_fn("==", |_x: INT, _y: INT| false);
+    #[cfg(not(feature = "fast_ops"))]
+    {
+        engine.register_fn("==", |_x: INT, _y: INT| false);
 
-    engine.set_optimization_level(OptimizationLevel::Simple);
+        engine.set_optimization_level(OptimizationLevel::Simple);
 
-    assert_eq!(
-        engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")?,
-        123
-    );
+        assert_eq!(
+            engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")?,
+            123
+        );
 
-    engine.set_optimization_level(OptimizationLevel::Full);
+        engine.set_optimization_level(OptimizationLevel::Full);
 
-    assert_eq!(
-        engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")?,
-        123
-    );
+        assert_eq!(
+            engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")?,
+            123
+        );
+    }
 
     Ok(())
 }

@@ -614,8 +614,9 @@ impl Engine {
                 args.shrink_to_fit();
 
                 return Ok(FnCallExpr {
-                    name: id,
+                    name: state.get_interned_string(id),
                     capture_parent_scope,
+                    is_standard_operator: false,
                     #[cfg(not(feature = "no_module"))]
                     namespace,
                     hashes,
@@ -687,6 +688,7 @@ impl Engine {
                     return Ok(FnCallExpr {
                         name: state.get_interned_string(id),
                         capture_parent_scope,
+                        is_standard_operator: false,
                         #[cfg(not(feature = "no_module"))]
                         namespace,
                         hashes,
@@ -2339,6 +2341,7 @@ impl Engine {
                 name: state.get_interned_string(op.as_ref()),
                 hashes: FnCallHashes::from_native(hash),
                 pos,
+                is_standard_operator: op_token.is_standard_symbol(),
                 ..Default::default()
             };
 

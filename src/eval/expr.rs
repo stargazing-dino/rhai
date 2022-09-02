@@ -222,10 +222,38 @@ impl Engine {
             #[cfg(not(feature = "no_module"))]
             namespace,
             capture_parent_scope: capture,
+            is_standard_operator,
             hashes,
             args,
             ..
         } = expr;
+
+        #[cfg(feature = "fast_ops")]
+        if *is_standard_operator {
+            let mut lhs = self
+                .get_arg_value(scope, global, caches, lib, this_ptr, &args[0], level)?
+                .0
+                .flatten();
+
+            let mut rhs = self
+                .get_arg_value(scope, global, caches, lib, this_ptr, &args[1], level)?
+                .0
+                .flatten();
+
+            let arg_values = &mut [&mut lhs, &mut rhs];
+
+            return if let Some(f) =
+                crate::func::get_builtin_binary_op_fn(&name, arg_values[0], arg_values[1])
+            {
+                let context = (self, name, None, &*global, lib, pos, level).into();
+                (f)(context, arg_values)
+            } else {
+                self.exec_fn_call(
+                    None, global, caches, lib, name, *hashes, arg_values, false, false, pos, level,
+                )
+                .map(|(v, ..)| v)
+            };
+        }
 
         #[cfg(not(feature = "no_module"))]
         if !namespace.is_empty() {
