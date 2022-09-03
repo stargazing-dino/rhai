@@ -77,11 +77,19 @@ fn test_native_overload() -> Result<(), Box<EvalAltResult>> {
 
     assert_eq!(
         engine.eval::<String>(r#"let x = "hello"; let y = "world"; x + y"#)?,
-        "hello***world"
+        if cfg!(not(feature = "fast_ops")) {
+            "hello***world"
+        } else {
+            "helloworld"
+        }
     );
     assert_eq!(
         engine.eval::<String>(r#"let x = "hello"; let y = (); x + y"#)?,
-        "hello Foo!"
+        if cfg!(not(feature = "fast_ops")) {
+            "hello Foo!"
+        } else {
+            "hello"
+        }
     );
 
     Ok(())
