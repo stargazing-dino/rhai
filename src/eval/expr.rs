@@ -228,8 +228,7 @@ impl Engine {
             ..
         } = expr;
 
-        #[cfg(feature = "fast_ops")]
-        if *std_ops {
+        if *std_ops && self.fast_operators() {
             let mut lhs = self
                 .get_arg_value(scope, global, caches, lib, this_ptr, &args[0], level)?
                 .0

@@ -128,14 +128,7 @@ fn test_plugins_package() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)")?, 6);
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; hi(a, 2)")?, 6);
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)")?, 6);
-    assert_eq!(
-        engine.eval::<INT>("2 + 2")?,
-        if cfg!(not(feature = "fast_ops")) {
-            5
-        } else {
-            4
-        }
-    );
+    assert_eq!(engine.eval::<INT>("2 + 2")?, 5);
     assert_eq!(
         engine.eval::<String>("let a = [1, 2, 3]; greet(test(a, 2))")?,
         "6 kitties"

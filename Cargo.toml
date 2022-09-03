@@ -39,10 +39,9 @@ serde_bytes = "0.11"
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 
 [features]
-default = ["std", "fast_ops"]
+default = ["std"]
 std = ["ahash/std", "ahash/runtime-rng", "num-traits/std", "smartstring/std"]
 unchecked = []                  # unchecked arithmetic
-fast_ops = []                   # ignore overloaded standard operators
 sync = []                       # restrict to only types that implement Send + Sync
 no_position = []                # do not track position in the parser
 no_optimize = []                # no script optimizer
