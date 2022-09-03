@@ -55,6 +55,13 @@ fn test_optimizer_run() -> Result<(), Box<EvalAltResult>> {
 
     assert_eq!(
         engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")?,
+        42
+    );
+
+    engine.set_fast_operators(false);
+
+    assert_eq!(
+        engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")?,
         123
     );
 

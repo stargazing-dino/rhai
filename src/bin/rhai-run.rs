@@ -50,8 +50,6 @@ fn main() {
         // Initialize scripting engine
         let mut engine = Engine::new();
 
-        engine.set_fast_operators(true);
-
         #[cfg(not(feature = "no_optimize"))]
         engine.set_optimization_level(rhai::OptimizationLevel::Simple);
 

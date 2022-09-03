@@ -616,7 +616,7 @@ impl Engine {
                 return Ok(FnCallExpr {
                     name: state.get_interned_string(id),
                     capture_parent_scope,
-                    is_standard_operator: false,
+                    is_native_operator: false,
                     #[cfg(not(feature = "no_module"))]
                     namespace,
                     hashes,
@@ -688,7 +688,7 @@ impl Engine {
                     return Ok(FnCallExpr {
                         name: state.get_interned_string(id),
                         capture_parent_scope,
-                        is_standard_operator: false,
+                        is_native_operator: false,
                         #[cfg(not(feature = "no_module"))]
                         namespace,
                         hashes,
@@ -1922,6 +1922,7 @@ impl Engine {
                             hashes: FnCallHashes::from_native(calc_fn_hash("-", 1)),
                             args,
                             pos,
+                            is_native_operator: true,
                             ..Default::default()
                         }
                         .into_fn_call_expr(pos))
@@ -1949,6 +1950,7 @@ impl Engine {
                             hashes: FnCallHashes::from_native(calc_fn_hash("+", 1)),
                             args,
                             pos,
+                            is_native_operator: true,
                             ..Default::default()
                         }
                         .into_fn_call_expr(pos))
@@ -1967,6 +1969,7 @@ impl Engine {
                     hashes: FnCallHashes::from_native(calc_fn_hash("!", 1)),
                     args,
                     pos,
+                    is_native_operator: true,
                     ..Default::default()
                 }
                 .into_fn_call_expr(pos))
@@ -2341,7 +2344,7 @@ impl Engine {
                 name: state.get_interned_string(op.as_ref()),
                 hashes: FnCallHashes::from_native(hash),
                 pos,
-                is_standard_operator: op_token.is_standard_symbol(),
+                is_native_operator: !is_valid_function_name(&op),
                 ..Default::default()
             };
 

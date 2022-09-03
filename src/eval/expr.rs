@@ -227,14 +227,14 @@ impl Engine {
             #[cfg(not(feature = "no_module"))]
             namespace,
             capture_parent_scope: capture,
-            is_standard_operator: std_ops,
+            is_native_operator: native_ops,
             hashes,
             args,
             ..
         } = expr;
 
-        // Short-circuit operator call if under Fast Operators mode
-        if *std_ops && self.fast_operators() {
+        // Short-circuit native binary operator call if under Fast Operators mode
+        if *native_ops && self.fast_operators() && args.len() == 2 {
             let mut lhs = self
                 .get_arg_value(scope, global, caches, lib, this_ptr, &args[0], level)?
                 .0
@@ -314,8 +314,19 @@ impl Engine {
         );
 
         self.make_function_call(
-            scope, global, caches, lib, this_ptr, name, first_arg, args, *hashes, *capture,
-            *std_ops, pos, level,
+            scope,
+            global,
+            caches,
+            lib,
+            this_ptr,
+            name,
+            first_arg,
+            args,
+            *hashes,
+            *capture,
+            *native_ops,
+            pos,
+            level,
         )
     }
 

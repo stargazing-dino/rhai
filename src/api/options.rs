@@ -35,17 +35,24 @@ bitflags! {
 impl LangOptions {
     /// Create a new [`LangOptions`] with default values.
     #[inline(always)]
+    #[must_use]
     pub fn new() -> Self {
-        Self::IF_EXPR | Self::SWITCH_EXPR | Self::STMT_EXPR | Self::LOOPING | Self::SHADOW | {
-            #[cfg(not(feature = "no_function"))]
-            {
-                Self::ANON_FN
+        Self::IF_EXPR
+            | Self::SWITCH_EXPR
+            | Self::STMT_EXPR
+            | Self::LOOPING
+            | Self::SHADOW
+            | Self::FAST_OPS
+            | {
+                #[cfg(not(feature = "no_function"))]
+                {
+                    Self::ANON_FN
+                }
+                #[cfg(feature = "no_function")]
+                {
+                    Self::empty()
+                }
             }
-            #[cfg(feature = "no_function")]
-            {
-                Self::empty()
-            }
-        }
     }
 }
 

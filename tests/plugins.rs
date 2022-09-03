@@ -128,11 +128,14 @@ fn test_plugins_package() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)")?, 6);
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; hi(a, 2)")?, 6);
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)")?, 6);
-    assert_eq!(engine.eval::<INT>("2 + 2")?, 5);
     assert_eq!(
         engine.eval::<String>("let a = [1, 2, 3]; greet(test(a, 2))")?,
         "6 kitties"
     );
+    assert_eq!(engine.eval::<INT>("2 + 2")?, 4);
+
+    engine.set_fast_operators(false);
+    assert_eq!(engine.eval::<INT>("2 + 2")?, 5);
 
     engine.register_static_module("test", exported_module!(test::special_array_package).into());
 
