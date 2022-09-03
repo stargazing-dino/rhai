@@ -115,6 +115,143 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
         } };
     }
 
+    // Check for common patterns
+    if type1 == type2 {
+        if type1 == TypeId::of::<INT>() {
+            #[cfg(not(feature = "unchecked"))]
+            use crate::packages::arithmetic::arith_basic::INT::functions::*;
+
+            #[cfg(not(feature = "unchecked"))]
+            match op {
+                "+" => return Some(impl_op!(INT => add(as_int, as_int))),
+                "-" => return Some(impl_op!(INT => subtract(as_int, as_int))),
+                "*" => return Some(impl_op!(INT => multiply(as_int, as_int))),
+                "/" => return Some(impl_op!(INT => divide(as_int, as_int))),
+                "%" => return Some(impl_op!(INT => modulo(as_int, as_int))),
+                "**" => return Some(impl_op!(INT => power(as_int, as_int))),
+                ">>" => return Some(impl_op!(INT => shift_right(as_int, as_int))),
+                "<<" => return Some(impl_op!(INT => shift_left(as_int, as_int))),
+                _ => (),
+            }
+
+            #[cfg(feature = "unchecked")]
+            match op {
+                "+" => return Some(impl_op!(INT => as_int + as_int)),
+                "-" => return Some(impl_op!(INT => as_int - as_int)),
+                "*" => return Some(impl_op!(INT => as_int * as_int)),
+                "/" => return Some(impl_op!(INT => as_int / as_int)),
+                "%" => return Some(impl_op!(INT => as_int % as_int)),
+                "**" => return Some(impl_op!(INT => as_int.pow(as_int as u32))),
+                ">>" => return Some(impl_op!(INT => as_int >> as_int)),
+                "<<" => return Some(impl_op!(INT => as_int << as_int)),
+                _ => (),
+            }
+
+            return match op {
+                "==" => Some(impl_op!(INT => as_int == as_int)),
+                "!=" => Some(impl_op!(INT => as_int != as_int)),
+                ">" => Some(impl_op!(INT => as_int > as_int)),
+                ">=" => Some(impl_op!(INT => as_int >= as_int)),
+                "<" => Some(impl_op!(INT => as_int < as_int)),
+                "<=" => Some(impl_op!(INT => as_int <= as_int)),
+                "&" => Some(impl_op!(INT => as_int & as_int)),
+                "|" => Some(impl_op!(INT => as_int | as_int)),
+                "^" => Some(impl_op!(INT => as_int ^ as_int)),
+                ".." => Some(|_, args| {
+                    let x = args[0].as_int().expect(BUILTIN);
+                    let y = args[1].as_int().expect(BUILTIN);
+                    Ok((x..y).into())
+                }),
+                "..=" => Some(|_, args| {
+                    let x = args[0].as_int().expect(BUILTIN);
+                    let y = args[1].as_int().expect(BUILTIN);
+                    Ok((x..=y).into())
+                }),
+                _ => None,
+            };
+        }
+
+        if type1 == TypeId::of::<bool>() {
+            return match op {
+                "==" => Some(impl_op!(bool => as_bool == as_bool)),
+                "!=" => Some(impl_op!(bool => as_bool != as_bool)),
+                ">" => Some(impl_op!(bool => as_bool > as_bool)),
+                ">=" => Some(impl_op!(bool => as_bool >= as_bool)),
+                "<" => Some(impl_op!(bool => as_bool < as_bool)),
+                "<=" => Some(impl_op!(bool => as_bool <= as_bool)),
+                "&" => Some(impl_op!(bool => as_bool & as_bool)),
+                "|" => Some(impl_op!(bool => as_bool | as_bool)),
+                "^" => Some(impl_op!(bool => as_bool ^ as_bool)),
+                _ => None,
+            };
+        }
+
+        if type1 == TypeId::of::<ImmutableString>() {
+            return match op {
+                "+" => Some(impl_op!(ImmutableString + ImmutableString)),
+                "-" => Some(impl_op!(ImmutableString - ImmutableString)),
+                "==" => Some(impl_op!(ImmutableString == ImmutableString)),
+                "!=" => Some(impl_op!(ImmutableString != ImmutableString)),
+                ">" => Some(impl_op!(ImmutableString > ImmutableString)),
+                ">=" => Some(impl_op!(ImmutableString >= ImmutableString)),
+                "<" => Some(impl_op!(ImmutableString < ImmutableString)),
+                "<=" => Some(impl_op!(ImmutableString <= ImmutableString)),
+                OP_CONTAINS => Some(impl_op!(ImmutableString.contains(ImmutableString.as_str()))),
+                _ => None,
+            };
+        }
+
+        if type1 == TypeId::of::<char>() {
+            return match op {
+                "+" => Some(|_, args| {
+                    let x = args[0].as_char().expect(BUILTIN);
+                    let y = args[1].as_char().expect(BUILTIN);
+                    Ok(format!("{x}{y}").into())
+                }),
+                "==" => Some(impl_op!(char => as_char == as_char)),
+                "!=" => Some(impl_op!(char => as_char != as_char)),
+                ">" => Some(impl_op!(char => as_char > as_char)),
+                ">=" => Some(impl_op!(char => as_char >= as_char)),
+                "<" => Some(impl_op!(char => as_char < as_char)),
+                "<=" => Some(impl_op!(char => as_char <= as_char)),
+                _ => None,
+            };
+        }
+
+        #[cfg(not(feature = "no_index"))]
+        if type1 == TypeId::of::<crate::Blob>() {
+            use crate::Blob;
+
+            return match op {
+                "+" => Some(|_, args| {
+                    let blob1 = &*args[0].read_lock::<Blob>().expect(BUILTIN);
+                    let blob2 = &*args[1].read_lock::<Blob>().expect(BUILTIN);
+
+                    Ok(Dynamic::from_blob(if blob2.is_empty() {
+                        blob1.clone()
+                    } else if blob1.is_empty() {
+                        blob2.clone()
+                    } else {
+                        let mut blob = blob1.clone();
+                        blob.extend(blob2);
+                        blob
+                    }))
+                }),
+                "==" => Some(impl_op!(Blob == Blob)),
+                "!=" => Some(impl_op!(Blob != Blob)),
+                _ => None,
+            };
+        }
+
+        if type1 == TypeId::of::<()>() {
+            return match op {
+                "==" => Some(|_, _| Ok(Dynamic::TRUE)),
+                "!=" | ">" | ">=" | "<" | "<=" => Some(|_, _| Ok(Dynamic::FALSE)),
+                _ => None,
+            };
+        }
+    }
+
     #[cfg(not(feature = "no_float"))]
     macro_rules! impl_float {
         ($x:ty, $xx:ident, $y:ty, $yy:ident) => {
@@ -406,141 +543,6 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
     }
 
     // Beyond here, type1 == type2
-
-    if type1 == TypeId::of::<INT>() {
-        #[cfg(not(feature = "unchecked"))]
-        use crate::packages::arithmetic::arith_basic::INT::functions::*;
-
-        #[cfg(not(feature = "unchecked"))]
-        match op {
-            "+" => return Some(impl_op!(INT => add(as_int, as_int))),
-            "-" => return Some(impl_op!(INT => subtract(as_int, as_int))),
-            "*" => return Some(impl_op!(INT => multiply(as_int, as_int))),
-            "/" => return Some(impl_op!(INT => divide(as_int, as_int))),
-            "%" => return Some(impl_op!(INT => modulo(as_int, as_int))),
-            "**" => return Some(impl_op!(INT => power(as_int, as_int))),
-            ">>" => return Some(impl_op!(INT => shift_right(as_int, as_int))),
-            "<<" => return Some(impl_op!(INT => shift_left(as_int, as_int))),
-            _ => (),
-        }
-
-        #[cfg(feature = "unchecked")]
-        match op {
-            "+" => return Some(impl_op!(INT => as_int + as_int)),
-            "-" => return Some(impl_op!(INT => as_int - as_int)),
-            "*" => return Some(impl_op!(INT => as_int * as_int)),
-            "/" => return Some(impl_op!(INT => as_int / as_int)),
-            "%" => return Some(impl_op!(INT => as_int % as_int)),
-            "**" => return Some(impl_op!(INT => as_int.pow(as_int as u32))),
-            ">>" => return Some(impl_op!(INT => as_int >> as_int)),
-            "<<" => return Some(impl_op!(INT => as_int << as_int)),
-            _ => (),
-        }
-
-        return match op {
-            "==" => Some(impl_op!(INT => as_int == as_int)),
-            "!=" => Some(impl_op!(INT => as_int != as_int)),
-            ">" => Some(impl_op!(INT => as_int > as_int)),
-            ">=" => Some(impl_op!(INT => as_int >= as_int)),
-            "<" => Some(impl_op!(INT => as_int < as_int)),
-            "<=" => Some(impl_op!(INT => as_int <= as_int)),
-            "&" => Some(impl_op!(INT => as_int & as_int)),
-            "|" => Some(impl_op!(INT => as_int | as_int)),
-            "^" => Some(impl_op!(INT => as_int ^ as_int)),
-            ".." => Some(|_, args| {
-                let x = args[0].as_int().expect(BUILTIN);
-                let y = args[1].as_int().expect(BUILTIN);
-                Ok((x..y).into())
-            }),
-            "..=" => Some(|_, args| {
-                let x = args[0].as_int().expect(BUILTIN);
-                let y = args[1].as_int().expect(BUILTIN);
-                Ok((x..=y).into())
-            }),
-            _ => None,
-        };
-    }
-
-    if type1 == TypeId::of::<bool>() {
-        return match op {
-            "==" => Some(impl_op!(bool => as_bool == as_bool)),
-            "!=" => Some(impl_op!(bool => as_bool != as_bool)),
-            ">" => Some(impl_op!(bool => as_bool > as_bool)),
-            ">=" => Some(impl_op!(bool => as_bool >= as_bool)),
-            "<" => Some(impl_op!(bool => as_bool < as_bool)),
-            "<=" => Some(impl_op!(bool => as_bool <= as_bool)),
-            "&" => Some(impl_op!(bool => as_bool & as_bool)),
-            "|" => Some(impl_op!(bool => as_bool | as_bool)),
-            "^" => Some(impl_op!(bool => as_bool ^ as_bool)),
-            _ => None,
-        };
-    }
-
-    if type1 == TypeId::of::<ImmutableString>() {
-        return match op {
-            "+" => Some(impl_op!(ImmutableString + ImmutableString)),
-            "-" => Some(impl_op!(ImmutableString - ImmutableString)),
-            "==" => Some(impl_op!(ImmutableString == ImmutableString)),
-            "!=" => Some(impl_op!(ImmutableString != ImmutableString)),
-            ">" => Some(impl_op!(ImmutableString > ImmutableString)),
-            ">=" => Some(impl_op!(ImmutableString >= ImmutableString)),
-            "<" => Some(impl_op!(ImmutableString < ImmutableString)),
-            "<=" => Some(impl_op!(ImmutableString <= ImmutableString)),
-            OP_CONTAINS => Some(impl_op!(ImmutableString.contains(ImmutableString.as_str()))),
-            _ => None,
-        };
-    }
-
-    if type1 == TypeId::of::<char>() {
-        return match op {
-            "+" => Some(|_, args| {
-                let x = args[0].as_char().expect(BUILTIN);
-                let y = args[1].as_char().expect(BUILTIN);
-                Ok(format!("{x}{y}").into())
-            }),
-            "==" => Some(impl_op!(char => as_char == as_char)),
-            "!=" => Some(impl_op!(char => as_char != as_char)),
-            ">" => Some(impl_op!(char => as_char > as_char)),
-            ">=" => Some(impl_op!(char => as_char >= as_char)),
-            "<" => Some(impl_op!(char => as_char < as_char)),
-            "<=" => Some(impl_op!(char => as_char <= as_char)),
-            _ => None,
-        };
-    }
-
-    #[cfg(not(feature = "no_index"))]
-    if type1 == TypeId::of::<crate::Blob>() {
-        use crate::Blob;
-
-        return match op {
-            "+" => Some(|_, args| {
-                let blob1 = &*args[0].read_lock::<Blob>().expect(BUILTIN);
-                let blob2 = &*args[1].read_lock::<Blob>().expect(BUILTIN);
-
-                Ok(Dynamic::from_blob(if blob2.is_empty() {
-                    blob1.clone()
-                } else if blob1.is_empty() {
-                    blob2.clone()
-                } else {
-                    let mut blob = blob1.clone();
-                    blob.extend(blob2);
-                    blob
-                }))
-            }),
-            "==" => Some(impl_op!(Blob == Blob)),
-            "!=" => Some(impl_op!(Blob != Blob)),
-            _ => None,
-        };
-    }
-
-    if type1 == TypeId::of::<()>() {
-        return match op {
-            "==" => Some(|_, _| Ok(Dynamic::TRUE)),
-            "!=" | ">" | ">=" | "<" | "<=" => Some(|_, _| Ok(Dynamic::FALSE)),
-            _ => None,
-        };
-    }
-
     None
 }
 
@@ -592,6 +594,98 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
             let y = <$x>::from(args[1].$yy().expect(BUILTIN));
             Ok((*args[0].write_lock().expect(BUILTIN) = $func(x, y)?).into())
         } };
+    }
+
+    // Check for common patterns
+    if type1 == type2 {
+        if type1 == TypeId::of::<INT>() {
+            #[cfg(not(feature = "unchecked"))]
+            use crate::packages::arithmetic::arith_basic::INT::functions::*;
+
+            #[cfg(not(feature = "unchecked"))]
+            match op {
+                "+=" => return Some(impl_op!(INT => add(as_int, as_int))),
+                "-=" => return Some(impl_op!(INT => subtract(as_int, as_int))),
+                "*=" => return Some(impl_op!(INT => multiply(as_int, as_int))),
+                "/=" => return Some(impl_op!(INT => divide(as_int, as_int))),
+                "%=" => return Some(impl_op!(INT => modulo(as_int, as_int))),
+                "**=" => return Some(impl_op!(INT => power(as_int, as_int))),
+                ">>=" => return Some(impl_op!(INT => shift_right(as_int, as_int))),
+                "<<=" => return Some(impl_op!(INT => shift_left(as_int, as_int))),
+                _ => (),
+            }
+
+            #[cfg(feature = "unchecked")]
+            match op {
+                "+=" => return Some(impl_op!(INT += as_int)),
+                "-=" => return Some(impl_op!(INT -= as_int)),
+                "*=" => return Some(impl_op!(INT *= as_int)),
+                "/=" => return Some(impl_op!(INT /= as_int)),
+                "%=" => return Some(impl_op!(INT %= as_int)),
+                "**=" => return Some(impl_op!(INT => as_int.pow(as_int as u32))),
+                ">>=" => return Some(impl_op!(INT >>= as_int)),
+                "<<=" => return Some(impl_op!(INT <<= as_int)),
+                _ => (),
+            }
+
+            return match op {
+                "&=" => Some(impl_op!(INT &= as_int)),
+                "|=" => Some(impl_op!(INT |= as_int)),
+                "^=" => Some(impl_op!(INT ^= as_int)),
+                _ => None,
+            };
+        }
+
+        if type1 == TypeId::of::<bool>() {
+            return match op {
+                "&=" => Some(impl_op!(bool = x && as_bool)),
+                "|=" => Some(impl_op!(bool = x || as_bool)),
+                _ => None,
+            };
+        }
+
+        if type1 == TypeId::of::<char>() {
+            return match op {
+                "+=" => Some(|_, args| {
+                    let y = args[1].as_char().expect(BUILTIN);
+                    let x = &mut *args[0].write_lock::<Dynamic>().expect(BUILTIN);
+                    Ok((*x = format!("{x}{y}").into()).into())
+                }),
+                _ => None,
+            };
+        }
+
+        if type1 == TypeId::of::<ImmutableString>() {
+            return match op {
+                "+=" => Some(|_, args| {
+                    let (first, second) = args.split_first_mut().expect(BUILTIN);
+                    let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
+                    let y = std::mem::take(second[0]).cast::<ImmutableString>();
+                    Ok((*x += y).into())
+                }),
+                "-=" => Some(|_, args| {
+                    let (first, second) = args.split_first_mut().expect(BUILTIN);
+                    let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
+                    let y = std::mem::take(second[0]).cast::<ImmutableString>();
+                    Ok((*x -= y).into())
+                }),
+                _ => None,
+            };
+        }
+
+        #[cfg(not(feature = "no_index"))]
+        if type1 == TypeId::of::<crate::Blob>() {
+            use crate::Blob;
+
+            return match op {
+                "+=" => Some(|_, args| {
+                    let blob2 = std::mem::take(args[1]).cast::<Blob>();
+                    let blob1 = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
+                    Ok(crate::packages::blob_basic::blob_functions::append(blob1, blob2).into())
+                }),
+                _ => None,
+            };
+        }
     }
 
     #[cfg(not(feature = "no_float"))]
@@ -750,101 +844,6 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
                 _ => None,
             };
         }
-    }
-
-    // No built-in op-assignments for different types.
-    if type2 != type1 {
-        return None;
-    }
-
-    // Beyond here, type1 == type2
-    if type1 == TypeId::of::<INT>() {
-        #[cfg(not(feature = "unchecked"))]
-        use crate::packages::arithmetic::arith_basic::INT::functions::*;
-
-        #[cfg(not(feature = "unchecked"))]
-        match op {
-            "+=" => return Some(impl_op!(INT => add(as_int, as_int))),
-            "-=" => return Some(impl_op!(INT => subtract(as_int, as_int))),
-            "*=" => return Some(impl_op!(INT => multiply(as_int, as_int))),
-            "/=" => return Some(impl_op!(INT => divide(as_int, as_int))),
-            "%=" => return Some(impl_op!(INT => modulo(as_int, as_int))),
-            "**=" => return Some(impl_op!(INT => power(as_int, as_int))),
-            ">>=" => return Some(impl_op!(INT => shift_right(as_int, as_int))),
-            "<<=" => return Some(impl_op!(INT => shift_left(as_int, as_int))),
-            _ => (),
-        }
-
-        #[cfg(feature = "unchecked")]
-        match op {
-            "+=" => return Some(impl_op!(INT += as_int)),
-            "-=" => return Some(impl_op!(INT -= as_int)),
-            "*=" => return Some(impl_op!(INT *= as_int)),
-            "/=" => return Some(impl_op!(INT /= as_int)),
-            "%=" => return Some(impl_op!(INT %= as_int)),
-            "**=" => return Some(impl_op!(INT => as_int.pow(as_int as u32))),
-            ">>=" => return Some(impl_op!(INT >>= as_int)),
-            "<<=" => return Some(impl_op!(INT <<= as_int)),
-            _ => (),
-        }
-
-        return match op {
-            "&=" => Some(impl_op!(INT &= as_int)),
-            "|=" => Some(impl_op!(INT |= as_int)),
-            "^=" => Some(impl_op!(INT ^= as_int)),
-            _ => None,
-        };
-    }
-
-    if type1 == TypeId::of::<bool>() {
-        return match op {
-            "&=" => Some(impl_op!(bool = x && as_bool)),
-            "|=" => Some(impl_op!(bool = x || as_bool)),
-            _ => None,
-        };
-    }
-
-    if type1 == TypeId::of::<char>() {
-        return match op {
-            "+=" => Some(|_, args| {
-                let y = args[1].as_char().expect(BUILTIN);
-                let x = &mut *args[0].write_lock::<Dynamic>().expect(BUILTIN);
-                Ok((*x = format!("{x}{y}").into()).into())
-            }),
-            _ => None,
-        };
-    }
-
-    if type1 == TypeId::of::<ImmutableString>() {
-        return match op {
-            "+=" => Some(|_, args| {
-                let (first, second) = args.split_first_mut().expect(BUILTIN);
-                let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
-                let y = std::mem::take(second[0]).cast::<ImmutableString>();
-                Ok((*x += y).into())
-            }),
-            "-=" => Some(|_, args| {
-                let (first, second) = args.split_first_mut().expect(BUILTIN);
-                let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
-                let y = std::mem::take(second[0]).cast::<ImmutableString>();
-                Ok((*x -= y).into())
-            }),
-            _ => None,
-        };
-    }
-
-    #[cfg(not(feature = "no_index"))]
-    if type1 == TypeId::of::<crate::Blob>() {
-        use crate::Blob;
-
-        return match op {
-            "+=" => Some(|_, args| {
-                let blob2 = std::mem::take(args[1]).cast::<Blob>();
-                let blob1 = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
-                Ok(crate::packages::blob_basic::blob_functions::append(blob1, blob2).into())
-            }),
-            _ => None,
-        };
     }
 
     None
