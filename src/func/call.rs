@@ -989,6 +989,7 @@ impl Engine {
         args_expr: &[Expr],
         hashes: FnCallHashes,
         capture_scope: bool,
+        is_standard_operator: bool,
         pos: Position,
         level: usize,
     ) -> RhaiResult {
@@ -1001,6 +1002,8 @@ impl Engine {
         let redirected; // Handle call() - Redirect function call
 
         match name {
+            _ if is_standard_operator => (),
+
             // Handle call()
             KEYWORD_FN_PTR_CALL if total_args >= 1 => {
                 let arg = first_arg.unwrap();

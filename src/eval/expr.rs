@@ -222,14 +222,14 @@ impl Engine {
             #[cfg(not(feature = "no_module"))]
             namespace,
             capture_parent_scope: capture,
-            is_standard_operator,
+            is_standard_operator: std_ops,
             hashes,
             args,
             ..
         } = expr;
 
         #[cfg(feature = "fast_ops")]
-        if *is_standard_operator {
+        if *std_ops {
             let mut lhs = self
                 .get_arg_value(scope, global, caches, lib, this_ptr, &args[0], level)?
                 .0
@@ -311,8 +311,8 @@ impl Engine {
         );
 
         self.make_function_call(
-            scope, global, caches, lib, this_ptr, name, first_arg, args, *hashes, *capture, pos,
-            level,
+            scope, global, caches, lib, this_ptr, name, first_arg, args, *hashes, *capture,
+            *std_ops, pos, level,
         )
     }
 
