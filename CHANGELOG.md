@@ -21,6 +21,10 @@ Deprecated API
 New features
 ------------
 
+### Fast operators
+
+* A new option `Engine::fast_operators` is introduced that short-circuits all built-in operators of built-in types for higher speed. User overloads are ignored. For operator-heavy scripts, this may yield substantial speed-up's.
+
 ### Fallible type iterators
 
 * For very special needs, the ability to register fallible type iterators is added.
@@ -29,10 +33,6 @@ New features
 
 * `if`-expressions are allowed in `Engine::eval_expression` and `Engine::compile_expression` provided that both statement blocks each contain at most a single expression.
 * `switch`-expressions are allowed in `Engine::eval_expression` and `Engine::compile_expression` provided that match actions are expressions only.
-
-### Fast operators
-
-* A new option `Engine::fast_operators` is introduced that short-circuits all built-in operators of built-in types for higher speed. User overloads are ignored. For operator-heavy scripts, this may yield substantial speed-up's.
 
 Enhancements
 ------------

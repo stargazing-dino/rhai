@@ -54,6 +54,23 @@ fn bench_eval_scope_longer(bench: &mut Bencher) {
 }
 
 #[bench]
+fn bench_eval_scope_longer_fast_ops(bench: &mut Bencher) {
+    let script = "(requests_made * requests_succeeded / 100) >= 90";
+
+    let mut engine = Engine::new();
+    engine.set_optimization_level(OptimizationLevel::None);
+    engine.set_fast_operators(true);
+
+    let mut scope = Scope::new();
+    scope.push("requests_made", 99 as INT);
+    scope.push("requests_succeeded", 90 as INT);
+
+    let ast = engine.compile_expression(script).unwrap();
+
+    bench.iter(|| engine.run_ast_with_scope(&mut scope, &ast).unwrap());
+}
+
+#[bench]
 fn bench_eval_scope_complex(bench: &mut Bencher) {
     let script = r#"
             2 > 1 &&
