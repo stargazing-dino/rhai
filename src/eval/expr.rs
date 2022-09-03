@@ -3,8 +3,13 @@
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::ast::{Expr, FnCallExpr, OpAssignment};
 use crate::engine::{KEYWORD_THIS, OP_CONCAT};
+use crate::eval::FnResolutionCacheEntry;
+use crate::func::{
+    calc_fn_params_hash, combine_hashes, get_builtin_binary_op_fn, CallableFunction, FnAny,
+};
 use crate::types::dynamic::AccessMode;
 use crate::{Dynamic, Engine, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR};
+use std::collections::btree_map::Entry;
 use std::num::NonZeroUsize;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -240,16 +245,35 @@ impl Engine {
                 .0
                 .flatten();
 
-            let arg_values = &mut [&mut lhs, &mut rhs];
+            let args = &mut [&mut lhs, &mut rhs];
 
-            let hash = crate::func::combine_hashes(
+            let hash = combine_hashes(
                 hashes.native,
-                crate::func::calc_fn_params_hash(arg_values.iter().map(|a| a.type_id())),
+                calc_fn_params_hash(args.iter().map(|a| a.type_id())),
             );
 
             let c = caches.fn_resolution_cache_mut();
 
-            let entry = if c.contains_key(&hash) {
+            let entry = if let Entry::Vacant(e) = c.entry(hash) {
+                match get_builtin_binary_op_fn(&name, args[0], args[1]) {
+                    Some(f) => {
+                        let entry = FnResolutionCacheEntry {
+                            func: CallableFunction::from_method(Box::new(f) as Box<FnAny>),
+                            source: None,
+                        };
+                        e.insert(Some(entry));
+                        c.get(&hash).unwrap().as_ref().unwrap()
+                    }
+                    None => {
+                        return self
+                            .exec_fn_call(
+                                None, global, caches, lib, name, *hashes, args, false, false, pos,
+                                level,
+                            )
+                            .map(|(v, ..)| v)
+                    }
+                }
+            } else {
                 match c.get(&hash).unwrap() {
                     Some(entry) => entry,
                     None => {
@@ -258,39 +282,18 @@ impl Engine {
                                 #[cfg(not(feature = "no_module"))]
                                 &crate::ast::Namespace::NONE,
                                 name,
-                                arg_values,
+                                args,
                             ),
                             pos,
                         )
                         .into())
                     }
                 }
-            } else {
-                match crate::func::get_builtin_binary_op_fn(&name, arg_values[0], arg_values[1]) {
-                    Some(f) => {
-                        let entry = crate::eval::FnResolutionCacheEntry {
-                            func: crate::func::CallableFunction::from_method(
-                                Box::new(f) as Box<crate::func::FnAny>
-                            ),
-                            source: None,
-                        };
-                        c.insert(hash, Some(entry));
-                        c.get(&hash).unwrap().as_ref().unwrap()
-                    }
-                    None => {
-                        return self
-                            .exec_fn_call(
-                                None, global, caches, lib, name, *hashes, arg_values, false, false,
-                                pos, level,
-                            )
-                            .map(|(v, ..)| v)
-                    }
-                }
             };
 
             let func = entry.func.get_native_fn().unwrap();
             let context = (self, name, None, &*global, lib, pos, level).into();
-            let result = (func)(context, arg_values);
+            let result = (func)(context, args);
             return self.check_return_value(result, pos);
         }
 
