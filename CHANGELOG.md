@@ -30,6 +30,10 @@ New features
 * `if`-expressions are allowed in `Engine::eval_expression` and `Engine::compile_expression` provided that both statement blocks each contain at most a single expression.
 * `switch`-expressions are allowed in `Engine::eval_expression` and `Engine::compile_expression` provided that match actions are expressions only.
 
+### `fast_ops` feature
+
+* A new feature `fast_ops` is introduced that short-circuits all built-in operators of built-in types for higher speed. New user overloads are ignored.
+
 Enhancements
 ------------
 

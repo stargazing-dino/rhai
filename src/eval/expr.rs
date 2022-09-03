@@ -278,13 +278,12 @@ impl Engine {
                         c.get(&hash).unwrap().as_ref().unwrap()
                     }
                     None => {
-                        println!("Exec {name} with {:?}", arg_values);
                         return self
                             .exec_fn_call(
                                 None, global, caches, lib, name, *hashes, arg_values, false, false,
                                 pos, level,
                             )
-                            .map(|(v, ..)| v);
+                            .map(|(v, ..)| v)
                     }
                 }
             };
