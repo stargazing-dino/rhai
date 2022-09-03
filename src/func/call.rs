@@ -131,7 +131,7 @@ impl Engine {
     /// Generate the signature for a function call.
     #[inline]
     #[must_use]
-    fn gen_call_signature(
+    pub(crate) fn gen_fn_call_signature(
         &self,
         #[cfg(not(feature = "no_module"))] namespace: &crate::ast::Namespace,
         fn_name: &str,
@@ -174,26 +174,26 @@ impl Engine {
     fn resolve_fn<'s>(
         &self,
         _global: &GlobalRuntimeState,
-        state: &'s mut Caches,
+        caches: &'s mut Caches,
         lib: &[&Module],
         fn_name: &str,
-        hash_script: u64,
+        hash_base: u64,
         args: Option<&mut FnCallArgs>,
         allow_dynamic: bool,
         is_op_assignment: bool,
     ) -> Option<&'s FnResolutionCacheEntry> {
-        if hash_script == 0 {
+        if hash_base == 0 {
             return None;
         }
 
-        let mut hash = args.as_ref().map_or(hash_script, |args| {
+        let mut hash = args.as_ref().map_or(hash_base, |args| {
             combine_hashes(
-                hash_script,
+                hash_base,
                 calc_fn_params_hash(args.iter().map(|a| a.type_id())),
             )
         });
 
-        let result = state
+        let result = caches
             .fn_resolution_cache_mut()
             .entry(hash)
             .or_insert_with(|| {
@@ -248,21 +248,21 @@ impl Engine {
 
                     // Check `Dynamic` parameters for functions with parameters
                     if allow_dynamic && max_bitmask == 0 && num_args > 0 {
-                        let is_dynamic = lib.iter().any(|&m| m.contains_dynamic_fn(hash_script))
+                        let is_dynamic = lib.iter().any(|&m| m.contains_dynamic_fn(hash_base))
                             || self
                                 .global_modules
                                 .iter()
-                                .any(|m| m.contains_dynamic_fn(hash_script));
+                                .any(|m| m.contains_dynamic_fn(hash_base));
 
                         #[cfg(not(feature = "no_module"))]
                         let is_dynamic = is_dynamic
                             || _global
                                 .iter_imports_raw()
-                                .any(|(_, m)| m.contains_dynamic_fn(hash_script))
+                                .any(|(_, m)| m.contains_dynamic_fn(hash_base))
                             || self
                                 .global_sub_modules
                                 .values()
-                                .any(|m| m.contains_dynamic_fn(hash_script));
+                                .any(|m| m.contains_dynamic_fn(hash_base));
 
                         // Set maximum bitmask when there are dynamic versions of the function
                         if is_dynamic {
@@ -317,7 +317,7 @@ impl Engine {
                                 }
                             }),
                     );
-                    hash = combine_hashes(hash_script, hash_params);
+                    hash = combine_hashes(hash_base, hash_params);
 
                     bitmask += 1;
                 }
@@ -542,7 +542,7 @@ impl Engine {
 
             // Raise error
             _ => Err(ERR::ErrorFunctionNotFound(
-                self.gen_call_signature(
+                self.gen_fn_call_signature(
                     #[cfg(not(feature = "no_module"))]
                     &crate::ast::Namespace::NONE,
                     name,
@@ -1429,7 +1429,7 @@ impl Engine {
             Some(f) => unreachable!("unknown function type: {:?}", f),
 
             None => Err(ERR::ErrorFunctionNotFound(
-                self.gen_call_signature(namespace, fn_name, &args),
+                self.gen_fn_call_signature(namespace, fn_name, &args),
                 pos,
             )
             .into()),

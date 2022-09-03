@@ -242,17 +242,57 @@ impl Engine {
 
             let arg_values = &mut [&mut lhs, &mut rhs];
 
-            return if let Some(f) =
-                crate::func::get_builtin_binary_op_fn(&name, arg_values[0], arg_values[1])
-            {
-                let context = (self, name, None, &*global, lib, pos, level).into();
-                (f)(context, arg_values)
+            let hash = crate::func::combine_hashes(
+                hashes.native,
+                crate::func::calc_fn_params_hash(arg_values.iter().map(|a| a.type_id())),
+            );
+
+            let c = caches.fn_resolution_cache_mut();
+
+            let entry = if c.contains_key(&hash) {
+                match c.get(&hash).unwrap() {
+                    Some(entry) => entry,
+                    None => {
+                        return Err(ERR::ErrorFunctionNotFound(
+                            self.gen_fn_call_signature(
+                                #[cfg(not(feature = "no_module"))]
+                                &crate::ast::Namespace::NONE,
+                                name,
+                                arg_values,
+                            ),
+                            pos,
+                        )
+                        .into())
+                    }
+                }
             } else {
-                self.exec_fn_call(
-                    None, global, caches, lib, name, *hashes, arg_values, false, false, pos, level,
-                )
-                .map(|(v, ..)| v)
+                match crate::func::get_builtin_binary_op_fn(&name, arg_values[0], arg_values[1]) {
+                    Some(f) => {
+                        let entry = crate::eval::FnResolutionCacheEntry {
+                            func: crate::func::CallableFunction::from_method(
+                                Box::new(f) as Box<crate::func::FnAny>
+                            ),
+                            source: None,
+                        };
+                        c.insert(hash, Some(entry));
+                        c.get(&hash).unwrap().as_ref().unwrap()
+                    }
+                    None => {
+                        println!("Exec {name} with {:?}", arg_values);
+                        return self
+                            .exec_fn_call(
+                                None, global, caches, lib, name, *hashes, arg_values, false, false,
+                                pos, level,
+                            )
+                            .map(|(v, ..)| v);
+                    }
+                }
             };
+
+            let func = entry.func.get_native_fn().unwrap();
+            let context = (self, name, None, &*global, lib, pos, level).into();
+            let result = (func)(context, arg_values);
+            return self.check_return_value(result, pos);
         }
 
         #[cfg(not(feature = "no_module"))]
