@@ -3,11 +3,16 @@
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::ast::{Expr, FnCallExpr, OpAssignment};
 use crate::engine::{KEYWORD_THIS, OP_CONCAT};
+use crate::eval::FnResolutionCacheEntry;
+use crate::func::{
+    calc_fn_params_hash, combine_hashes, gen_fn_call_signature, get_builtin_binary_op_fn,
+    CallableFunction, FnAny,
+};
 use crate::types::dynamic::AccessMode;
 use crate::{Dynamic, Engine, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR};
-use std::num::NonZeroUsize;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+use std::{collections::btree_map::Entry, num::NonZeroUsize};
 
 impl Engine {
     /// Search for a module within an imports stack.
@@ -218,19 +223,78 @@ impl Engine {
         level: usize,
     ) -> RhaiResult {
         let FnCallExpr {
-            name,
-            #[cfg(not(feature = "no_module"))]
-            namespace,
-            capture_parent_scope: capture,
-            hashes,
-            args,
-            ..
+            name, hashes, args, ..
         } = expr;
 
+        // Short-circuit native binary operator call if under Fast Operators mode
+        if expr.is_native_operator && self.fast_operators() && (args.len() == 1 || args.len() == 2)
+        {
+            let mut lhs = self
+                .get_arg_value(scope, global, caches, lib, this_ptr, &args[0], level)?
+                .0
+                .flatten();
+
+            let mut rhs = if args.len() == 2 {
+                self.get_arg_value(scope, global, caches, lib, this_ptr, &args[1], level)?
+                    .0
+                    .flatten()
+            } else {
+                Dynamic::UNIT
+            };
+
+            let mut operands = [&mut lhs, &mut rhs];
+            let operands = if args.len() == 2 {
+                &mut operands[..]
+            } else {
+                &mut operands[0..1]
+            };
+
+            let hash = calc_fn_params_hash(operands.iter().map(|a| a.type_id()));
+            let hash = combine_hashes(hashes.native, hash);
+
+            let cache = caches.fn_resolution_cache_mut();
+
+            let func = if let Entry::Vacant(entry) = cache.entry(hash) {
+                let func = if args.len() == 2 {
+                    get_builtin_binary_op_fn(&name, operands[0], operands[1])
+                } else {
+                    None
+                };
+
+                if let Some(f) = func {
+                    entry.insert(Some(FnResolutionCacheEntry {
+                        func: CallableFunction::from_method(Box::new(f) as Box<FnAny>),
+                        source: None,
+                    }));
+                    &cache.get(&hash).unwrap().as_ref().unwrap().func
+                } else {
+                    let result = self.exec_fn_call(
+                        None, global, caches, lib, name, *hashes, operands, false, false, pos,
+                        level,
+                    );
+                    return result.map(|(v, ..)| v);
+                }
+            } else if let Some(entry) = cache.get(&hash).unwrap() {
+                &entry.func
+            } else {
+                let sig = gen_fn_call_signature(self, name, operands);
+                return Err(ERR::ErrorFunctionNotFound(sig, pos).into());
+            };
+
+            let context = (self, name, None, &*global, lib, pos, level).into();
+            let result = if func.is_plugin_fn() {
+                func.get_plugin_fn().unwrap().call(context, operands)
+            } else {
+                func.get_native_fn().unwrap()(context, operands)
+            };
+            return self.check_return_value(result, pos);
+        }
+
         #[cfg(not(feature = "no_module"))]
-        if !namespace.is_empty() {
+        if !expr.namespace.is_empty() {
             // Qualified function call
             let hash = hashes.native;
+            let namespace = &expr.namespace;
 
             return self.make_qualified_function_call(
                 scope, global, caches, lib, this_ptr, namespace, name, args, hash, pos, level,
@@ -244,7 +308,18 @@ impl Engine {
         );
 
         self.make_function_call(
-            scope, global, caches, lib, this_ptr, name, first_arg, args, *hashes, *capture, pos,
+            scope,
+            global,
+            caches,
+            lib,
+            this_ptr,
+            name,
+            first_arg,
+            args,
+            *hashes,
+            expr.capture_parent_scope,
+            expr.is_native_operator,
+            pos,
             level,
         )
     }

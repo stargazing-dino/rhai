@@ -235,6 +235,7 @@ fn multiple_fn_rename_test() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
     let m = rhai::exported_module!(crate::multiple_fn_rename::my_adds);
     engine.register_global_module(m.into());
+    engine.set_fast_operators(false);
 
     let output_array = engine.eval::<Array>(
         "

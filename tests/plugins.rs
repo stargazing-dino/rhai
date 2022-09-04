@@ -75,12 +75,36 @@ fn make_greeting(n: impl std::fmt::Display) -> String {
 
 gen_unary_functions!(greet = make_greeting(INT, bool, char) -> String);
 
+macro_rules! expand_enum {
+    ($module:ident : $typ:ty => $($variant:ident),+) => {
+        #[export_module]
+        pub mod $module {
+            $(
+                #[allow(non_upper_case_globals)]
+                pub const $variant: $typ = <$typ>::$variant;
+            )*
+        }
+    };
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum MyEnum {
+    Foo,
+    Bar,
+    Baz,
+    Hello,
+    World,
+}
+
+expand_enum! { my_enum_module: MyEnum => Foo, Bar, Baz, Hello, World }
+
 #[test]
 fn test_plugins_package() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
 
     let mut m = Module::new();
     combine_with_exported_module!(&mut m, "test", test::special_array_package);
+    combine_with_exported_module!(&mut m, "enum", my_enum_module);
     engine.register_global_module(m.into());
 
     reg_functions!(engine += greet::single(INT, bool, char));
@@ -104,11 +128,14 @@ fn test_plugins_package() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)")?, 6);
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; hi(a, 2)")?, 6);
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)")?, 6);
-    assert_eq!(engine.eval::<INT>("2 + 2")?, 5);
     assert_eq!(
         engine.eval::<String>("let a = [1, 2, 3]; greet(test(a, 2))")?,
         "6 kitties"
     );
+    assert_eq!(engine.eval::<INT>("2 + 2")?, 4);
+
+    engine.set_fast_operators(false);
+    assert_eq!(engine.eval::<INT>("2 + 2")?, 5);
 
     engine.register_static_module("test", exported_module!(test::special_array_package).into());
 

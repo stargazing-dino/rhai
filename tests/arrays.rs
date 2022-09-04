@@ -169,6 +169,22 @@ fn test_arrays() -> Result<(), Box<EvalAltResult>> {
         "
     )?);
 
+    let value = vec![
+        String::from("hello"),
+        String::from("world"),
+        String::from("foo"),
+        String::from("bar"),
+    ];
+
+    let array: Dynamic = value.into();
+
+    assert_eq!(array.type_name(), "array");
+
+    let array = array.cast::<Array>();
+
+    assert_eq!(array[0].type_name(), "string");
+    assert_eq!(array.len(), 4);
+
     Ok(())
 }
 

@@ -7,43 +7,52 @@ use std::prelude::v1::*;
 
 bitflags! {
     /// Bit-flags containing all language options for the [`Engine`].
-    pub struct LangOptions: u8 {
+    pub struct LangOptions: u16 {
         /// Is `if`-expression allowed?
-        const IF_EXPR = 0b_0000_0001;
+        const IF_EXPR = 0b_0000_0000_0001;
         /// Is `switch` expression allowed?
-        const SWITCH_EXPR = 0b_0000_0010;
+        const SWITCH_EXPR = 0b_0000_0000_0010;
         /// Is statement-expression allowed?
-        const STMT_EXPR = 0b_0000_0100;
+        const STMT_EXPR = 0b_0000_0000_0100;
         /// Is anonymous function allowed?
         #[cfg(not(feature = "no_function"))]
-        const ANON_FN = 0b_0000_1000;
+        const ANON_FN = 0b_0000_0000_1000;
         /// Is looping allowed?
-        const LOOPING = 0b_0001_0000;
+        const LOOPING = 0b_0000_0001_0000;
         /// Is variables shadowing allowed?
-        const SHADOW = 0b_0010_0000;
+        const SHADOW = 0b_0000_0010_0000;
         /// Strict variables mode?
-        const STRICT_VAR = 0b_0100_0000;
+        const STRICT_VAR = 0b_0000_0100_0000;
         /// Raise error if an object map property does not exist?
         /// Returns `()` if `false`.
         #[cfg(not(feature = "no_object"))]
-        const FAIL_ON_INVALID_MAP_PROPERTY = 0b_1000_0000;
+        const FAIL_ON_INVALID_MAP_PROPERTY = 0b_0000_1000_0000;
+        /// Fast operators mode?
+        const FAST_OPS = 0b_0001_0000_0000;
     }
 }
 
 impl LangOptions {
     /// Create a new [`LangOptions`] with default values.
     #[inline(always)]
+    #[must_use]
     pub fn new() -> Self {
-        Self::IF_EXPR | Self::SWITCH_EXPR | Self::STMT_EXPR | Self::LOOPING | Self::SHADOW | {
-            #[cfg(not(feature = "no_function"))]
-            {
-                Self::ANON_FN
+        Self::IF_EXPR
+            | Self::SWITCH_EXPR
+            | Self::STMT_EXPR
+            | Self::LOOPING
+            | Self::SHADOW
+            | Self::FAST_OPS
+            | {
+                #[cfg(not(feature = "no_function"))]
+                {
+                    Self::ANON_FN
+                }
+                #[cfg(feature = "no_function")]
+                {
+                    Self::empty()
+                }
             }
-            #[cfg(feature = "no_function")]
-            {
-                Self::empty()
-            }
-        }
     }
 }
 
@@ -157,5 +166,17 @@ impl Engine {
     pub fn set_fail_on_invalid_map_property(&mut self, enable: bool) {
         self.options
             .set(LangOptions::FAIL_ON_INVALID_MAP_PROPERTY, enable);
+    }
+    /// Is fast operators mode enabled?
+    /// Default is `false`.
+    #[inline(always)]
+    #[must_use]
+    pub const fn fast_operators(&self) -> bool {
+        self.options.contains(LangOptions::FAST_OPS)
+    }
+    /// Set whether fast operators mode is enabled.
+    #[inline(always)]
+    pub fn set_fast_operators(&mut self, enable: bool) {
+        self.options.set(LangOptions::FAST_OPS, enable);
     }
 }
