@@ -127,41 +127,48 @@ pub fn ensure_no_data_race(
     Ok(())
 }
 
-impl Engine {
-    /// Generate the signature for a function call.
-    #[inline]
-    #[must_use]
-    pub(crate) fn gen_fn_call_signature(
-        &self,
-        #[cfg(not(feature = "no_module"))] namespace: &crate::ast::Namespace,
-        fn_name: &str,
-        args: &[&mut Dynamic],
-    ) -> String {
-        #[cfg(not(feature = "no_module"))]
-        let (ns, sep) = (
-            namespace.to_string(),
-            if namespace.is_empty() {
-                ""
+/// Generate the signature for a function call.
+#[inline]
+#[must_use]
+pub fn gen_fn_call_signature(engine: &Engine, fn_name: &str, args: &[&mut Dynamic]) -> String {
+    format!(
+        "{fn_name} ({})",
+        args.iter()
+            .map(|a| if a.is::<ImmutableString>() {
+                "&str | ImmutableString | String"
             } else {
-                crate::tokenizer::Token::DoubleColon.literal_syntax()
-            },
-        );
-        #[cfg(feature = "no_module")]
-        let (ns, sep) = ("", "");
+                engine.map_type_name(a.type_name())
+            })
+            .collect::<FnArgsVec<_>>()
+            .join(", ")
+    )
+}
 
-        format!(
-            "{ns}{sep}{fn_name} ({})",
-            args.iter()
-                .map(|a| if a.is::<ImmutableString>() {
-                    "&str | ImmutableString | String"
-                } else {
-                    self.map_type_name(a.type_name())
-                })
-                .collect::<FnArgsVec<_>>()
-                .join(", ")
-        )
-    }
+/// Generate the signature for a namespace-qualified function call.
+///
+/// Not available under `no_module`.
+#[cfg(not(feature = "no_module"))]
+#[inline]
+#[must_use]
+pub fn gen_qualified_fn_call_signature(
+    engine: &Engine,
+    namespace: &crate::ast::Namespace,
+    fn_name: &str,
+    args: &[&mut Dynamic],
+) -> String {
+    let (ns, sep) = (
+        namespace.to_string(),
+        if namespace.is_empty() {
+            ""
+        } else {
+            crate::tokenizer::Token::DoubleColon.literal_syntax()
+        },
+    );
 
+    format!("{ns}{sep}{}", gen_fn_call_signature(engine, fn_name, args))
+}
+
+impl Engine {
     /// Resolve a normal (non-qualified) function call.
     ///
     /// Search order:
@@ -405,11 +412,9 @@ impl Engine {
                 let context = (self, name, source, &*global, lib, pos, level).into();
 
                 let result = if func.is_plugin_fn() {
-                    func.get_plugin_fn()
-                        .expect("plugin function")
-                        .call(context, args)
+                    func.get_plugin_fn().unwrap().call(context, args)
                 } else {
-                    func.get_native_fn().expect("native function")(context, args)
+                    func.get_native_fn().unwrap()(context, args)
                 };
 
                 // Restore the original reference
@@ -541,16 +546,9 @@ impl Engine {
             }
 
             // Raise error
-            _ => Err(ERR::ErrorFunctionNotFound(
-                self.gen_fn_call_signature(
-                    #[cfg(not(feature = "no_module"))]
-                    &crate::ast::Namespace::NONE,
-                    name,
-                    args,
-                ),
-                pos,
-            )
-            .into()),
+            _ => {
+                Err(ERR::ErrorFunctionNotFound(gen_fn_call_signature(self, name, args), pos).into())
+            }
         }
     }
 
@@ -1432,7 +1430,7 @@ impl Engine {
             Some(f) => unreachable!("unknown function type: {:?}", f),
 
             None => Err(ERR::ErrorFunctionNotFound(
-                self.gen_fn_call_signature(namespace, fn_name, &args),
+                gen_qualified_fn_call_signature(self, namespace, fn_name, &args),
                 pos,
             )
             .into()),

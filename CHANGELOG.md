@@ -4,10 +4,18 @@ Rhai Release Notes
 Version 1.10.0
 ==============
 
-This version, by default, turns on _Fast Operators_ mode, which assumes that built-in operators for
-standard data types are never overloaded &ndash; in the vast majority of cases this should be so.
-Avoid checking for overloads may result in substantial speed improvements especially for
-operator-heavy scripts.
+This version introduces _Fast Operators_ mode, which is turned on by default but can be disabled via
+a new options API: `Engine::set_fast_operators`.
+
+_Fast Operators_ mode assumes that none of Rhai's built-in operators for standard data types are
+overloaded by user-registered functions. In the vast majority of cases this should be so (really,
+who overloads the `+` operator for integers anyway?).
+
+This assumption allows the `Engine` to avoid checking for overloads for every single operator call.
+This usually results in substantial speed improvements, especially for expressions.
+
+Minimum Rust Version
+--------------------
 
 The minimum Rust version is now `1.61.0` in order to use some `const` generics.
 
@@ -28,7 +36,7 @@ New features
 
 ### Fast operators
 
-* A new option `Engine::fast_operators` is introduced (default to `true`) that short-circuits all built-in operators of built-in types for higher speed. User overloads are ignored. For operator-heavy scripts, this may yield substantial speed-up's.
+* A new option `Engine::fast_operators` is introduced (default to `true`) to enable/disable _Fast Operators_ mode.
 
 ### Fallible type iterators
 
