@@ -278,9 +278,9 @@ pub struct Module {
     /// Native Rust functions (in scripted hash format) that contain [`Dynamic`] parameters.
     dynamic_functions: StraightHashSet<u64>,
     /// Iterator functions, keyed by the type producing the iterator.
-    type_iterators: StraightHashMap<TypeId, Shared<IteratorFn>>,
+    type_iterators: BTreeMap<TypeId, Shared<IteratorFn>>,
     /// Flattened collection of iterator functions, including those in sub-modules.
-    all_type_iterators: StraightHashMap<TypeId, Shared<IteratorFn>>,
+    all_type_iterators: BTreeMap<TypeId, Shared<IteratorFn>>,
     /// Is the [`Module`] indexed?
     indexed: bool,
     /// Does the [`Module`] contain indexed functions that have been exposed to the global namespace?
@@ -378,8 +378,8 @@ impl Module {
             functions: StraightHashMap::default(),
             all_functions: StraightHashMap::default(),
             dynamic_functions: StraightHashSet::default(),
-            type_iterators: StraightHashMap::default(),
-            all_type_iterators: StraightHashMap::default(),
+            type_iterators: BTreeMap::new(),
+            all_type_iterators: BTreeMap::new(),
             indexed: true,
             contains_indexed_global_functions: false,
         }
@@ -2141,7 +2141,7 @@ impl Module {
             path: &mut Vec<&'a str>,
             variables: &mut StraightHashMap<u64, Dynamic>,
             functions: &mut StraightHashMap<u64, CallableFunction>,
-            type_iterators: &mut StraightHashMap<TypeId, Shared<IteratorFn>>,
+            type_iterators: &mut BTreeMap<TypeId, Shared<IteratorFn>>,
         ) -> bool {
             let mut contains_indexed_global_functions = false;
 
@@ -2205,7 +2205,7 @@ impl Module {
             let mut path = Vec::with_capacity(4);
             let mut variables = StraightHashMap::default();
             let mut functions = StraightHashMap::default();
-            let mut type_iterators = StraightHashMap::default();
+            let mut type_iterators = BTreeMap::new();
 
             path.push("");
 
