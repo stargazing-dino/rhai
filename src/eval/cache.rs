@@ -1,10 +1,10 @@
 //! System caches.
 
-use crate::func::CallableFunction;
+use crate::func::{CallableFunction, StraightHashMap};
 use crate::{Identifier, StaticVec};
+use std::marker::PhantomData;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{collections::BTreeMap, marker::PhantomData};
 
 /// _(internals)_ An entry in a function resolution cache.
 /// Exported under the `internals` feature only.
@@ -21,7 +21,7 @@ pub struct FnResolutionCacheEntry {
 ///
 /// [`FnResolutionCacheEntry`] is [`Box`]ed in order to pack as many entries inside a single B-Tree
 /// level as possible.
-pub type FnResolutionCache = BTreeMap<u64, Option<FnResolutionCacheEntry>>;
+pub type FnResolutionCache = StraightHashMap<u64, Option<FnResolutionCacheEntry>>;
 
 /// _(internals)_ A type containing system-wide caches.
 /// Exported under the `internals` feature only.
@@ -66,7 +66,7 @@ impl Caches<'_> {
     #[allow(dead_code)]
     #[inline(always)]
     pub fn push_fn_resolution_cache(&mut self) {
-        self.fn_resolution.push(BTreeMap::new());
+        self.fn_resolution.push(StraightHashMap::default());
     }
     /// Rewind the function resolution caches stack to a particular size.
     #[inline(always)]

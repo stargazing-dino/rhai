@@ -7,6 +7,16 @@ use std::{
     hash::{BuildHasher, Hash, Hasher},
 };
 
+#[cfg(feature = "no_std")]
+pub type StraightHashMap<K, V> = hashbrown::HashMap<K, V, StraightHasherBuilder>;
+#[cfg(feature = "no_std")]
+pub type StraightHashSet<K> = hashbrown::HashSet<K, StraightHasherBuilder>;
+
+#[cfg(not(feature = "no_std"))]
+pub type StraightHashMap<K, V> = std::collections::HashMap<K, V, StraightHasherBuilder>;
+#[cfg(not(feature = "no_std"))]
+pub type StraightHashSet<K> = std::collections::HashSet<K, StraightHasherBuilder>;
+
 /// Dummy hash value to map zeros to. This value can be anything.
 ///
 /// # Notes
@@ -30,7 +40,7 @@ pub const ALT_ZERO_HASH: u64 = 42;
 ///
 /// Panics when hashing any data type other than a [`u64`].
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-struct StraightHasher(u64);
+pub struct StraightHasher(u64);
 
 impl Hasher for StraightHasher {
     #[inline(always)]
@@ -38,23 +48,22 @@ impl Hasher for StraightHasher {
         self.0
     }
     #[inline]
-    fn write(&mut self, bytes: &[u8]) {
-        assert_eq!(bytes.len(), 8, "StraightHasher can only hash u64 values");
+    fn write(&mut self, _bytes: &[u8]) {
+        panic!("StraightHasher can only hash u64 values");
+    }
 
-        let mut key = [0_u8; 8];
-        key.copy_from_slice(bytes);
-
-        self.0 = u64::from_ne_bytes(key);
-
-        if self.0 == 0 {
+    fn write_u64(&mut self, i: u64) {
+        if i == 0 {
             self.0 = ALT_ZERO_HASH;
+        } else {
+            self.0 = i;
         }
     }
 }
 
 /// A hash builder for `StraightHasher`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
-struct StraightHasherBuilder;
+pub struct StraightHasherBuilder;
 
 impl BuildHasher for StraightHasherBuilder {
     type Hasher = StraightHasher;

@@ -11,8 +11,12 @@ use crate::func::{
 use crate::types::dynamic::AccessMode;
 use crate::{Dynamic, Engine, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR};
 #[cfg(feature = "no_std")]
+use hashbrown::hash_map::Entry;
+#[cfg(not(feature = "no_std"))]
+use std::collections::hash_map::Entry;
+use std::num::NonZeroUsize;
+#[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{collections::btree_map::Entry, num::NonZeroUsize};
 
 impl Engine {
     /// Search for a module within an imports stack.
