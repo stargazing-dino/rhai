@@ -27,6 +27,7 @@ rhai_codegen = { version = "1.4.1", path = "codegen", default-features = false }
 
 no-std-compat = { version = "0.4", default-features = false, features = ["alloc"], optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
+hashbrown = { version = "0.12", optional = true }
 core-error = { version = "0.0", default-features = false, features = ["alloc"], optional = true }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"], optional = true }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
@@ -63,7 +64,7 @@ debugging = ["internals"]       # enable debugging
 serde = ["dep:serde", "smartstring/serde", "smallvec/serde"] # implement serde for rhai types
 
 # compiling for no-std
-no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm", "ahash/compile-time-rng"]
+no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm", "ahash/compile-time-rng", "hashbrown"]
 
 # compiling for WASM
 wasm-bindgen = ["instant/wasm-bindgen"]

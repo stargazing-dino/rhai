@@ -4,12 +4,18 @@
 use std::prelude::v1::*;
 use std::{
     any::TypeId,
-    collections::{HashMap, HashSet},
     hash::{BuildHasher, Hash, Hasher},
 };
 
-pub type StraightHashMap<K, V> = HashMap<K, V, StraightHasherBuilder>;
-pub type StraightHashSet<K> = HashSet<K, StraightHasherBuilder>;
+#[cfg(feature = "no_std")]
+pub type StraightHashMap<K, V> = hashbrown::HashMap<K, V, StraightHasherBuilder>;
+#[cfg(feature = "no_std")]
+pub type StraightHashSet<K> = hashbrown::HashSet<K, StraightHasherBuilder>;
+
+#[cfg(not(feature = "no_std"))]
+pub type StraightHashMap<K, V> = std::collections::HashMap<K, V, StraightHasherBuilder>;
+#[cfg(not(feature = "no_std"))]
+pub type StraightHashSet<K> = std::collections::HashSet<K, StraightHasherBuilder>;
 
 /// Dummy hash value to map zeros to. This value can be anything.
 ///
@@ -47,7 +53,11 @@ impl Hasher for StraightHasher {
     }
 
     fn write_u64(&mut self, i: u64) {
-        self.0 = i;
+        if i == 0 {
+            self.0 = ALT_ZERO_HASH;
+        } else {
+            self.0 = i;
+        }
     }
 }
 
