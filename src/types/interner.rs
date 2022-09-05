@@ -1,10 +1,9 @@
-use crate::func::hashing::get_hasher;
+use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::ImmutableString;
 
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
-    collections::BTreeMap,
     fmt,
     hash::{Hash, Hasher},
     marker::PhantomData,
@@ -21,14 +20,14 @@ pub const MAX_STRING_LEN: usize = 24;
 /// Exported under the `internals` feature only.
 ///
 /// Normal identifiers, property getters and setters are interned separately.
-#[derive(Clone, Hash)]
+#[derive(Clone)]
 pub struct StringsInterner<'a> {
     /// Maximum number of strings interned.
     pub capacity: usize,
     /// Maximum string length.
     pub max_string_len: usize,
     /// Normal strings.
-    strings: BTreeMap<u64, ImmutableString>,
+    strings: StraightHashMap<u64, ImmutableString>,
     /// Take care of the lifetime parameter.
     dummy: PhantomData<&'a ()>,
 }
@@ -55,7 +54,7 @@ impl StringsInterner<'_> {
         Self {
             capacity: MAX_INTERNED_STRINGS,
             max_string_len: MAX_STRING_LEN,
-            strings: BTreeMap::new(),
+            strings: StraightHashMap::default(),
             dummy: PhantomData,
         }
     }

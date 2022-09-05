@@ -9,7 +9,7 @@ use crate::ast::{
 };
 use crate::engine::{Precedence, KEYWORD_THIS, OP_CONTAINS};
 use crate::eval::GlobalRuntimeState;
-use crate::func::hashing::get_hasher;
+use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::tokenizer::{
     is_keyword_function, is_valid_function_name, is_valid_identifier, Token, TokenStream,
     TokenizerControl,
@@ -32,7 +32,7 @@ use std::{
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
-type FnLib = BTreeMap<u64, Shared<ScriptFnDef>>;
+type FnLib = StraightHashMap<u64, Shared<ScriptFnDef>>;
 
 const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
 
@@ -3790,7 +3790,7 @@ impl Engine {
         state: &mut ParseState,
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
-        let mut functions = BTreeMap::new();
+        let mut functions = StraightHashMap::default();
 
         let mut options = self.options;
         options.remove(LangOptions::STMT_EXPR);
@@ -3850,7 +3850,7 @@ impl Engine {
         state: &mut ParseState,
     ) -> ParseResult<(StmtBlockContainer, StaticVec<Shared<ScriptFnDef>>)> {
         let mut statements = StmtBlockContainer::new_const();
-        let mut functions = BTreeMap::new();
+        let mut functions = StraightHashMap::default();
 
         while !input.peek().expect(NEVER_ENDS).0.is_eof() {
             let settings = ParseSettings {

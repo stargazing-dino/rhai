@@ -23,6 +23,8 @@ use std::{
 #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
 use crate::func::register::Mut;
 
+use crate::func::{StraightHashMap, StraightHashSet};
+
 /// A type representing the namespace of a function.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "metadata", derive(serde::Serialize))]
@@ -267,18 +269,18 @@ pub struct Module {
     /// [`Module`] variables.
     variables: BTreeMap<Identifier, Dynamic>,
     /// Flattened collection of all [`Module`] variables, including those in sub-modules.
-    all_variables: BTreeMap<u64, Dynamic>,
+    all_variables: StraightHashMap<u64, Dynamic>,
     /// Functions (both native Rust and scripted).
-    functions: BTreeMap<u64, Box<FuncInfo>>,
+    functions: StraightHashMap<u64, Box<FuncInfo>>,
     /// Flattened collection of all functions, native Rust and scripted.
     /// including those in sub-modules.
-    all_functions: BTreeMap<u64, CallableFunction>,
+    all_functions: StraightHashMap<u64, CallableFunction>,
     /// Native Rust functions (in scripted hash format) that contain [`Dynamic`] parameters.
-    dynamic_functions: BTreeSet<u64>,
+    dynamic_functions: StraightHashSet<u64>,
     /// Iterator functions, keyed by the type producing the iterator.
-    type_iterators: BTreeMap<TypeId, Shared<IteratorFn>>,
+    type_iterators: StraightHashMap<TypeId, Shared<IteratorFn>>,
     /// Flattened collection of iterator functions, including those in sub-modules.
-    all_type_iterators: BTreeMap<TypeId, Shared<IteratorFn>>,
+    all_type_iterators: StraightHashMap<TypeId, Shared<IteratorFn>>,
     /// Is the [`Module`] indexed?
     indexed: bool,
     /// Does the [`Module`] contain indexed functions that have been exposed to the global namespace?
@@ -372,12 +374,12 @@ impl Module {
             custom_types: CustomTypesCollection::new(),
             modules: BTreeMap::new(),
             variables: BTreeMap::new(),
-            all_variables: BTreeMap::new(),
-            functions: BTreeMap::new(),
-            all_functions: BTreeMap::new(),
-            dynamic_functions: BTreeSet::new(),
-            type_iterators: BTreeMap::new(),
-            all_type_iterators: BTreeMap::new(),
+            all_variables: StraightHashMap::default(),
+            functions: StraightHashMap::default(),
+            all_functions: StraightHashMap::default(),
+            dynamic_functions: StraightHashSet::default(),
+            type_iterators: StraightHashMap::default(),
+            all_type_iterators: StraightHashMap::default(),
             indexed: true,
             contains_indexed_global_functions: false,
         }
@@ -2137,9 +2139,9 @@ impl Module {
         fn index_module<'a>(
             module: &'a Module,
             path: &mut Vec<&'a str>,
-            variables: &mut BTreeMap<u64, Dynamic>,
-            functions: &mut BTreeMap<u64, CallableFunction>,
-            type_iterators: &mut BTreeMap<TypeId, Shared<IteratorFn>>,
+            variables: &mut StraightHashMap<u64, Dynamic>,
+            functions: &mut StraightHashMap<u64, CallableFunction>,
+            type_iterators: &mut StraightHashMap<TypeId, Shared<IteratorFn>>,
         ) -> bool {
             let mut contains_indexed_global_functions = false;
 
@@ -2201,9 +2203,9 @@ impl Module {
 
         if !self.indexed {
             let mut path = Vec::with_capacity(4);
-            let mut variables = BTreeMap::new();
-            let mut functions = BTreeMap::new();
-            let mut type_iterators = BTreeMap::new();
+            let mut variables = StraightHashMap::default();
+            let mut functions = StraightHashMap::default();
+            let mut type_iterators = StraightHashMap::default();
 
             path.push("");
 
