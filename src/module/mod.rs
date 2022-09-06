@@ -239,7 +239,7 @@ impl FuncInfo {
 /// The first module name is skipped.  Hashing starts from the _second_ module in the chain.
 #[inline]
 pub fn calc_native_fn_hash<'a>(
-    modules: impl IntoIterator<Item = &'a str>,
+    modules: impl IntoIterator<Item = &'a str, IntoIter = impl ExactSizeIterator<Item = &'a str>>,
     fn_name: &str,
     params: &[TypeId],
 ) -> u64 {
