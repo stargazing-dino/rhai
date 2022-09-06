@@ -258,31 +258,39 @@ impl Engine {
 
             let cache = caches.fn_resolution_cache_mut();
 
-            let func = if let Entry::Vacant(entry) = cache.entry(hash) {
-                let func = if args.len() == 2 {
-                    get_builtin_binary_op_fn(&name, operands[0], operands[1])
-                } else {
-                    None
-                };
+            let func = match cache.entry(hash) {
+                Entry::Vacant(entry) => {
+                    let func = if args.len() == 2 {
+                        get_builtin_binary_op_fn(&name, operands[0], operands[1])
+                    } else {
+                        None
+                    };
 
-                if let Some(f) = func {
-                    entry.insert(Some(FnResolutionCacheEntry {
-                        func: CallableFunction::from_method(Box::new(f) as Box<FnAny>),
-                        source: None,
-                    }));
-                    &cache.get(&hash).unwrap().as_ref().unwrap().func
-                } else {
-                    let result = self.exec_fn_call(
-                        None, global, caches, lib, name, *hashes, operands, false, false, pos,
-                        level,
-                    );
-                    return result.map(|(v, ..)| v);
+                    if let Some(f) = func {
+                        &entry
+                            .insert(Some(FnResolutionCacheEntry {
+                                func: CallableFunction::from_method(Box::new(f) as Box<FnAny>),
+                                source: None,
+                            }))
+                            .as_ref()
+                            .unwrap()
+                            .func
+                    } else {
+                        let result = self.exec_fn_call(
+                            None, global, caches, lib, name, *hashes, operands, false, false, pos,
+                            level,
+                        );
+                        return result.map(|(v, ..)| v);
+                    }
                 }
-            } else if let Some(entry) = cache.get(&hash).unwrap() {
-                &entry.func
-            } else {
-                let sig = gen_fn_call_signature(self, name, operands);
-                return Err(ERR::ErrorFunctionNotFound(sig, pos).into());
+                Entry::Occupied(entry) => {
+                    if let Some(entry) = entry.into_mut() {
+                        &entry.func
+                    } else {
+                        let sig = gen_fn_call_signature(self, name, operands);
+                        return Err(ERR::ErrorFunctionNotFound(sig, pos).into());
+                    }
+                }
             };
 
             let context = (self, name, None, &*global, lib, pos, level).into();
