@@ -6,7 +6,7 @@ use crate::engine::{KEYWORD_THIS, OP_CONCAT};
 use crate::eval::FnResolutionCacheEntry;
 use crate::func::{
     calc_fn_params_hash, combine_hashes, gen_fn_call_signature, get_builtin_binary_op_fn,
-    CallableFunction, FnAny,
+    CallableFunction,
 };
 use crate::types::dynamic::AccessMode;
 use crate::{Dynamic, Engine, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR};
@@ -269,7 +269,7 @@ impl Engine {
                     if let Some(f) = func {
                         &entry
                             .insert(Some(FnResolutionCacheEntry {
-                                func: CallableFunction::from_method(Box::new(f) as Box<FnAny>),
+                                func: CallableFunction::from_fn_builtin(f),
                                 source: None,
                             }))
                             .as_ref()

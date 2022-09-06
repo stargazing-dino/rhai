@@ -1263,7 +1263,7 @@ impl Module {
             access,
             None,
             arg_types,
-            CallableFunction::from_method(Box::new(f)),
+            CallableFunction::Method(Shared::new(f)),
         )
     }
 
