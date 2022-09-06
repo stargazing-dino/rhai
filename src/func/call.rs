@@ -1,7 +1,6 @@
 //! Implement function-calling mechanism for [`Engine`].
 
 use super::callable_function::CallableFunction;
-use super::native::FnAny;
 use super::{get_builtin_binary_op_fn, get_builtin_op_assignment_fn};
 use crate::api::default_limits::MAX_DYNAMIC_PARAMETERS;
 use crate::ast::{Expr, FnCallHashes, Stmt};
@@ -289,18 +288,14 @@ impl Engine {
 
                                 get_builtin_op_assignment_fn(fn_name, *first_arg, rest_args[0]).map(
                                     |f| FnResolutionCacheEntry {
-                                        func: CallableFunction::from_method(
-                                            Box::new(f) as Box<FnAny>
-                                        ),
+                                        func: CallableFunction::from_fn_builtin(f),
                                         source: None,
                                     },
                                 )
                             } else {
                                 get_builtin_binary_op_fn(fn_name, args[0], args[1]).map(|f| {
                                     FnResolutionCacheEntry {
-                                        func: CallableFunction::from_method(
-                                            Box::new(f) as Box<FnAny>
-                                        ),
+                                        func: CallableFunction::from_fn_builtin(f),
                                         source: None,
                                     }
                                 })

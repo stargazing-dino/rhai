@@ -253,7 +253,7 @@ impl<'a> Target<'a> {
     #[must_use]
     pub fn source(&self) -> &Dynamic {
         match self {
-            Self::RefMut(r) => *r,
+            Self::RefMut(r) => r,
             #[cfg(not(feature = "no_closure"))]
             Self::SharedValue { source, .. } => source,
             Self::TempValue(v) => v,
@@ -401,9 +401,9 @@ impl Deref for Target<'_> {
     #[inline]
     fn deref(&self) -> &Dynamic {
         match self {
-            Self::RefMut(r) => *r,
+            Self::RefMut(r) => r,
             #[cfg(not(feature = "no_closure"))]
-            Self::SharedValue { source, .. } => &**source,
+            Self::SharedValue { source, .. } => source,
             Self::TempValue(ref r) => r,
             #[cfg(not(feature = "no_index"))]
             Self::Bit { ref value, .. }
@@ -425,7 +425,7 @@ impl DerefMut for Target<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Dynamic {
         match self {
-            Self::RefMut(r) => *r,
+            Self::RefMut(r) => r,
             #[cfg(not(feature = "no_closure"))]
             Self::SharedValue { source, .. } => &mut *source,
             Self::TempValue(ref mut r) => r,

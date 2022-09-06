@@ -4,7 +4,7 @@
 
 use super::call::FnCallArgs;
 use super::callable_function::CallableFunction;
-use super::native::{FnAny, SendSync};
+use super::native::{SendSync, Shared};
 use crate::types::dynamic::{DynamicWriteLock, Variant};
 use crate::{reify, Dynamic, NativeCallContext, RhaiResultOf};
 #[cfg(feature = "no_std")]
@@ -120,7 +120,7 @@ macro_rules! check_constant {
 
 macro_rules! def_register {
     () => {
-        def_register!(imp from_pure :);
+        def_register!(imp Pure :);
     };
     (imp $abi:ident : $($par:ident => $arg:expr => $mark:ty => $param:ty => $let:stmt => $clone:expr),*) => {
     //   ^ function ABI type
@@ -140,7 +140,7 @@ macro_rules! def_register {
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { std::any::type_name::<RET>() }
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Box::new(move |_ctx: NativeCallContext, args: &mut FnCallArgs| {
+                CallableFunction::$abi(Shared::new(move |_ctx: NativeCallContext, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
                     check_constant!(_ctx, args);
 
@@ -152,7 +152,7 @@ macro_rules! def_register {
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }) as Box<FnAny>)
+                }))
             }
         }
 
@@ -166,7 +166,7 @@ macro_rules! def_register {
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { std::any::type_name::<RET>() }
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Box::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
+                CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
                     check_constant!(ctx, args);
 
@@ -178,7 +178,7 @@ macro_rules! def_register {
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }) as Box<FnAny>)
+                }))
             }
         }
 
@@ -192,7 +192,7 @@ macro_rules! def_register {
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { std::any::type_name::<RhaiResultOf<RET>>() }
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Box::new(move |_ctx: NativeCallContext, args: &mut FnCallArgs| {
+                CallableFunction::$abi(Shared::new(move |_ctx: NativeCallContext, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
                     check_constant!(_ctx, args);
 
@@ -201,7 +201,7 @@ macro_rules! def_register {
 
                     // Call the function with each argument value
                     self($($arg),*).map(Dynamic::from)
-                }) as Box<FnAny>)
+                }))
             }
         }
 
@@ -215,7 +215,7 @@ macro_rules! def_register {
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { std::any::type_name::<RhaiResultOf<RET>>() }
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Box::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
+                CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
                     check_constant!(ctx, args);
 
@@ -224,15 +224,15 @@ macro_rules! def_register {
 
                     // Call the function with each argument value
                     self(ctx, $($arg),*).map(Dynamic::from)
-                }) as Box<FnAny>)
+                }))
             }
         }
 
         //def_register!(imp_pop $($par => $mark => $param),*);
     };
     ($p0:ident $(, $p:ident)*) => {
-        def_register!(imp from_pure   : $p0 => $p0      => $p0      => $p0      => let $p0     => by_value $(, $p => $p => $p => $p => let $p => by_value)*);
-        def_register!(imp from_method : $p0 => &mut $p0 => Mut<$p0> => &mut $p0 => let mut $p0 => by_ref   $(, $p => $p => $p => $p => let $p => by_value)*);
+        def_register!(imp Pure   : $p0 => $p0      => $p0      => $p0      => let $p0     => by_value $(, $p => $p => $p => $p => let $p => by_value)*);
+        def_register!(imp Method : $p0 => &mut $p0 => Mut<$p0> => &mut $p0 => let mut $p0 => by_ref   $(, $p => $p => $p => $p => let $p => by_value)*);
         //                ^ CallableFunction constructor
         //                                                             ^ first parameter passed through
         //                                                                                                     ^ others passed by value (by_value)

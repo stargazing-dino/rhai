@@ -1,6 +1,6 @@
 //! Module defining the standard Rhai function type.
 
-use super::native::{FnAny, FnPlugin, IteratorFn, SendSync};
+use super::native::{FnAny, FnBuiltin, FnPlugin, IteratorFn, SendSync};
 use crate::ast::FnAccess;
 use crate::plugin::PluginFunction;
 use crate::Shared;
@@ -197,23 +197,17 @@ impl CallableFunction {
             Self::Script(..) => None,
         }
     }
-    /// Create a new [`CallableFunction::Pure`].
+    /// Create a new [`CallableFunction::Method`] from `FnBuiltin`.
     #[inline(always)]
     #[must_use]
-    pub fn from_pure(func: Box<FnAny>) -> Self {
-        Self::Pure(func.into())
-    }
-    /// Create a new [`CallableFunction::Method`].
-    #[inline(always)]
-    #[must_use]
-    pub fn from_method(func: Box<FnAny>) -> Self {
-        Self::Method(func.into())
+    pub fn from_fn_builtin(func: FnBuiltin) -> Self {
+        Self::Method(Shared::new(func))
     }
     /// Create a new [`CallableFunction::Plugin`].
     #[inline(always)]
     #[must_use]
     pub fn from_plugin(func: impl PluginFunction + 'static + SendSync) -> Self {
-        Self::Plugin((Box::new(func) as Box<FnPlugin>).into())
+        Self::Plugin(Shared::new(func))
     }
 }
 
