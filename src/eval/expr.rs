@@ -261,7 +261,7 @@ impl Engine {
             let func = match cache.entry(hash) {
                 Entry::Vacant(entry) => {
                     let func = if args.len() == 2 {
-                        get_builtin_binary_op_fn(&name, operands[0], operands[1])
+                        get_builtin_binary_op_fn(name, operands[0], operands[1])
                     } else {
                         None
                     };
