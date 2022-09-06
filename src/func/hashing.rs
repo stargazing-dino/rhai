@@ -96,18 +96,15 @@ pub fn get_hasher() -> ahash::AHasher {
 #[inline]
 #[must_use]
 pub fn calc_qualified_var_hash<'a>(
-    modules: impl IntoIterator<Item = &'a str>,
+    modules: impl IntoIterator<Item = &'a str, IntoIter = impl ExactSizeIterator<Item = &'a str>>,
     var_name: &str,
 ) -> u64 {
     let s = &mut get_hasher();
 
     // We always skip the first module
-    let mut len = 0;
-    modules
-        .into_iter()
-        .inspect(|_| len += 1)
-        .skip(1)
-        .for_each(|m| m.hash(s));
+    let iter = modules.into_iter();
+    let len = iter.len();
+    iter.skip(1).for_each(|m| m.hash(s));
     len.hash(s);
     var_name.hash(s);
 
@@ -133,19 +130,16 @@ pub fn calc_qualified_var_hash<'a>(
 #[inline]
 #[must_use]
 pub fn calc_qualified_fn_hash<'a>(
-    modules: impl IntoIterator<Item = &'a str>,
+    modules: impl IntoIterator<Item = &'a str, IntoIter = impl ExactSizeIterator<Item = &'a str>>,
     fn_name: &str,
     num: usize,
 ) -> u64 {
     let s = &mut get_hasher();
 
     // We always skip the first module
-    let mut len = 0;
-    modules
-        .into_iter()
-        .inspect(|_| len += 1)
-        .skip(1)
-        .for_each(|m| m.hash(s));
+    let iter = modules.into_iter();
+    let len = iter.len();
+    iter.skip(1).for_each(|m| m.hash(s));
     len.hash(s);
     fn_name.hash(s);
     num.hash(s);
@@ -179,11 +173,13 @@ pub fn calc_fn_hash(fn_name: &str, num: usize) -> u64 {
 /// If the hash happens to be zero, it is mapped to `DEFAULT_HASH`.
 #[inline]
 #[must_use]
-pub fn calc_fn_params_hash(params: impl IntoIterator<Item = TypeId>) -> u64 {
+pub fn calc_fn_params_hash(
+    params: impl IntoIterator<Item = TypeId, IntoIter = impl ExactSizeIterator<Item = TypeId>>,
+) -> u64 {
     let s = &mut get_hasher();
-    let mut len = 0;
-    params.into_iter().for_each(|t| {
-        len += 1;
+    let iter = params.into_iter();
+    let len = iter.len();
+    iter.for_each(|t| {
         t.hash(s);
     });
     len.hash(s);
