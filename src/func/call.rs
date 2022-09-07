@@ -15,10 +15,13 @@ use crate::{
     Scope, ERR,
 };
 #[cfg(feature = "no_std")]
+use hashbrown::hash_map::Entry;
+#[cfg(not(feature = "no_std"))]
+use std::collections::hash_map::Entry;
+#[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
     any::{type_name, TypeId},
-    collections::hash_map::Entry,
     convert::TryFrom,
     mem,
 };
