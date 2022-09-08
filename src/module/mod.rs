@@ -1,5 +1,6 @@
 //! Module defining external-loaded modules for Rhai.
 
+#[cfg(feature = "metadata")]
 use crate::api::type_names::format_type;
 use crate::ast::FnAccess;
 use crate::func::{
