@@ -53,6 +53,7 @@ Enhancements
 * `is_empty` method is added to arrays, BLOB's, object maps, strings and ranges.
 * `StaticModuleResolver` now stores the path in the module's `id` field.
 * `Engine::module_resolver` is added to grant access to the `Engine`'s module resolver.
+* Constants and variables now have types in generated definition files.
 
 
 Version 1.9.1

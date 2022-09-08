@@ -47,11 +47,11 @@ impl Hasher for StraightHasher {
     fn finish(&self) -> u64 {
         self.0
     }
-    #[inline]
+    #[inline(always)]
     fn write(&mut self, _bytes: &[u8]) {
         panic!("StraightHasher can only hash u64 values");
     }
-
+    #[inline(always)]
     fn write_u64(&mut self, i: u64) {
         if i == 0 {
             self.0 = ALT_ZERO_HASH;

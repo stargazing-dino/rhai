@@ -339,7 +339,7 @@ impl Definitions<'_> {
         };
 
         if let Some(scope) = self.scope {
-            scope.write_definition(&mut s).unwrap();
+            scope.write_definition(&mut s, self).unwrap();
         }
 
         s
@@ -412,13 +412,15 @@ impl Module {
         let mut vars = self.iter_var().collect::<Vec<_>>();
         vars.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-        for (name, _) in vars {
+        for (name, value) in vars {
             if !first {
                 writer.write_str("\n\n")?;
             }
             first = false;
 
-            write!(writer, "const {name}: ?;")?;
+            let ty = def_type_name(value.type_name(), def.engine);
+
+            write!(writer, "const {name}: {ty};")?;
         }
 
         let mut func_infos = self.iter_fn().collect::<Vec<_>>();
@@ -554,17 +556,18 @@ fn def_type_name<'a>(ty: &'a str, engine: &'a Engine) -> Cow<'a, str> {
 
 impl Scope<'_> {
     /// _(metadata, internals)_ Return definitions for all items inside the [`Scope`].
-    fn write_definition(&self, writer: &mut dyn fmt::Write) -> fmt::Result {
+    fn write_definition(&self, writer: &mut dyn fmt::Write, def: &Definitions) -> fmt::Result {
         let mut first = true;
-        for (name, constant, _) in self.iter_raw() {
+        for (name, constant, value) in self.iter_raw() {
             if !first {
                 writer.write_str("\n\n")?;
             }
             first = false;
 
             let kw = if constant { Token::Const } else { Token::Let };
+            let ty = def_type_name(value.type_name(), def.engine);
 
-            write!(writer, "{kw} {name};")?;
+            write!(writer, "{kw} {name}: {ty};")?;
         }
 
         Ok(())

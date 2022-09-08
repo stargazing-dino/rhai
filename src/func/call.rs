@@ -15,6 +15,10 @@ use crate::{
     Scope, ERR,
 };
 #[cfg(feature = "no_std")]
+use hashbrown::hash_map::Entry;
+#[cfg(not(feature = "no_std"))]
+use std::collections::hash_map::Entry;
+#[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
     any::{type_name, TypeId},
@@ -199,10 +203,9 @@ impl Engine {
             )
         });
 
-        let result = caches
-            .fn_resolution_cache_mut()
-            .entry(hash)
-            .or_insert_with(|| {
+        match caches.fn_resolution_cache_mut().entry(hash) {
+            Entry::Occupied(entry) => entry.into_mut().as_ref(),
+            Entry::Vacant(entry) => {
                 let num_args = args.as_ref().map_or(0, |a| a.len());
                 let mut max_bitmask = 0; // One above maximum bitmask based on number of parameters.
                                          // Set later when a specific matching function is not found.
@@ -211,45 +214,27 @@ impl Engine {
                 loop {
                     let func = lib
                         .iter()
-                        .find_map(|&m| {
-                            m.get_fn(hash).cloned().map(|func| FnResolutionCacheEntry {
-                                func,
-                                source: m.id().map(|s| Box::new(s.into())),
-                            })
-                        })
+                        .find_map(|&m| m.get_fn(hash).map(|f| (f, m.id())))
                         .or_else(|| {
-                            self.global_modules.iter().find_map(|m| {
-                                m.get_fn(hash).cloned().map(|func| FnResolutionCacheEntry {
-                                    func,
-                                    source: m.id().map(|s| Box::new(s.into())),
-                                })
-                            })
+                            self.global_modules
+                                .iter()
+                                .find_map(|m| m.get_fn(hash).map(|f| (f, m.id())))
                         });
 
                     #[cfg(not(feature = "no_module"))]
-                    let func = func
-                        .or_else(|| {
-                            _global.get_qualified_fn(hash).map(|(func, source)| {
-                                FnResolutionCacheEntry {
-                                    func: func.clone(),
-                                    source: source.map(|s| Box::new(s.into())),
-                                }
-                            })
-                        })
-                        .or_else(|| {
-                            self.global_sub_modules.values().find_map(|m| {
-                                m.get_qualified_fn(hash).cloned().map(|func| {
-                                    FnResolutionCacheEntry {
-                                        func,
-                                        source: m.id().map(|s| Box::new(s.into())),
-                                    }
-                                })
-                            })
-                        });
+                    let func = func.or_else(|| _global.get_qualified_fn(hash)).or_else(|| {
+                        self.global_sub_modules
+                            .values()
+                            .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id())))
+                    });
 
-                    // Specific version found
-                    if let Some(f) = func {
-                        return Some(f);
+                    if let Some((f, s)) = func {
+                        // Specific version found - insert into cache and return it
+                        let new_entry = FnResolutionCacheEntry {
+                            func: f.clone(),
+                            source: s.map(|s| Box::new(s.into())),
+                        };
+                        return entry.insert(Some(new_entry)).as_ref();
                     }
 
                     // Check `Dynamic` parameters for functions with parameters
@@ -282,7 +267,8 @@ impl Engine {
                             return None;
                         }
 
-                        return args.and_then(|args| {
+                        // Try to find a built-in version
+                        let builtin = args.and_then(|args| {
                             if is_op_assignment {
                                 let (first_arg, rest_args) = args.split_first().unwrap();
 
@@ -301,6 +287,8 @@ impl Engine {
                                 })
                             }
                         });
+
+                        return entry.insert(builtin).as_ref();
                     }
 
                     // Try all permutations with `Dynamic` wildcards
@@ -323,9 +311,8 @@ impl Engine {
 
                     bitmask += 1;
                 }
-            });
-
-        result.as_ref()
+            }
+        }
     }
 
     /// # Main Entry-Point

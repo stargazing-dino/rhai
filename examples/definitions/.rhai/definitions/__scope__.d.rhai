@@ -1,3 +1,5 @@
 module static;
 
-let hello_there;
+let hello_there: string;
+
+const HELLO: string;
