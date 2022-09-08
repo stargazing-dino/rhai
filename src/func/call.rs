@@ -239,21 +239,21 @@ impl Engine {
 
                     // Check `Dynamic` parameters for functions with parameters
                     if allow_dynamic && max_bitmask == 0 && num_args > 0 {
-                        let is_dynamic = lib.iter().any(|&m| m.contains_dynamic_fn(hash_base))
+                        let is_dynamic = lib.iter().any(|&m| m.may_contain_dynamic_fn(hash_base))
                             || self
                                 .global_modules
                                 .iter()
-                                .any(|m| m.contains_dynamic_fn(hash_base));
+                                .any(|m| m.may_contain_dynamic_fn(hash_base));
 
                         #[cfg(not(feature = "no_module"))]
                         let is_dynamic = is_dynamic
                             || _global
                                 .iter_imports_raw()
-                                .any(|(_, m)| m.contains_dynamic_fn(hash_base))
+                                .any(|(_, m)| m.may_contain_dynamic_fn(hash_base))
                             || self
                                 .global_sub_modules
                                 .values()
-                                .any(|m| m.contains_dynamic_fn(hash_base));
+                                .any(|m| m.may_contain_dynamic_fn(hash_base));
 
                         // Set maximum bitmask when there are dynamic versions of the function
                         if is_dynamic {
