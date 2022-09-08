@@ -693,7 +693,7 @@ fn all(array: Array, filter: FnPtr) -> bool;
 /// let x = [1, 2, 3];
 /// let y = [true, 'x'];
 ///
-/// x.push(y);
+/// x.append(y);
 ///
 /// print(x);       // prints "[1, 2, 3, true, 'x']"
 /// ```

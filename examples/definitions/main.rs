@@ -3,6 +3,9 @@ use rhai::{Engine, EvalAltResult, Scope};
 
 #[export_module]
 pub mod general_kenobi {
+    /// General Kenobi's Constant.
+    pub const CONSTANT: i64 = 42;
+
     /// Returns a string where "hello there" is repeated `n` times.
     pub fn hello_there(n: i64) -> String {
         use std::convert::TryInto;
@@ -16,6 +19,9 @@ fn main() -> Result<(), Box<EvalAltResult>> {
 
     // This variable will also show up in the definitions, since it will be part of the scope.
     scope.push("hello_there", "hello there");
+
+    // This constant will also show up in the definitions, since it will be part of the scope.
+    scope.push_constant("HELLO", "hello there");
 
     #[cfg(not(feature = "no_module"))]
     engine.register_static_module("general_kenobi", exported_module!(general_kenobi).into());

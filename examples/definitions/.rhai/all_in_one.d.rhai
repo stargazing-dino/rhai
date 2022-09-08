@@ -1211,7 +1211,7 @@ fn all(array: Array, filter: FnPtr) -> bool;
 /// let x = [1, 2, 3];
 /// let y = [true, 'x'];
 ///
-/// x.push(y);
+/// x.append(y);
 ///
 /// print(x);       // prints "[1, 2, 3, true, 'x']"
 /// ```
@@ -6480,8 +6480,12 @@ op |(u64, u64) -> u64;
 op |(u8, u8) -> u8;
 
 module general_kenobi {
+const CONSTANT: int;
+
 /// Returns a string where "hello there" is repeated `n` times.
 fn hello_there(n: int) -> String;
 }
 
-let hello_there;
+let hello_there: string;
+
+const HELLO: string;
