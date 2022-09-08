@@ -106,6 +106,71 @@ fn map_std_type_name(name: &str, shorthands: bool) -> &str {
         .map_or(name, |s| map_std_type_name(s, shorthands))
 }
 
+/// Format a Rust type to be display-friendly.
+///
+/// * `()` is cleared.
+/// * `INT` and `FLOAT` are expanded.
+/// * [`RhaiResult`][crate::RhaiResult] and [`RhaiResultOf<T>`][crate::RhaiResultOf] are expanded.
+#[cfg(feature = "metadata")]
+pub fn format_type(typ: &str, is_return_type: bool) -> std::borrow::Cow<str> {
+    const RHAI_RESULT_TYPE: &str = "RhaiResult";
+    const RHAI_RESULT_TYPE_EXPAND: &str = "Result<Dynamic, Box<EvalAltResult>>";
+    const RHAI_RESULT_OF_TYPE: &str = "RhaiResultOf<";
+    const RHAI_RESULT_OF_TYPE_EXPAND: &str = "Result<{}, Box<EvalAltResult>>";
+    const RHAI_RANGE: &str = "ExclusiveRange";
+    const RHAI_RANGE_TYPE: &str = "Range<";
+    const RHAI_RANGE_EXPAND: &str = "Range<{}>";
+    const RHAI_INCLUSIVE_RANGE: &str = "InclusiveRange";
+    const RHAI_INCLUSIVE_RANGE_TYPE: &str = "RangeInclusive<";
+    const RHAI_INCLUSIVE_RANGE_EXPAND: &str = "RangeInclusive<{}>";
+
+    let typ = typ.trim();
+
+    if let Some(x) = typ.strip_prefix("rhai::") {
+        return format_type(x, is_return_type);
+    } else if let Some(x) = typ.strip_prefix("&mut ") {
+        let r = format_type(x, false);
+        return if r == x {
+            typ.into()
+        } else {
+            format!("&mut {r}").into()
+        };
+    }
+
+    match typ {
+        "" | "()" if is_return_type => "".into(),
+        "INT" => std::any::type_name::<crate::INT>().into(),
+        #[cfg(not(feature = "no_float"))]
+        "FLOAT" => std::any::type_name::<crate::FLOAT>().into(),
+        RHAI_RANGE => RHAI_RANGE_EXPAND
+            .replace("{}", std::any::type_name::<crate::INT>())
+            .into(),
+        RHAI_INCLUSIVE_RANGE => RHAI_INCLUSIVE_RANGE_EXPAND
+            .replace("{}", std::any::type_name::<crate::INT>())
+            .into(),
+        RHAI_RESULT_TYPE => RHAI_RESULT_TYPE_EXPAND.into(),
+        ty if ty.starts_with(RHAI_RANGE_TYPE) && ty.ends_with('>') => {
+            let inner = &ty[RHAI_RANGE_TYPE.len()..ty.len() - 1];
+            RHAI_RANGE_EXPAND
+                .replace("{}", format_type(inner, false).trim())
+                .into()
+        }
+        ty if ty.starts_with(RHAI_INCLUSIVE_RANGE_TYPE) && ty.ends_with('>') => {
+            let inner = &ty[RHAI_INCLUSIVE_RANGE_TYPE.len()..ty.len() - 1];
+            RHAI_INCLUSIVE_RANGE_EXPAND
+                .replace("{}", format_type(inner, false).trim())
+                .into()
+        }
+        ty if ty.starts_with(RHAI_RESULT_OF_TYPE) && ty.ends_with('>') => {
+            let inner = &ty[RHAI_RESULT_OF_TYPE.len()..ty.len() - 1];
+            RHAI_RESULT_OF_TYPE_EXPAND
+                .replace("{}", format_type(inner, false).trim())
+                .into()
+        }
+        ty => ty.into(),
+    }
+}
+
 impl Engine {
     /// Pretty-print a type name.
     ///

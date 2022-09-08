@@ -1,6 +1,7 @@
 //! Serialization of functions metadata.
 #![cfg(feature = "metadata")]
 
+use crate::api::type_names::format_type;
 use crate::module::{calc_native_fn_hash, FuncInfo};
 use crate::{calc_fn_hash, Engine, FnAccess, SmartString, StaticVec, AST};
 use serde::Serialize;
@@ -94,12 +95,12 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
                         "_" => None,
                         s => Some(s),
                     };
-                    let typ = seg.next().map(|s| FuncInfo::format_type(s, false));
+                    let typ = seg.next().map(|s| format_type(s, false));
                     FnParam { name, typ }
                 })
                 .collect(),
             _dummy: None,
-            return_type: FuncInfo::format_type(&info.metadata.return_type, true),
+            return_type: format_type(&info.metadata.return_type, true),
             signature: info.gen_signature().into(),
             doc_comments: if info.func.is_script() {
                 #[cfg(feature = "no_function")]
