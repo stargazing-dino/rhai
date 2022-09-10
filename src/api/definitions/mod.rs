@@ -424,11 +424,10 @@ impl Module {
         }
 
         let mut func_infos = self.iter_fn().collect::<Vec<_>>();
-        func_infos.sort_by(|a, b| match a.metadata.name.cmp(&b.metadata.name) {
-            Ordering::Equal => match a.metadata.params.cmp(&b.metadata.params) {
-                Ordering::Equal => (a.metadata.params_info.join("")
-                    + a.metadata.return_type.as_str())
-                .cmp(&(b.metadata.params_info.join("") + b.metadata.return_type.as_str())),
+        func_infos.sort_by(|a, b| match a.name.cmp(&b.name) {
+            Ordering::Equal => match a.num_params.cmp(&b.num_params) {
+                Ordering::Equal => (a.params_info.join("") + a.return_type.as_str())
+                    .cmp(&(b.params_info.join("") + b.return_type.as_str())),
                 o => o,
             },
             o => o,
@@ -440,17 +439,16 @@ impl Module {
             }
             first = false;
 
-            if f.metadata.access == FnAccess::Private {
+            if f.access == FnAccess::Private {
                 continue;
             }
 
             #[cfg(not(feature = "no_custom_syntax"))]
-            let operator = def.engine.custom_keywords.contains_key(&f.metadata.name)
-                || (!f.metadata.name.contains('$') && !is_valid_function_name(&f.metadata.name));
+            let operator = def.engine.custom_keywords.contains_key(&f.name)
+                || (!f.name.contains('$') && !is_valid_function_name(&f.name));
 
             #[cfg(feature = "no_custom_syntax")]
-            let operator =
-                !f.metadata.name.contains('$') && !is_valid_function_name(&f.metadata.name);
+            let operator = !f.name.contains('$') && !is_valid_function_name(&f.name);
 
             f.write_definition(writer, def, operator)?;
         }
@@ -467,7 +465,7 @@ impl FuncInfo {
         def: &Definitions,
         operator: bool,
     ) -> fmt::Result {
-        for comment in &*self.metadata.comments {
+        for comment in &*self.comments {
             writeln!(writer, "{comment}")?;
         }
 
@@ -477,33 +475,29 @@ impl FuncInfo {
             writer.write_str("fn ")?;
         }
 
-        if let Some(name) = self.metadata.name.strip_prefix("get$") {
+        if let Some(name) = self.name.strip_prefix("get$") {
             write!(writer, "get {name}(")?;
-        } else if let Some(name) = self.metadata.name.strip_prefix("set$") {
+        } else if let Some(name) = self.name.strip_prefix("set$") {
             write!(writer, "set {name}(")?;
         } else {
-            write!(writer, "{}(", self.metadata.name)?;
+            write!(writer, "{}(", self.name)?;
         }
 
         let mut first = true;
-        for i in 0..self.metadata.params {
+        for i in 0..self.num_params {
             if !first {
                 writer.write_str(", ")?;
             }
             first = false;
 
-            let (param_name, param_type) =
-                self.metadata
-                    .params_info
-                    .get(i)
-                    .map_or(("_", "?".into()), |s| {
-                        let mut s = s.splitn(2, ':');
-                        (
-                            s.next().unwrap_or("_").split(' ').last().unwrap(),
-                            s.next()
-                                .map_or(Cow::Borrowed("?"), |ty| def_type_name(ty, def.engine)),
-                        )
-                    });
+            let (param_name, param_type) = self.params_info.get(i).map_or(("_", "?".into()), |s| {
+                let mut s = s.splitn(2, ':');
+                (
+                    s.next().unwrap_or("_").split(' ').last().unwrap(),
+                    s.next()
+                        .map_or(Cow::Borrowed("?"), |ty| def_type_name(ty, def.engine)),
+                )
+            });
 
             if operator {
                 write!(writer, "{param_type}")?;
@@ -515,7 +509,7 @@ impl FuncInfo {
         write!(
             writer,
             ") -> {};",
-            def_type_name(&self.metadata.return_type, def.engine)
+            def_type_name(&self.return_type, def.engine)
         )?;
 
         Ok(())

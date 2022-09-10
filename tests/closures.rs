@@ -375,3 +375,62 @@ fn test_closures_external() -> Result<(), Box<EvalAltResult>> {
 
     Ok(())
 }
+
+#[test]
+#[cfg(not(feature = "no_closure"))]
+fn test_closures_callback() -> Result<(), Box<EvalAltResult>> {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    type SingleNode = Rc<dyn Node>;
+
+    trait Node {
+        fn run(&self, x: INT) -> INT;
+    }
+
+    struct PhaserNode {
+        func: Box<dyn Fn(INT) -> INT>,
+    }
+
+    impl Node for PhaserNode {
+        fn run(&self, x: INT) -> INT {
+            (self.func)(x)
+        }
+    }
+
+    fn phaser(callback: impl Fn(INT) -> INT + 'static) -> impl Node {
+        PhaserNode {
+            func: Box::new(callback),
+        }
+    }
+
+    let mut engine = Engine::new();
+
+    let ast = Rc::new(engine.compile(
+        "
+            const FACTOR = 2;
+            phaser(|x| x * FACTOR)
+        ",
+    )?);
+
+    let shared_engine = Rc::new(RefCell::new(Engine::new_raw()));
+    let engine2 = shared_engine.clone();
+    let ast2 = ast.clone();
+
+    engine.register_fn("phaser", move |fp: FnPtr| {
+        let engine = engine2.clone();
+        let ast = ast2.clone();
+
+        let callback = Box::new(move |x: INT| fp.call(&engine.borrow(), &ast, (x,)).unwrap());
+
+        Rc::new(phaser(callback)) as SingleNode
+    });
+
+    *shared_engine.borrow_mut() = engine;
+
+    let cb = shared_engine.borrow().eval_ast::<SingleNode>(&ast)?;
+
+    assert_eq!(cb.run(21), 42);
+
+    Ok(())
+}

@@ -9,13 +9,9 @@ use std::{
 
 #[cfg(feature = "no_std")]
 pub type StraightHashMap<K, V> = hashbrown::HashMap<K, V, StraightHasherBuilder>;
-#[cfg(feature = "no_std")]
-pub type StraightHashSet<K> = hashbrown::HashSet<K, StraightHasherBuilder>;
 
 #[cfg(not(feature = "no_std"))]
 pub type StraightHashMap<K, V> = std::collections::HashMap<K, V, StraightHasherBuilder>;
-#[cfg(not(feature = "no_std"))]
-pub type StraightHashSet<K> = std::collections::HashSet<K, StraightHasherBuilder>;
 
 /// Dummy hash value to map zeros to. This value can be anything.
 ///

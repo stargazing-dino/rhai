@@ -21,7 +21,7 @@ pub use callable_function::CallableFunction;
 pub use func::Func;
 pub use hashing::{
     calc_fn_hash, calc_fn_params_hash, calc_qualified_fn_hash, calc_qualified_var_hash,
-    combine_hashes, get_hasher, StraightHashMap, StraightHashSet,
+    combine_hashes, get_hasher, StraightHashMap,
 };
 pub use native::{
     locked_read, locked_write, shared_get_mut, shared_make_mut, shared_take, shared_take_or_clone,
