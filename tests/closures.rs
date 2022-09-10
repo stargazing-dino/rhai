@@ -378,10 +378,8 @@ fn test_closures_external() -> Result<(), Box<EvalAltResult>> {
 
 #[test]
 #[cfg(not(feature = "no_closure"))]
+#[cfg(not(feature = "sync"))]
 fn test_closures_callback() -> Result<(), Box<EvalAltResult>> {
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
     type SingleNode = Rc<dyn Node>;
 
     trait Node {
