@@ -8,10 +8,10 @@ use std::{
 };
 
 #[cfg(feature = "no_std")]
-pub type StraightHashMap<K, V> = hashbrown::HashMap<K, V, StraightHasherBuilder>;
+pub type StraightHashMap<V> = hashbrown::HashMap<u64, V, StraightHasherBuilder>;
 
 #[cfg(not(feature = "no_std"))]
-pub type StraightHashMap<K, V> = std::collections::HashMap<K, V, StraightHasherBuilder>;
+pub type StraightHashMap<V> = std::collections::HashMap<u64, V, StraightHasherBuilder>;
 
 /// Dummy hash value to map zeros to. This value can be anything.
 ///

@@ -27,7 +27,7 @@ pub struct StringsInterner<'a> {
     /// Maximum string length.
     pub max_string_len: usize,
     /// Normal strings.
-    strings: StraightHashMap<u64, ImmutableString>,
+    strings: StraightHashMap<ImmutableString>,
     /// Take care of the lifetime parameter.
     dummy: PhantomData<&'a ()>,
 }

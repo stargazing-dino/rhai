@@ -20,12 +20,12 @@ pub struct FnResolutionCacheEntry {
 /// _(internals)_ A function resolution cache with a bloom filter.
 /// Exported under the `internals` feature only.
 ///
-/// [`FnResolutionCacheEntry`] is [`Box`]ed in order to pack as many entries inside a single B-Tree
-/// level as possible.
+/// The bloom filter is used to rapidly check whether a function hash has never been encountered.
+/// It enables caching a hash only during the second encounter to avoid "one-hit wonders".
 #[derive(Debug, Clone, Default)]
 pub struct FnResolutionCache {
     /// Hash map containing cached functions.
-    pub map: StraightHashMap<u64, Option<FnResolutionCacheEntry>>,
+    pub map: StraightHashMap<Option<FnResolutionCacheEntry>>,
     /// Bloom filter to avoid caching "one-hit wonders".
     pub filter: BloomFilterU64,
 }
@@ -47,7 +47,7 @@ impl FnResolutionCache {
 #[derive(Debug, Clone)]
 pub struct Caches<'a> {
     /// Stack of [function resolution caches][FnResolutionCache].
-    fn_resolution_caches: StaticVec<FnResolutionCache>,
+    stack: StaticVec<FnResolutionCache>,
     /// Take care of the lifetime parameter.
     dummy: PhantomData<&'a ()>,
 }
@@ -58,7 +58,7 @@ impl Caches<'_> {
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            fn_resolution_caches: StaticVec::new_const(),
+            stack: StaticVec::new_const(),
             dummy: PhantomData,
         }
     }
@@ -66,27 +66,27 @@ impl Caches<'_> {
     #[inline(always)]
     #[must_use]
     pub fn fn_resolution_caches_len(&self) -> usize {
-        self.fn_resolution_caches.len()
+        self.stack.len()
     }
     /// Get a mutable reference to the current function resolution cache.
     #[inline]
     #[must_use]
     pub fn fn_resolution_cache_mut(&mut self) -> &mut FnResolutionCache {
-        if self.fn_resolution_caches.is_empty() {
+        if self.stack.is_empty() {
             // Push a new function resolution cache if the stack is empty
             self.push_fn_resolution_cache();
         }
-        self.fn_resolution_caches.last_mut().unwrap()
+        self.stack.last_mut().unwrap()
     }
     /// Push an empty function resolution cache onto the stack and make it current.
     #[allow(dead_code)]
     #[inline(always)]
     pub fn push_fn_resolution_cache(&mut self) {
-        self.fn_resolution_caches.push(Default::default());
+        self.stack.push(Default::default());
     }
     /// Rewind the function resolution caches stack to a particular size.
     #[inline(always)]
     pub fn rewind_fn_resolution_caches(&mut self, len: usize) {
-        self.fn_resolution_caches.truncate(len);
+        self.stack.truncate(len);
     }
 }

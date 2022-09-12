@@ -176,12 +176,12 @@ pub struct Module {
     /// [`Module`] variables.
     variables: BTreeMap<Identifier, Dynamic>,
     /// Flattened collection of all [`Module`] variables, including those in sub-modules.
-    all_variables: StraightHashMap<u64, Dynamic>,
+    all_variables: StraightHashMap<Dynamic>,
     /// Functions (both native Rust and scripted).
-    functions: StraightHashMap<u64, Box<FuncInfo>>,
+    functions: StraightHashMap<Box<FuncInfo>>,
     /// Flattened collection of all functions, native Rust and scripted.
     /// including those in sub-modules.
-    all_functions: StraightHashMap<u64, CallableFunction>,
+    all_functions: StraightHashMap<CallableFunction>,
     /// Native Rust functions (in scripted hash format) that contain [`Dynamic`] parameters.
     dynamic_functions: BloomFilterU64,
     /// Iterator functions, keyed by the type producing the iterator.
@@ -2025,8 +2025,8 @@ impl Module {
         fn index_module<'a>(
             module: &'a Module,
             path: &mut Vec<&'a str>,
-            variables: &mut StraightHashMap<u64, Dynamic>,
-            functions: &mut StraightHashMap<u64, CallableFunction>,
+            variables: &mut StraightHashMap<Dynamic>,
+            functions: &mut StraightHashMap<CallableFunction>,
             type_iterators: &mut BTreeMap<TypeId, Shared<IteratorFn>>,
         ) -> bool {
             let mut contains_indexed_global_functions = false;

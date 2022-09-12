@@ -32,7 +32,7 @@ use std::{
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
-type FnLib = StraightHashMap<u64, Shared<ScriptFnDef>>;
+type FnLib = StraightHashMap<Shared<ScriptFnDef>>;
 
 const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
 
