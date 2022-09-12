@@ -596,7 +596,7 @@ impl Engine {
                 let mut context =
                     EvalContext::new(self, scope, global, Some(caches), lib, this_ptr, level);
 
-                let result = (custom_def.func)(&mut context, &expressions);
+                let result = (custom_def.func)(&mut context, &expressions, &custom.state);
 
                 self.check_return_value(result, expr.start_position())
             }

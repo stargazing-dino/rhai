@@ -2477,6 +2477,7 @@ impl Engine {
             state.stack.push(marker, ());
         }
 
+        let mut user_state = Dynamic::UNIT;
         let parse_func = &*syntax.parse;
         let mut required_token: ImmutableString = key.into();
 
@@ -2488,7 +2489,7 @@ impl Engine {
             settings.pos = *fwd_pos;
             let settings = settings.level_up();
 
-            required_token = match parse_func(&segments, &*fwd_token.syntax()) {
+            required_token = match parse_func(&segments, &*fwd_token.syntax(), &mut user_state) {
                 Ok(Some(seg))
                     if seg.starts_with(CUSTOM_SYNTAX_MARKER_SYNTAX_VARIANT)
                         && seg.len() > CUSTOM_SYNTAX_MARKER_SYNTAX_VARIANT.len() =>
@@ -2624,6 +2625,7 @@ impl Engine {
             crate::ast::CustomExpr {
                 inputs,
                 tokens,
+                state: user_state,
                 scope_may_be_changed: syntax.scope_may_be_changed,
                 self_terminated,
             }

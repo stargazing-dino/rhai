@@ -7,8 +7,8 @@ use crate::parser::ParseResult;
 use crate::tokenizer::{is_valid_identifier, Token};
 use crate::types::dynamic::Variant;
 use crate::{
-    reify, Engine, EvalContext, Identifier, ImmutableString, LexError, Position, RhaiResult,
-    StaticVec,
+    reify, Dynamic, Engine, EvalContext, Identifier, ImmutableString, LexError, Position,
+    RhaiResult, StaticVec,
 };
 use std::ops::Deref;
 #[cfg(feature = "no_std")]
@@ -39,19 +39,21 @@ pub mod markers {
 
 /// A general expression evaluation trait object.
 #[cfg(not(feature = "sync"))]
-pub type FnCustomSyntaxEval = dyn Fn(&mut EvalContext, &[Expression]) -> RhaiResult;
+pub type FnCustomSyntaxEval = dyn Fn(&mut EvalContext, &[Expression], &Dynamic) -> RhaiResult;
 /// A general expression evaluation trait object.
 #[cfg(feature = "sync")]
-pub type FnCustomSyntaxEval = dyn Fn(&mut EvalContext, &[Expression]) -> RhaiResult + Send + Sync;
+pub type FnCustomSyntaxEval =
+    dyn Fn(&mut EvalContext, &[Expression], &Dynamic) -> RhaiResult + Send + Sync;
 
 /// A general expression parsing trait object.
 #[cfg(not(feature = "sync"))]
 pub type FnCustomSyntaxParse =
-    dyn Fn(&[ImmutableString], &str) -> ParseResult<Option<ImmutableString>>;
+    dyn Fn(&[ImmutableString], &str, &mut Dynamic) -> ParseResult<Option<ImmutableString>>;
 /// A general expression parsing trait object.
 #[cfg(feature = "sync")]
-pub type FnCustomSyntaxParse =
-    dyn Fn(&[ImmutableString], &str) -> ParseResult<Option<ImmutableString>> + Send + Sync;
+pub type FnCustomSyntaxParse = dyn Fn(&[ImmutableString], &str, &mut Dynamic) -> ParseResult<Option<ImmutableString>>
+    + Send
+    + Sync;
 
 /// An expression sub-tree in an [`AST`][crate::AST].
 #[derive(Debug, Clone)]
@@ -297,10 +299,10 @@ impl Engine {
         // The first keyword is the discriminator
         let key = segments[0].clone();
 
-        self.register_custom_syntax_raw(
+        self.register_custom_syntax_with_state_raw(
             key,
             // Construct the parsing function
-            move |stream, _| {
+            move |stream, _, _| {
                 if stream.len() >= segments.len() {
                     Ok(None)
                 } else {
@@ -308,12 +310,12 @@ impl Engine {
                 }
             },
             scope_may_be_changed,
-            func,
+            move |context, expressions, _| func(context, expressions),
         );
 
         Ok(self)
     }
-    /// Register a custom syntax with the [`Engine`].
+    /// Register a custom syntax with the [`Engine`] with custom user-defined state.
     ///
     /// Not available under `no_custom_syntax`.
     ///
@@ -328,30 +330,31 @@ impl Engine {
     /// All custom keywords used as symbols must be manually registered via [`Engine::register_custom_operator`].
     /// Otherwise, they won't be recognized.
     ///
-    /// # Implementation Function Signature
+    /// # Parsing Function Signature
     ///
-    /// The implementation function has the following signature:
+    /// The parsing function has the following signature:
     ///
-    /// `Fn(symbols: &[ImmutableString], look_ahead: &str) -> Result<Option<ImmutableString>, ParseError>`
+    /// `Fn(symbols: &[ImmutableString], look_ahead: &str, state: &mut Dynamic) -> Result<Option<ImmutableString>, ParseError>`
     ///
     /// where:
     /// * `symbols`: a slice of symbols that have been parsed so far, possibly containing `$expr$` and/or `$block$`;
     ///   `$ident$` and other literal markers are replaced by the actual text
     /// * `look_ahead`: a string slice containing the next symbol that is about to be read
+    /// * `state`: a [`Dynamic`] value that contains a user-defined state
     ///
     /// ## Return value
     ///
     /// * `Ok(None)`: parsing complete and there are no more symbols to match.
     /// * `Ok(Some(symbol))`: the next symbol to match, which can also be `$expr$`, `$ident$` or `$block$`.
     /// * `Err(ParseError)`: error that is reflected back to the [`Engine`], normally `ParseError(ParseErrorType::BadInput(LexError::ImproperSymbol(message)), Position::NONE)` to indicate a syntax error, but it can be any [`ParseError`][crate::ParseError].
-    pub fn register_custom_syntax_raw(
+    pub fn register_custom_syntax_with_state_raw(
         &mut self,
         key: impl Into<Identifier>,
-        parse: impl Fn(&[ImmutableString], &str) -> ParseResult<Option<ImmutableString>>
+        parse: impl Fn(&[ImmutableString], &str, &mut Dynamic) -> ParseResult<Option<ImmutableString>>
             + SendSync
             + 'static,
         scope_may_be_changed: bool,
-        func: impl Fn(&mut EvalContext, &[Expression]) -> RhaiResult + SendSync + 'static,
+        func: impl Fn(&mut EvalContext, &[Expression], &Dynamic) -> RhaiResult + SendSync + 'static,
     ) -> &mut Self {
         self.custom_syntax.insert(
             key.into(),

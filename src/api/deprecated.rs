@@ -258,6 +258,68 @@ impl Engine {
     ) -> &mut Self {
         self.register_indexer_set(set_fn)
     }
+    /// Register a custom syntax with the [`Engine`].
+    ///
+    /// Not available under `no_custom_syntax`.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated.
+    /// Use [`register_custom_syntax_with_state_raw`][Engine::register_custom_syntax_with_state_raw] instead.
+    ///
+    /// This method will be removed in the next major version.
+    ///
+    /// # WARNING - Low Level API
+    ///
+    /// This function is very low level.
+    ///
+    /// * `scope_may_be_changed` specifies variables have been added/removed by this custom syntax.
+    /// * `parse` is the parsing function.
+    /// * `func` is the implementation function.
+    ///
+    /// All custom keywords used as symbols must be manually registered via [`Engine::register_custom_operator`].
+    /// Otherwise, they won't be recognized.
+    ///
+    /// # Parsing Function Signature
+    ///
+    /// The parsing function has the following signature:
+    ///
+    /// `Fn(symbols: &[ImmutableString], look_ahead: &str) -> Result<Option<ImmutableString>, ParseError>`
+    ///
+    /// where:
+    /// * `symbols`: a slice of symbols that have been parsed so far, possibly containing `$expr$` and/or `$block$`;
+    ///   `$ident$` and other literal markers are replaced by the actual text
+    /// * `look_ahead`: a string slice containing the next symbol that is about to be read
+    ///
+    /// ## Return value
+    ///
+    /// * `Ok(None)`: parsing complete and there are no more symbols to match.
+    /// * `Ok(Some(symbol))`: the next symbol to match, which can also be `$expr$`, `$ident$` or `$block$`.
+    /// * `Err(ParseError)`: error that is reflected back to the [`Engine`], normally `ParseError(ParseErrorType::BadInput(LexError::ImproperSymbol(message)), Position::NONE)` to indicate a syntax error, but it can be any [`ParseError`][crate::ParseError].
+    #[deprecated(
+        since = "1.11.0",
+        note = "use `register_custom_syntax_with_state_raw` instead"
+    )]
+    #[inline(always)]
+    #[cfg(not(feature = "no_custom_syntax"))]
+    pub fn register_custom_syntax_raw(
+        &mut self,
+        key: impl Into<Identifier>,
+        parse: impl Fn(&[ImmutableString], &str) -> crate::parser::ParseResult<Option<ImmutableString>>
+            + crate::func::SendSync
+            + 'static,
+        scope_may_be_changed: bool,
+        func: impl Fn(&mut crate::EvalContext, &[crate::Expression]) -> RhaiResult
+            + crate::func::SendSync
+            + 'static,
+    ) -> &mut Self {
+        self.register_custom_syntax_with_state_raw(
+            key,
+            move |keywords, look_ahead, _| parse(keywords, look_ahead),
+            scope_may_be_changed,
+            move |context, expressions, _| func(context, expressions),
+        )
+    }
 }
 
 impl Dynamic {
