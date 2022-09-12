@@ -185,6 +185,7 @@ impl Engine {
         &self,
         _global: &GlobalRuntimeState,
         caches: &'s mut Caches,
+        local_entry: &'s mut Option<FnResolutionCacheEntry>,
         lib: &[&Module],
         fn_name: &str,
         hash_base: u64,
@@ -203,7 +204,9 @@ impl Engine {
             )
         });
 
-        match caches.fn_resolution_cache_mut().entry(hash) {
+        let cache = caches.fn_resolution_cache_mut();
+
+        match cache.map.entry(hash) {
             Entry::Occupied(entry) => entry.into_mut().as_ref(),
             Entry::Vacant(entry) => {
                 let num_args = args.as_ref().map_or(0, |a| a.len());
@@ -229,12 +232,20 @@ impl Engine {
                     });
 
                     if let Some((f, s)) = func {
-                        // Specific version found - insert into cache and return it
-                        let new_entry = FnResolutionCacheEntry {
+                        // Specific version found
+                        let new_entry = Some(FnResolutionCacheEntry {
                             func: f.clone(),
                             source: s.map(|s| Box::new(s.into())),
+                        });
+                        return if cache.filter.is_absent(hash) {
+                            // Do not cache "one-hit wonders"
+                            cache.filter.mark(hash);
+                            *local_entry = new_entry;
+                            local_entry.as_ref()
+                        } else {
+                            // Cache entry
+                            entry.insert(new_entry).as_ref()
                         };
-                        return entry.insert(Some(new_entry)).as_ref();
                     }
 
                     // Check `Dynamic` parameters for functions with parameters
@@ -288,7 +299,15 @@ impl Engine {
                             }
                         });
 
-                        return entry.insert(builtin).as_ref();
+                        return if cache.filter.is_absent(hash) {
+                            // Do not cache "one-hit wonders"
+                            cache.filter.mark(hash);
+                            *local_entry = builtin;
+                            local_entry.as_ref()
+                        } else {
+                            // Cache entry
+                            entry.insert(builtin).as_ref()
+                        };
                     }
 
                     // Try all permutations with `Dynamic` wildcards
@@ -345,9 +364,12 @@ impl Engine {
         let parent_source = global.source.clone();
 
         // Check if function access already in the cache
+        let mut local_entry = None;
+
         let func = self.resolve_fn(
             global,
             caches,
+            &mut local_entry,
             lib,
             name,
             hash,
@@ -620,10 +642,14 @@ impl Engine {
 
         // Script-defined function call?
         #[cfg(not(feature = "no_function"))]
+        let mut local_entry = None;
+
+        #[cfg(not(feature = "no_function"))]
         if let Some(FnResolutionCacheEntry { func, ref source }) = self
             .resolve_fn(
                 global,
                 caches,
+                &mut local_entry,
                 lib,
                 fn_name,
                 hashes.script,
