@@ -237,9 +237,8 @@ impl Engine {
                             func: f.clone(),
                             source: s.map(|s| Box::new(s.into())),
                         });
-                        return if cache.filter.is_absent(hash) {
+                        return if cache.filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
-                            cache.filter.mark(hash);
                             *local_entry = new_entry;
                             local_entry.as_ref()
                         } else {
@@ -299,9 +298,8 @@ impl Engine {
                             }
                         });
 
-                        return if cache.filter.is_absent(hash) {
+                        return if cache.filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
-                            cache.filter.mark(hash);
                             *local_entry = builtin;
                             local_entry.as_ref()
                         } else {

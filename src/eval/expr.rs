@@ -268,9 +268,8 @@ impl Engine {
                     };
 
                     if let Some(f) = func {
-                        if cache.filter.is_absent(hash) {
+                        if cache.filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
-                            cache.filter.mark(hash);
                             local_entry = CallableFunction::from_fn_builtin(f);
                             &local_entry
                         } else {
