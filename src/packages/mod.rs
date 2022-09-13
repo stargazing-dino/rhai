@@ -124,7 +124,7 @@ pub trait Package {
 ///         // Load a native Rust function.
 ///         module.set_native_fn("my_add", add);
 ///     } |> |engine| {
-///         engine.set_custom_operator("@", 160);
+///         engine.register_custom_operator("@", 160).unwrap();
 ///     }
 /// }
 /// ```
