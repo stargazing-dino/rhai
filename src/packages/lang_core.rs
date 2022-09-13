@@ -1,7 +1,7 @@
 use crate::def_package;
 use crate::plugin::*;
 use crate::types::dynamic::Tag;
-use crate::{Dynamic, RhaiResultOf, ERR, INT, MAX_USIZE_INT};
+use crate::{Dynamic, RhaiResultOf, ERR, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -113,7 +113,7 @@ mod reflection_functions {
     }
     #[rhai_fn(name = "get_fn_metadata_list")]
     pub fn get_fn_metadata2(ctx: NativeCallContext, name: &str, params: INT) -> crate::Array {
-        if params < 0 || params > MAX_USIZE_INT {
+        if params < 0 || params > crate::MAX_USIZE_INT {
             crate::Array::new()
         } else {
             collect_fn_metadata(ctx, |_, _, n, p, _| p == (params as usize) && n == name)

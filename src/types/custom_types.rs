@@ -29,11 +29,6 @@ impl CustomTypesCollection {
     pub fn new() -> Self {
         Self(BTreeMap::new())
     }
-    /// Clear the [`CustomTypesCollection`].
-    #[inline(always)]
-    pub fn clear(&mut self) {
-        self.0.clear();
-    }
     /// Register a custom type.
     #[inline(always)]
     pub fn add(&mut self, type_name: impl Into<Identifier>, name: impl Into<Identifier>) {

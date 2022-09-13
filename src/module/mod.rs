@@ -270,27 +270,10 @@ impl Module {
     /// module.set_var("answer", 42_i64);
     /// assert_eq!(module.get_var_value::<i64>("answer").expect("answer should exist"), 42);
     /// ```
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            id: Identifier::new_const(),
-            #[cfg(feature = "metadata")]
-            doc: crate::SmartString::new_const(),
-            internal: false,
-            standard: false,
-            custom_types: None,
-            modules: None,
-            variables: None,
-            all_variables: None,
-            functions: StraightHashMap::default(),
-            all_functions: None,
-            dynamic_functions: BloomFilterU64::new(),
-            type_iterators: None,
-            all_type_iterators: None,
-            indexed: true,
-            contains_indexed_global_functions: false,
-        }
+        Self::with_capacity(16)
     }
     /// Create a new [`Module`] with a pre-sized capacity for functions.
     ///
@@ -486,7 +469,7 @@ impl Module {
     #[inline(always)]
     pub fn set_custom_type<T>(&mut self, name: &str) -> &mut Self {
         self.custom_types
-            .get_or_insert_with(|| Default::default())
+            .get_or_insert_with(CustomTypesCollection::new)
             .add_type::<T>(name);
         self
     }
@@ -512,7 +495,7 @@ impl Module {
         name: impl Into<Identifier>,
     ) -> &mut Self {
         self.custom_types
-            .get_or_insert_with(|| Default::default())
+            .get_or_insert_with(CustomTypesCollection::new)
             .add(type_name, name);
         self
     }
@@ -1752,7 +1735,7 @@ impl Module {
             if let Some(ref mut m) = self.modules {
                 m.extend(modules.iter().map(|(k, v)| (k.clone(), v.clone())));
             } else {
-                m = modules.clone();
+                self.modules = Some(modules.clone());
             }
         }
 
