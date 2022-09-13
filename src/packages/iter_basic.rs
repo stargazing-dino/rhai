@@ -326,7 +326,7 @@ macro_rules! reg_range {
 
 def_package! {
     /// Package of basic range iterators
-    pub BasicIteratorPackage(lib) {
+    pub BasicIteratorPackage(lib @ 64) {
         lib.standard = true;
 
         reg_range!(lib | "range" => INT);

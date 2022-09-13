@@ -12,6 +12,11 @@ New features
 * [`Engine::register_custom_syntax_with_state_raw`] is added. The custom syntax parser and implementation functions take on an additional parameter that holds a user-defined custom _state_ which should substantially simplify writing some custom parsers.
 * [`Engine::register_custom_syntax_raw`] is deprecated.
 
+### Initial capacity for packages
+
+* For packages that register a large number of functions, a syntax extension for `def_package!` allows the specification of the initial _capacity_ of the package to reduce reallocation costs.
+* A `capacity` method is added to the `Package` trait.
+
 
 Version 1.10.0
 ==============

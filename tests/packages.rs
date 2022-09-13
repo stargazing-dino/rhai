@@ -7,7 +7,7 @@ use rhai::{def_package, Engine, EvalAltResult, Module, Scope, INT};
 fn test_packages() -> Result<(), Box<EvalAltResult>> {
     def_package! {
         /// My custom package.
-        MyPackage(m) : SSS {
+        MyPackage(m @ 32) : SSS {
             m.set_native_fn("hello", |x: INT| Ok(x + 1));
             m.set_native_fn("@", |x: INT, y: INT| Ok(x * x + y * y));
         } |> |engine| {

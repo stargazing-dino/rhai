@@ -53,7 +53,7 @@ macro_rules! reg_functions {
 
 def_package! {
     /// Basic mathematical package.
-    pub BasicMathPackage(lib) {
+    pub BasicMathPackage(lib @ 128) {
         lib.standard = true;
 
         // Integer functions

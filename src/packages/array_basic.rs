@@ -13,7 +13,7 @@ use std::{any::TypeId, cmp::Ordering, mem};
 
 def_package! {
     /// Package of basic array utilities.
-    pub BasicArrayPackage(lib) {
+    pub BasicArrayPackage(lib @ 64) {
         lib.standard = true;
 
         combine_with_exported_module!(lib, "array", array_functions);

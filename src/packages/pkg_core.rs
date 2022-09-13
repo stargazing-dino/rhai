@@ -15,7 +15,7 @@ def_package! {
     /// * [`BasicIteratorPackage`][super::BasicIteratorPackage]
     /// * [`BasicFnPackage`][super::BasicFnPackage]
     /// * [`DebuggingPackage`][super::DebuggingPackage]
-    pub CorePackage(lib) :
+    pub CorePackage(lib @ 0) :
             LanguageCorePackage,
             ArithmeticPackage,
             BasicStringPackage,
