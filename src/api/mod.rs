@@ -170,11 +170,8 @@ impl Engine {
         keyword: impl AsRef<str>,
         precedence: u8,
     ) -> Result<&mut Self, String> {
-        let precedence = Precedence::new(precedence);
-
-        if precedence.is_none() {
-            return Err("precedence cannot be zero".into());
-        }
+        let precedence =
+            Precedence::new(precedence).ok_or_else(|| "precedence cannot be zero".to_string())?;
 
         let keyword = keyword.as_ref();
 
@@ -213,7 +210,8 @@ impl Engine {
         }
 
         // Add to custom keywords
-        self.custom_keywords.insert(keyword.into(), precedence);
+        self.custom_keywords
+            .insert(keyword.into(), Some(precedence));
 
         Ok(self)
     }

@@ -120,11 +120,9 @@ pub trait Package {
 ///
 /// def_package! {
 ///     /// My super-duper package.
-///     pub MyPackage(module @ 10) {
+///     pub MyPackage(module) {
 ///         // Load a native Rust function.
 ///         module.set_native_fn("my_add", add);
-///     } |> |engine| {
-///         engine.register_custom_operator("@", 160).unwrap();
 ///     }
 /// }
 /// ```

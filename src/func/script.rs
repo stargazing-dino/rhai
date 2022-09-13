@@ -35,6 +35,7 @@ impl Engine {
         pos: Position,
         level: usize,
     ) -> RhaiResult {
+        #[cold]
         #[inline(never)]
         fn make_error(
             name: String,

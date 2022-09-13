@@ -79,7 +79,6 @@ impl Caches<'_> {
         self.stack.last_mut().unwrap()
     }
     /// Push an empty function resolution cache onto the stack and make it current.
-    #[allow(dead_code)]
     #[inline(always)]
     pub fn push_fn_resolution_cache(&mut self) {
         self.stack.push(Default::default());
