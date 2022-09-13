@@ -170,24 +170,24 @@ pub struct Module {
     /// Is this module part of a standard library?
     pub(crate) standard: bool,
     /// Custom types.
-    custom_types: CustomTypesCollection,
+    custom_types: Option<CustomTypesCollection>,
     /// Sub-modules.
-    modules: BTreeMap<Identifier, Shared<Module>>,
+    modules: Option<BTreeMap<Identifier, Shared<Module>>>,
     /// [`Module`] variables.
-    variables: BTreeMap<Identifier, Dynamic>,
+    variables: Option<BTreeMap<Identifier, Dynamic>>,
     /// Flattened collection of all [`Module`] variables, including those in sub-modules.
-    all_variables: StraightHashMap<Dynamic>,
+    all_variables: Option<StraightHashMap<Dynamic>>,
     /// Functions (both native Rust and scripted).
     functions: StraightHashMap<Box<FuncInfo>>,
     /// Flattened collection of all functions, native Rust and scripted.
     /// including those in sub-modules.
-    all_functions: StraightHashMap<CallableFunction>,
+    all_functions: Option<StraightHashMap<CallableFunction>>,
     /// Native Rust functions (in scripted hash format) that contain [`Dynamic`] parameters.
     dynamic_functions: BloomFilterU64,
     /// Iterator functions, keyed by the type producing the iterator.
-    type_iterators: BTreeMap<TypeId, Shared<IteratorFn>>,
+    type_iterators: Option<BTreeMap<TypeId, Shared<IteratorFn>>>,
     /// Flattened collection of iterator functions, including those in sub-modules.
-    all_type_iterators: BTreeMap<TypeId, Shared<IteratorFn>>,
+    all_type_iterators: Option<BTreeMap<TypeId, Shared<IteratorFn>>>,
     /// Is the [`Module`] indexed?
     indexed: bool,
     /// Does the [`Module`] contain indexed functions that have been exposed to the global namespace?
@@ -210,7 +210,8 @@ impl fmt::Debug for Module {
                 "modules",
                 &self
                     .modules
-                    .keys()
+                    .iter()
+                    .flat_map(|m| m.keys())
                     .map(SmartString::as_str)
                     .collect::<BTreeSet<_>>(),
             )
@@ -278,15 +279,47 @@ impl Module {
             doc: crate::SmartString::new_const(),
             internal: false,
             standard: false,
-            custom_types: CustomTypesCollection::new(),
-            modules: BTreeMap::new(),
-            variables: BTreeMap::new(),
-            all_variables: StraightHashMap::default(),
+            custom_types: None,
+            modules: None,
+            variables: None,
+            all_variables: None,
             functions: StraightHashMap::default(),
-            all_functions: StraightHashMap::default(),
+            all_functions: None,
             dynamic_functions: BloomFilterU64::new(),
-            type_iterators: BTreeMap::new(),
-            all_type_iterators: BTreeMap::new(),
+            type_iterators: None,
+            all_type_iterators: None,
+            indexed: true,
+            contains_indexed_global_functions: false,
+        }
+    }
+    /// Create a new [`Module`] with a pre-sized capacity for functions.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use rhai::Module;
+    /// let mut module = Module::with_capacity(10);
+    /// module.set_var("answer", 42_i64);
+    /// assert_eq!(module.get_var_value::<i64>("answer").expect("answer should exist"), 42);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            id: Identifier::new_const(),
+            #[cfg(feature = "metadata")]
+            doc: crate::SmartString::new_const(),
+            internal: false,
+            standard: false,
+            custom_types: None,
+            modules: None,
+            variables: None,
+            all_variables: None,
+            functions: StraightHashMap::with_capacity_and_hasher(capacity, Default::default()),
+            all_functions: None,
+            dynamic_functions: BloomFilterU64::new(),
+            type_iterators: None,
+            all_type_iterators: None,
             indexed: true,
             contains_indexed_global_functions: false,
         }
@@ -420,15 +453,15 @@ impl Module {
         self.doc.clear();
         self.internal = false;
         self.standard = false;
-        self.custom_types.clear();
-        self.modules.clear();
-        self.variables.clear();
-        self.all_variables.clear();
+        self.custom_types = None;
+        self.modules = None;
+        self.variables = None;
+        self.all_variables = None;
         self.functions.clear();
-        self.all_functions.clear();
+        self.all_functions = None;
         self.dynamic_functions.clear();
-        self.type_iterators.clear();
-        self.all_type_iterators.clear();
+        self.type_iterators = None;
+        self.all_type_iterators = None;
         self.indexed = false;
         self.contains_indexed_global_functions = false;
     }
@@ -452,7 +485,9 @@ impl Module {
     /// ```
     #[inline(always)]
     pub fn set_custom_type<T>(&mut self, name: &str) -> &mut Self {
-        self.custom_types.add_type::<T>(name);
+        self.custom_types
+            .get_or_insert_with(|| Default::default())
+            .add_type::<T>(name);
         self
     }
     /// Map a custom type to a friendly display name.
@@ -476,7 +511,9 @@ impl Module {
         type_name: impl Into<Identifier>,
         name: impl Into<Identifier>,
     ) -> &mut Self {
-        self.custom_types.add(type_name, name);
+        self.custom_types
+            .get_or_insert_with(|| Default::default())
+            .add(type_name, name);
         self
     }
     /// Get the display name of a registered custom type.
@@ -499,7 +536,10 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn get_custom_type(&self, key: &str) -> Option<&str> {
-        self.custom_types.get(key).map(|t| t.display_name.as_str())
+        self.custom_types
+            .as_ref()
+            .and_then(|c| c.get(key))
+            .map(|t| t.display_name.as_str())
     }
 
     /// Returns `true` if this [`Module`] contains no items.
@@ -517,12 +557,15 @@ impl Module {
         self.indexed
             && !self.contains_indexed_global_functions
             && self.functions.is_empty()
-            && self.all_functions.is_empty()
-            && self.variables.is_empty()
-            && self.all_variables.is_empty()
-            && self.modules.is_empty()
-            && self.type_iterators.is_empty()
-            && self.all_type_iterators.is_empty()
+            && self.all_functions.as_ref().map_or(true, |m| m.is_empty())
+            && self.variables.as_ref().map_or(true, |m| m.is_empty())
+            && self.all_variables.as_ref().map_or(true, |m| m.is_empty())
+            && self.modules.as_ref().map_or(true, |m| m.is_empty())
+            && self.type_iterators.as_ref().map_or(true, |t| t.is_empty())
+            && self
+                .all_type_iterators
+                .as_ref()
+                .map_or(true, |m| m.is_empty())
     }
 
     /// Is the [`Module`] indexed?
@@ -577,11 +620,9 @@ impl Module {
     #[inline(always)]
     #[must_use]
     pub fn contains_var(&self, name: &str) -> bool {
-        if self.variables.is_empty() {
-            false
-        } else {
-            self.variables.contains_key(name)
-        }
+        self.variables
+            .as_ref()
+            .map_or(false, |m| m.contains_key(name))
     }
 
     /// Get the value of a [`Module`] variable.
@@ -613,11 +654,7 @@ impl Module {
     #[inline(always)]
     #[must_use]
     pub fn get_var(&self, name: &str) -> Option<Dynamic> {
-        if self.variables.is_empty() {
-            None
-        } else {
-            self.variables.get(name).cloned()
-        }
+        self.variables.as_ref().and_then(|m| m.get(name)).cloned()
     }
 
     /// Set a variable into the [`Module`].
@@ -643,9 +680,13 @@ impl Module {
 
         if self.indexed {
             let hash_var = crate::calc_qualified_var_hash(Some(""), &ident);
-            self.all_variables.insert(hash_var, value.clone());
+            self.all_variables
+                .get_or_insert_with(|| Default::default())
+                .insert(hash_var, value.clone());
         }
-        self.variables.insert(ident, value);
+        self.variables
+            .get_or_insert_with(|| Default::default())
+            .insert(ident, value);
         self
     }
 
@@ -653,11 +694,9 @@ impl Module {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     pub(crate) fn get_qualified_var(&self, hash_var: u64) -> Option<Dynamic> {
-        if self.all_variables.is_empty() {
-            None
-        } else {
-            self.all_variables.get(&hash_var).cloned()
-        }
+        self.all_variables
+            .as_ref()
+            .and_then(|c| c.get(&hash_var).cloned())
     }
 
     /// Set a script-defined function into the [`Module`].
@@ -717,7 +756,8 @@ impl Module {
         }
     }
 
-    /// Get a mutable reference to the underlying [`BTreeMap`] of sub-modules.
+    /// Get a mutable reference to the underlying [`BTreeMap`] of sub-modules,
+    /// creating one if empty.
     ///
     /// # WARNING
     ///
@@ -726,16 +766,16 @@ impl Module {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     #[must_use]
-    pub(crate) fn sub_modules_mut(&mut self) -> &mut BTreeMap<Identifier, Shared<Module>> {
+    pub(crate) fn get_sub_modules(&mut self) -> &mut BTreeMap<Identifier, Shared<Module>> {
         // We must assume that the user has changed the sub-modules
         // (otherwise why take a mutable reference?)
-        self.all_functions.clear();
-        self.all_variables.clear();
-        self.all_type_iterators.clear();
+        self.all_functions = None;
+        self.all_variables = None;
+        self.all_type_iterators = None;
         self.indexed = false;
         self.contains_indexed_global_functions = false;
 
-        &mut self.modules
+        self.modules.get_or_insert_with(|| Default::default())
     }
 
     /// Does a sub-module exist in the [`Module`]?
@@ -752,11 +792,9 @@ impl Module {
     #[inline(always)]
     #[must_use]
     pub fn contains_sub_module(&self, name: &str) -> bool {
-        if self.modules.is_empty() {
-            false
-        } else {
-            self.modules.contains_key(name)
-        }
+        self.modules
+            .as_ref()
+            .map_or(false, |m| m.contains_key(name))
     }
 
     /// Get a sub-module in the [`Module`].
@@ -773,11 +811,10 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn get_sub_module(&self, name: &str) -> Option<&Module> {
-        if self.modules.is_empty() {
-            None
-        } else {
-            self.modules.get(name).map(|m| &**m)
-        }
+        self.modules
+            .as_ref()
+            .and_then(|m| m.get(name))
+            .map(|m| &**m)
     }
 
     /// Set a sub-module into the [`Module`].
@@ -799,7 +836,9 @@ impl Module {
         name: impl Into<Identifier>,
         sub_module: impl Into<Shared<Module>>,
     ) -> &mut Self {
-        self.modules.insert(name.into(), sub_module.into());
+        self.modules
+            .get_or_insert_with(|| Default::default())
+            .insert(name.into(), sub_module.into());
         self.indexed = false;
         self.contains_indexed_global_functions = false;
         self
@@ -1535,11 +1574,9 @@ impl Module {
     #[inline(always)]
     #[must_use]
     pub fn contains_qualified_fn(&self, hash_fn: u64) -> bool {
-        if self.all_functions.is_empty() {
-            false
-        } else {
-            self.all_functions.contains_key(&hash_fn)
-        }
+        self.all_functions
+            .as_ref()
+            .map_or(false, |m| m.contains_key(&hash_fn))
     }
 
     /// Get a namespace-qualified function.
@@ -1549,25 +1586,41 @@ impl Module {
     #[inline]
     #[must_use]
     pub(crate) fn get_qualified_fn(&self, hash_qualified_fn: u64) -> Option<&CallableFunction> {
-        if self.all_functions.is_empty() {
-            None
-        } else {
-            self.all_functions.get(&hash_qualified_fn)
-        }
+        self.all_functions
+            .as_ref()
+            .and_then(|m| m.get(&hash_qualified_fn))
     }
 
     /// Combine another [`Module`] into this [`Module`].
     /// The other [`Module`] is _consumed_ to merge into this [`Module`].
     #[inline]
     pub fn combine(&mut self, other: Self) -> &mut Self {
-        self.modules.extend(other.modules.into_iter());
-        self.variables.extend(other.variables.into_iter());
+        match self.modules {
+            Some(ref mut m) if other.modules.is_some() => {
+                m.extend(other.modules.unwrap().into_iter())
+            }
+            Some(_) => (),
+            None => self.modules = other.modules,
+        }
+        match self.variables {
+            Some(ref mut m) if other.variables.is_some() => {
+                m.extend(other.variables.unwrap().into_iter())
+            }
+            Some(_) => (),
+            None => self.variables = other.variables,
+        }
         self.functions.extend(other.functions.into_iter());
         self.dynamic_functions += &other.dynamic_functions;
-        self.type_iterators.extend(other.type_iterators.into_iter());
-        self.all_functions.clear();
-        self.all_variables.clear();
-        self.all_type_iterators.clear();
+        match self.type_iterators {
+            Some(ref mut m) if other.type_iterators.is_some() => {
+                m.extend(other.type_iterators.unwrap().into_iter())
+            }
+            Some(_) => (),
+            None => self.type_iterators = other.type_iterators,
+        }
+        self.all_functions = None;
+        self.all_variables = None;
+        self.all_type_iterators = None;
         self.indexed = false;
         self.contains_indexed_global_functions = false;
 
@@ -1587,16 +1640,30 @@ impl Module {
     /// Sub-modules are flattened onto the root [`Module`], with higher level overriding lower level.
     #[inline]
     pub fn combine_flatten(&mut self, other: Self) -> &mut Self {
-        for (.., m) in other.modules {
-            self.combine_flatten(shared_take_or_clone(m));
+        if let Some(modules) = other.modules {
+            for m in modules.into_values() {
+                self.combine_flatten(shared_take_or_clone(m));
+            }
         }
-        self.variables.extend(other.variables.into_iter());
+        match self.variables {
+            Some(ref mut m) if other.variables.is_some() => {
+                m.extend(other.variables.unwrap().into_iter())
+            }
+            Some(_) => (),
+            None => self.variables = other.variables,
+        }
         self.functions.extend(other.functions.into_iter());
         self.dynamic_functions += &other.dynamic_functions;
-        self.type_iterators.extend(other.type_iterators.into_iter());
-        self.all_functions.clear();
-        self.all_variables.clear();
-        self.all_type_iterators.clear();
+        match self.type_iterators {
+            Some(ref mut m) if other.type_iterators.is_some() => {
+                m.extend(other.type_iterators.unwrap().into_iter())
+            }
+            Some(_) => (),
+            None => self.type_iterators = other.type_iterators,
+        }
+        self.all_functions = None;
+        self.all_variables = None;
+        self.all_type_iterators = None;
         self.indexed = false;
         self.contains_indexed_global_functions = false;
 
@@ -1615,26 +1682,40 @@ impl Module {
     /// Only items not existing in this [`Module`] are added.
     #[inline]
     pub fn fill_with(&mut self, other: &Self) -> &mut Self {
-        for (k, v) in &other.modules {
-            if !self.modules.contains_key(k) {
-                self.modules.insert(k.clone(), v.clone());
+        if let Some(ref modules) = other.modules {
+            let m = self.modules.get_or_insert_with(|| Default::default());
+
+            for (k, v) in modules {
+                if !m.contains_key(k) {
+                    m.insert(k.clone(), v.clone());
+                }
             }
         }
-        for (k, v) in &other.variables {
-            if !self.variables.contains_key(k) {
-                self.variables.insert(k.clone(), v.clone());
+        if let Some(ref variables) = other.variables {
+            for (k, v) in variables {
+                let m = self.variables.get_or_insert_with(|| Default::default());
+
+                if !m.contains_key(k) {
+                    m.insert(k.clone(), v.clone());
+                }
             }
         }
         for (&k, v) in &other.functions {
             self.functions.entry(k).or_insert_with(|| v.clone());
         }
         self.dynamic_functions += &other.dynamic_functions;
-        for (&k, v) in &other.type_iterators {
-            self.type_iterators.entry(k).or_insert_with(|| v.clone());
+        if let Some(ref type_iterators) = other.type_iterators {
+            let t = self
+                .type_iterators
+                .get_or_insert_with(|| Default::default());
+
+            for (&k, v) in type_iterators {
+                t.entry(k).or_insert_with(|| v.clone());
+            }
         }
-        self.all_functions.clear();
-        self.all_variables.clear();
-        self.all_type_iterators.clear();
+        self.all_functions = None;
+        self.all_variables = None;
+        self.all_type_iterators = None;
         self.indexed = false;
         self.contains_indexed_global_functions = false;
 
@@ -1661,17 +1742,27 @@ impl Module {
         other: &Self,
         _filter: impl Fn(FnNamespace, FnAccess, bool, &str, usize) -> bool + Copy,
     ) -> &mut Self {
-        for (k, v) in &other.modules {
-            let mut m = Self::new();
-            m.merge_filtered(v, _filter);
-            self.set_sub_module(k.clone(), m);
+        if let Some(ref modules) = other.modules {
+            for (k, v) in modules {
+                let mut m = Self::new();
+                m.merge_filtered(v, _filter);
+                self.set_sub_module(k.clone(), m);
+            }
+            #[cfg(feature = "no_function")]
+            if let Some(ref mut m) = self.modules {
+                m.extend(modules.iter().map(|(k, v)| (k.clone(), v.clone())));
+            } else {
+                m = modules.clone();
+            }
         }
-        #[cfg(feature = "no_function")]
-        self.modules
-            .extend(other.modules.iter().map(|(k, v)| (k.clone(), v.clone())));
 
-        self.variables
-            .extend(other.variables.iter().map(|(k, v)| (k.clone(), v.clone())));
+        if let Some(ref variables) = other.variables {
+            if let Some(ref mut m) = self.variables {
+                m.extend(variables.iter().map(|(k, v)| (k.clone(), v.clone())));
+            } else {
+                self.variables = other.variables.clone();
+            }
+        }
 
         self.functions.extend(
             other
@@ -1690,11 +1781,16 @@ impl Module {
         );
         self.dynamic_functions += &other.dynamic_functions;
 
-        self.type_iterators
-            .extend(other.type_iterators.iter().map(|(&k, v)| (k, v.clone())));
-        self.all_functions.clear();
-        self.all_variables.clear();
-        self.all_type_iterators.clear();
+        if let Some(ref type_iterators) = other.type_iterators {
+            if let Some(ref mut t) = self.type_iterators {
+                t.extend(type_iterators.iter().map(|(&k, v)| (k, v.clone())));
+            } else {
+                self.type_iterators = other.type_iterators.clone();
+            }
+        }
+        self.all_functions = None;
+        self.all_variables = None;
+        self.all_type_iterators = None;
         self.indexed = false;
         self.contains_indexed_global_functions = false;
 
@@ -1727,10 +1823,10 @@ impl Module {
             })
             .collect();
 
-        self.all_functions.clear();
         self.dynamic_functions.clear();
-        self.all_variables.clear();
-        self.all_type_iterators.clear();
+        self.all_functions = None;
+        self.all_variables = None;
+        self.all_type_iterators = None;
         self.indexed = false;
         self.contains_indexed_global_functions = false;
         self
@@ -1741,22 +1837,26 @@ impl Module {
     #[must_use]
     pub fn count(&self) -> (usize, usize, usize) {
         (
-            self.variables.len(),
+            self.variables.as_ref().map_or(0, |m| m.len()),
             self.functions.len(),
-            self.type_iterators.len(),
+            self.type_iterators.as_ref().map_or(0, |t| t.len()),
         )
     }
 
     /// Get an iterator to the sub-modules in the [`Module`].
     #[inline]
     pub fn iter_sub_modules(&self) -> impl Iterator<Item = (&str, &Shared<Module>)> {
-        self.modules.iter().map(|(k, m)| (k.as_str(), m))
+        self.modules
+            .iter()
+            .flat_map(|m| m.iter().map(|(k, m)| (k.as_str(), m)))
     }
 
     /// Get an iterator to the variables in the [`Module`].
     #[inline]
     pub fn iter_var(&self) -> impl Iterator<Item = (&str, &Dynamic)> {
-        self.variables.iter().map(|(k, v)| (k.as_str(), v))
+        self.variables
+            .iter()
+            .flat_map(|m| m.iter().map(|(k, v)| (k.as_str(), v)))
     }
 
     /// Get an iterator to the functions in the [`Module`].
@@ -2031,25 +2131,31 @@ impl Module {
         ) -> bool {
             let mut contains_indexed_global_functions = false;
 
-            for (name, m) in &module.modules {
-                // Index all the sub-modules first.
-                path.push(name);
-                if index_module(m, path, variables, functions, type_iterators) {
-                    contains_indexed_global_functions = true;
+            if let Some(ref modules) = module.modules {
+                for (name, m) in modules {
+                    // Index all the sub-modules first.
+                    path.push(name);
+                    if index_module(m, path, variables, functions, type_iterators) {
+                        contains_indexed_global_functions = true;
+                    }
+                    path.pop();
                 }
-                path.pop();
             }
 
             // Index all variables
-            for (var_name, value) in &module.variables {
-                let hash_var = crate::calc_qualified_var_hash(path.iter().copied(), var_name);
-                variables.insert(hash_var, value.clone());
+            if let Some(ref v) = module.variables {
+                for (var_name, value) in v {
+                    let hash_var = crate::calc_qualified_var_hash(path.iter().copied(), var_name);
+                    variables.insert(hash_var, value.clone());
+                }
             }
 
             // Index type iterators
-            for (&type_id, func) in &module.type_iterators {
-                type_iterators.insert(type_id, func.clone());
-                contains_indexed_global_functions = true;
+            if let Some(ref t) = module.type_iterators {
+                for (&type_id, func) in t {
+                    type_iterators.insert(type_id, func.clone());
+                    contains_indexed_global_functions = true;
+                }
             }
 
             // Index all Rust functions
@@ -2097,9 +2203,22 @@ impl Module {
                 &mut type_iterators,
             );
 
-            self.all_variables = variables;
-            self.all_functions = functions;
-            self.all_type_iterators = type_iterators;
+            self.all_variables = if variables.is_empty() {
+                None
+            } else {
+                Some(variables)
+            };
+            self.all_functions = if functions.is_empty() {
+                None
+            } else {
+                Some(functions)
+            };
+            self.all_type_iterators = if type_iterators.is_empty() {
+                None
+            } else {
+                Some(type_iterators)
+            };
+
             self.indexed = true;
         }
 
@@ -2110,22 +2229,18 @@ impl Module {
     #[inline(always)]
     #[must_use]
     pub fn contains_qualified_iter(&self, id: TypeId) -> bool {
-        if self.all_type_iterators.is_empty() {
-            false
-        } else {
-            self.all_type_iterators.contains_key(&id)
-        }
+        self.all_type_iterators
+            .as_ref()
+            .map_or(false, |t| t.contains_key(&id))
     }
 
     /// Does a type iterator exist in the module?
     #[inline(always)]
     #[must_use]
     pub fn contains_iter(&self, id: TypeId) -> bool {
-        if self.type_iterators.is_empty() {
-            false
-        } else {
-            self.type_iterators.contains_key(&id)
-        }
+        self.type_iterators
+            .as_ref()
+            .map_or(false, |t| t.contains_key(&id))
     }
 
     /// Set a type iterator into the [`Module`].
@@ -2149,10 +2264,14 @@ impl Module {
     ) -> &mut Self {
         let func = Shared::new(func);
         if self.indexed {
-            self.all_type_iterators.insert(type_id, func.clone());
+            self.all_type_iterators
+                .get_or_insert_with(|| Default::default())
+                .insert(type_id, func.clone());
             self.contains_indexed_global_functions = true;
         }
-        self.type_iterators.insert(type_id, func);
+        self.type_iterators
+            .get_or_insert_with(|| Default::default())
+            .insert(type_id, func);
         self
     }
 
@@ -2209,22 +2328,20 @@ impl Module {
     #[inline]
     #[must_use]
     pub(crate) fn get_qualified_iter(&self, id: TypeId) -> Option<&IteratorFn> {
-        if self.all_type_iterators.is_empty() {
-            None
-        } else {
-            self.all_type_iterators.get(&id).map(|f| &**f)
-        }
+        self.all_type_iterators
+            .as_ref()
+            .and_then(|t| t.get(&id))
+            .map(|f| &**f)
     }
 
     /// Get the specified type iterator.
     #[inline]
     #[must_use]
     pub(crate) fn get_iter(&self, id: TypeId) -> Option<&IteratorFn> {
-        if self.type_iterators.is_empty() {
-            None
-        } else {
-            self.type_iterators.get(&id).map(|f| &**f)
-        }
+        self.type_iterators
+            .as_ref()
+            .and_then(|t| t.get(&id))
+            .map(|f| &**f)
     }
 }
 

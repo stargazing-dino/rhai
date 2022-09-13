@@ -867,13 +867,14 @@ impl Engine {
                                 && access == AccessMode::ReadOnly
                                 && lib.iter().any(|&m| !m.is_empty())
                             {
-                                if global.constants.is_none() {
-                                    global.constants = Some(crate::Shared::new(
-                                        crate::Locked::new(std::collections::BTreeMap::new()),
-                                    ));
-                                }
-                                crate::func::locked_write(global.constants.as_ref().unwrap())
-                                    .insert(var_name.name.clone(), value.clone());
+                                crate::func::locked_write(global.constants.get_or_insert_with(
+                                    || {
+                                        crate::Shared::new(crate::Locked::new(
+                                            std::collections::BTreeMap::new(),
+                                        ))
+                                    },
+                                ))
+                                .insert(var_name.name.clone(), value.clone());
                             }
 
                             if export {
