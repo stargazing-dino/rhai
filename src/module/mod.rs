@@ -178,7 +178,7 @@ pub struct Module {
     /// Flattened collection of all [`Module`] variables, including those in sub-modules.
     all_variables: Option<StraightHashMap<Dynamic>>,
     /// Functions (both native Rust and scripted).
-    functions: StraightHashMap<Box<FuncInfo>>,
+    functions: StraightHashMap<FuncInfo>,
     /// Flattened collection of all functions, native Rust and scripted.
     /// including those in sub-modules.
     all_functions: Option<StraightHashMap<CallableFunction>>,
@@ -1846,7 +1846,7 @@ impl Module {
     #[inline]
     #[allow(dead_code)]
     pub(crate) fn iter_fn(&self) -> impl Iterator<Item = &FuncInfo> {
-        self.functions.values().map(<_>::as_ref)
+        self.functions.values()
     }
 
     /// Get an iterator over all script-defined functions in the [`Module`].
