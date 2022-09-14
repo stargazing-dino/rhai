@@ -1,6 +1,6 @@
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::ImmutableString;
-
+use std::collections::hash_map::Entry;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -71,7 +71,7 @@ impl StringsInterner<'_> {
     #[must_use]
     pub fn get_with_mapper<S: AsRef<str>>(
         &mut self,
-        mapper: fn(S) -> ImmutableString,
+        mapper: impl Fn(S) -> ImmutableString,
         text: S,
     ) -> ImmutableString {
         let key = text.as_ref();
@@ -84,19 +84,20 @@ impl StringsInterner<'_> {
         key.hash(hasher);
         let key = hasher.finish();
 
-        if !self.strings.is_empty() && self.strings.contains_key(&key) {
-            return self.strings.get(&key).unwrap().clone();
-        }
+        let result = match self.strings.entry(key) {
+            Entry::Occupied(e) => return e.get().clone(),
+            Entry::Vacant(e) => {
+                let value = mapper(text);
 
-        let value = mapper(text);
+                if value.strong_count() > 1 {
+                    return value;
+                }
 
-        if value.strong_count() > 1 {
-            return value;
-        }
+                e.insert(value).clone()
+            }
+        };
 
-        self.strings.insert(key, value.clone());
-
-        // If the interner is over capacity, remove the longest entry
+        // If the interner is over capacity, remove the longest entry that has the lowest count
         if self.strings.len() > self.capacity {
             // Leave some buffer to grow when shrinking the cache.
             // We leave at least two entries, one for the empty string, and one for the string
@@ -108,19 +109,24 @@ impl StringsInterner<'_> {
             };
 
             while self.strings.len() > max {
-                let (_, n) = self.strings.iter().fold((0, 0), |(x, n), (&k, v)| {
-                    if k != key && v.len() > x {
-                        (v.len(), k)
-                    } else {
-                        (x, n)
-                    }
-                });
+                let (_, _, n) =
+                    self.strings
+                        .iter()
+                        .fold((0, usize::MAX, 0), |(x, c, n), (&k, v)| {
+                            if k != key
+                                && (v.strong_count() < c || (v.strong_count() == c && v.len() > x))
+                            {
+                                (v.len(), v.strong_count(), k)
+                            } else {
+                                (x, c, n)
+                            }
+                        });
 
                 self.strings.remove(&n);
             }
         }
 
-        value
+        result
     }
 
     /// Number of strings interned.
