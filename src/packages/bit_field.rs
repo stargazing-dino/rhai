@@ -9,7 +9,7 @@ use std::prelude::v1::*;
 
 def_package! {
     /// Package of basic bit-field utilities.
-    pub BitFieldPackage(lib @ 16) {
+    pub BitFieldPackage(lib) {
         lib.standard = true;
 
         combine_with_exported_module!(lib, "bit_field", bit_field_functions);

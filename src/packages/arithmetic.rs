@@ -191,7 +191,7 @@ macro_rules! reg_functions {
 
 def_package! {
     /// Basic arithmetic package.
-    pub ArithmeticPackage(lib @ 128) {
+    pub ArithmeticPackage(lib) {
         lib.standard = true;
 
         combine_with_exported_module!(lib, "int", int_functions);

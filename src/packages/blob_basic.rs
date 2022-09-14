@@ -15,7 +15,7 @@ use crate::{FLOAT, FLOAT_BYTES};
 
 def_package! {
     /// Package of basic BLOB utilities.
-    pub BasicBlobPackage(lib @ 64) {
+    pub BasicBlobPackage(lib) {
         lib.standard = true;
 
         combine_with_exported_module!(lib, "blob", blob_functions);

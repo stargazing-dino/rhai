@@ -53,14 +53,6 @@ pub trait Package {
     #[allow(unused_variables)]
     fn init_engine(engine: &mut Engine) {}
 
-    /// Number of functions expected by the package.
-    ///
-    /// This capacity only acts as a hint. It may not be precise.
-    #[allow(unused_variables)]
-    fn capacity() -> usize {
-        16
-    }
-
     /// Register the package with an [`Engine`].
     ///
     /// # Example
@@ -128,7 +120,7 @@ pub trait Package {
 /// ```
 #[macro_export]
 macro_rules! def_package {
-    ($($(#[$outer:meta])* $mod:vis $package:ident($lib:ident $(@ $capacity:expr)?)
+    ($($(#[$outer:meta])* $mod:vis $package:ident($lib:ident)
                 $( : $($(#[$base_meta:meta])* $base_pkg:ty),+ )?
                 $block:block
                 $( |> | $engine:ident | $init_engine:block )?
@@ -144,7 +136,7 @@ macro_rules! def_package {
             #[inline]
             fn init($lib: &mut $crate::Module) {
                 $($(
-                    $(#[$base_meta])* <$base_pkg>::init($lib);
+                    $(#[$base_meta])* { <$base_pkg>::init($lib); }
                 )*)*
 
                 $block
@@ -152,22 +144,13 @@ macro_rules! def_package {
             #[inline]
             fn init_engine(_engine: &mut $crate::Engine) {
                 $($(
-                    $(#[$base_meta])* <$base_pkg>::init_engine(_engine);
+                    $(#[$base_meta])* { <$base_pkg>::init_engine(_engine); }
                 )*)*
 
                 $(
                     let $engine = _engine;
                     $init_engine
                 )*
-            }
-            #[inline(always)]
-            fn capacity() -> usize {
-                let mut _capacity = 16;
-                $(_capacity = $capacity;)?
-                $($(
-                    $(#[$base_meta])* { _capacity += <$base_pkg>::capacity(); }
-                )*)*
-                _capacity
             }
         }
 
@@ -183,7 +166,7 @@ macro_rules! def_package {
             #[inline]
             #[must_use]
             pub fn new() -> Self {
-                let mut module = $crate::Module::with_capacity(<Self as $crate::packages::Package>::capacity());
+                let mut module = $crate::Module::new();
                 <Self as $crate::packages::Package>::init(&mut module);
                 module.build_index();
                 Self(module.into())

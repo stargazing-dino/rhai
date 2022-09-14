@@ -18,7 +18,7 @@ def_package! {
     /// * [`BasicMapPackage`][super::BasicMapPackage]
     /// * [`BasicTimePackage`][super::BasicTimePackage]
     /// * [`MoreStringPackage`][super::MoreStringPackage]
-    pub StandardPackage(lib @ 0) :
+    pub StandardPackage(lib) :
             CorePackage,
             BitFieldPackage,
             LogicPackage,

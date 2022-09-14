@@ -37,7 +37,7 @@ macro_rules! reg_functions {
 
 def_package! {
     /// Package of basic logic operators.
-    pub LogicPackage(lib @ 128) {
+    pub LogicPackage(lib) {
         lib.standard = true;
 
         #[cfg(not(feature = "only_i32"))]
