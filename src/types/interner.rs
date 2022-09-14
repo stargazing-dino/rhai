@@ -1,5 +1,8 @@
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::ImmutableString;
+#[cfg(feature = "no_std")]
+use hashbrown::hash_map::Entry;
+#[cfg(not(feature = "no_std"))]
 use std::collections::hash_map::Entry;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
