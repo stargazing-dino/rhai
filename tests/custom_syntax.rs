@@ -254,14 +254,17 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
 fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
 
-    engine.register_custom_syntax_raw(
+    engine.register_custom_syntax_with_state_raw(
         "hello",
-        |stream, _| match stream.len() {
+        |stream, _, state| match stream.len() {
             0 => unreachable!(),
             1 => Ok(Some("$ident$".into())),
             2 => match stream[1].as_str() {
                 "world" => Ok(Some("$$hello".into())),
-                "kitty" => Ok(None),
+                "kitty" => {
+                    *state = (42 as INT).into();
+                    Ok(None)
+                }
                 s => Err(LexError::ImproperSymbol(s.to_string(), String::new())
                     .into_err(Position::NONE)
                     .into()),
@@ -269,7 +272,7 @@ fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
             _ => unreachable!(),
         },
         true,
-        |context, inputs| {
+        |context, inputs, state| {
             context.scope_mut().push("foo", 999 as INT);
 
             Ok(match inputs[0].get_string_value().unwrap() {
@@ -277,14 +280,14 @@ fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
                     if inputs
                         .last()
                         .unwrap()
-                        .get_literal_value::<ImmutableString>()
+                        .get_string_value()
                         .map_or(false, |s| s == "$$hello") =>
                 {
                     0 as INT
                 }
                 "world" => 123 as INT,
                 "kitty" if inputs.len() > 1 => 999 as INT,
-                "kitty" => 42 as INT,
+                "kitty" => state.as_int().unwrap(),
                 _ => unreachable!(),
             }
             .into())
@@ -313,9 +316,9 @@ fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
 fn test_custom_syntax_raw2() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
 
-    engine.register_custom_syntax_raw(
+    engine.register_custom_syntax_with_state_raw(
         "#",
-        |symbols, lookahead| match symbols.len() {
+        |symbols, lookahead, _| match symbols.len() {
             1 if lookahead == "-" => Ok(Some("$symbol$".into())),
             1 => Ok(Some("$int$".into())),
             2 if symbols[1] == "-" => Ok(Some("$int$".into())),
@@ -324,7 +327,7 @@ fn test_custom_syntax_raw2() -> Result<(), Box<EvalAltResult>> {
             _ => unreachable!(),
         },
         false,
-        move |_, inputs| {
+        move |_, inputs, _| {
             let id = if inputs.len() == 2 {
                 -inputs[1].get_literal_value::<INT>().unwrap()
             } else {

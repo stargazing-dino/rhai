@@ -263,6 +263,7 @@ impl fmt::Display for ParseErrorType {
 }
 
 impl From<LexError> for ParseErrorType {
+    #[cold]
     #[inline(never)]
     fn from(err: LexError) -> Self {
         match err {
@@ -300,13 +301,15 @@ impl fmt::Display for ParseError {
 
 impl ParseError {
     /// Get the [type][ParseErrorType] of this parse error.
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     #[must_use]
     pub const fn err_type(&self) -> &ParseErrorType {
         &self.0
     }
     /// Get the [position][Position] of this parse error.
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     #[must_use]
     pub const fn position(&self) -> Position {
         self.1
@@ -314,28 +317,32 @@ impl ParseError {
 }
 
 impl From<ParseErrorType> for RhaiError {
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     fn from(err: ParseErrorType) -> Self {
         Box::new(err.into())
     }
 }
 
 impl From<ParseErrorType> for ERR {
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     fn from(err: ParseErrorType) -> Self {
         Self::ErrorParsing(err, Position::NONE)
     }
 }
 
 impl From<ParseError> for RhaiError {
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     fn from(err: ParseError) -> Self {
         Box::new(err.into())
     }
 }
 
 impl From<ParseError> for ERR {
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     fn from(err: ParseError) -> Self {
         Self::ErrorParsing(*err.0, err.1)
     }

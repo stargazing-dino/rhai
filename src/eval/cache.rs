@@ -1,6 +1,7 @@
 //! System caches.
 
 use crate::func::{CallableFunction, StraightHashMap};
+use crate::types::BloomFilterU64;
 use crate::{Identifier, StaticVec};
 use std::marker::PhantomData;
 #[cfg(feature = "no_std")]
@@ -16,12 +17,27 @@ pub struct FnResolutionCacheEntry {
     pub source: Option<Box<Identifier>>,
 }
 
-/// _(internals)_ A function resolution cache.
+/// _(internals)_ A function resolution cache with a bloom filter.
 /// Exported under the `internals` feature only.
 ///
-/// [`FnResolutionCacheEntry`] is [`Box`]ed in order to pack as many entries inside a single B-Tree
-/// level as possible.
-pub type FnResolutionCache = StraightHashMap<u64, Option<FnResolutionCacheEntry>>;
+/// The bloom filter is used to rapidly check whether a function hash has never been encountered.
+/// It enables caching a hash only during the second encounter to avoid "one-hit wonders".
+#[derive(Debug, Clone, Default)]
+pub struct FnResolutionCache {
+    /// Hash map containing cached functions.
+    pub map: StraightHashMap<Option<FnResolutionCacheEntry>>,
+    /// Bloom filter to avoid caching "one-hit wonders".
+    pub filter: BloomFilterU64,
+}
+
+impl FnResolutionCache {
+    /// Clear the [`FnResolutionCache`].
+    #[inline(always)]
+    pub fn clear(&mut self) {
+        self.map.clear();
+        self.filter.clear();
+    }
+}
 
 /// _(internals)_ A type containing system-wide caches.
 /// Exported under the `internals` feature only.
@@ -31,7 +47,7 @@ pub type FnResolutionCache = StraightHashMap<u64, Option<FnResolutionCacheEntry>
 #[derive(Debug, Clone)]
 pub struct Caches<'a> {
     /// Stack of [function resolution caches][FnResolutionCache].
-    fn_resolution: StaticVec<FnResolutionCache>,
+    stack: StaticVec<FnResolutionCache>,
     /// Take care of the lifetime parameter.
     dummy: PhantomData<&'a ()>,
 }
@@ -42,7 +58,7 @@ impl Caches<'_> {
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            fn_resolution: StaticVec::new_const(),
+            stack: StaticVec::new_const(),
             dummy: PhantomData,
         }
     }
@@ -50,27 +66,26 @@ impl Caches<'_> {
     #[inline(always)]
     #[must_use]
     pub fn fn_resolution_caches_len(&self) -> usize {
-        self.fn_resolution.len()
+        self.stack.len()
     }
     /// Get a mutable reference to the current function resolution cache.
     #[inline]
     #[must_use]
     pub fn fn_resolution_cache_mut(&mut self) -> &mut FnResolutionCache {
-        if self.fn_resolution.is_empty() {
+        if self.stack.is_empty() {
             // Push a new function resolution cache if the stack is empty
             self.push_fn_resolution_cache();
         }
-        self.fn_resolution.last_mut().unwrap()
+        self.stack.last_mut().unwrap()
     }
     /// Push an empty function resolution cache onto the stack and make it current.
-    #[allow(dead_code)]
     #[inline(always)]
     pub fn push_fn_resolution_cache(&mut self) {
-        self.fn_resolution.push(StraightHashMap::default());
+        self.stack.push(Default::default());
     }
     /// Rewind the function resolution caches stack to a particular size.
     #[inline(always)]
     pub fn rewind_fn_resolution_caches(&mut self, len: usize) {
-        self.fn_resolution.truncate(len);
+        self.stack.truncate(len);
     }
 }

@@ -10,7 +10,7 @@ use std::{
 /// Number of `usize` values required for 256 bits.
 const SIZE: usize = (256 / 8) / mem::size_of::<usize>();
 
-/// A simple bloom filter implementation for `u64` hash values only - i.e., all 64 bits are assumed
+/// A simple bloom filter implementation for `u64` hash values only - i.e. all 64 bits are assumed
 /// to be relatively random.
 ///
 /// For this reason, the implementation is simplistic - it just looks at the least significant byte
@@ -23,7 +23,8 @@ pub struct BloomFilterU64([usize; SIZE]);
 impl BloomFilterU64 {
     /// Get the bit position of a `u64` hash value.
     #[inline(always)]
-    const fn hash(value: u64) -> (usize, usize) {
+    #[must_use]
+    const fn calc_hash(value: u64) -> (usize, usize) {
         let hash = (value & 0x00ff) as usize;
         (hash / 64, 0x01 << (hash % 64))
     }
@@ -37,7 +38,7 @@ impl BloomFilterU64 {
     #[inline(always)]
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.0.iter().all(|&v| v == 0)
+        self.0 == [0; SIZE]
     }
     /// Clear this [`BloomFilterU64`].
     #[inline(always)]
@@ -46,17 +47,28 @@ impl BloomFilterU64 {
         self
     }
     /// Mark a `u64` hash into this [`BloomFilterU64`].
-    #[inline(always)]
+    #[inline]
     pub fn mark(&mut self, hash: u64) -> &mut Self {
-        let (offset, mask) = Self::hash(hash);
+        let (offset, mask) = Self::calc_hash(hash);
         self.0[offset] |= mask;
         self
     }
     /// Is a `u64` hash definitely absent from this [`BloomFilterU64`]?
     #[inline]
+    #[must_use]
     pub const fn is_absent(&self, hash: u64) -> bool {
-        let (offset, mask) = Self::hash(hash);
+        let (offset, mask) = Self::calc_hash(hash);
         (self.0[offset] & mask) == 0
+    }
+    /// If a `u64` hash is absent from this [`BloomFilterU64`], return `true` and then mark it.
+    /// Otherwise return `false`.
+    #[inline]
+    #[must_use]
+    pub fn is_absent_and_set(&mut self, hash: u64) -> bool {
+        let (offset, mask) = Self::calc_hash(hash);
+        let result = (self.0[offset] & mask) == 0;
+        self.0[offset] |= mask;
+        result
     }
 }
 

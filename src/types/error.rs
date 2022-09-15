@@ -249,6 +249,7 @@ impl fmt::Display for EvalAltResult {
 }
 
 impl<T: AsRef<str>> From<T> for EvalAltResult {
+    #[cold]
     #[inline(never)]
     fn from(err: T) -> Self {
         Self::ErrorRuntime(err.as_ref().to_string().into(), Position::NONE)
@@ -256,6 +257,7 @@ impl<T: AsRef<str>> From<T> for EvalAltResult {
 }
 
 impl<T: AsRef<str>> From<T> for Box<EvalAltResult> {
+    #[cold]
     #[inline(never)]
     fn from(err: T) -> Self {
         EvalAltResult::ErrorRuntime(err.as_ref().to_string().into(), Position::NONE).into()
@@ -266,6 +268,8 @@ impl EvalAltResult {
     /// Is this a pseudo error?  A pseudo error is one that does not occur naturally.
     ///
     /// [`LoopBreak`][EvalAltResult::LoopBreak] and [`Return`][EvalAltResult::Return] are pseudo errors.
+    #[cold]
+    #[inline(never)]
     #[must_use]
     pub const fn is_pseudo_error(&self) -> bool {
         match self {
@@ -274,6 +278,8 @@ impl EvalAltResult {
         }
     }
     /// Can this error be caught?
+    #[cold]
+    #[inline(never)]
     #[must_use]
     pub const fn is_catchable(&self) -> bool {
         match self {
@@ -319,6 +325,8 @@ impl EvalAltResult {
         }
     }
     /// Is this error a system exception?
+    #[cold]
+    #[inline(never)]
     #[must_use]
     pub const fn is_system_exception(&self) -> bool {
         match self {
@@ -338,6 +346,8 @@ impl EvalAltResult {
     }
     /// Get the [position][Position] of this error.
     #[cfg(not(feature = "no_object"))]
+    #[cold]
+    #[inline(never)]
     pub(crate) fn dump_fields(&self, map: &mut crate::Map) {
         map.insert(
             "error".into(),
@@ -419,6 +429,8 @@ impl EvalAltResult {
         };
     }
     /// Unwrap this error and get the very base error.
+    #[cold]
+    #[inline(never)]
     #[must_use]
     pub fn unwrap_inner(&self) -> &Self {
         match self {
@@ -429,6 +441,8 @@ impl EvalAltResult {
         }
     }
     /// Get the [position][Position] of this error.
+    #[cold]
+    #[inline(never)]
     #[must_use]
     pub const fn position(&self) -> Position {
         match self {
@@ -470,18 +484,24 @@ impl EvalAltResult {
     /// Remove the [position][Position] information from this error.
     ///
     /// The [position][Position] of this error is set to [`NONE`][Position::NONE] afterwards.
+    #[cold]
+    #[inline(never)]
     pub fn clear_position(&mut self) -> &mut Self {
         self.set_position(Position::NONE)
     }
     /// Remove the [position][Position] information from this error and return it.
     ///
     /// The [position][Position] of this error is set to [`NONE`][Position::NONE] afterwards.
+    #[cold]
+    #[inline(never)]
     pub fn take_position(&mut self) -> Position {
         let pos = self.position();
         self.set_position(Position::NONE);
         pos
     }
     /// Override the [position][Position] of this error.
+    #[cold]
+    #[inline(never)]
     pub fn set_position(&mut self, new_position: Position) -> &mut Self {
         match self {
             Self::ErrorSystem(..) => (),
@@ -522,6 +542,7 @@ impl EvalAltResult {
     }
     /// Consume the current [`EvalAltResult`] and return a new one with the specified [`Position`]
     /// if the current position is [`Position::NONE`].
+    #[cold]
     #[inline(never)]
     #[must_use]
     pub(crate) fn fill_position(mut self: Box<Self>, new_position: Position) -> Box<Self> {

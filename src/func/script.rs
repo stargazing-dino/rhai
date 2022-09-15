@@ -35,6 +35,7 @@ impl Engine {
         pos: Position,
         level: usize,
     ) -> RhaiResult {
+        #[cold]
         #[inline(never)]
         fn make_error(
             name: String,
@@ -234,7 +235,7 @@ impl Engine {
     ) -> bool {
         let cache = caches.fn_resolution_cache_mut();
 
-        if let Some(result) = cache.get(&hash_script).map(Option::is_some) {
+        if let Some(result) = cache.map.get(&hash_script).map(Option::is_some) {
             return result;
         }
 
@@ -251,7 +252,11 @@ impl Engine {
             || self.global_sub_modules.values().any(|m| m.contains_qualified_fn(hash_script));
 
         if !result {
-            cache.insert(hash_script, None);
+            if cache.filter.is_absent(hash_script) {
+                cache.filter.mark(hash_script);
+            } else {
+                cache.map.insert(hash_script, None);
+            }
         }
 
         result

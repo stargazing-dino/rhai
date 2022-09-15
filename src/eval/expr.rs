@@ -257,8 +257,9 @@ impl Engine {
             let hash = combine_hashes(hashes.native, hash);
 
             let cache = caches.fn_resolution_cache_mut();
+            let local_entry: CallableFunction;
 
-            let func = match cache.entry(hash) {
+            let func = match cache.map.entry(hash) {
                 Entry::Vacant(entry) => {
                     let func = if args.len() == 2 {
                         get_builtin_binary_op_fn(name, operands[0], operands[1])
@@ -267,14 +268,21 @@ impl Engine {
                     };
 
                     if let Some(f) = func {
-                        &entry
-                            .insert(Some(FnResolutionCacheEntry {
-                                func: CallableFunction::from_fn_builtin(f),
-                                source: None,
-                            }))
-                            .as_ref()
-                            .unwrap()
-                            .func
+                        if cache.filter.is_absent_and_set(hash) {
+                            // Do not cache "one-hit wonders"
+                            local_entry = CallableFunction::from_fn_builtin(f);
+                            &local_entry
+                        } else {
+                            // Cache repeated calls
+                            &entry
+                                .insert(Some(FnResolutionCacheEntry {
+                                    func: CallableFunction::from_fn_builtin(f),
+                                    source: None,
+                                }))
+                                .as_ref()
+                                .unwrap()
+                                .func
+                        }
                     } else {
                         let result = self.exec_fn_call(
                             None, global, caches, lib, name, *hashes, operands, false, false, pos,
@@ -596,7 +604,7 @@ impl Engine {
                 let mut context =
                     EvalContext::new(self, scope, global, Some(caches), lib, this_ptr, level);
 
-                let result = (custom_def.func)(&mut context, &expressions);
+                let result = (custom_def.func)(&mut context, &expressions, &custom.state);
 
                 self.check_return_value(result, expr.start_position())
             }

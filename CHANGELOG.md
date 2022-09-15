@@ -1,6 +1,18 @@
 Rhai Release Notes
 ==================
 
+Version 1.11.0
+==============
+
+New features
+------------
+
+### Custom syntax with state
+
+* [`Engine::register_custom_syntax_with_state_raw`] is added. The custom syntax parser and implementation functions take on an additional parameter that holds a user-defined custom _state_ which should substantially simplify writing some custom parsers.
+* [`Engine::register_custom_syntax_raw`] is deprecated.
+
+
 Version 1.10.0
 ==============
 

@@ -1115,12 +1115,12 @@ impl Dynamic {
     /// Beware that you need to pass in an [`Array`][crate::Array] type for it to be recognized as
     /// an [`Array`][crate::Array]. A [`Vec<T>`][Vec] does not get automatically converted to an
     /// [`Array`][crate::Array], but will be a custom type instead (stored as a trait object).  Use
-    /// `Into<Dynamic>` to convert a [`Vec<T>`][Vec] into a [`Dynamic`] as an
+    /// [`Dynamic::from_array`] to convert a [`Vec<T>`][Vec] into a [`Dynamic`] as an
     /// [`Array`][crate::Array] value.
     ///
     /// Similarly, passing in a [`HashMap<String, T>`][std::collections::HashMap] or
     /// [`BTreeMap<String, T>`][std::collections::BTreeMap] will not get a [`Map`][crate::Map] but a
-    /// custom type. Again, use `Into<Dynamic>` to get a [`Dynamic`] with a [`Map`][crate::Map]
+    /// custom type. Again, use [`Dynamic::from_map`] to get a [`Dynamic`] with a [`Map`][crate::Map]
     /// value.
     ///
     /// # Examples

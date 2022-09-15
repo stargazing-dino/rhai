@@ -4,7 +4,7 @@
 use crate::eval::GlobalRuntimeState;
 use crate::func::{locked_read, locked_write};
 use crate::{
-    Engine, Identifier, Module, ModuleResolver, Position, RhaiResultOf, Scope, Shared, ERR,
+    Engine, Identifier, Locked, Module, ModuleResolver, Position, RhaiResultOf, Scope, Shared, ERR,
 };
 
 use std::{
@@ -51,11 +51,7 @@ pub struct FileModuleResolver {
     extension: Identifier,
     cache_enabled: bool,
     scope: Scope<'static>,
-
-    #[cfg(not(feature = "sync"))]
-    cache: std::cell::RefCell<BTreeMap<PathBuf, Shared<Module>>>,
-    #[cfg(feature = "sync")]
-    cache: std::sync::RwLock<BTreeMap<PathBuf, Shared<Module>>>,
+    cache: Locked<BTreeMap<PathBuf, Shared<Module>>>,
 }
 
 impl Default for FileModuleResolver {

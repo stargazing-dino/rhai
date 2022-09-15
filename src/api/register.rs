@@ -695,13 +695,13 @@ impl Engine {
 
                 if root.is_empty() || !root.contains_key(sub_module) {
                     let mut m = Module::new();
-                    register_static_module_raw(m.sub_modules_mut(), remainder, module);
+                    register_static_module_raw(m.get_sub_modules_mut(), remainder, module);
                     m.build_index();
                     root.insert(sub_module.into(), m.into());
                 } else {
                     let m = root.remove(sub_module).expect("contains sub-module");
                     let mut m = crate::func::shared_take_or_clone(m);
-                    register_static_module_raw(m.sub_modules_mut(), remainder, module);
+                    register_static_module_raw(m.get_sub_modules_mut(), remainder, module);
                     m.build_index();
                     root.insert(sub_module.into(), m.into());
                 }

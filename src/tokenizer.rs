@@ -1545,14 +1545,17 @@ fn get_next_token_inner(
 
             // digit ...
             ('0'..='9', ..) => {
-                let mut result = smallvec::SmallVec::<[char; 16]>::new();
+                let mut result = SmartString::new_const();
                 let mut radix_base: Option<u32> = None;
                 let mut valid: fn(char) -> bool = is_numeric_digit;
                 result.push(c);
 
                 while let Some(next_char) = stream.peek_next() {
                     match next_char {
-                        ch if valid(ch) || ch == NUMBER_SEPARATOR => {
+                        NUMBER_SEPARATOR => {
+                            eat_next(stream, pos);
+                        }
+                        ch if valid(ch) => {
                             result.push(next_char);
                             eat_next(stream, pos);
                         }
@@ -1649,49 +1652,42 @@ fn get_next_token_inner(
                 // Parse number
                 return Some((
                     if let Some(radix) = radix_base {
-                        let out: String = result
-                            .iter()
-                            .skip(2)
-                            .filter(|&&c| c != NUMBER_SEPARATOR)
-                            .collect();
+                        let result = &result[2..];
 
-                        UNSIGNED_INT::from_str_radix(&out, radix)
+                        UNSIGNED_INT::from_str_radix(&result, radix)
                             .map(|v| v as INT)
                             .map_or_else(
                                 |_| {
                                     Token::LexError(
-                                        LERR::MalformedNumber(result.into_iter().collect()).into(),
+                                        LERR::MalformedNumber(result.to_string()).into(),
                                     )
                                 },
                                 Token::IntegerConstant,
                             )
                     } else {
-                        let out: String =
-                            result.iter().filter(|&&c| c != NUMBER_SEPARATOR).collect();
-                        let num = INT::from_str(&out).map(Token::IntegerConstant);
+                        let num = INT::from_str(&result).map(Token::IntegerConstant);
 
                         // If integer parsing is unnecessary, try float instead
                         #[cfg(not(feature = "no_float"))]
                         let num = num.or_else(|_| {
-                            crate::ast::FloatWrapper::from_str(&out).map(Token::FloatConstant)
+                            crate::ast::FloatWrapper::from_str(&result).map(Token::FloatConstant)
                         });
 
                         // Then try decimal
                         #[cfg(feature = "decimal")]
                         let num = num.or_else(|_| {
-                            rust_decimal::Decimal::from_str(&out).map(Token::DecimalConstant)
+                            rust_decimal::Decimal::from_str(&result).map(Token::DecimalConstant)
                         });
 
                         // Then try decimal in scientific notation
                         #[cfg(feature = "decimal")]
                         let num = num.or_else(|_| {
-                            rust_decimal::Decimal::from_scientific(&out).map(Token::DecimalConstant)
+                            rust_decimal::Decimal::from_scientific(&result)
+                                .map(Token::DecimalConstant)
                         });
 
                         num.unwrap_or_else(|_| {
-                            Token::LexError(
-                                LERR::MalformedNumber(result.into_iter().collect()).into(),
-                            )
+                            Token::LexError(LERR::MalformedNumber(result.to_string()).into())
                         })
                     },
                     num_pos,
@@ -2179,22 +2175,20 @@ fn get_identifier(
     start_pos: Position,
     first_char: char,
 ) -> (Token, Position) {
-    let mut result = smallvec::SmallVec::<[char; 8]>::new();
-    result.push(first_char);
+    let mut identifier = SmartString::new_const();
+    identifier.push(first_char);
 
     while let Some(next_char) = stream.peek_next() {
         match next_char {
             x if is_id_continue(x) => {
-                result.push(x);
+                identifier.push(x);
                 eat_next(stream, pos);
             }
             _ => break,
         }
     }
 
-    let is_valid_identifier = is_valid_identifier(result.iter().copied());
-
-    let identifier: String = result.into_iter().collect();
+    let is_valid_identifier = is_valid_identifier(identifier.chars());
 
     if let Some(token) = Token::lookup_from_syntax(&identifier) {
         return (token, start_pos);
@@ -2202,12 +2196,12 @@ fn get_identifier(
 
     if !is_valid_identifier {
         return (
-            Token::LexError(LERR::MalformedIdentifier(identifier).into()),
+            Token::LexError(LERR::MalformedIdentifier(identifier.to_string()).into()),
             start_pos,
         );
     }
 
-    (Token::Identifier(identifier.into()), start_pos)
+    (Token::Identifier(identifier), start_pos)
 }
 
 /// Is a keyword allowed as a function?

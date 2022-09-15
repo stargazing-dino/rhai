@@ -61,6 +61,8 @@ pub struct CustomExpr {
     pub inputs: StaticVec<Expr>,
     /// List of tokens actually parsed.
     pub tokens: StaticVec<ImmutableString>,
+    /// State value.
+    pub state: Dynamic,
     /// Is the current [`Scope`][crate::Scope] possibly modified by this custom statement
     /// (e.g. introducing a new variable)?
     pub scope_may_be_changed: bool,

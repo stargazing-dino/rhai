@@ -238,6 +238,7 @@ impl Engine {
     }
 
     /// Make a `Box<`[`EvalAltResult<ErrorMismatchDataType>`][ERR::ErrorMismatchDataType]`>`.
+    #[cold]
     #[inline(never)]
     #[must_use]
     pub(crate) fn make_type_mismatch_err<T>(&self, typ: &str, pos: Position) -> RhaiError {
