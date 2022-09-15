@@ -23,7 +23,6 @@ pub const MAX_STRING_LEN: usize = 24;
 /// Exported under the `internals` feature only.
 ///
 /// Normal identifiers, property getters and setters are interned separately.
-#[derive(Clone)]
 pub struct StringsInterner<'a> {
     /// Maximum number of strings interned.
     pub capacity: usize,

@@ -25,32 +25,42 @@ const BUILTIN: &str = "data type was checked";
 #[inline]
 #[must_use]
 fn is_numeric(type_id: TypeId) -> bool {
-    let result = false;
+    if type_id == TypeId::of::<INT>() {
+        return true;
+    }
 
     #[cfg(not(feature = "only_i64"))]
     #[cfg(not(feature = "only_i32"))]
-    let result = result
-        || type_id == TypeId::of::<u8>()
+    if type_id == TypeId::of::<u8>()
         || type_id == TypeId::of::<u16>()
         || type_id == TypeId::of::<u32>()
         || type_id == TypeId::of::<u64>()
         || type_id == TypeId::of::<i8>()
         || type_id == TypeId::of::<i16>()
         || type_id == TypeId::of::<i32>()
-        || type_id == TypeId::of::<i64>();
+        || type_id == TypeId::of::<i64>()
+    {
+        return true;
+    }
 
     #[cfg(not(feature = "only_i64"))]
     #[cfg(not(feature = "only_i32"))]
     #[cfg(not(target_family = "wasm"))]
-    let result = result || type_id == TypeId::of::<u128>() || type_id == TypeId::of::<i128>();
+    if type_id == TypeId::of::<u128>() || type_id == TypeId::of::<i128>() {
+        return true;
+    }
 
     #[cfg(not(feature = "no_float"))]
-    let result = result || type_id == TypeId::of::<f32>() || type_id == TypeId::of::<f64>();
+    if type_id == TypeId::of::<f32>() || type_id == TypeId::of::<f64>() {
+        return true;
+    }
 
     #[cfg(feature = "decimal")]
-    let result = result || type_id == TypeId::of::<rust_decimal::Decimal>();
+    if type_id == TypeId::of::<rust_decimal::Decimal>() {
+        return true;
+    }
 
-    result
+    false
 }
 
 /// Build in common binary operator implementations to avoid the cost of calling a registered function.
@@ -60,8 +70,6 @@ fn is_numeric(type_id: TypeId) -> bool {
 pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<FnBuiltin> {
     let type1 = x.type_id();
     let type2 = y.type_id();
-
-    let types_pair = (type1, type2);
 
     macro_rules! impl_op {
         ($xx:ident $op:tt $yy:ident) => { |_, args| {
@@ -255,7 +263,7 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
     #[cfg(not(feature = "no_float"))]
     macro_rules! impl_float {
         ($x:ty, $xx:ident, $y:ty, $yy:ident) => {
-            if types_pair == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
+            if (type1, type2) == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
                 return match op {
                     "+" => Some(impl_op!(FLOAT => $xx + $yy)),
                     "-" => Some(impl_op!(FLOAT => $xx - $yy)),
@@ -285,7 +293,7 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
     #[cfg(feature = "decimal")]
     macro_rules! impl_decimal {
         ($x:ty, $xx:ident, $y:ty, $yy:ident) => {
-            if types_pair == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
+            if (type1, type2) == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
                 #[cfg(not(feature = "unchecked"))]
                 use crate::packages::arithmetic::decimal_functions::*;
 
@@ -335,7 +343,7 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
     }
 
     // char op string
-    if types_pair == (TypeId::of::<char>(), TypeId::of::<ImmutableString>()) {
+    if (type1, type2) == (TypeId::of::<char>(), TypeId::of::<ImmutableString>()) {
         fn get_s1s2(args: &FnCallArgs) -> ([char; 2], [char; 2]) {
             let x = args[0].as_char().expect(BUILTIN);
             let y = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
@@ -361,7 +369,7 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
         };
     }
     // string op char
-    if types_pair == (TypeId::of::<ImmutableString>(), TypeId::of::<char>()) {
+    if (type1, type2) == (TypeId::of::<ImmutableString>(), TypeId::of::<char>()) {
         fn get_s1s2(args: &FnCallArgs) -> ([char; 2], [char; 2]) {
             let x = &*args[0].read_lock::<ImmutableString>().expect(BUILTIN);
             let y = args[1].as_char().expect(BUILTIN);
@@ -397,7 +405,7 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
         };
     }
     // () op string
-    if types_pair == (TypeId::of::<()>(), TypeId::of::<ImmutableString>()) {
+    if (type1, type2) == (TypeId::of::<()>(), TypeId::of::<ImmutableString>()) {
         return match op {
             "+" => Some(|_, args| Ok(args[1].clone())),
             "==" | ">" | ">=" | "<" | "<=" => Some(|_, _| Ok(Dynamic::FALSE)),
@@ -406,7 +414,7 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
         };
     }
     // string op ()
-    if types_pair == (TypeId::of::<ImmutableString>(), TypeId::of::<()>()) {
+    if (type1, type2) == (TypeId::of::<ImmutableString>(), TypeId::of::<()>()) {
         return match op {
             "+" => Some(|_, args| Ok(args[0].clone())),
             "==" | ">" | ">=" | "<" | "<=" => Some(|_, _| Ok(Dynamic::FALSE)),
@@ -446,7 +454,7 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
 
     // map op string
     #[cfg(not(feature = "no_object"))]
-    if types_pair == (TypeId::of::<crate::Map>(), TypeId::of::<ImmutableString>()) {
+    if (type1, type2) == (TypeId::of::<crate::Map>(), TypeId::of::<ImmutableString>()) {
         use crate::Map;
 
         return match op {
@@ -456,12 +464,12 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
     }
 
     // Non-compatible ranges
-    if types_pair
+    if (type1, type2)
         == (
             TypeId::of::<ExclusiveRange>(),
             TypeId::of::<InclusiveRange>(),
         )
-        || types_pair
+        || (type1, type2)
             == (
                 TypeId::of::<InclusiveRange>(),
                 TypeId::of::<ExclusiveRange>(),
@@ -553,8 +561,6 @@ pub fn get_builtin_binary_op_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<Fn
 pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Option<FnBuiltin> {
     let type1 = x.type_id();
     let type2 = y.type_id();
-
-    let types_pair = (type1, type2);
 
     macro_rules! impl_op {
         ($x:ty = x $op:tt $yy:ident) => { |_, args| {
@@ -691,7 +697,7 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
     #[cfg(not(feature = "no_float"))]
     macro_rules! impl_float {
         ($x:ident, $xx:ident, $y:ty, $yy:ident) => {
-            if types_pair == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
+            if (type1, type2) == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
                 return match op {
                     "+=" => Some(impl_op!($x += $yy)),
                     "-=" => Some(impl_op!($x -= $yy)),
@@ -714,7 +720,7 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
     #[cfg(feature = "decimal")]
     macro_rules! impl_decimal {
         ($x:ident, $xx:ident, $y:ty, $yy:ident) => {
-            if types_pair == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
+            if (type1, type2) == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
                 #[cfg(not(feature = "unchecked"))]
                 use crate::packages::arithmetic::decimal_functions::*;
 
@@ -753,7 +759,7 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
     }
 
     // string op= char
-    if types_pair == (TypeId::of::<ImmutableString>(), TypeId::of::<char>()) {
+    if (type1, type2) == (TypeId::of::<ImmutableString>(), TypeId::of::<char>()) {
         return match op {
             "+=" => Some(impl_op!(ImmutableString += as_char as char)),
             "-=" => Some(impl_op!(ImmutableString -= as_char as char)),
@@ -761,7 +767,7 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
         };
     }
     // char op= string
-    if types_pair == (TypeId::of::<char>(), TypeId::of::<ImmutableString>()) {
+    if (type1, type2) == (TypeId::of::<char>(), TypeId::of::<ImmutableString>()) {
         return match op {
             "+=" => Some(|_, args| {
                 let mut ch = args[0].as_char().expect(BUILTIN).to_string();
@@ -810,7 +816,7 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
         use crate::Blob;
 
         // blob op= int
-        if types_pair == (TypeId::of::<Blob>(), TypeId::of::<INT>()) {
+        if (type1, type2) == (TypeId::of::<Blob>(), TypeId::of::<INT>()) {
             return match op {
                 "+=" => Some(|_, args| {
                     let x = args[1].as_int().expect("`INT`");
@@ -822,7 +828,7 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
         }
 
         // blob op= char
-        if types_pair == (TypeId::of::<Blob>(), TypeId::of::<char>()) {
+        if (type1, type2) == (TypeId::of::<Blob>(), TypeId::of::<char>()) {
             return match op {
                 "+=" => Some(|_, args| {
                     let x = args[1].as_char().expect("`char`");
@@ -834,7 +840,7 @@ pub fn get_builtin_op_assignment_fn(op: &str, x: &Dynamic, y: &Dynamic) -> Optio
         }
 
         // blob op= string
-        if types_pair == (TypeId::of::<Blob>(), TypeId::of::<ImmutableString>()) {
+        if (type1, type2) == (TypeId::of::<Blob>(), TypeId::of::<ImmutableString>()) {
             return match op {
                 "+=" => Some(|_, args| {
                     let s = std::mem::take(args[1]).cast::<ImmutableString>();

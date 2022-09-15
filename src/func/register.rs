@@ -64,7 +64,7 @@ pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
 ///
 /// # Type Parameters
 ///
-/// * `ARGS` - a tuple containing parameter types, with `&mut T` represented by [`Mut<T>`].
+/// * `ARGS` - a tuple containing parameter types, with `&mut T` represented by `Mut<T>`.
 /// * `RET` - return type of the function; if the function returns `Result`, it is the unwrapped inner value type.
 pub trait RegisterNativeFunction<ARGS, RET, RESULT> {
     /// Convert this function into a [`CallableFunction`].

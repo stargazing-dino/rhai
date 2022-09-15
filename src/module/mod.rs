@@ -16,7 +16,7 @@ use crate::{
 use std::prelude::v1::*;
 use std::{
     any::TypeId,
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     fmt,
     ops::{Add, AddAssign},
 };
@@ -213,7 +213,7 @@ impl fmt::Debug for Module {
                     .iter()
                     .flat_map(|m| m.keys())
                     .map(SmartString::as_str)
-                    .collect::<BTreeSet<_>>(),
+                    .collect::<Vec<_>>(),
             )
             .field("vars", &self.variables)
             .field(
@@ -221,7 +221,7 @@ impl fmt::Debug for Module {
                 &self
                     .iter_fn()
                     .map(|f| f.func.to_string())
-                    .collect::<BTreeSet<_>>(),
+                    .collect::<Vec<_>>(),
             );
 
         #[cfg(feature = "metadata")]
@@ -710,8 +710,7 @@ impl Module {
                 #[cfg(feature = "metadata")]
                 comments: Box::default(),
                 func: fn_def.into(),
-            }
-            .into(),
+            },
         );
         self.indexed = false;
         self.contains_indexed_global_functions = false;
@@ -749,7 +748,7 @@ impl Module {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     #[must_use]
-    pub(crate) fn get_sub_modules(&mut self) -> &mut BTreeMap<Identifier, Shared<Module>> {
+    pub(crate) fn get_sub_modules_mut(&mut self) -> &mut BTreeMap<Identifier, Shared<Module>> {
         // We must assume that the user has changed the sub-modules
         // (otherwise why take a mutable reference?)
         self.all_functions = None;
@@ -1044,8 +1043,7 @@ impl Module {
                 return_type: return_type_name,
                 #[cfg(feature = "metadata")]
                 comments: Box::default(),
-            }
-            .into(),
+            },
         );
 
         self.indexed = false;

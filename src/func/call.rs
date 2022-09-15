@@ -362,12 +362,12 @@ impl Engine {
         let parent_source = global.source.clone();
 
         // Check if function access already in the cache
-        let mut local_entry = None;
+        let local_entry = &mut None;
 
         let func = self.resolve_fn(
             global,
             caches,
-            &mut local_entry,
+            local_entry,
             lib,
             name,
             hash,
@@ -640,14 +640,14 @@ impl Engine {
 
         // Script-defined function call?
         #[cfg(not(feature = "no_function"))]
-        let mut local_entry = None;
+        let local_entry = &mut None;
 
         #[cfg(not(feature = "no_function"))]
         if let Some(FnResolutionCacheEntry { func, ref source }) = self
             .resolve_fn(
                 global,
                 caches,
-                &mut local_entry,
+                local_entry,
                 lib,
                 fn_name,
                 hashes.script,
