@@ -195,13 +195,14 @@ impl Engine {
     ///
     /// A [`GlobalRuntimeState`] and [`Caches`] need to be passed into the function, which can be
     /// created via [`GlobalRuntimeState::new`] and [`Caches::new`].
-    /// This makes repeatedly calling particular functions more efficient as the functions resolution cache
-    /// is kept intact.
+    ///
+    /// This makes repeatedly calling particular functions more efficient as the functions
+    /// resolution cache is kept intact.
     ///
     /// # Arguments
     ///
-    /// All the arguments are _consumed_, meaning that they're replaced by `()`.
-    /// This is to avoid unnecessarily cloning the arguments.
+    /// All the arguments are _consumed_, meaning that they're replaced by `()`. This is to avoid
+    /// unnecessarily cloning the arguments.
     ///
     /// Do not use the arguments after this call. If they are needed afterwards, clone them _before_
     /// calling this function.
@@ -246,6 +247,8 @@ impl Engine {
         arg_values: &mut [Dynamic],
     ) -> RhaiResult {
         let statements = ast.statements();
+        let lib = &[ast.as_ref()];
+        let mut this_ptr = this_ptr;
 
         let orig_scope_len = scope.len();
 
@@ -255,44 +258,47 @@ impl Engine {
             ast.resolver().cloned(),
         );
 
+        let mut result = Ok(Dynamic::UNIT);
+
         if eval_ast && !statements.is_empty() {
-            self.eval_global_statements(scope, global, caches, statements, &[ast.as_ref()], 0)?;
+            result = self.eval_global_statements(scope, global, caches, statements, lib, 0);
 
             if rewind_scope {
                 scope.rewind(orig_scope_len);
             }
         }
 
-        let mut this_ptr = this_ptr;
-        let mut args: StaticVec<_> = arg_values.iter_mut().collect();
+        result = result.and_then(|_| {
+            let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
-        // Check for data race.
-        #[cfg(not(feature = "no_closure"))]
-        crate::func::call::ensure_no_data_race(name, &args, false)?;
+            // Check for data race.
+            #[cfg(not(feature = "no_closure"))]
+            crate::func::call::ensure_no_data_race(name, &args, false).map(|_| Dynamic::UNIT)?;
 
-        let lib = &[ast.as_ref()];
-        let fn_def = ast
-            .shared_lib()
-            .get_script_fn(name, args.len())
-            .ok_or_else(|| ERR::ErrorFunctionNotFound(name.into(), Position::NONE))?;
-
-        let result = self.call_script_fn(
-            scope,
-            global,
-            caches,
-            lib,
-            &mut this_ptr,
-            fn_def,
-            &mut args,
-            rewind_scope,
-            Position::NONE,
-            0,
-        )?;
+            if let Some(fn_def) = ast.shared_lib().get_script_fn(name, args.len()) {
+                self.call_script_fn(
+                    scope,
+                    global,
+                    caches,
+                    lib,
+                    &mut this_ptr,
+                    fn_def,
+                    &mut args,
+                    rewind_scope,
+                    Position::NONE,
+                    0,
+                )
+            } else {
+                Err(ERR::ErrorFunctionNotFound(name.into(), Position::NONE).into())
+            }
+        });
 
         #[cfg(not(feature = "no_module"))]
         {
             global.embedded_module_resolver = orig_embedded_module_resolver;
         }
+
+        let result = result?;
 
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {
