@@ -215,19 +215,21 @@ impl Engine {
                 loop {
                     let func = lib
                         .iter()
-                        .find_map(|&m| m.get_fn(hash).map(|f| (f, m.id())))
-                        .or_else(|| {
-                            self.global_modules
-                                .iter()
-                                .find_map(|m| m.get_fn(hash).map(|f| (f, m.id())))
-                        });
+                        .copied()
+                        .chain(self.global_modules.iter().map(|m| m.as_ref()))
+                        .find_map(|m| m.get_fn(hash).map(|f| (f, m.id())));
 
                     #[cfg(not(feature = "no_module"))]
-                    let func = func.or_else(|| _global.get_qualified_fn(hash)).or_else(|| {
-                        self.global_sub_modules
-                            .values()
-                            .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id())))
-                    });
+                    let func = if args.is_none() {
+                        // Scripted functions are not exposed globally
+                        func
+                    } else {
+                        func.or_else(|| _global.get_qualified_fn(hash)).or_else(|| {
+                            self.global_sub_modules
+                                .values()
+                                .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id())))
+                        })
+                    };
 
                     if let Some((f, s)) = func {
                         // Specific version found
@@ -247,7 +249,7 @@ impl Engine {
 
                     // Check `Dynamic` parameters for functions with parameters
                     if allow_dynamic && max_bitmask == 0 && num_args > 0 {
-                        let is_dynamic = lib.iter().any(|&m| m.may_contain_dynamic_fn(hash_base))
+                        let is_dynamic = lib.iter().any(|m| m.may_contain_dynamic_fn(hash_base))
                             || self
                                 .global_modules
                                 .iter()

@@ -182,8 +182,8 @@ pub struct Module {
     /// Flattened collection of all functions, native Rust and scripted.
     /// including those in sub-modules.
     all_functions: Option<StraightHashMap<CallableFunction>>,
-    /// Native Rust functions (in scripted hash format) that contain [`Dynamic`] parameters.
-    dynamic_functions: BloomFilterU64,
+    /// Bloom filter on native Rust functions (in scripted hash format) that contain [`Dynamic`] parameters.
+    dynamic_functions_filter: BloomFilterU64,
     /// Iterator functions, keyed by the type producing the iterator.
     type_iterators: Option<BTreeMap<TypeId, Shared<IteratorFn>>>,
     /// Flattened collection of iterator functions, including those in sub-modules.
@@ -300,7 +300,7 @@ impl Module {
             all_variables: None,
             functions: StraightHashMap::with_capacity_and_hasher(capacity, Default::default()),
             all_functions: None,
-            dynamic_functions: BloomFilterU64::new(),
+            dynamic_functions_filter: BloomFilterU64::new(),
             type_iterators: None,
             all_type_iterators: None,
             indexed: true,
@@ -442,7 +442,7 @@ impl Module {
         self.all_variables = None;
         self.functions.clear();
         self.all_functions = None;
-        self.dynamic_functions.clear();
+        self.dynamic_functions_filter.clear();
         self.type_iterators = None;
         self.all_type_iterators = None;
         self.indexed = false;
@@ -1026,7 +1026,7 @@ impl Module {
         let hash_fn = combine_hashes(hash_script, hash_params);
 
         if is_dynamic {
-            self.dynamic_functions.mark(hash_script);
+            self.dynamic_functions_filter.mark(hash_script);
         }
 
         self.functions.insert(
@@ -1547,7 +1547,7 @@ impl Module {
     #[inline(always)]
     #[must_use]
     pub(crate) fn may_contain_dynamic_fn(&self, hash_script: u64) -> bool {
-        !self.dynamic_functions.is_absent(hash_script)
+        !self.dynamic_functions_filter.is_absent(hash_script)
     }
 
     /// Does the particular namespace-qualified function exist in the [`Module`]?
@@ -1592,7 +1592,7 @@ impl Module {
             None => self.variables = other.variables,
         }
         self.functions.extend(other.functions.into_iter());
-        self.dynamic_functions += &other.dynamic_functions;
+        self.dynamic_functions_filter += &other.dynamic_functions_filter;
         match self.type_iterators {
             Some(ref mut m) if other.type_iterators.is_some() => {
                 m.extend(other.type_iterators.unwrap().into_iter())
@@ -1635,7 +1635,7 @@ impl Module {
             None => self.variables = other.variables,
         }
         self.functions.extend(other.functions.into_iter());
-        self.dynamic_functions += &other.dynamic_functions;
+        self.dynamic_functions_filter += &other.dynamic_functions_filter;
         match self.type_iterators {
             Some(ref mut m) if other.type_iterators.is_some() => {
                 m.extend(other.type_iterators.unwrap().into_iter())
@@ -1685,7 +1685,7 @@ impl Module {
         for (&k, v) in &other.functions {
             self.functions.entry(k).or_insert_with(|| v.clone());
         }
-        self.dynamic_functions += &other.dynamic_functions;
+        self.dynamic_functions_filter += &other.dynamic_functions_filter;
         if let Some(ref type_iterators) = other.type_iterators {
             let t = self
                 .type_iterators
@@ -1761,7 +1761,7 @@ impl Module {
                 })
                 .map(|(&k, v)| (k, v.clone())),
         );
-        self.dynamic_functions += &other.dynamic_functions;
+        self.dynamic_functions_filter += &other.dynamic_functions_filter;
 
         if let Some(ref type_iterators) = other.type_iterators {
             if let Some(ref mut t) = self.type_iterators {
@@ -1805,7 +1805,7 @@ impl Module {
             })
             .collect();
 
-        self.dynamic_functions.clear();
+        self.dynamic_functions_filter.clear();
         self.all_functions = None;
         self.all_variables = None;
         self.all_type_iterators = None;
@@ -2136,7 +2136,6 @@ impl Module {
             if let Some(ref t) = module.type_iterators {
                 for (&type_id, func) in t {
                     type_iterators.insert(type_id, func.clone());
-                    contains_indexed_global_functions = true;
                 }
             }
 
@@ -2249,7 +2248,6 @@ impl Module {
             self.all_type_iterators
                 .get_or_insert_with(|| Default::default())
                 .insert(type_id, func.clone());
-            self.contains_indexed_global_functions = true;
         }
         self.type_iterators
             .get_or_insert_with(|| Default::default())
