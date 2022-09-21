@@ -7,8 +7,11 @@ use std::{
     ops::{Add, AddAssign},
 };
 
+/// Number of bits for a `usize`.
+const USIZE_BITS: usize = mem::size_of::<usize>() * 8;
+
 /// Number of `usize` values required for 256 bits.
-const SIZE: usize = (256 / 8) / mem::size_of::<usize>();
+const SIZE: usize = 256 / USIZE_BITS;
 
 /// A simple bloom filter implementation for `u64` hash values only - i.e. all 64 bits are assumed
 /// to be relatively random.
@@ -26,7 +29,7 @@ impl BloomFilterU64 {
     #[must_use]
     const fn calc_hash(value: u64) -> (usize, usize) {
         let hash = (value & 0x00ff) as usize;
-        (hash / 64, 0x01 << (hash % 64))
+        (hash / USIZE_BITS, 0x01 << (hash % USIZE_BITS))
     }
     /// Create a new [`BloomFilterU64`].
     #[inline(always)]

@@ -321,11 +321,11 @@ impl<'a> NativeCallContext<'a> {
         let hash = if is_method_call {
             FnCallHashes::from_all(
                 #[cfg(not(feature = "no_function"))]
-                calc_fn_hash(fn_name, args_len - 1),
-                calc_fn_hash(fn_name, args_len),
+                calc_fn_hash(None, fn_name, args_len - 1),
+                calc_fn_hash(None, fn_name, args_len),
             )
         } else {
-            calc_fn_hash(fn_name, args_len).into()
+            calc_fn_hash(None, fn_name, args_len).into()
         };
 
         self.engine()

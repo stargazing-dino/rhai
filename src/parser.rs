@@ -358,9 +358,9 @@ impl Expr {
             Self::Variable(x, .., pos) => {
                 let ident = x.3.clone();
                 let getter = state.get_interned_getter(ident.as_str());
-                let hash_get = calc_fn_hash(&getter, 1);
+                let hash_get = calc_fn_hash(None, &getter, 1);
                 let setter = state.get_interned_setter(ident.as_str());
-                let hash_set = calc_fn_hash(&setter, 2);
+                let hash_set = calc_fn_hash(None, &setter, 2);
 
                 Self::Property(
                     Box::new(((getter, hash_get), (setter, hash_set), ident)),
@@ -576,7 +576,7 @@ impl Engine {
 
                 #[cfg(not(feature = "no_module"))]
                 let hash = if namespace.is_empty() {
-                    calc_fn_hash(&id, 0)
+                    calc_fn_hash(None, &id, 0)
                 } else {
                     let root = namespace.root();
                     let index = state.find_module(root);
@@ -600,10 +600,10 @@ impl Engine {
 
                     namespace.set_index(index);
 
-                    crate::calc_qualified_fn_hash(namespace.iter().map(Ident::as_str), &id, 0)
+                    crate::calc_fn_hash(namespace.iter().map(Ident::as_str), &id, 0)
                 };
                 #[cfg(feature = "no_module")]
-                let hash = calc_fn_hash(&id, 0);
+                let hash = calc_fn_hash(None, &id, 0);
 
                 let hashes = if is_valid_function_name(&id) {
                     hash.into()
@@ -645,7 +645,7 @@ impl Engine {
 
                     #[cfg(not(feature = "no_module"))]
                     let hash = if namespace.is_empty() {
-                        calc_fn_hash(&id, args.len())
+                        calc_fn_hash(None, &id, args.len())
                     } else {
                         let root = namespace.root();
                         let index = state.find_module(root);
@@ -668,14 +668,10 @@ impl Engine {
 
                         namespace.set_index(index);
 
-                        crate::calc_qualified_fn_hash(
-                            namespace.iter().map(Ident::as_str),
-                            &id,
-                            args.len(),
-                        )
+                        crate::calc_fn_hash(namespace.iter().map(Ident::as_str), &id, args.len())
                     };
                     #[cfg(feature = "no_module")]
-                    let hash = calc_fn_hash(&id, args.len());
+                    let hash = calc_fn_hash(None, &id, args.len());
 
                     let hashes = if is_valid_function_name(&id) {
                         hash.into()
@@ -1470,7 +1466,7 @@ impl Engine {
                     },
                 )?;
 
-                let hash_script = calc_fn_hash(&func.name, func.params.len());
+                let hash_script = calc_fn_hash(None, &func.name, func.params.len());
                 lib.insert(hash_script, func.into());
 
                 expr
@@ -1835,7 +1831,7 @@ impl Engine {
         #[cfg(not(feature = "no_module"))]
         if let Some((.., namespace, hash, name)) = namespaced_variable {
             if !namespace.is_empty() {
-                *hash = crate::calc_qualified_var_hash(namespace.iter().map(Ident::as_str), name);
+                *hash = crate::calc_var_hash(namespace.iter().map(Ident::as_str), name);
 
                 #[cfg(not(feature = "no_module"))]
                 {
@@ -1919,7 +1915,7 @@ impl Engine {
 
                         Ok(FnCallExpr {
                             name: state.get_interned_string("-"),
-                            hashes: FnCallHashes::from_native(calc_fn_hash("-", 1)),
+                            hashes: FnCallHashes::from_native(calc_fn_hash(None, "-", 1)),
                             args,
                             pos,
                             is_native_operator: true,
@@ -1947,7 +1943,7 @@ impl Engine {
 
                         Ok(FnCallExpr {
                             name: state.get_interned_string("+"),
-                            hashes: FnCallHashes::from_native(calc_fn_hash("+", 1)),
+                            hashes: FnCallHashes::from_native(calc_fn_hash(None, "+", 1)),
                             args,
                             pos,
                             is_native_operator: true,
@@ -1966,7 +1962,7 @@ impl Engine {
 
                 Ok(FnCallExpr {
                     name: state.get_interned_string("!"),
-                    hashes: FnCallHashes::from_native(calc_fn_hash("!", 1)),
+                    hashes: FnCallHashes::from_native(calc_fn_hash(None, "!", 1)),
                     args,
                     pos,
                     is_native_operator: true,
@@ -2187,8 +2183,8 @@ impl Engine {
                 // Recalculate hash
                 func.hashes = FnCallHashes::from_all(
                     #[cfg(not(feature = "no_function"))]
-                    calc_fn_hash(&func.name, func.args.len()),
-                    calc_fn_hash(&func.name, func.args.len() + 1),
+                    calc_fn_hash(None, &func.name, func.args.len()),
+                    calc_fn_hash(None, &func.name, func.args.len() + 1),
                 );
 
                 let rhs = Expr::MethodCall(func, func_pos);
@@ -2233,8 +2229,8 @@ impl Engine {
                         // Recalculate hash
                         func.hashes = FnCallHashes::from_all(
                             #[cfg(not(feature = "no_function"))]
-                            calc_fn_hash(&func.name, func.args.len()),
-                            calc_fn_hash(&func.name, func.args.len() + 1),
+                            calc_fn_hash(None, &func.name, func.args.len()),
+                            calc_fn_hash(None, &func.name, func.args.len() + 1),
                         );
 
                         let new_lhs = BinaryExpr {
@@ -2338,7 +2334,7 @@ impl Engine {
             settings.ensure_level_within_max_limit(state.max_expr_depth)?;
 
             let op = op_token.syntax();
-            let hash = calc_fn_hash(&op, 2);
+            let hash = calc_fn_hash(None, &op, 2);
 
             let op_base = FnCallExpr {
                 name: state.get_interned_string(op.as_ref()),
@@ -2412,7 +2408,7 @@ impl Engine {
 
                     // Convert into a call to `contains`
                     FnCallExpr {
-                        hashes: calc_fn_hash(OP_CONTAINS, 2).into(),
+                        hashes: calc_fn_hash(None, OP_CONTAINS, 2).into(),
                         args,
                         name: state.get_interned_string(OP_CONTAINS),
                         ..op_base
@@ -2427,7 +2423,7 @@ impl Engine {
                         .get(s.as_str())
                         .map_or(false, Option::is_some) =>
                 {
-                    let hash = calc_fn_hash(&s, 2);
+                    let hash = calc_fn_hash(None, &s, 2);
                     let pos = args[0].start_position();
 
                     FnCallExpr {
@@ -3345,7 +3341,7 @@ impl Engine {
 
                         let func = func?;
 
-                        let hash = calc_fn_hash(&func.name, func.params.len());
+                        let hash = calc_fn_hash(None, &func.name, func.params.len());
 
                         if !lib.is_empty() && lib.contains_key(&hash) {
                             return Err(PERR::FnDuplicatedDefinition(
@@ -3657,6 +3653,7 @@ impl Engine {
         let expr = FnCallExpr {
             name: state.get_interned_string(crate::engine::KEYWORD_FN_PTR_CURRY),
             hashes: FnCallHashes::from_native(calc_fn_hash(
+                None,
                 crate::engine::KEYWORD_FN_PTR_CURRY,
                 num_externals + 1,
             )),

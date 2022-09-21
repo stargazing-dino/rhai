@@ -4,7 +4,7 @@
 
 use crate::module::FuncInfo;
 use crate::tokenizer::{is_valid_function_name, Token};
-use crate::{Engine, FnAccess, Module, Scope, INT};
+use crate::{Engine, FnAccess, FnPtr, Module, Scope, INT};
 
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -544,6 +544,20 @@ fn def_type_name<'a>(ty: &'a str, engine: &'a Engine) -> Cow<'a, str> {
 
     #[cfg(not(feature = "no_float"))]
     let ty = ty.replace(type_name::<crate::FLOAT>(), "float");
+
+    #[cfg(not(feature = "no_index"))]
+    let ty = ty.replace(type_name::<crate::Array>(), "Array");
+
+    #[cfg(not(feature = "no_index"))]
+    let ty = ty.replace(type_name::<crate::Blob>(), "Blob");
+
+    #[cfg(not(feature = "no_object"))]
+    let ty = ty.replace(type_name::<crate::Map>(), "Map");
+
+    #[cfg(not(feature = "no_std"))]
+    let ty = ty.replace(type_name::<crate::Instant>(), "Instant");
+
+    let ty = ty.replace(type_name::<FnPtr>(), "FnPtr");
 
     ty.into()
 }

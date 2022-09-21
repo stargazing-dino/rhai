@@ -240,7 +240,7 @@ impl Engine {
         }
 
         // First check script-defined functions
-        let result = lib.iter().any(|&m| m.contains_fn(hash_script))
+        let result = lib.iter().any(|m| m.contains_fn(hash_script))
             // Then check the global namespace and packages
             || self.global_modules.iter().any(|m| m.contains_fn(hash_script));
 

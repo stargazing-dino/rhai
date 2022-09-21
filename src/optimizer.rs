@@ -151,7 +151,7 @@ impl<'a> OptimizerState<'a> {
                 &mut self.caches,
                 lib,
                 fn_name,
-                calc_fn_hash(fn_name, arg_values.len()),
+                calc_fn_hash(None, fn_name, arg_values.len()),
                 &mut arg_values.iter_mut().collect::<StaticVec<_>>(),
                 false,
                 false,
@@ -1229,7 +1229,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         => {
             // First search for script-defined functions (can override built-in)
             #[cfg(not(feature = "no_function"))]
-            let has_script_fn = state.lib.iter().any(|&m| m.get_script_fn(&x.name, x.args.len()).is_some());
+            let has_script_fn = state.lib.iter().copied().any(|m| m.get_script_fn(&x.name, x.args.len()).is_some());
             #[cfg(feature = "no_function")]
             let has_script_fn = false;
 
