@@ -151,7 +151,7 @@ impl<'a> OptimizerState<'a> {
                 &mut self.caches,
                 lib,
                 fn_name,
-                calc_fn_hash(fn_name, arg_values.len()),
+                calc_fn_hash(None, fn_name, arg_values.len()),
                 &mut arg_values.iter_mut().collect::<StaticVec<_>>(),
                 false,
                 false,

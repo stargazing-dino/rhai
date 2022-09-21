@@ -237,10 +237,7 @@ pub use func::Shared;
 /// Alias to [`RefCell`][std::cell::RefCell] or [`RwLock`][std::sync::RwLock] depending on the `sync` feature flag.
 pub use func::Locked;
 
-pub(crate) use func::{
-    calc_fn_hash, calc_fn_params_hash, calc_qualified_fn_hash, calc_qualified_var_hash,
-    combine_hashes,
-};
+pub(crate) use func::{calc_fn_hash, calc_fn_params_hash, calc_var_hash, combine_hashes};
 
 pub use rhai_codegen::*;
 

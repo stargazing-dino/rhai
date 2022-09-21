@@ -74,8 +74,8 @@ impl OpAssignment {
             .expect("op-assignment operator")
             .literal_syntax();
         Self {
-            hash_op_assign: calc_fn_hash(op.literal_syntax(), 2),
-            hash_op: calc_fn_hash(op_raw, 2),
+            hash_op_assign: calc_fn_hash(None, op.literal_syntax(), 2),
+            hash_op: calc_fn_hash(None, op_raw, 2),
             op_assign: op.literal_syntax(),
             op: op_raw,
             pos,

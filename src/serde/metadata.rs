@@ -66,7 +66,7 @@ impl Ord for FnMetadata<'_> {
 
 impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
     fn from(info: &'a FuncInfo) -> Self {
-        let base_hash = calc_fn_hash(&info.name, info.num_params);
+        let base_hash = calc_fn_hash(None, &info.name, info.num_params);
         let (typ, full_hash) = if info.func.is_script() {
             (FnType::Script, base_hash)
         } else {

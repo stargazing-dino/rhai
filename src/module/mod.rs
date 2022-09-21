@@ -9,8 +9,8 @@ use crate::func::{
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypesCollection};
 use crate::{
-    calc_fn_hash, calc_fn_params_hash, calc_qualified_fn_hash, combine_hashes, Dynamic, Identifier,
-    ImmutableString, NativeCallContext, RhaiResultOf, Shared, SmartString, StaticVec,
+    calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Identifier, ImmutableString,
+    NativeCallContext, RhaiResultOf, Shared, SmartString, StaticVec,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -150,7 +150,7 @@ pub fn calc_native_fn_hash<'a>(
     fn_name: &str,
     params: &[TypeId],
 ) -> u64 {
-    let hash_script = calc_qualified_fn_hash(modules, fn_name, params.len());
+    let hash_script = calc_fn_hash(modules, fn_name, params.len());
     let hash_params = calc_fn_params_hash(params.iter().copied());
     combine_hashes(hash_script, hash_params)
 }
@@ -662,7 +662,7 @@ impl Module {
         let value = Dynamic::from(value);
 
         if self.indexed {
-            let hash_var = crate::calc_qualified_var_hash(Some(""), &ident);
+            let hash_var = crate::calc_var_hash(Some(""), &ident);
             self.all_variables
                 .get_or_insert_with(|| Default::default())
                 .insert(hash_var, value.clone());
@@ -692,7 +692,7 @@ impl Module {
 
         // None + function name + number of arguments.
         let num_params = fn_def.params.len();
-        let hash_script = crate::calc_fn_hash(&fn_def.name, num_params);
+        let hash_script = crate::calc_fn_hash(None, &fn_def.name, num_params);
         #[cfg(feature = "metadata")]
         let params_info = fn_def.params.iter().map(Into::into).collect();
         self.functions.insert(
@@ -1021,11 +1021,12 @@ impl Module {
         };
 
         let name = name.as_ref();
-        let hash_fn = calc_native_fn_hash(None, name, &param_types);
+        let hash_script = calc_fn_hash(None, name, param_types.len());
+        let hash_params = calc_fn_params_hash(param_types.iter().copied());
+        let hash_fn = combine_hashes(hash_script, hash_params);
 
         if is_dynamic {
-            self.dynamic_functions
-                .mark(calc_fn_hash(name, param_types.len()));
+            self.dynamic_functions.mark(hash_script);
         }
 
         self.functions.insert(
@@ -2126,7 +2127,7 @@ impl Module {
             // Index all variables
             if let Some(ref v) = module.variables {
                 for (var_name, value) in v {
-                    let hash_var = crate::calc_qualified_var_hash(path.iter().copied(), var_name);
+                    let hash_var = crate::calc_var_hash(path.iter().copied(), var_name);
                     variables.insert(hash_var, value.clone());
                 }
             }
@@ -2160,7 +2161,7 @@ impl Module {
                     functions.insert(hash_qualified_fn, f.func.clone());
                 } else if cfg!(not(feature = "no_function")) {
                     let hash_qualified_script =
-                        crate::calc_qualified_fn_hash(path.iter().copied(), &f.name, f.num_params);
+                        crate::calc_fn_hash(path.iter().copied(), &f.name, f.num_params);
                     functions.insert(hash_qualified_script, f.func.clone());
                 }
             }

@@ -666,7 +666,7 @@ impl Expr {
                     #[cfg(not(feature = "no_module"))]
                     namespace: super::Namespace::NONE,
                     name: KEYWORD_FN_PTR.into(),
-                    hashes: calc_fn_hash(f.fn_name(), 1).into(),
+                    hashes: calc_fn_hash(None, f.fn_name(), 1).into(),
                     args: once(Self::StringConstant(f.fn_name().into(), pos)).collect(),
                     capture_parent_scope: false,
                     is_native_operator: false,

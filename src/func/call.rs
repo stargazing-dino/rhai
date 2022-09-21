@@ -198,10 +198,8 @@ impl Engine {
         }
 
         let mut hash = args.as_ref().map_or(hash_base, |args| {
-            combine_hashes(
-                hash_base,
-                calc_fn_params_hash(args.iter().map(|a| a.type_id())),
-            )
+            let hash_params = calc_fn_params_hash(args.iter().map(|a| a.type_id()));
+            combine_hashes(hash_base, hash_params)
         });
 
         let cache = caches.fn_resolution_cache_mut();
@@ -611,7 +609,7 @@ impl Engine {
                     if num_params < 0 || num_params > crate::MAX_USIZE_INT {
                         false
                     } else {
-                        let hash_script = calc_fn_hash(fn_name.as_str(), num_params as usize);
+                        let hash_script = calc_fn_hash(None, fn_name.as_str(), num_params as usize);
                         self.has_script_fn(Some(global), caches, lib, hash_script)
                     }
                     .into(),
@@ -815,7 +813,7 @@ impl Engine {
                 let fn_name = fn_ptr.fn_name();
                 let args_len = call_args.len() + fn_ptr.curry().len();
                 // Recalculate hashes
-                let new_hash = calc_fn_hash(fn_name, args_len).into();
+                let new_hash = calc_fn_hash(None, fn_name, args_len).into();
                 // Arguments are passed as-is, adding the curried arguments
                 let mut curry = FnArgsVec::with_capacity(fn_ptr.curry().len());
                 curry.extend(fn_ptr.curry().iter().cloned());
@@ -857,8 +855,8 @@ impl Engine {
                 // Recalculate hash
                 let new_hash = FnCallHashes::from_all(
                     #[cfg(not(feature = "no_function"))]
-                    calc_fn_hash(fn_name, args_len),
-                    calc_fn_hash(fn_name, args_len + 1),
+                    calc_fn_hash(None, fn_name, args_len),
+                    calc_fn_hash(None, fn_name, args_len + 1),
                 );
                 // Replace the first argument with the object pointer, adding the curried arguments
                 let mut curry = FnArgsVec::with_capacity(fn_ptr.curry().len());
@@ -944,8 +942,8 @@ impl Engine {
                             // Recalculate the hash based on the new function name and new arguments
                             hash = FnCallHashes::from_all(
                                 #[cfg(not(feature = "no_function"))]
-                                calc_fn_hash(fn_name, call_args.len()),
-                                calc_fn_hash(fn_name, call_args.len() + 1),
+                                calc_fn_hash(None, fn_name, call_args.len()),
+                                calc_fn_hash(None, fn_name, call_args.len() + 1),
                             );
                         }
                     }
@@ -1036,9 +1034,9 @@ impl Engine {
                 // Recalculate hash
                 let args_len = total_args + curry.len();
                 hashes = if hashes.is_native_only() {
-                    FnCallHashes::from_native(calc_fn_hash(name, args_len))
+                    FnCallHashes::from_native(calc_fn_hash(None, name, args_len))
                 } else {
-                    calc_fn_hash(name, args_len).into()
+                    calc_fn_hash(None, name, args_len).into()
                 };
             }
             // Handle Fn()
@@ -1110,7 +1108,7 @@ impl Engine {
                 return Ok(if num_params < 0 || num_params > crate::MAX_USIZE_INT {
                     false
                 } else {
-                    let hash_script = calc_fn_hash(&fn_name, num_params as usize);
+                    let hash_script = calc_fn_hash(None, &fn_name, num_params as usize);
                     self.has_script_fn(Some(global), caches, lib, hash_script)
                 }
                 .into());

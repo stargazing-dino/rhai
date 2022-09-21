@@ -91,7 +91,7 @@ pub fn get_hasher() -> ahash::AHasher {
 /// The first module name is skipped.  Hashing starts from the _second_ module in the chain.
 #[inline]
 #[must_use]
-pub fn calc_qualified_var_hash<'a>(
+pub fn calc_var_hash<'a>(
     modules: impl IntoIterator<Item = &'a str, IntoIter = impl ExactSizeIterator<Item = &'a str>>,
     var_name: &str,
 ) -> u64 {
@@ -113,8 +113,10 @@ pub fn calc_qualified_var_hash<'a>(
 /// Calculate a non-zero [`u64`] hash key from a namespace-qualified function name
 /// and the number of parameters, but no parameter types.
 ///
-/// Module names are passed in via `&str` references from an iterator.
+/// Module names making up the namespace are passed in via `&str` references from an iterator.
 /// Parameter types are passed in via [`TypeId`] values from an iterator.
+///
+/// If the function is not namespace-qualified, pass [`None`] as the namespace.
 ///
 /// # Zeros
 ///
@@ -125,15 +127,15 @@ pub fn calc_qualified_var_hash<'a>(
 /// The first module name is skipped.  Hashing starts from the _second_ module in the chain.
 #[inline]
 #[must_use]
-pub fn calc_qualified_fn_hash<'a>(
-    modules: impl IntoIterator<Item = &'a str, IntoIter = impl ExactSizeIterator<Item = &'a str>>,
+pub fn calc_fn_hash<'a>(
+    namespace: impl IntoIterator<Item = &'a str, IntoIter = impl ExactSizeIterator<Item = &'a str>>,
     fn_name: &str,
     num: usize,
 ) -> u64 {
     let s = &mut get_hasher();
 
     // We always skip the first module
-    let iter = modules.into_iter();
+    let iter = namespace.into_iter();
     let len = iter.len();
     iter.skip(1).for_each(|m| m.hash(s));
     len.hash(s);
@@ -144,20 +146,6 @@ pub fn calc_qualified_fn_hash<'a>(
         0 => ALT_ZERO_HASH,
         r => r,
     }
-}
-
-/// Calculate a non-zero [`u64`] hash key from a non-namespace-qualified function name
-/// and the number of parameters, but no parameter types.
-///
-/// Parameter types are passed in via [`TypeId`] values from an iterator.
-///
-/// # Zeros
-///
-/// If the hash happens to be zero, it is mapped to `DEFAULT_HASH`.
-#[inline(always)]
-#[must_use]
-pub fn calc_fn_hash(fn_name: &str, num: usize) -> u64 {
-    calc_qualified_fn_hash(None, fn_name, num)
 }
 
 /// Calculate a non-zero [`u64`] hash key from a list of parameter types.
