@@ -865,7 +865,7 @@ impl Engine {
                             #[cfg(not(feature = "no_module"))]
                             if global.scope_level == 0
                                 && access == AccessMode::ReadOnly
-                                && lib.iter().copied().any(Module::is_empty)
+                                && lib.iter().any(|m| !m.is_empty())
                             {
                                 crate::func::locked_write(global.constants.get_or_insert_with(
                                     || {
