@@ -8,7 +8,7 @@ Bug fixes
 ---------
 
 * Compiling on 32-bit architectures no longer cause a compilation error.
-* Fix type-size test fo 32-bit architectures without the `decimal` feature.
+* Fix type-size test for 32-bit architectures without the `decimal` feature.
 
 Custom syntax with state
 ------------------------
