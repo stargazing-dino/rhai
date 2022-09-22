@@ -7,6 +7,7 @@ fn check_struct_sizes() {
     use crate::*;
     use std::mem::size_of;
 
+    const IS_32_BIT: bool = cfg!(target_pointer_width = "32");
     const PACKED: bool = cfg!(all(
         target_pointer_width = "32",
         feature = "only_i32",
@@ -19,11 +20,25 @@ fn check_struct_sizes() {
         size_of::<Position>(),
         if cfg!(feature = "no_position") { 0 } else { 4 }
     );
-    assert_eq!(size_of::<tokenizer::Token>(), 32);
+    assert_eq!(
+        size_of::<tokenizer::Token>(),
+        if IS_32_BIT {
+            if cfg!(feature = "decimal") {
+                24
+            } else {
+                16
+            }
+        } else {
+            32
+        }
+    );
     assert_eq!(size_of::<ast::Expr>(), if PACKED { 12 } else { 16 });
     assert_eq!(size_of::<Option<ast::Expr>>(), if PACKED { 12 } else { 16 });
-    assert_eq!(size_of::<ast::Stmt>(), if PACKED { 12 } else { 16 });
-    assert_eq!(size_of::<Option<ast::Stmt>>(), if PACKED { 12 } else { 16 });
+    assert_eq!(size_of::<ast::Stmt>(), if IS_32_BIT { 12 } else { 16 });
+    assert_eq!(
+        size_of::<Option<ast::Stmt>>(),
+        if IS_32_BIT { 12 } else { 16 }
+    );
 
     #[cfg(target_pointer_width = "64")]
     {
