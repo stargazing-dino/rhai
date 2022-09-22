@@ -1,13 +1,17 @@
 Rhai Release Notes
 ==================
 
-Version 1.11.0
+Version 1.10.1
 ==============
 
-New features
-------------
+Bug fixes
+---------
 
-### Custom syntax with state
+* Compiling on 32-bit architectures no longer cause a compilation error.
+* Fix type-size test fo 32-bit architectures without the `decimal` feature.
+
+Custom syntax with state
+------------------------
 
 * [`Engine::register_custom_syntax_with_state_raw`] is added. The custom syntax parser and implementation functions take on an additional parameter that holds a user-defined custom _state_ which should substantially simplify writing some custom parsers.
 * [`Engine::register_custom_syntax_raw`] is deprecated.
