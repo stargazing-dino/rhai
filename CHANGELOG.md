@@ -1,6 +1,14 @@
 Rhai Release Notes
 ==================
 
+Version 1.11.0
+==============
+
+Enhancements
+
+* The look-ahead symbol for custom syntax now renders a string literal in quotes (instead of the generic term `string`). This facilitates more accurate parsing by separating strings and identifiers.
+
+
 Version 1.10.1
 ==============
 

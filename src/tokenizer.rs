@@ -699,7 +699,7 @@ impl Token {
             FloatConstant(f) => f.to_string().into(),
             #[cfg(feature = "decimal")]
             DecimalConstant(d) => d.to_string().into(),
-            StringConstant(..) => "string".into(),
+            StringConstant(s) => format!("\"{s}\"").into(),
             InterpolatedString(..) => "string".into(),
             CharConstant(c) => c.to_string().into(),
             Identifier(s) => s.to_string().into(),

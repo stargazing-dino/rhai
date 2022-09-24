@@ -2461,7 +2461,7 @@ impl Engine {
         use crate::api::custom_syntax::markers::*;
 
         let mut settings = settings;
-        let mut inputs = StaticVec::<Expr>::new();
+        let mut inputs = StaticVec::new_const();
         let mut segments = StaticVec::new_const();
         let mut tokens = StaticVec::new_const();
 
