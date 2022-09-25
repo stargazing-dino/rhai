@@ -11,21 +11,28 @@ struct DynamicVisitor;
 impl<'d> Visitor<'d> for DynamicVisitor {
     type Value = Dynamic;
 
+    #[cold]
+    #[inline(never)]
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str("any type that can be converted into a Dynamic")
     }
+    #[inline(always)]
     fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> {
         Ok(v.into())
     }
+    #[inline(always)]
     fn visit_i8<E: Error>(self, v: i8) -> Result<Self::Value, E> {
         Ok(INT::from(v).into())
     }
+    #[inline(always)]
     fn visit_i16<E: Error>(self, v: i16) -> Result<Self::Value, E> {
         Ok(INT::from(v).into())
     }
+    #[inline(always)]
     fn visit_i32<E: Error>(self, v: i32) -> Result<Self::Value, E> {
         Ok(INT::from(v).into())
     }
+    #[inline]
     fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> {
         #[cfg(not(feature = "only_i32"))]
         {
@@ -38,12 +45,15 @@ impl<'d> Visitor<'d> for DynamicVisitor {
             self.visit_i32(v as i32)
         }
     }
+    #[inline(always)]
     fn visit_u8<E: Error>(self, v: u8) -> Result<Self::Value, E> {
         Ok(INT::from(v).into())
     }
+    #[inline(always)]
     fn visit_u16<E: Error>(self, v: u16) -> Result<Self::Value, E> {
         Ok(INT::from(v).into())
     }
+    #[inline]
     fn visit_u32<E: Error>(self, v: u32) -> Result<Self::Value, E> {
         #[cfg(not(feature = "only_i32"))]
         {
@@ -56,6 +66,7 @@ impl<'d> Visitor<'d> for DynamicVisitor {
             self.visit_i32(v as i32)
         }
     }
+    #[inline]
     fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
         #[cfg(not(feature = "only_i32"))]
         if v > i64::MAX as u64 {
@@ -72,6 +83,7 @@ impl<'d> Visitor<'d> for DynamicVisitor {
     }
 
     #[cfg(not(feature = "no_float"))]
+    #[inline(always)]
     fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
         #[cfg(not(feature = "f32_float"))]
         return self.visit_f64(v as f64);
@@ -79,6 +91,7 @@ impl<'d> Visitor<'d> for DynamicVisitor {
         return Ok(v.into());
     }
     #[cfg(not(feature = "no_float"))]
+    #[inline(always)]
     fn visit_f64<E: Error>(self, v: f64) -> Result<Self::Value, E> {
         #[cfg(not(feature = "f32_float"))]
         return Ok(v.into());
@@ -88,6 +101,7 @@ impl<'d> Visitor<'d> for DynamicVisitor {
 
     #[cfg(feature = "no_float")]
     #[cfg(feature = "decimal")]
+    #[inline]
     fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
         use rust_decimal::Decimal;
         use std::convert::TryFrom;
@@ -98,6 +112,7 @@ impl<'d> Visitor<'d> for DynamicVisitor {
     }
     #[cfg(feature = "no_float")]
     #[cfg(feature = "decimal")]
+    #[inline]
     fn visit_f64<E: Error>(self, v: f64) -> Result<Self::Value, E> {
         use rust_decimal::Decimal;
         use std::convert::TryFrom;
@@ -107,23 +122,29 @@ impl<'d> Visitor<'d> for DynamicVisitor {
             .map_err(Error::custom)
     }
 
+    #[inline(always)]
     fn visit_char<E: Error>(self, v: char) -> Result<Self::Value, E> {
         self.visit_string(v.to_string())
     }
+    #[inline(always)]
     fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
         Ok(v.into())
     }
+    #[inline(always)]
     fn visit_borrowed_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
         self.visit_str(v)
     }
+    #[inline(always)]
     fn visit_string<E: Error>(self, v: String) -> Result<Self::Value, E> {
         Ok(v.into())
     }
 
+    #[inline(always)]
     fn visit_unit<E: Error>(self) -> Result<Self::Value, E> {
         Ok(Dynamic::UNIT)
     }
 
+    #[inline(always)]
     fn visit_newtype_struct<D: Deserializer<'d>>(self, de: D) -> Result<Self::Value, D::Error> {
         Deserialize::deserialize(de)
     }
@@ -152,12 +173,14 @@ impl<'d> Visitor<'d> for DynamicVisitor {
 }
 
 impl<'d> Deserialize<'d> for Dynamic {
+    #[inline(always)]
     fn deserialize<D: Deserializer<'d>>(de: D) -> Result<Self, D::Error> {
         de.deserialize_any(DynamicVisitor)
     }
 }
 
 impl<'d> Deserialize<'d> for ImmutableString {
+    #[inline]
     fn deserialize<D: Deserializer<'d>>(de: D) -> Result<Self, D::Error> {
         let s: String = Deserialize::deserialize(de)?;
         Ok(s.into())

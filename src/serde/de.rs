@@ -8,12 +8,19 @@ use serde::{Deserialize, Deserializer};
 use std::prelude::v1::*;
 use std::{any::type_name, fmt};
 
-/// Deserializer for [`Dynamic`][crate::Dynamic] which is kept as a reference.
-///
-/// The reference is necessary because the deserialized type may hold references
-/// (especially `&str`) to the source [`Dynamic`][crate::Dynamic].
-struct DynamicDeserializer<'a> {
-    value: &'a Dynamic,
+/// Deserializer for [`Dynamic`][crate::Dynamic].
+pub struct DynamicDeserializer<'de> {
+    value: &'de Dynamic,
+}
+
+impl<'de> IntoDeserializer<'de, RhaiError> for &'de Dynamic {
+    type Deserializer = DynamicDeserializer<'de>;
+
+    #[inline(always)]
+    #[must_use]
+    fn into_deserializer(self) -> Self::Deserializer {
+        DynamicDeserializer { value: self }
+    }
 }
 
 impl<'de> DynamicDeserializer<'de> {
@@ -21,15 +28,20 @@ impl<'de> DynamicDeserializer<'de> {
     ///
     /// The reference is necessary because the deserialized type may hold references
     /// (especially `&str`) to the source [`Dynamic`][crate::Dynamic].
+    #[inline(always)]
     #[must_use]
-    pub const fn from_dynamic(value: &'de Dynamic) -> Self {
+    pub const fn new(value: &'de Dynamic) -> Self {
         Self { value }
     }
     /// Shortcut for a type conversion error.
+    #[cold]
+    #[inline(always)]
     fn type_error<T>(&self) -> RhaiResultOf<T> {
         self.type_error_str(type_name::<T>())
     }
     /// Shortcut for a type conversion error.
+    #[cold]
+    #[inline(never)]
     fn type_error_str<T>(&self, error: &str) -> RhaiResultOf<T> {
         Err(ERR::ErrorMismatchOutputType(
             error.into(),
@@ -38,11 +50,8 @@ impl<'de> DynamicDeserializer<'de> {
         )
         .into())
     }
-    fn deserialize_int<V: Visitor<'de>>(
-        &mut self,
-        v: crate::INT,
-        visitor: V,
-    ) -> RhaiResultOf<V::Value> {
+    #[inline(always)]
+    fn deserialize_int<V: Visitor<'de>>(self, v: crate::INT, visitor: V) -> RhaiResultOf<V::Value> {
         #[cfg(not(feature = "only_i32"))]
         return visitor.visit_i64(v);
         #[cfg(feature = "only_i32")]
@@ -102,10 +111,12 @@ impl<'de> DynamicDeserializer<'de> {
 /// # }
 /// ```
 pub fn from_dynamic<'de, T: Deserialize<'de>>(value: &'de Dynamic) -> RhaiResultOf<T> {
-    T::deserialize(&mut DynamicDeserializer::from_dynamic(value))
+    T::deserialize(DynamicDeserializer::new(value))
 }
 
 impl Error for RhaiError {
+    #[cold]
+    #[inline(never)]
     fn custom<T: fmt::Display>(err: T) -> Self {
         LexError::ImproperSymbol(String::new(), err.to_string())
             .into_err(Position::NONE)
@@ -113,7 +124,7 @@ impl Error for RhaiError {
     }
 }
 
-impl<'de> Deserializer<'de> for &mut DynamicDeserializer<'de> {
+impl<'de> Deserializer<'de> for DynamicDeserializer<'de> {
     type Error = RhaiError;
 
     fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
@@ -458,7 +469,7 @@ impl<'de> Deserializer<'de> for &mut DynamicDeserializer<'de> {
                     if let (Some((key, value)), None) = (first, second) {
                         visitor.visit_enum(EnumDeserializer {
                             tag: key,
-                            content: DynamicDeserializer::from_dynamic(value),
+                            content: DynamicDeserializer::new(value),
                         })
                     } else {
                         self.type_error()
@@ -470,10 +481,12 @@ impl<'de> Deserializer<'de> for &mut DynamicDeserializer<'de> {
         }
     }
 
+    #[inline(always)]
     fn deserialize_identifier<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
         self.deserialize_str(visitor)
     }
 
+    #[inline(always)]
     fn deserialize_ignored_any<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
         self.deserialize_any(visitor)
     }
@@ -481,13 +494,14 @@ impl<'de> Deserializer<'de> for &mut DynamicDeserializer<'de> {
 
 /// `SeqAccess` implementation for arrays.
 #[cfg(not(feature = "no_index"))]
-struct IterateDynamicArray<'a, ITER: Iterator<Item = &'a Dynamic>> {
+struct IterateDynamicArray<'de, ITER: Iterator<Item = &'de Dynamic>> {
     /// Iterator for a stream of [`Dynamic`][crate::Dynamic] values.
     iter: ITER,
 }
 
 #[cfg(not(feature = "no_index"))]
-impl<'a, ITER: Iterator<Item = &'a Dynamic>> IterateDynamicArray<'a, ITER> {
+impl<'de, ITER: Iterator<Item = &'de Dynamic>> IterateDynamicArray<'de, ITER> {
+    #[inline(always)]
     #[must_use]
     pub const fn new(iter: ITER) -> Self {
         Self { iter }
@@ -495,8 +509,8 @@ impl<'a, ITER: Iterator<Item = &'a Dynamic>> IterateDynamicArray<'a, ITER> {
 }
 
 #[cfg(not(feature = "no_index"))]
-impl<'a: 'de, 'de, ITER: Iterator<Item = &'a Dynamic>> serde::de::SeqAccess<'de>
-    for IterateDynamicArray<'a, ITER>
+impl<'de, ITER: Iterator<Item = &'de Dynamic>> serde::de::SeqAccess<'de>
+    for IterateDynamicArray<'de, ITER>
 {
     type Error = RhaiError;
 
@@ -506,17 +520,15 @@ impl<'a: 'de, 'de, ITER: Iterator<Item = &'a Dynamic>> serde::de::SeqAccess<'de>
     ) -> RhaiResultOf<Option<T::Value>> {
         // Deserialize each item coming out of the iterator.
         match self.iter.next() {
+            Some(item) => seed.deserialize(item.into_deserializer()).map(Some),
             None => Ok(None),
-            Some(item) => seed
-                .deserialize(&mut DynamicDeserializer::from_dynamic(item))
-                .map(Some),
         }
     }
 }
 
 /// `MapAccess` implementation for maps.
 #[cfg(not(feature = "no_object"))]
-struct IterateMap<'a, K: Iterator<Item = &'a str>, V: Iterator<Item = &'a Dynamic>> {
+struct IterateMap<'de, K: Iterator<Item = &'de str>, V: Iterator<Item = &'de Dynamic>> {
     // Iterator for a stream of [`Dynamic`][crate::Dynamic] keys.
     keys: K,
     // Iterator for a stream of [`Dynamic`][crate::Dynamic] values.
@@ -524,7 +536,8 @@ struct IterateMap<'a, K: Iterator<Item = &'a str>, V: Iterator<Item = &'a Dynami
 }
 
 #[cfg(not(feature = "no_object"))]
-impl<'a, K: Iterator<Item = &'a str>, V: Iterator<Item = &'a Dynamic>> IterateMap<'a, K, V> {
+impl<'de, K: Iterator<Item = &'de str>, V: Iterator<Item = &'de Dynamic>> IterateMap<'de, K, V> {
+    #[inline(always)]
     #[must_use]
     pub const fn new(keys: K, values: V) -> Self {
         Self { keys, values }
@@ -532,8 +545,8 @@ impl<'a, K: Iterator<Item = &'a str>, V: Iterator<Item = &'a Dynamic>> IterateMa
 }
 
 #[cfg(not(feature = "no_object"))]
-impl<'a: 'de, 'de, K: Iterator<Item = &'a str>, V: Iterator<Item = &'a Dynamic>>
-    serde::de::MapAccess<'de> for IterateMap<'a, K, V>
+impl<'de, K: Iterator<Item = &'de str>, V: Iterator<Item = &'de Dynamic>> serde::de::MapAccess<'de>
+    for IterateMap<'de, K, V>
 {
     type Error = RhaiError;
 
@@ -542,11 +555,9 @@ impl<'a: 'de, 'de, K: Iterator<Item = &'a str>, V: Iterator<Item = &'a Dynamic>>
         seed: S,
     ) -> RhaiResultOf<Option<S::Value>> {
         // Deserialize each `Identifier` key coming out of the keys iterator.
-        match self.keys.next() {
+        match self.keys.next().map(<_>::into_deserializer) {
+            Some(d) => seed.deserialize(d).map(Some),
             None => Ok(None),
-            Some(item) => seed
-                .deserialize(&mut super::str::StringSliceDeserializer::from_str(item))
-                .map(Some),
         }
     }
 
@@ -555,20 +566,18 @@ impl<'a: 'de, 'de, K: Iterator<Item = &'a str>, V: Iterator<Item = &'a Dynamic>>
         seed: S,
     ) -> RhaiResultOf<S::Value> {
         // Deserialize each value item coming out of the iterator.
-        seed.deserialize(&mut DynamicDeserializer::from_dynamic(
-            self.values.next().unwrap(),
-        ))
+        seed.deserialize(self.values.next().unwrap().into_deserializer())
     }
 }
 
 #[cfg(not(feature = "no_object"))]
-struct EnumDeserializer<'t, 'de: 't> {
-    tag: &'t str,
+struct EnumDeserializer<'de> {
+    tag: &'de str,
     content: DynamicDeserializer<'de>,
 }
 
 #[cfg(not(feature = "no_object"))]
-impl<'t, 'de> serde::de::EnumAccess<'de> for EnumDeserializer<'t, 'de> {
+impl<'de> serde::de::EnumAccess<'de> for EnumDeserializer<'de> {
     type Error = RhaiError;
     type Variant = Self;
 
@@ -582,26 +591,30 @@ impl<'t, 'de> serde::de::EnumAccess<'de> for EnumDeserializer<'t, 'de> {
 }
 
 #[cfg(not(feature = "no_object"))]
-impl<'t, 'de> serde::de::VariantAccess<'de> for EnumDeserializer<'t, 'de> {
+impl<'de> serde::de::VariantAccess<'de> for EnumDeserializer<'de> {
     type Error = RhaiError;
 
-    fn unit_variant(mut self) -> RhaiResultOf<()> {
-        Deserialize::deserialize(&mut self.content)
+    #[inline(always)]
+    fn unit_variant(self) -> RhaiResultOf<()> {
+        Deserialize::deserialize(self.content)
     }
 
+    #[inline(always)]
     fn newtype_variant_seed<T: serde::de::DeserializeSeed<'de>>(
-        mut self,
+        self,
         seed: T,
     ) -> RhaiResultOf<T::Value> {
-        seed.deserialize(&mut self.content)
+        seed.deserialize(self.content)
     }
 
-    fn tuple_variant<V: Visitor<'de>>(mut self, len: usize, visitor: V) -> RhaiResultOf<V::Value> {
+    #[inline(always)]
+    fn tuple_variant<V: Visitor<'de>>(self, len: usize, visitor: V) -> RhaiResultOf<V::Value> {
         self.content.deserialize_tuple(len, visitor)
     }
 
+    #[inline(always)]
     fn struct_variant<V: Visitor<'de>>(
-        mut self,
+        self,
         fields: &'static [&'static str],
         visitor: V,
     ) -> RhaiResultOf<V::Value> {
