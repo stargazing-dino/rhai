@@ -874,9 +874,9 @@ impl Token {
             "**=" => PowerOfAssign,
 
             #[cfg(feature = "no_object")]
-            "?." => Reserved(syntax.into()),
+            "?." => Reserved(Box::new(syntax.into())),
             #[cfg(feature = "no_index")]
-            "?[" => Reserved(syntax.into()),
+            "?[" => Reserved(Box::new(syntax.into())),
 
             #[cfg(not(feature = "no_function"))]
             "fn" => Fn,
@@ -884,7 +884,7 @@ impl Token {
             "private" => Private,
 
             #[cfg(feature = "no_function")]
-            "fn" | "private" => Reserved(syntax.into()),
+            "fn" | "private" => Reserved(Box::new(syntax.into())),
 
             #[cfg(not(feature = "no_module"))]
             "import" => Import,
@@ -894,7 +894,7 @@ impl Token {
             "as" => As,
 
             #[cfg(feature = "no_module")]
-            "import" | "export" | "as" => Reserved(syntax.into()),
+            "import" | "export" | "as" => Reserved(Box::new(syntax.into())),
 
             // List of reserved operators
             "===" | "!==" | "->" | "<-" | "?" | ":=" | ":;" | "~" | "!." | "::<" | "(*" | "*)"
