@@ -75,6 +75,7 @@ impl Engine {
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
+    #[must_use]
     pub fn module_resolver(&self) -> &dyn crate::ModuleResolver {
         &*self.module_resolver
     }

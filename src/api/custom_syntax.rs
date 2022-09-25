@@ -147,6 +147,7 @@ impl Expression<'_> {
 
 impl AsRef<Expr> for Expression<'_> {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &Expr {
         self.0
     }
@@ -156,6 +157,7 @@ impl Deref for Expression<'_> {
     type Target = Expr;
 
     #[inline(always)]
+    #[must_use]
     fn deref(&self) -> &Self::Target {
         self.0
     }

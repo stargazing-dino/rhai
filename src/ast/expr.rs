@@ -257,6 +257,7 @@ impl Hash for FloatWrapper<crate::FLOAT> {
 #[cfg(not(feature = "no_float"))]
 impl<F: Float> AsRef<F> for FloatWrapper<F> {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &F {
         &self.0
     }
@@ -265,6 +266,7 @@ impl<F: Float> AsRef<F> for FloatWrapper<F> {
 #[cfg(not(feature = "no_float"))]
 impl<F: Float> AsMut<F> for FloatWrapper<F> {
     #[inline(always)]
+    #[must_use]
     fn as_mut(&mut self) -> &mut F {
         &mut self.0
     }
@@ -275,6 +277,7 @@ impl<F: Float> Deref for FloatWrapper<F> {
     type Target = F;
 
     #[inline(always)]
+    #[must_use]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -283,6 +286,7 @@ impl<F: Float> Deref for FloatWrapper<F> {
 #[cfg(not(feature = "no_float"))]
 impl<F: Float> DerefMut for FloatWrapper<F> {
     #[inline(always)]
+    #[must_use]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

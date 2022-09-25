@@ -42,7 +42,7 @@ mod test {
         #[rhai_fn(name = "no_effect", set = "no_effect", pure)]
         pub fn no_effect(array: &mut Array, value: INT) {
             // array is not modified
-            println!("Array = {:?}, Value = {}", array, value);
+            println!("Array = {array:?}, Value = {value}");
         }
     }
 }

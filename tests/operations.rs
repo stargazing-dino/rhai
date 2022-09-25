@@ -10,7 +10,7 @@ fn test_max_operations() -> Result<(), Box<EvalAltResult>> {
 
     engine.on_progress(|count| {
         if count % 100 == 0 {
-            println!("{}", count);
+            println!("{count}");
         }
         None
     });
@@ -68,7 +68,7 @@ fn test_max_operations_functions() -> Result<(), Box<EvalAltResult>> {
 
     engine.on_progress(|count| {
         if count % 100 == 0 {
-            println!("{}", count);
+            println!("{count}");
         }
         None
     });
@@ -124,7 +124,7 @@ fn test_max_operations_eval() -> Result<(), Box<EvalAltResult>> {
 
     engine.on_progress(|count| {
         if count % 100 == 0 {
-            println!("{}", count);
+            println!("{count}");
         }
         None
     });

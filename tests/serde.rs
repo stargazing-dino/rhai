@@ -820,6 +820,6 @@ fn test_serde_blob() -> Result<(), Box<EvalAltResult>> {
 #[cfg(not(feature = "no_object"))]
 fn test_serde_json_borrowed_string() {
     let value = json!({ "a": "b" });
-    println!("value: {:?}", value);
+    println!("value: {value:?}");
     let _: Dynamic = serde_json::from_value(value).unwrap();
 }

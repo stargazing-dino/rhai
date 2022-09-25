@@ -140,7 +140,7 @@ fn test_scope_eval() -> Result<(), Box<EvalAltResult>> {
     // Second invocation using the same state
     let result = engine.eval_with_scope::<INT>(&mut scope, "x")?;
 
-    println!("result: {}", result); // should print 966
+    println!("result: {result}"); // should print 966
 
     // Variable y is changed in the script
     assert_eq!(

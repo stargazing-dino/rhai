@@ -13,6 +13,7 @@ use std::prelude::v1::*;
 /// Error encountered when tokenizing the script text.
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 #[non_exhaustive]
+#[must_use]
 pub enum LexError {
     /// An unexpected symbol is encountered when tokenizing the script text.
     UnexpectedInput(String),
@@ -58,8 +59,8 @@ impl fmt::Display for LexError {
 
 impl LexError {
     /// Convert a [`LexError`] into a [`ParseError`].
-    #[inline(always)]
-    #[must_use]
+    #[cold]
+    #[inline(never)]
     pub fn into_err(self, pos: Position) -> ParseError {
         ParseError(Box::new(self.into()), pos)
     }
@@ -72,6 +73,7 @@ impl LexError {
 /// massive code changes to remove/add back enum variants in match statements.
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 #[non_exhaustive]
+#[must_use]
 pub enum ParseErrorType {
     /// The script ends prematurely.
     UnexpectedEOF,
@@ -171,7 +173,8 @@ pub enum ParseErrorType {
 
 impl ParseErrorType {
     /// Make a [`ParseError`] using the current type and position.
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     #[must_use]
     pub(crate) fn into_err(self, pos: Position) -> ParseError {
         ParseError(self.into(), pos)
@@ -277,6 +280,7 @@ impl From<LexError> for ParseErrorType {
 
 /// Error when parsing a script.
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
+#[must_use]
 pub struct ParseError(
     /// Parse error type.
     pub Box<ParseErrorType>,

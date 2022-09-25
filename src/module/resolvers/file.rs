@@ -194,8 +194,8 @@ impl FileModuleResolver {
     /// Get a reference to the file module resolver's [scope][Scope].
     ///
     /// The [scope][Scope] is used for compiling module scripts.
-    #[must_use]
     #[inline(always)]
+    #[must_use]
     pub const fn scope(&self) -> &Scope {
         &self.scope
     }
@@ -211,8 +211,8 @@ impl FileModuleResolver {
     /// Get a mutable reference to the file module resolver's [scope][Scope].
     ///
     /// The [scope][Scope] is used for compiling module scripts.
-    #[must_use]
     #[inline(always)]
+    #[must_use]
     pub fn scope_mut(&mut self) -> &mut Scope<'static> {
         &mut self.scope
     }

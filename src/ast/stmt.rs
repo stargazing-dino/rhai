@@ -424,6 +424,7 @@ impl Deref for StmtBlock {
     type Target = StmtBlockContainer;
 
     #[inline(always)]
+    #[must_use]
     fn deref(&self) -> &Self::Target {
         &self.block
     }
@@ -431,6 +432,7 @@ impl Deref for StmtBlock {
 
 impl DerefMut for StmtBlock {
     #[inline(always)]
+    #[must_use]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.block
     }
@@ -438,6 +440,7 @@ impl DerefMut for StmtBlock {
 
 impl AsRef<[Stmt]> for StmtBlock {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &[Stmt] {
         &self.block
     }
@@ -445,6 +448,7 @@ impl AsRef<[Stmt]> for StmtBlock {
 
 impl AsMut<[Stmt]> for StmtBlock {
     #[inline(always)]
+    #[must_use]
     fn as_mut(&mut self) -> &mut [Stmt] {
         &mut self.block
     }

@@ -240,12 +240,12 @@ impl Engine {
                 source.map_or_else(
                     || {
                         if pos.is_none() {
-                            println!("{}", s);
+                            println!("{s}");
                         } else {
-                            println!("{:?} | {}", pos, s);
+                            println!("{pos:?} | {s}");
                         }
                     },
-                    |source| println!("{} @ {:?} | {}", source, pos, s),
+                    |source| println!("{source} @ {pos:?} | {s}"),
                 )
             });
         }

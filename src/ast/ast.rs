@@ -919,6 +919,7 @@ impl<A: Into<Self>> AddAssign<A> for AST {
 
 impl AsRef<[Stmt]> for AST {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &[Stmt] {
         self.statements()
     }
@@ -927,6 +928,7 @@ impl AsRef<[Stmt]> for AST {
 #[cfg(not(feature = "no_function"))]
 impl AsRef<crate::Module> for AST {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &crate::Module {
         self.shared_lib().as_ref()
     }
@@ -935,6 +937,7 @@ impl AsRef<crate::Module> for AST {
 #[cfg(not(feature = "no_function"))]
 impl AsRef<crate::Shared<crate::Module>> for AST {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &crate::Shared<crate::Module> {
         self.shared_lib()
     }

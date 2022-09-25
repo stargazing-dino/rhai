@@ -53,6 +53,7 @@ impl Deref for ImmutableString {
     type Target = SmartString;
 
     #[inline(always)]
+    #[must_use]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -60,6 +61,7 @@ impl Deref for ImmutableString {
 
 impl AsRef<SmartString> for ImmutableString {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &SmartString {
         &self.0
     }
@@ -67,6 +69,7 @@ impl AsRef<SmartString> for ImmutableString {
 
 impl AsRef<str> for ImmutableString {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &str {
         &self.0
     }
@@ -74,6 +77,7 @@ impl AsRef<str> for ImmutableString {
 
 impl Borrow<SmartString> for ImmutableString {
     #[inline(always)]
+    #[must_use]
     fn borrow(&self) -> &SmartString {
         &self.0
     }
@@ -81,6 +85,7 @@ impl Borrow<SmartString> for ImmutableString {
 
 impl Borrow<str> for ImmutableString {
     #[inline(always)]
+    #[must_use]
     fn borrow(&self) -> &str {
         self.as_str()
     }
@@ -623,7 +628,7 @@ impl ImmutableString {
     #[inline]
     #[must_use]
     pub fn into_owned(mut self) -> String {
-        self.make_mut(); // Make sure it is unique reference
+        let _ = self.make_mut(); // Make sure it is unique reference
         shared_take(self.0).into() // Should succeed
     }
     /// Make sure that the [`ImmutableString`] is unique (i.e. no other outstanding references).
@@ -631,6 +636,7 @@ impl ImmutableString {
     ///
     /// If there are other references to the same string, a cloned copy is used.
     #[inline(always)]
+    #[must_use]
     pub(crate) fn make_mut(&mut self) -> &mut SmartString {
         shared_make_mut(&mut self.0)
     }
