@@ -19,16 +19,16 @@ use std::{
 /// Exported under the `internals` feature only.
 ///
 /// This type may hold a straight assignment (i.e. not an op-assignment).
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, PartialEq, Hash)]
 pub struct OpAssignment {
     /// Hash of the op-assignment call.
     pub hash_op_assign: u64,
     /// Hash of the underlying operator call (for fallback).
     pub hash_op: u64,
     /// Op-assignment operator.
-    pub op_assign: &'static str,
+    pub op_assign: Token,
     /// Underlying operator.
-    pub op: &'static str,
+    pub op: Token,
     /// [Position] of the op-assignment operator.
     pub pos: Position,
 }
@@ -41,8 +41,8 @@ impl OpAssignment {
         Self {
             hash_op_assign: 0,
             hash_op: 0,
-            op_assign: "=",
-            op: "=",
+            op_assign: Token::Equals,
+            op: Token::Equals,
             pos,
         }
     }
@@ -71,12 +71,11 @@ impl OpAssignment {
     pub fn new_op_assignment_from_token(op: &Token, pos: Position) -> Self {
         let op_raw = op
             .get_base_op_from_assignment()
-            .expect("op-assignment operator")
-            .literal_syntax();
+            .expect("op-assignment operator");
         Self {
             hash_op_assign: calc_fn_hash(None, op.literal_syntax(), 2),
-            hash_op: calc_fn_hash(None, op_raw, 2),
-            op_assign: op.literal_syntax(),
+            hash_op: calc_fn_hash(None, op_raw.literal_syntax(), 2),
+            op_assign: op.clone(),
             op: op_raw,
             pos,
         }

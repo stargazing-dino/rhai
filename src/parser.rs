@@ -472,7 +472,7 @@ fn match_token(input: &mut TokenStream, token: Token) -> (bool, Position) {
 fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position)> {
     match input.next().expect(NEVER_ENDS) {
         // Variable name
-        (Token::Identifier(s), pos) => Ok((s, pos)),
+        (Token::Identifier(s), pos) => Ok((*s, pos)),
         // Reserved keyword
         (Token::Reserved(s), pos) if is_valid_identifier(s.chars()) => {
             Err(PERR::Reserved(s.to_string()).into_err(pos))
@@ -492,7 +492,7 @@ fn parse_symbol(input: &mut TokenStream) -> ParseResult<(SmartString, Position)>
         // Symbol
         (token, pos) if token.is_standard_symbol() => Ok((token.literal_syntax().into(), pos)),
         // Reserved symbol
-        (Token::Reserved(s), pos) if !is_valid_identifier(s.chars()) => Ok((s, pos)),
+        (Token::Reserved(s), pos) if !is_valid_identifier(s.chars()) => Ok((*s, pos)),
         // Bad symbol
         (Token::LexError(err), pos) => Err(err.into_err(pos)),
         // Not a symbol
@@ -616,7 +616,7 @@ impl Engine {
                 return Ok(FnCallExpr {
                     name: state.get_interned_string(id),
                     capture_parent_scope,
-                    is_native_operator: false,
+                    operator_token: None,
                     #[cfg(not(feature = "no_module"))]
                     namespace,
                     hashes,
@@ -684,7 +684,7 @@ impl Engine {
                     return Ok(FnCallExpr {
                         name: state.get_interned_string(id),
                         capture_parent_scope,
-                        is_native_operator: false,
+                        operator_token: None,
                         #[cfg(not(feature = "no_module"))]
                         namespace,
                         hashes,
@@ -1000,10 +1000,10 @@ impl Engine {
 
             let (name, pos) = match input.next().expect(NEVER_ENDS) {
                 (Token::Identifier(s) | Token::StringConstant(s), pos) => {
-                    if map.iter().any(|(p, ..)| **p == s) {
+                    if map.iter().any(|(p, ..)| **p == *s) {
                         return Err(PERR::DuplicatedProperty(s.to_string()).into_err(pos));
                     }
-                    (s, pos)
+                    (*s, pos)
                 }
                 (Token::InterpolatedString(..), pos) => {
                     return Err(PERR::PropertyExpected.into_err(pos))
@@ -1342,7 +1342,7 @@ impl Engine {
                 Token::IntegerConstant(x) => Expr::IntegerConstant(x, settings.pos),
                 Token::CharConstant(c) => Expr::CharConstant(c, settings.pos),
                 Token::StringConstant(s) => {
-                    Expr::StringConstant(state.get_interned_string(s), settings.pos)
+                    Expr::StringConstant(state.get_interned_string(*s), settings.pos)
                 }
                 Token::True => Expr::BoolConstant(true, settings.pos),
                 Token::False => Expr::BoolConstant(false, settings.pos),
@@ -1356,7 +1356,7 @@ impl Engine {
             }
             #[cfg(feature = "decimal")]
             Token::DecimalConstant(x) => {
-                let x = (*x).into();
+                let x = (**x).into();
                 input.next();
                 Expr::DynamicConstant(Box::new(x), settings.pos)
             }
@@ -1479,7 +1479,7 @@ impl Engine {
                 match input.next().expect(NEVER_ENDS) {
                     (Token::InterpolatedString(s), ..) if s.is_empty() => (),
                     (Token::InterpolatedString(s), pos) => {
-                        segments.push(Expr::StringConstant(s.into(), pos))
+                        segments.push(Expr::StringConstant(state.get_interned_string(*s), pos))
                     }
                     token => {
                         unreachable!("Token::InterpolatedString expected but gets {:?}", token)
@@ -1502,14 +1502,16 @@ impl Engine {
                     match input.next().expect(NEVER_ENDS) {
                         (Token::StringConstant(s), pos) => {
                             if !s.is_empty() {
-                                segments.push(Expr::StringConstant(s.into(), pos));
+                                segments
+                                    .push(Expr::StringConstant(state.get_interned_string(*s), pos));
                             }
                             // End the interpolated string if it is terminated by a back-tick.
                             break;
                         }
                         (Token::InterpolatedString(s), pos) => {
                             if !s.is_empty() {
-                                segments.push(Expr::StringConstant(s.into(), pos));
+                                segments
+                                    .push(Expr::StringConstant(state.get_interned_string(*s), pos));
                             }
                         }
                         (Token::LexError(err), pos)
@@ -1574,7 +1576,7 @@ impl Engine {
                             state.allow_capture = true;
                         }
                         Expr::Variable(
-                            (None, ns, 0, state.get_interned_string(s)).into(),
+                            (None, ns, 0, state.get_interned_string(*s)).into(),
                             None,
                             settings.pos,
                         )
@@ -1587,7 +1589,7 @@ impl Engine {
                             // Once the identifier consumed we must enable next variables capturing
                             state.allow_capture = true;
                         }
-                        let name = state.get_interned_string(s);
+                        let name = state.get_interned_string(*s);
                         Expr::Variable((None, ns, 0, name).into(), None, settings.pos)
                     }
                     // Normal variable access
@@ -1612,7 +1614,7 @@ impl Engine {
                                 None
                             }
                         });
-                        let name = state.get_interned_string(s);
+                        let name = state.get_interned_string(*s);
                         Expr::Variable((index, ns, 0, name).into(), short_index, settings.pos)
                     }
                 }
@@ -1634,7 +1636,7 @@ impl Engine {
                     // Function call is allowed to have reserved keyword
                     Token::LeftParen | Token::Bang | Token::Unit if is_keyword_function(&s) => {
                         Expr::Variable(
-                            (None, ns, 0, state.get_interned_string(s)).into(),
+                            (None, ns, 0, state.get_interned_string(*s)).into(),
                             None,
                             settings.pos,
                         )
@@ -1642,7 +1644,7 @@ impl Engine {
                     // Access to `this` as a variable is OK within a function scope
                     #[cfg(not(feature = "no_function"))]
                     _ if &*s == KEYWORD_THIS && settings.in_fn_scope => Expr::Variable(
-                        (None, ns, 0, state.get_interned_string(s)).into(),
+                        (None, ns, 0, state.get_interned_string(*s)).into(),
                         None,
                         settings.pos,
                     ),
@@ -1888,7 +1890,7 @@ impl Engine {
             // -expr
             Token::Minus | Token::UnaryMinus => {
                 let token = token.clone();
-                let pos = eat_token(input, token);
+                let pos = eat_token(input, token.clone());
 
                 match self.parse_unary(input, state, lib, settings.level_up())? {
                     // Negative integer
@@ -1918,7 +1920,7 @@ impl Engine {
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "-", 1)),
                             args,
                             pos,
-                            is_native_operator: true,
+                            operator_token: Some(token),
                             ..Default::default()
                         }
                         .into_fn_call_expr(pos))
@@ -1928,7 +1930,7 @@ impl Engine {
             // +expr
             Token::Plus | Token::UnaryPlus => {
                 let token = token.clone();
-                let pos = eat_token(input, token);
+                let pos = eat_token(input, token.clone());
 
                 match self.parse_unary(input, state, lib, settings.level_up())? {
                     expr @ Expr::IntegerConstant(..) => Ok(expr),
@@ -1946,7 +1948,7 @@ impl Engine {
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "+", 1)),
                             args,
                             pos,
-                            is_native_operator: true,
+                            operator_token: Some(token),
                             ..Default::default()
                         }
                         .into_fn_call_expr(pos))
@@ -1955,7 +1957,9 @@ impl Engine {
             }
             // !expr
             Token::Bang => {
+                let token = token.clone();
                 let pos = eat_token(input, Token::Bang);
+
                 let mut args = StaticVec::new_const();
                 args.push(self.parse_unary(input, state, lib, settings.level_up())?);
                 args.shrink_to_fit();
@@ -1965,7 +1969,7 @@ impl Engine {
                     hashes: FnCallHashes::from_native(calc_fn_hash(None, "!", 1)),
                     args,
                     pos,
-                    is_native_operator: true,
+                    operator_token: Some(token),
                     ..Default::default()
                 }
                 .into_fn_call_expr(pos))
@@ -2283,7 +2287,7 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .get(c)
+                    .get(&**c)
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*current_pos))?,
                 Token::Reserved(c) if !is_valid_identifier(c.chars()) => {
@@ -2308,7 +2312,7 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .get(c)
+                    .get(&**c)
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*next_pos))?,
                 Token::Reserved(c) if !is_valid_identifier(c.chars()) => {
@@ -2335,12 +2339,17 @@ impl Engine {
 
             let op = op_token.syntax();
             let hash = calc_fn_hash(None, &op, 2);
+            let operator_token = if is_valid_function_name(&op) {
+                None
+            } else {
+                Some(op_token.clone())
+            };
 
             let op_base = FnCallExpr {
                 name: state.get_interned_string(op.as_ref()),
                 hashes: FnCallHashes::from_native(hash),
                 pos,
-                is_native_operator: !is_valid_function_name(&op),
+                operator_token,
                 ..Default::default()
             };
 
@@ -2578,7 +2587,7 @@ impl Engine {
                 },
                 CUSTOM_SYNTAX_MARKER_STRING => match input.next().expect(NEVER_ENDS) {
                     (Token::StringConstant(s), pos) => {
-                        let s = state.get_interned_string(s);
+                        let s = state.get_interned_string(*s);
                         inputs.push(Expr::StringConstant(s.clone(), pos));
                         segments.push(s);
                         tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_STRING));
@@ -3228,7 +3237,7 @@ impl Engine {
 
                 match input.next().expect(NEVER_ENDS).0 {
                     Token::Comment(comment) => {
-                        comments.push(comment);
+                        comments.push(*comment);
 
                         match input.peek().expect(NEVER_ENDS) {
                             (Token::Fn | Token::Private, ..) => break,
@@ -3562,7 +3571,7 @@ impl Engine {
                             return Err(PERR::FnDuplicatedParam(name.to_string(), s.to_string())
                                 .into_err(pos));
                         }
-                        let s = state.get_interned_string(s);
+                        let s = state.get_interned_string(*s);
                         state.stack.push(s.clone(), ());
                         params.push((s, pos));
                     }
@@ -3700,7 +3709,7 @@ impl Engine {
                                 PERR::FnDuplicatedParam(String::new(), s.to_string()).into_err(pos)
                             );
                         }
-                        let s = state.get_interned_string(s);
+                        let s = state.get_interned_string(*s);
                         state.stack.push(s.clone(), ());
                         params_list.push(s);
                     }

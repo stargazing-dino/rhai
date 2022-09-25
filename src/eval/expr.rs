@@ -219,11 +219,15 @@ impl Engine {
         level: usize,
     ) -> RhaiResult {
         let FnCallExpr {
-            name, hashes, args, ..
+            name,
+            hashes,
+            args,
+            operator_token,
+            ..
         } = expr;
 
         // Short-circuit native binary operator call if under Fast Operators mode
-        if expr.is_native_operator && self.fast_operators() && args.len() == 2 {
+        if operator_token.is_some() && self.fast_operators() && args.len() == 2 {
             let mut lhs = self
                 .get_arg_value(scope, global, caches, lib, this_ptr, &args[0], level)?
                 .0
@@ -236,7 +240,9 @@ impl Engine {
 
             let operands = &mut [&mut lhs, &mut rhs];
 
-            if let Some(func) = get_builtin_binary_op_fn(name, operands[0], operands[1]) {
+            if let Some(func) =
+                get_builtin_binary_op_fn(operator_token.as_ref().unwrap(), operands[0], operands[1])
+            {
                 // Built-in found
                 let context = (self, name, None, &*global, lib, pos, level + 1).into();
                 let result = func(context, operands);
@@ -278,7 +284,7 @@ impl Engine {
             args,
             *hashes,
             expr.capture_parent_scope,
-            expr.is_native_operator,
+            expr.operator_token.as_ref(),
             pos,
             level,
         )
@@ -384,9 +390,9 @@ impl Engine {
 
                     op_info.pos = expr.start_position();
 
-                    if let Err(err) = self
-                        .eval_op_assignment(global, caches, lib, op_info, target, root, item, level)
-                    {
+                    if let Err(err) = self.eval_op_assignment(
+                        global, caches, lib, &op_info, target, root, item, level,
+                    ) {
                         result = Err(err);
                         break;
                     }

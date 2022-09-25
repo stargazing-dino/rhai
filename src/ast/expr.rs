@@ -193,7 +193,7 @@ pub struct FnCallExpr {
     /// Does this function call capture the parent scope?
     pub capture_parent_scope: bool,
     /// Is this function call a native operator?
-    pub is_native_operator: bool,
+    pub operator_token: Option<Token>,
     /// [Position] of the function name.
     pub pos: Position,
 }
@@ -208,8 +208,8 @@ impl fmt::Debug for FnCallExpr {
         if self.capture_parent_scope {
             ff.field("capture_parent_scope", &self.capture_parent_scope);
         }
-        if self.is_native_operator {
-            ff.field("is_native_operator", &self.is_native_operator);
+        if let Some(ref token) = self.operator_token {
+            ff.field("operator_token", token);
         }
         ff.field("hash", &self.hashes)
             .field("name", &self.name)
@@ -673,7 +673,7 @@ impl Expr {
                     hashes: calc_fn_hash(None, f.fn_name(), 1).into(),
                     args: once(Self::StringConstant(f.fn_name().into(), pos)).collect(),
                     capture_parent_scope: false,
-                    is_native_operator: false,
+                    operator_token: None,
                     pos,
                 }
                 .into(),
