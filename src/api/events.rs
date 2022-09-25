@@ -172,7 +172,7 @@ impl Engine {
     /// engine.on_parse_token(|token, _, _| {
     ///     match token {
     ///         // Convert all integer literals to strings
-    ///         Token::IntegerConstant(n) => Token::StringConstant(n.to_string().into()),
+    ///         Token::IntegerConstant(n) => Token::StringConstant(Box::new(n.to_string().into())),
     ///         // Convert 'begin' .. 'end' to '{' .. '}'
     ///         Token::Identifier(s) if &*s == "begin" => Token::LeftBrace,
     ///         Token::Identifier(s) if &*s == "end" => Token::RightBrace,
