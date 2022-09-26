@@ -2,7 +2,7 @@
 
 use rhai::{
     serde::{from_dynamic, to_dynamic},
-    Dynamic, Engine, EvalAltResult, ImmutableString, INT,
+    Dynamic, Engine, EvalAltResult, ImmutableString, Scope, INT,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -822,4 +822,35 @@ fn test_serde_json_borrowed_string() {
     let value = json!({ "a": "b" });
     println!("value: {value:?}");
     let _: Dynamic = serde_json::from_value(value).unwrap();
+}
+
+#[test]
+#[cfg(not(feature = "no_object"))]
+fn test_serde_scope() {
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    struct TestStruct {
+        foo: Option<char>,
+    }
+
+    let mut scope = Scope::new();
+    scope.push("x", 42 as INT);
+    scope.push_constant("y", true);
+    scope.push("z", TestStruct { foo: None });
+
+    let json = serde_json::to_string(&scope).unwrap();
+
+    assert_eq!(
+        json,
+        r#"[{"name":"x","value":42},{"name":"y","value":true,"is_constant":true},{"name":"z","value":"serde::test_serde_scope::TestStruct"}]"#
+    );
+
+    scope = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(scope.len(), 3);
+    assert_eq!(scope.get_value::<INT>("x").unwrap(), 42);
+    assert_eq!(scope.get_value::<bool>("y").unwrap(), true);
+    assert_eq!(
+        scope.get_value::<String>("z").unwrap(),
+        "serde::test_serde_scope::TestStruct"
+    );
 }

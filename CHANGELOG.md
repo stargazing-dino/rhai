@@ -5,8 +5,12 @@ Version 1.11.0
 ==============
 
 Enhancements
+------------
 
 * The look-ahead symbol for custom syntax now renders a string literal in quotes (instead of the generic term `string`). This facilitates more accurate parsing by separating strings and identifiers.
+* Due to a code refactor, built-in operators for standard types now run even faster, in certain cases by 20-30%.
+* `Scope` is now serializable and deserializable via `serde`.
+* `Scope` now contains a const generic parameter that allows specifying how many entries to be kept inline.
 
 
 Version 1.10.1

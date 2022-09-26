@@ -22,6 +22,14 @@ const SCOPE_ENTRIES_INLINED: usize = 8;
 /// Currently the lifetime parameter is not used, but it is not guaranteed to remain unused for
 /// future versions. Until then, `'static` can be used.
 ///
+/// # Constant Generic Parameter
+///
+/// There is a constant generic parameter that indicates how many entries to keep inline.
+/// As long as the number of entries does not exceed this limit, no allocations occur.
+/// The default is 8.
+///
+/// A larger value makes [`Scope`] larger, but reduces the chance of allocations.
+///
 /// # Thread Safety
 ///
 /// Currently, [`Scope`] is neither [`Send`] nor [`Sync`]. Turn on the `sync` feature to make it
@@ -61,7 +69,7 @@ const SCOPE_ENTRIES_INLINED: usize = 8;
 //
 // [`Dynamic`] is reasonably small so packing it tightly improves cache performance.
 #[derive(Debug, Hash, Default)]
-pub struct Scope<'a> {
+pub struct Scope<'a, const N: usize = SCOPE_ENTRIES_INLINED> {
     /// Current value of the entry.
     values: SmallVec<[Dynamic; SCOPE_ENTRIES_INLINED]>,
     /// Name of the entry.
@@ -167,6 +175,28 @@ impl Scope<'_> {
             values: SmallVec::new_const(),
             names: SmallVec::new_const(),
             aliases: SmallVec::new_const(),
+            dummy: PhantomData,
+        }
+    }
+    /// Create a new [`Scope`] with a particular capacity.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rhai::Scope;
+    ///
+    /// let mut my_scope = Scope::with_capacity(10);
+    ///
+    /// my_scope.push("x", 42_i64);
+    /// assert_eq!(my_scope.get_value::<i64>("x").expect("x should exist"), 42);
+    /// ```
+    #[inline(always)]
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            values: SmallVec::with_capacity(capacity),
+            names: SmallVec::with_capacity(capacity),
+            aliases: SmallVec::with_capacity(capacity),
             dummy: PhantomData,
         }
     }
