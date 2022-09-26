@@ -184,77 +184,69 @@ impl ParseErrorType {
 impl fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::BadInput(err) => write!(f, "{}", err),
+            Self::BadInput(err) => write!(f, "{err}"),
 
-            Self::UnknownOperator(s) => write!(f, "Unknown operator: '{}'", s),
+            Self::UnknownOperator(s) => write!(f, "Unknown operator: '{s}'"),
 
-            Self::MalformedCallExpr(s) => match s.as_str() {
-                "" => f.write_str("Invalid expression in function call arguments"),
-                s => f.write_str(s)
-            },
-            Self::MalformedIndexExpr(s) => match s.as_str() {
-                "" => f.write_str("Invalid index in indexing expression"),
-                s => f.write_str(s)
-            },
-            Self::MalformedInExpr(s) => match s.as_str() {
-                "" => f.write_str("Invalid 'in' expression"),
-                s => f.write_str(s)
-            },
-            Self::MalformedCapture(s) => match s.as_str() {
-                "" => f.write_str("Invalid capturing"),
-                s => f.write_str(s)
-            },
+            Self::MalformedCallExpr(s)  if s.is_empty() => f.write_str(s),
+            Self::MalformedCallExpr(..) => f.write_str("Invalid expression in function call arguments"),
+
+            Self::MalformedIndexExpr(s) if s.is_empty() => f.write_str("Invalid index in indexing expression"),
+            Self::MalformedIndexExpr(s) =>  f.write_str(s),
+
+            Self::MalformedInExpr(s) if s.is_empty() => f.write_str("Invalid 'in' expression"),
+            Self::MalformedInExpr(s) =>  f.write_str(s),
+
+            Self::MalformedCapture(s) if s.is_empty()  => f.write_str("Invalid capturing"),
+            Self::MalformedCapture(s) => f.write_str(s),
 
             Self::FnDuplicatedDefinition(s, n) => {
-                write!(f, "Function {} with ", s)?;
+                write!(f, "Function {s} with ")?;
                 match n {
                     0 => f.write_str("no parameters already exists"),
                     1 => f.write_str("1 parameter already exists"),
-                    _ => write!(f, "{} parameters already exists", n),
+                    _ => write!(f, "{n} parameters already exists"),
                 }
             }
-            Self::FnMissingBody(s) => match s.as_str() {
-                "" => f.write_str("Expecting body statement block for anonymous function"),
-                s => write!(f, "Expecting body statement block for function {}", s)
-            },
-            Self::FnMissingParams(s) => write!(f, "Expecting parameters for function {}", s),
-            Self::FnDuplicatedParam(s, arg) => write!(f, "Duplicated parameter {} for function {}", arg, s),
 
-            Self::DuplicatedProperty(s) => write!(f, "Duplicated property for object map literal: {}", s),
+            Self::FnMissingBody(s) if s.is_empty()  => f.write_str("Expecting body statement block for anonymous function"),
+            Self::FnMissingBody(s) =>  write!(f, "Expecting body statement block for function {s}"),
+
+            Self::FnMissingParams(s) => write!(f, "Expecting parameters for function {s}"),
+            Self::FnDuplicatedParam(s, arg) => write!(f, "Duplicated parameter {arg} for function {s}"),
+
+            Self::DuplicatedProperty(s) => write!(f, "Duplicated property for object map literal: {s}"),
             #[allow(deprecated)]
             Self::DuplicatedSwitchCase => f.write_str("Duplicated switch case"),
-            Self::DuplicatedVariable(s) => write!(f, "Duplicated variable name: {}", s),
+            Self::DuplicatedVariable(s) => write!(f, "Duplicated variable name: {s}"),
 
-            Self::VariableExists(s) => write!(f, "Variable already defined: {}", s),
-            Self::VariableUndefined(s) => write!(f, "Undefined variable: {}", s),
-            Self::ModuleUndefined(s) => write!(f, "Undefined module: {}", s),
+            Self::VariableExists(s) => write!(f, "Variable already defined: {s}"),
+            Self::VariableUndefined(s) => write!(f, "Undefined variable: {s}"),
+            Self::ModuleUndefined(s) => write!(f, "Undefined module: {s}"),
 
-            Self::MismatchedType(r, a) => write!(f, "Expecting {}, not {}", r, a),
+            Self::MismatchedType(r, a) => write!(f, "Expecting {r}, not {a}"),
             Self::ExprExpected(s) => write!(f, "Expecting {} expression", s),
-            Self::MissingToken(token, s) => write!(f, "Expecting '{}' {}", token, s),
+            Self::MissingToken(token, s) => write!(f, "Expecting '{token}' {s}"),
 
             Self::MissingSymbol(s) if s.is_empty() => f.write_str("Expecting a symbol"),
             Self::MissingSymbol(s) => f.write_str(s),
 
-            Self::AssignmentToConstant(s) => match s.as_str() {
-                "" => f.write_str("Cannot assign to a constant value"),
-                s => write!(f, "Cannot assign to constant {}", s)
-            },
-            Self::AssignmentToInvalidLHS(s) => match s.as_str() {
-                "" => f.write_str("Expression cannot be assigned to"),
-                s => f.write_str(s)
-            },
+            Self::AssignmentToConstant(s) if s.is_empty() => f.write_str("Cannot assign to a constant value"),
+            Self::AssignmentToConstant(s) =>  write!(f, "Cannot assign to constant {s}"),
 
-            Self::LiteralTooLarge(typ, max) => write!(f, "{} exceeds the maximum limit ({})", typ, max),
-            Self::Reserved(s) if is_valid_identifier(s.chars()) => write!(f, "'{}' is a reserved keyword", s),
-            Self::Reserved(s) => write!(f, "'{}' is a reserved symbol", s),
+            Self::AssignmentToInvalidLHS(s) if s.is_empty() => f.write_str("Expression cannot be assigned to"),
+            Self::AssignmentToInvalidLHS(s) => f.write_str(s),
+
+            Self::LiteralTooLarge(typ, max) => write!(f, "{typ} exceeds the maximum limit ({max})"),
+            Self::Reserved(s) if is_valid_identifier(s.chars()) => write!(f, "'{s}' is a reserved keyword"),
+            Self::Reserved(s) => write!(f, "'{s}' is a reserved symbol"),
             Self::UnexpectedEOF => f.write_str("Script is incomplete"),
             Self::WrongSwitchIntegerCase => f.write_str("Integer switch case cannot follow a range case"),
             Self::WrongSwitchDefaultCase => f.write_str("Default switch case must be the last"),
             Self::WrongSwitchCaseCondition => f.write_str("This switch case cannot have a condition"),
             Self::PropertyExpected => f.write_str("Expecting name of a property"),
             Self::VariableExpected => f.write_str("Expecting name of a variable"),
-            Self::ForbiddenVariable(s) => write!(f, "Forbidden variable name: {}", s),
+            Self::ForbiddenVariable(s) => write!(f, "Forbidden variable name: {s}"),
             Self::WrongFnDefinition => f.write_str("Function definitions must be at global level and cannot be inside a block or another function"),
             Self::FnMissingName => f.write_str("Expecting function name in function declaration"),
             Self::WrongDocComment => f.write_str("Doc-comment must be followed immediately by a function definition"),
