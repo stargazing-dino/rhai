@@ -42,6 +42,7 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 [features]
 default = ["std"]
 std = ["ahash/std", "ahash/runtime-rng", "num-traits/std", "smartstring/std"]
+base_std = ["ahash/std", "num-traits/std", "smartstring/std"] # Prevent ahash random seed, enabling dynamic libraries to be used.
 unchecked = []                  # unchecked arithmetic
 sync = []                       # restrict to only types that implement Send + Sync
 no_position = []                # do not track position in the parser
