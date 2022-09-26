@@ -23,6 +23,7 @@ use std::prelude::v1::*;
 /// Turn on the `sync` feature to make it [`Send`] `+` [`Sync`].
 #[derive(Debug)]
 #[non_exhaustive]
+#[must_use]
 pub enum EvalAltResult {
     /// System error. Wrapped values are the error message and the internal error.
     #[cfg(not(feature = "sync"))]
@@ -494,6 +495,7 @@ impl EvalAltResult {
     /// The [position][Position] of this error is set to [`NONE`][Position::NONE] afterwards.
     #[cold]
     #[inline(never)]
+    #[must_use]
     pub fn take_position(&mut self) -> Position {
         let pos = self.position();
         self.set_position(Position::NONE);

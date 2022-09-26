@@ -146,6 +146,21 @@ pub mod blob_functions {
     pub fn is_empty(blob: &mut Blob) -> bool {
         blob.len() == 0
     }
+    /// Return `true` if the BLOB contains a specified byte value.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let text = "hello, world!";
+    ///
+    /// print(text.contains('h'));      // prints true
+    ///
+    /// print(text.contains('x'));      // prints false
+    /// ```
+    #[rhai_fn(name = "contains")]
+    pub fn contains(blob: &mut Blob, value: INT) -> bool {
+        blob.contains(&((value & 0x0000_00ff) as u8))
+    }
     /// Get the byte value at the `index` position in the BLOB.
     ///
     /// * If `index` < 0, position counts from the end of the BLOB (`-1` is the last element).

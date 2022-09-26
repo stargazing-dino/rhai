@@ -1,6 +1,6 @@
 //! Implement serialization support of [`Dynamic`][crate::Dynamic] for [`serde`].
 
-use crate::{Dynamic, Position, RhaiError, RhaiResult, RhaiResultOf, ERR};
+use crate::{Dynamic, Identifier, Position, RhaiError, RhaiResult, RhaiResultOf, ERR};
 use serde::ser::{
     Error, SerializeMap, SerializeSeq, SerializeStruct, SerializeTuple, SerializeTupleStruct,
 };
@@ -9,10 +9,10 @@ use std::fmt;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
-/// Serializer for [`Dynamic`][crate::Dynamic] which is kept as a reference.
-struct DynamicSerializer {
+/// Serializer for [`Dynamic`][crate::Dynamic].
+pub struct DynamicSerializer {
     /// Buffer to hold a temporary key.
-    _key: Dynamic,
+    _key: Identifier,
     /// Buffer to hold a temporary value.
     _value: Dynamic,
 }
@@ -20,10 +20,10 @@ struct DynamicSerializer {
 impl DynamicSerializer {
     /// Create a [`DynamicSerializer`] from a [`Dynamic`][crate::Dynamic] value.
     #[must_use]
-    pub const fn new(_value: Dynamic) -> Self {
+    pub const fn new(value: Dynamic) -> Self {
         Self {
-            _key: Dynamic::UNIT,
-            _value,
+            _key: Identifier::new_const(),
+            _value: value,
         }
     }
 }
@@ -105,10 +105,12 @@ impl Serializer for &mut DynamicSerializer {
     #[cfg(feature = "no_object")]
     type SerializeStructVariant = serde::ser::Impossible<Dynamic, RhaiError>;
 
+    #[inline(always)]
     fn serialize_bool(self, v: bool) -> RhaiResultOf<Self::Ok> {
         Ok(v.into())
     }
 
+    #[inline(always)]
     fn serialize_i8(self, v: i8) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
         return self.serialize_i64(i64::from(v));
@@ -116,6 +118,7 @@ impl Serializer for &mut DynamicSerializer {
         return self.serialize_i32(i32::from(v));
     }
 
+    #[inline(always)]
     fn serialize_i16(self, v: i16) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
         return self.serialize_i64(i64::from(v));
@@ -123,6 +126,7 @@ impl Serializer for &mut DynamicSerializer {
         return self.serialize_i32(i32::from(v));
     }
 
+    #[inline(always)]
     fn serialize_i32(self, v: i32) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
         return self.serialize_i64(i64::from(v));
@@ -130,6 +134,7 @@ impl Serializer for &mut DynamicSerializer {
         return Ok(v.into());
     }
 
+    #[inline]
     fn serialize_i64(self, v: i64) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
         {
@@ -143,6 +148,7 @@ impl Serializer for &mut DynamicSerializer {
         }
     }
 
+    #[inline]
     fn serialize_i128(self, v: i128) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
         if v > i64::MAX as i128 {
@@ -158,6 +164,7 @@ impl Serializer for &mut DynamicSerializer {
         }
     }
 
+    #[inline(always)]
     fn serialize_u8(self, v: u8) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
         return self.serialize_i64(i64::from(v));
@@ -165,6 +172,7 @@ impl Serializer for &mut DynamicSerializer {
         return self.serialize_i32(i32::from(v));
     }
 
+    #[inline(always)]
     fn serialize_u16(self, v: u16) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
         return self.serialize_i64(i64::from(v));
@@ -172,6 +180,7 @@ impl Serializer for &mut DynamicSerializer {
         return self.serialize_i32(i32::from(v));
     }
 
+    #[inline]
     fn serialize_u32(self, v: u32) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
         {
@@ -185,6 +194,7 @@ impl Serializer for &mut DynamicSerializer {
         }
     }
 
+    #[inline]
     fn serialize_u64(self, v: u64) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
         if v > i64::MAX as u64 {
@@ -200,6 +210,7 @@ impl Serializer for &mut DynamicSerializer {
         }
     }
 
+    #[inline]
     fn serialize_u128(self, v: u128) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
         if v > i64::MAX as u128 {
@@ -215,6 +226,7 @@ impl Serializer for &mut DynamicSerializer {
         }
     }
 
+    #[inline]
     fn serialize_f32(self, v: f32) -> RhaiResultOf<Self::Ok> {
         #[cfg(any(not(feature = "no_float"), not(feature = "decimal")))]
         return Ok(Dynamic::from(v));
@@ -231,6 +243,7 @@ impl Serializer for &mut DynamicSerializer {
         }
     }
 
+    #[inline]
     fn serialize_f64(self, v: f64) -> RhaiResultOf<Self::Ok> {
         #[cfg(any(not(feature = "no_float"), not(feature = "decimal")))]
         return Ok(Dynamic::from(v));
@@ -247,14 +260,17 @@ impl Serializer for &mut DynamicSerializer {
         }
     }
 
+    #[inline(always)]
     fn serialize_char(self, v: char) -> RhaiResultOf<Self::Ok> {
         Ok(v.into())
     }
 
+    #[inline(always)]
     fn serialize_str(self, v: &str) -> RhaiResultOf<Self::Ok> {
         Ok(v.into())
     }
 
+    #[inline]
     fn serialize_bytes(self, _v: &[u8]) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "no_index"))]
         return Ok(Dynamic::from_blob(_v.to_vec()));
@@ -262,28 +278,33 @@ impl Serializer for &mut DynamicSerializer {
         #[cfg(feature = "no_index")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "BLOB's are not supported with 'no_index'".into(),
+            "BLOB's are not supported under 'no_index'".into(),
             Position::NONE,
         )
         .into());
     }
 
+    #[inline(always)]
     fn serialize_none(self) -> RhaiResultOf<Self::Ok> {
         Ok(Dynamic::UNIT)
     }
 
+    #[inline(always)]
     fn serialize_some<T: ?Sized + Serialize>(self, value: &T) -> RhaiResultOf<Self::Ok> {
         value.serialize(&mut *self)
     }
 
+    #[inline(always)]
     fn serialize_unit(self) -> RhaiResultOf<Self::Ok> {
         Ok(Dynamic::UNIT)
     }
 
+    #[inline(always)]
     fn serialize_unit_struct(self, _name: &'static str) -> RhaiResultOf<Self::Ok> {
         self.serialize_unit()
     }
 
+    #[inline(always)]
     fn serialize_unit_variant(
         self,
         _name: &'static str,
@@ -293,6 +314,7 @@ impl Serializer for &mut DynamicSerializer {
         self.serialize_str(variant)
     }
 
+    #[inline(always)]
     fn serialize_newtype_struct<T: ?Sized + Serialize>(
         self,
         _name: &'static str,
@@ -301,6 +323,7 @@ impl Serializer for &mut DynamicSerializer {
         value.serialize(&mut *self)
     }
 
+    #[inline]
     fn serialize_newtype_variant<T: ?Sized + Serialize>(
         self,
         _name: &'static str,
@@ -316,28 +339,31 @@ impl Serializer for &mut DynamicSerializer {
         #[cfg(feature = "no_object")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "object maps are not supported with 'no_object'".into(),
+            "object maps are not supported under 'no_object'".into(),
             Position::NONE,
         )
         .into());
     }
 
+    #[inline]
     fn serialize_seq(self, _len: Option<usize>) -> RhaiResultOf<Self::SerializeSeq> {
         #[cfg(not(feature = "no_index"))]
         return Ok(DynamicSerializer::new(crate::Array::new().into()));
         #[cfg(feature = "no_index")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "arrays are not supported with 'no_index'".into(),
+            "arrays are not supported under 'no_index'".into(),
             Position::NONE,
         )
         .into());
     }
 
+    #[inline(always)]
     fn serialize_tuple(self, len: usize) -> RhaiResultOf<Self::SerializeTuple> {
         self.serialize_seq(Some(len))
     }
 
+    #[inline(always)]
     fn serialize_tuple_struct(
         self,
         _name: &'static str,
@@ -346,6 +372,7 @@ impl Serializer for &mut DynamicSerializer {
         self.serialize_seq(Some(len))
     }
 
+    #[inline]
     fn serialize_tuple_variant(
         self,
         _name: &'static str,
@@ -362,24 +389,26 @@ impl Serializer for &mut DynamicSerializer {
         #[cfg(any(feature = "no_object", feature = "no_index"))]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "tuples are not supported with 'no_index' or 'no_object'".into(),
+            "tuples are not supported under 'no_index' or 'no_object'".into(),
             Position::NONE,
         )
         .into());
     }
 
+    #[inline]
     fn serialize_map(self, _len: Option<usize>) -> RhaiResultOf<Self::SerializeMap> {
         #[cfg(not(feature = "no_object"))]
         return Ok(DynamicSerializer::new(crate::Map::new().into()));
         #[cfg(feature = "no_object")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "object maps are not supported with 'no_object'".into(),
+            "object maps are not supported under 'no_object'".into(),
             Position::NONE,
         )
         .into());
     }
 
+    #[inline(always)]
     fn serialize_struct(
         self,
         _name: &'static str,
@@ -388,6 +417,7 @@ impl Serializer for &mut DynamicSerializer {
         self.serialize_map(Some(len))
     }
 
+    #[inline]
     fn serialize_struct_variant(
         self,
         _name: &'static str,
@@ -403,7 +433,7 @@ impl Serializer for &mut DynamicSerializer {
         #[cfg(feature = "no_object")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "object maps are not supported with 'no_object'".into(),
+            "object maps are not supported under 'no_object'".into(),
             Position::NONE,
         )
         .into());
@@ -425,20 +455,21 @@ impl SerializeSeq for DynamicSerializer {
         #[cfg(feature = "no_index")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "arrays are not supported with 'no_index'".into(),
+            "arrays are not supported under 'no_index'".into(),
             Position::NONE,
         )
         .into());
     }
 
     // Close the sequence.
+    #[inline]
     fn end(self) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "no_index"))]
         return Ok(self._value);
         #[cfg(feature = "no_index")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "arrays are not supported with 'no_index'".into(),
+            "arrays are not supported under 'no_index'".into(),
             Position::NONE,
         )
         .into());
@@ -460,19 +491,20 @@ impl SerializeTuple for DynamicSerializer {
         #[cfg(feature = "no_index")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "tuples are not supported with 'no_index'".into(),
+            "tuples are not supported under 'no_index'".into(),
             Position::NONE,
         )
         .into());
     }
 
+    #[inline]
     fn end(self) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "no_index"))]
         return Ok(self._value);
         #[cfg(feature = "no_index")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "tuples are not supported with 'no_index'".into(),
+            "tuples are not supported under 'no_index'".into(),
             Position::NONE,
         )
         .into());
@@ -494,19 +526,20 @@ impl SerializeTupleStruct for DynamicSerializer {
         #[cfg(feature = "no_index")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "tuples are not supported with 'no_index'".into(),
+            "tuples are not supported under 'no_index'".into(),
             Position::NONE,
         )
         .into());
     }
 
+    #[inline]
     fn end(self) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "no_index"))]
         return Ok(self._value);
         #[cfg(feature = "no_index")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "tuples are not supported with 'no_index'".into(),
+            "tuples are not supported under 'no_index'".into(),
             Position::NONE,
         )
         .into());
@@ -520,13 +553,19 @@ impl SerializeMap for DynamicSerializer {
     fn serialize_key<T: ?Sized + Serialize>(&mut self, _key: &T) -> RhaiResultOf<()> {
         #[cfg(not(feature = "no_object"))]
         {
-            self._key = _key.serialize(&mut *self)?;
+            let key = _key.serialize(&mut *self)?;
+            self._key = key
+                .into_immutable_string()
+                .map_err(|typ| {
+                    ERR::ErrorMismatchDataType("string".into(), typ.into(), Position::NONE)
+                })?
+                .into();
             Ok(())
         }
         #[cfg(feature = "no_object")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "object maps are not supported with 'no_object'".into(),
+            "object maps are not supported under 'no_object'".into(),
             Position::NONE,
         )
         .into());
@@ -535,20 +574,16 @@ impl SerializeMap for DynamicSerializer {
     fn serialize_value<T: ?Sized + Serialize>(&mut self, _value: &T) -> RhaiResultOf<()> {
         #[cfg(not(feature = "no_object"))]
         {
-            let key = std::mem::take(&mut self._key)
-                .into_immutable_string()
-                .map_err(|typ| {
-                    ERR::ErrorMismatchDataType("string".into(), typ.into(), Position::NONE)
-                })?;
+            let key = std::mem::take(&mut self._key);
             let value = _value.serialize(&mut *self)?;
             let map = self._value.downcast_mut::<crate::Map>().unwrap();
-            map.insert(key.into(), value);
+            map.insert(key, value);
             Ok(())
         }
         #[cfg(feature = "no_object")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "object maps are not supported with 'no_object'".into(),
+            "object maps are not supported under 'no_object'".into(),
             Position::NONE,
         )
         .into());
@@ -573,19 +608,20 @@ impl SerializeMap for DynamicSerializer {
         #[cfg(feature = "no_object")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "object maps are not supported with 'no_object'".into(),
+            "object maps are not supported under 'no_object'".into(),
             Position::NONE,
         )
         .into());
     }
 
+    #[inline]
     fn end(self) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "no_object"))]
         return Ok(self._value);
         #[cfg(feature = "no_object")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "object maps are not supported with 'no_object'".into(),
+            "object maps are not supported under 'no_object'".into(),
             Position::NONE,
         )
         .into());
@@ -611,19 +647,20 @@ impl SerializeStruct for DynamicSerializer {
         #[cfg(feature = "no_object")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "object maps are not supported with 'no_object'".into(),
+            "object maps are not supported under 'no_object'".into(),
             Position::NONE,
         )
         .into());
     }
 
+    #[inline]
     fn end(self) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "no_object"))]
         return Ok(self._value);
         #[cfg(feature = "no_object")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
-            "object maps are not supported with 'no_object'".into(),
+            "object maps are not supported under 'no_object'".into(),
             Position::NONE,
         )
         .into());
@@ -632,7 +669,7 @@ impl SerializeStruct for DynamicSerializer {
 
 #[cfg(not(feature = "no_object"))]
 #[cfg(not(feature = "no_index"))]
-struct TupleVariantSerializer {
+pub struct TupleVariantSerializer {
     variant: &'static str,
     array: crate::Array,
 }
@@ -649,13 +686,14 @@ impl serde::ser::SerializeTupleVariant for TupleVariantSerializer {
         Ok(())
     }
 
+    #[inline]
     fn end(self) -> RhaiResultOf<Self::Ok> {
         make_variant(self.variant, self.array.into())
     }
 }
 
 #[cfg(not(feature = "no_object"))]
-struct StructVariantSerializer {
+pub struct StructVariantSerializer {
     variant: &'static str,
     map: crate::Map,
 }
@@ -665,6 +703,7 @@ impl serde::ser::SerializeStructVariant for StructVariantSerializer {
     type Ok = Dynamic;
     type Error = RhaiError;
 
+    #[inline]
     fn serialize_field<T: ?Sized + Serialize>(
         &mut self,
         key: &'static str,
@@ -675,12 +714,14 @@ impl serde::ser::SerializeStructVariant for StructVariantSerializer {
         Ok(())
     }
 
+    #[inline]
     fn end(self) -> RhaiResultOf<Self::Ok> {
         make_variant(self.variant, self.map.into())
     }
 }
 
 #[cfg(not(feature = "no_object"))]
+#[inline]
 fn make_variant(variant: &'static str, value: Dynamic) -> RhaiResult {
     let mut map = crate::Map::new();
     map.insert(variant.into(), value);

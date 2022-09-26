@@ -506,6 +506,37 @@ mod string_functions {
         *character = to_lower_char(*character);
     }
 
+    /// Return `true` if the string contains a specified string.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let text = "hello, world!";
+    ///
+    /// print(text.contains("hello"));  // prints true
+    ///
+    /// print(text.contains("hey"));    // prints false
+    /// ```
+    pub fn contains(string: &str, match_string: &str) -> bool {
+        string.contains(match_string)
+    }
+
+    /// Return `true` if the string contains a specified character.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let text = "hello, world!";
+    ///
+    /// print(text.contains('h'));      // prints true
+    ///
+    /// print(text.contains('x'));      // prints false
+    /// ```
+    #[rhai_fn(name = "contains")]
+    pub fn contains_char(string: &str, character: char) -> bool {
+        string.contains(character).into()
+    }
+
     /// Return `true` if the string starts with a specified string.
     ///
     /// # Example

@@ -1,8 +1,8 @@
 //! Implementations of [`serde::Serialize`].
 
 use crate::types::dynamic::Union;
-use crate::{Dynamic, ImmutableString};
-use serde::ser::{Serialize, Serializer};
+use crate::{Dynamic, ImmutableString, Scope};
+use serde::{ser::SerializeSeq, Serialize, Serializer};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -83,7 +83,38 @@ impl Serialize for Dynamic {
 }
 
 impl Serialize for ImmutableString {
+    #[inline(always)]
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         ser.serialize_str(self.as_str())
+    }
+}
+
+impl Serialize for Scope<'_> {
+    #[inline(always)]
+    fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+        #[derive(Debug, Clone, Hash, Serialize)]
+        struct ScopeEntry<'a> {
+            pub name: &'a str,
+            pub value: &'a Dynamic,
+            #[serde(default, skip_serializing_if = "is_false")]
+            pub is_constant: bool,
+        }
+
+        fn is_false(value: &bool) -> bool {
+            !value
+        }
+
+        let mut ser = ser.serialize_seq(Some(self.len()))?;
+
+        for (name, is_constant, value) in self.iter_raw() {
+            let entry = ScopeEntry {
+                name,
+                value,
+                is_constant,
+            };
+            ser.serialize_element(&entry)?;
+        }
+
+        ser.end()
     }
 }

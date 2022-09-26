@@ -381,15 +381,15 @@ pub enum Token {
     ///
     /// Requires the `decimal` feature.
     #[cfg(feature = "decimal")]
-    DecimalConstant(rust_decimal::Decimal),
+    DecimalConstant(Box<rust_decimal::Decimal>),
     /// An identifier.
-    Identifier(Identifier),
+    Identifier(Box<Identifier>),
     /// A character constant.
     CharConstant(char),
     /// A string constant.
-    StringConstant(SmartString),
+    StringConstant(Box<SmartString>),
     /// An interpolated string.
-    InterpolatedString(SmartString),
+    InterpolatedString(Box<SmartString>),
     /// `{`
     LeftBrace,
     /// `}`
@@ -570,14 +570,14 @@ pub enum Token {
     /// A lexer error.
     LexError(Box<LexError>),
     /// A comment block.
-    Comment(SmartString),
+    Comment(Box<SmartString>),
     /// A reserved symbol.
-    Reserved(SmartString),
+    Reserved(Box<SmartString>),
     /// A custom keyword.
     ///
     /// Not available under `no_custom_syntax`.
     #[cfg(not(feature = "no_custom_syntax"))]
-    Custom(SmartString),
+    Custom(Box<SmartString>),
     /// End of the input stream.
     EOF,
 }
@@ -699,7 +699,7 @@ impl Token {
             FloatConstant(f) => f.to_string().into(),
             #[cfg(feature = "decimal")]
             DecimalConstant(d) => d.to_string().into(),
-            StringConstant(..) => "string".into(),
+            StringConstant(s) => format!("\"{s}\"").into(),
             InterpolatedString(..) => "string".into(),
             CharConstant(c) => c.to_string().into(),
             Identifier(s) => s.to_string().into(),
@@ -874,9 +874,9 @@ impl Token {
             "**=" => PowerOfAssign,
 
             #[cfg(feature = "no_object")]
-            "?." => Reserved(syntax.into()),
+            "?." => Reserved(Box::new(syntax.into())),
             #[cfg(feature = "no_index")]
-            "?[" => Reserved(syntax.into()),
+            "?[" => Reserved(Box::new(syntax.into())),
 
             #[cfg(not(feature = "no_function"))]
             "fn" => Fn,
@@ -884,7 +884,7 @@ impl Token {
             "private" => Private,
 
             #[cfg(feature = "no_function")]
-            "fn" | "private" => Reserved(syntax.into()),
+            "fn" | "private" => Reserved(Box::new(syntax.into())),
 
             #[cfg(not(feature = "no_module"))]
             "import" => Import,
@@ -894,25 +894,27 @@ impl Token {
             "as" => As,
 
             #[cfg(feature = "no_module")]
-            "import" | "export" | "as" => Reserved(syntax.into()),
+            "import" | "export" | "as" => Reserved(Box::new(syntax.into())),
 
             // List of reserved operators
             "===" | "!==" | "->" | "<-" | "?" | ":=" | ":;" | "~" | "!." | "::<" | "(*" | "*)"
-            | "#" | "#!" | "@" | "$" | "++" | "--" | "..." | "<|" | "|>" => Reserved(syntax.into()),
+            | "#" | "#!" | "@" | "$" | "++" | "--" | "..." | "<|" | "|>" => {
+                Reserved(Box::new(syntax.into()))
+            }
 
             // List of reserved keywords
             "public" | "protected" | "super" | "new" | "use" | "module" | "package" | "var"
             | "static" | "shared" | "with" | "is" | "goto" | "exit" | "match" | "case"
             | "default" | "void" | "null" | "nil" | "spawn" | "thread" | "go" | "sync"
-            | "async" | "await" | "yield" => Reserved(syntax.into()),
+            | "async" | "await" | "yield" => Reserved(Box::new(syntax.into())),
 
             KEYWORD_PRINT | KEYWORD_DEBUG | KEYWORD_TYPE_OF | KEYWORD_EVAL | KEYWORD_FN_PTR
             | KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY | KEYWORD_THIS | KEYWORD_IS_DEF_VAR => {
-                Reserved(syntax.into())
+                Reserved(Box::new(syntax.into()))
             }
 
             #[cfg(not(feature = "no_function"))]
-            crate::engine::KEYWORD_IS_DEF_FN => Reserved(syntax.into()),
+            crate::engine::KEYWORD_IS_DEF_FN => Reserved(Box::new(syntax.into())),
 
             _ => return None,
         })
@@ -1097,8 +1099,8 @@ impl Token {
     pub(crate) fn into_function_name_for_override(self) -> Result<SmartString, Self> {
         match self {
             #[cfg(not(feature = "no_custom_syntax"))]
-            Self::Custom(s) if is_valid_function_name(&s) => Ok(s),
-            Self::Identifier(s) if is_valid_function_name(&s) => Ok(s),
+            Self::Custom(s) if is_valid_function_name(&s) => Ok(*s),
+            Self::Identifier(s) if is_valid_function_name(&s) => Ok(*s),
             _ => Err(self),
         }
     }
@@ -1510,7 +1512,7 @@ fn get_next_token_inner(
         let return_comment = return_comment || is_doc_comment(comment.as_ref().expect("`Some`"));
 
         if return_comment {
-            return Some((Token::Comment(comment.expect("`Some`")), start_pos));
+            return Some((Token::Comment(comment.expect("`Some`").into()), start_pos));
         }
         if state.comment_level > 0 {
             // Reached EOF without ending comment block
@@ -1524,9 +1526,9 @@ fn get_next_token_inner(
             |(err, err_pos)| Some((Token::LexError(err.into()), err_pos)),
             |(result, interpolated, start_pos)| {
                 if interpolated {
-                    Some((Token::InterpolatedString(result), start_pos))
+                    Some((Token::InterpolatedString(result.into()), start_pos))
                 } else {
-                    Some((Token::StringConstant(result), start_pos))
+                    Some((Token::StringConstant(result.into()), start_pos))
                 }
             },
         );
@@ -1676,13 +1678,16 @@ fn get_next_token_inner(
                         // Then try decimal
                         #[cfg(feature = "decimal")]
                         let num = num.or_else(|_| {
-                            rust_decimal::Decimal::from_str(&result).map(Token::DecimalConstant)
+                            rust_decimal::Decimal::from_str(&result)
+                                .map(Box::new)
+                                .map(Token::DecimalConstant)
                         });
 
                         // Then try decimal in scientific notation
                         #[cfg(feature = "decimal")]
                         let num = num.or_else(|_| {
                             rust_decimal::Decimal::from_scientific(&result)
+                                .map(Box::new)
                                 .map(Token::DecimalConstant)
                         });
 
@@ -1709,7 +1714,7 @@ fn get_next_token_inner(
                 return parse_string_literal(stream, state, pos, c, false, true, false)
                     .map_or_else(
                         |(err, err_pos)| Some((Token::LexError(err.into()), err_pos)),
-                        |(result, ..)| Some((Token::StringConstant(result), start_pos)),
+                        |(result, ..)| Some((Token::StringConstant(result.into()), start_pos)),
                     );
             }
             // ` - string literal
@@ -1737,9 +1742,9 @@ fn get_next_token_inner(
                     |(err, err_pos)| Some((Token::LexError(err.into()), err_pos)),
                     |(result, interpolated, ..)| {
                         if interpolated {
-                            Some((Token::InterpolatedString(result), start_pos))
+                            Some((Token::InterpolatedString(result.into()), start_pos))
                         } else {
-                            Some((Token::StringConstant(result), start_pos))
+                            Some((Token::StringConstant(result.into()), start_pos))
                         }
                     },
                 );
@@ -1786,7 +1791,7 @@ fn get_next_token_inner(
             // Parentheses
             ('(', '*') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("(*".into()), start_pos));
+                return Some((Token::Reserved(Box::new("(*".into())), start_pos));
             }
             ('(', ..) => return Some((Token::LeftParen, start_pos)),
             (')', ..) => return Some((Token::RightParen, start_pos)),
@@ -1802,7 +1807,7 @@ fn get_next_token_inner(
                 return Some((Token::MapStart, start_pos));
             }
             // Shebang
-            ('#', '!') => return Some((Token::Reserved("#!".into()), start_pos)),
+            ('#', '!') => return Some((Token::Reserved(Box::new("#!".into())), start_pos)),
 
             ('#', ' ') => {
                 eat_next(stream, pos);
@@ -1812,10 +1817,10 @@ fn get_next_token_inner(
                 } else {
                     "#"
                 };
-                return Some((Token::Reserved(token.into()), start_pos));
+                return Some((Token::Reserved(Box::new(token.into())), start_pos));
             }
 
-            ('#', ..) => return Some((Token::Reserved("#".into()), start_pos)),
+            ('#', ..) => return Some((Token::Reserved(Box::new("#".into())), start_pos)),
 
             // Operators
             ('+', '=') => {
@@ -1824,7 +1829,7 @@ fn get_next_token_inner(
             }
             ('+', '+') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("++".into()), start_pos));
+                return Some((Token::Reserved(Box::new("++".into())), start_pos));
             }
             ('+', ..) if !state.next_token_cannot_be_unary => {
                 return Some((Token::UnaryPlus, start_pos))
@@ -1839,11 +1844,11 @@ fn get_next_token_inner(
             }
             ('-', '>') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("->".into()), start_pos));
+                return Some((Token::Reserved(Box::new("->".into())), start_pos));
             }
             ('-', '-') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("--".into()), start_pos));
+                return Some((Token::Reserved(Box::new("--".into())), start_pos));
             }
             ('-', ..) if !state.next_token_cannot_be_unary => {
                 return Some((Token::UnaryMinus, start_pos))
@@ -1852,7 +1857,7 @@ fn get_next_token_inner(
 
             ('*', ')') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("*)".into()), start_pos));
+                return Some((Token::Reserved(Box::new("*)".into())), start_pos));
             }
             ('*', '=') => {
                 eat_next(stream, pos);
@@ -1925,7 +1930,7 @@ fn get_next_token_inner(
                             .borrow_mut()
                             .global_comments
                             .push(comment),
-                        _ => return Some((Token::Comment(comment), start_pos)),
+                        _ => return Some((Token::Comment(comment.into()), start_pos)),
                     }
                 }
             }
@@ -1953,7 +1958,7 @@ fn get_next_token_inner(
                     scan_block_comment(stream, state.comment_level, pos, comment.as_mut());
 
                 if let Some(comment) = comment {
-                    return Some((Token::Comment(comment), start_pos));
+                    return Some((Token::Comment(comment.into()), start_pos));
                 }
             }
 
@@ -1972,7 +1977,7 @@ fn get_next_token_inner(
                     match stream.peek_next() {
                         Some('.') => {
                             eat_next(stream, pos);
-                            Token::Reserved("...".into())
+                            Token::Reserved(Box::new("...".into()))
                         }
                         Some('=') => {
                             eat_next(stream, pos);
@@ -1990,7 +1995,7 @@ fn get_next_token_inner(
 
                 if stream.peek_next() == Some('=') {
                     eat_next(stream, pos);
-                    return Some((Token::Reserved("===".into()), start_pos));
+                    return Some((Token::Reserved(Box::new("===".into())), start_pos));
                 }
 
                 return Some((Token::EqualsTo, start_pos));
@@ -2007,18 +2012,18 @@ fn get_next_token_inner(
 
                 if stream.peek_next() == Some('<') {
                     eat_next(stream, pos);
-                    return Some((Token::Reserved("::<".into()), start_pos));
+                    return Some((Token::Reserved(Box::new("::<".into())), start_pos));
                 }
 
                 return Some((Token::DoubleColon, start_pos));
             }
             (':', '=') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved(":=".into()), start_pos));
+                return Some((Token::Reserved(Box::new(":=".into())), start_pos));
             }
             (':', ';') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved(":;".into()), start_pos));
+                return Some((Token::Reserved(Box::new(":;".into())), start_pos));
             }
             (':', ..) => return Some((Token::Colon, start_pos)),
 
@@ -2028,7 +2033,7 @@ fn get_next_token_inner(
             }
             ('<', '-') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("<-".into()), start_pos));
+                return Some((Token::Reserved(Box::new("<-".into())), start_pos));
             }
             ('<', '<') => {
                 eat_next(stream, pos);
@@ -2045,7 +2050,7 @@ fn get_next_token_inner(
             }
             ('<', '|') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("<|".into()), start_pos));
+                return Some((Token::Reserved(Box::new("<|".into())), start_pos));
             }
             ('<', ..) => return Some((Token::LessThan, start_pos)),
 
@@ -2073,14 +2078,14 @@ fn get_next_token_inner(
 
                 if stream.peek_next() == Some('=') {
                     eat_next(stream, pos);
-                    return Some((Token::Reserved("!==".into()), start_pos));
+                    return Some((Token::Reserved(Box::new("!==".into())), start_pos));
                 }
 
                 return Some((Token::NotEqualsTo, start_pos));
             }
             ('!', '.') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("!.".into()), start_pos));
+                return Some((Token::Reserved(Box::new("!.".into())), start_pos));
             }
             ('!', ..) => return Some((Token::Bang, start_pos)),
 
@@ -2094,7 +2099,7 @@ fn get_next_token_inner(
             }
             ('|', '>') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("|>".into()), start_pos));
+                return Some((Token::Reserved(Box::new("|>".into())), start_pos));
             }
             ('|', ..) => return Some((Token::Pipe, start_pos)),
 
@@ -2114,7 +2119,7 @@ fn get_next_token_inner(
             }
             ('^', ..) => return Some((Token::XOr, start_pos)),
 
-            ('~', ..) => return Some((Token::Reserved("~".into()), start_pos)),
+            ('~', ..) => return Some((Token::Reserved(Box::new("~".into())), start_pos)),
 
             ('%', '=') => {
                 eat_next(stream, pos);
@@ -2122,9 +2127,9 @@ fn get_next_token_inner(
             }
             ('%', ..) => return Some((Token::Modulo, start_pos)),
 
-            ('@', ..) => return Some((Token::Reserved("@".into()), start_pos)),
+            ('@', ..) => return Some((Token::Reserved(Box::new("@".into())), start_pos)),
 
-            ('$', ..) => return Some((Token::Reserved("$".into()), start_pos)),
+            ('$', ..) => return Some((Token::Reserved(Box::new("$".into())), start_pos)),
 
             ('?', '.') => {
                 eat_next(stream, pos);
@@ -2132,7 +2137,7 @@ fn get_next_token_inner(
                     #[cfg(not(feature = "no_object"))]
                     Token::Elvis,
                     #[cfg(feature = "no_object")]
-                    Token::Reserved("?.".into()),
+                    Token::Reserved(Box::new("?.".into())),
                     start_pos,
                 ));
             }
@@ -2146,11 +2151,11 @@ fn get_next_token_inner(
                     #[cfg(not(feature = "no_index"))]
                     Token::QuestionBracket,
                     #[cfg(feature = "no_index")]
-                    Token::Reserved("?[".into()),
+                    Token::Reserved(Box::new("?[".into())),
                     start_pos,
                 ));
             }
-            ('?', ..) => return Some((Token::Reserved("?".into()), start_pos)),
+            ('?', ..) => return Some((Token::Reserved(Box::new("?".into())), start_pos)),
 
             (ch, ..) if ch.is_whitespace() => (),
 
@@ -2201,7 +2206,7 @@ fn get_identifier(
         );
     }
 
-    (Token::Identifier(identifier), start_pos)
+    (Token::Identifier(identifier.into()), start_pos)
 }
 
 /// Is a keyword allowed as a function?
@@ -2382,7 +2387,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             }
             // Reserved keyword/symbol
             Some((Token::Reserved(s), pos)) => (match
-                (&*s,
+                (s.as_str(),
                     #[cfg(not(feature = "no_custom_syntax"))]
                     (!self.engine.custom_keywords.is_empty() && self.engine.custom_keywords.contains_key(&*s)),
                     #[cfg(feature = "no_custom_syntax")]
@@ -2438,7 +2443,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             Some((token, pos)) if !self.engine.custom_keywords.is_empty() && self.engine.custom_keywords.contains_key(token.literal_syntax()) => {
                 if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token.literal_syntax()) {
                     // Disabled standard keyword/symbol
-                    (Token::Custom(token.literal_syntax().into()), pos)
+                    (Token::Custom(Box::new(token.literal_syntax().into())), pos)
                 } else {
                     // Active standard keyword - should never be a custom keyword!
                     unreachable!("{:?} is an active keyword", token)
@@ -2446,7 +2451,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             }
             // Disabled symbol
             Some((token, pos)) if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token.literal_syntax()) => {
-                (Token::Reserved(token.literal_syntax().into()), pos)
+                (Token::Reserved(Box::new(token.literal_syntax().into())), pos)
             }
             // Normal symbol
             Some(r) => r,

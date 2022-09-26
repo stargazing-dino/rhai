@@ -50,7 +50,7 @@ impl Engine {
         idx_values: &mut FnArgsVec<Dynamic>,
         chain_type: ChainType,
         level: usize,
-        new_val: Option<(Dynamic, OpAssignment)>,
+        new_val: Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResultOf<(Dynamic, bool)> {
         let is_ref_mut = target.is_ref();
 
@@ -558,7 +558,7 @@ impl Engine {
         this_ptr: &mut Option<&mut Dynamic>,
         expr: &Expr,
         level: usize,
-        new_val: Option<(Dynamic, OpAssignment)>,
+        new_val: Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResult {
         let chain_type = ChainType::from(expr);
         let (crate::ast::BinaryExpr { lhs, rhs }, options, op_pos) = match expr {

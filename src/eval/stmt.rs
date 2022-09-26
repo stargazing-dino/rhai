@@ -5,7 +5,7 @@ use crate::api::events::VarDefInfo;
 use crate::ast::{
     ASTFlags, BinaryExpr, Expr, Ident, OpAssignment, Stmt, SwitchCasesCollection, TryCatchBlock,
 };
-use crate::func::get_hasher;
+use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::types::dynamic::{AccessMode, Union};
 use crate::{
     Dynamic, Engine, ImmutableString, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR, INT,
@@ -117,7 +117,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[&Module],
-        op_info: OpAssignment,
+        op_info: &OpAssignment,
         target: &mut Target,
         root: (&str, Position),
         new_val: Dynamic,
@@ -141,12 +141,29 @@ impl Engine {
 
             let mut lock_guard = target.write_lock::<Dynamic>().unwrap();
 
-            let hash = hash_op_assign;
+            let hash = *hash_op_assign;
             let args = &mut [&mut *lock_guard, &mut new_val];
             let level = level + 1;
 
+            if self.fast_operators() {
+                if let Some(func) = get_builtin_op_assignment_fn(op_assign, args[0], args[1]) {
+                    // Built-in found
+                    let op = op_assign.literal_syntax();
+                    let context = (self, op, None, &*global, lib, *op_pos, level).into();
+                    let result = func(context, args).map(|_| ());
+
+                    #[cfg(not(feature = "unchecked"))]
+                    self.check_data_size(args[0], root.1)?;
+
+                    return result;
+                }
+            }
+
+            let op_assign = op_assign.literal_syntax();
+            let op = op.literal_syntax();
+
             match self.call_native_fn(
-                global, caches, lib, op_assign, hash, args, true, true, op_pos, level,
+                global, caches, lib, op_assign, hash, args, true, true, *op_pos, level,
             ) {
                 Ok(_) => {
                     #[cfg(not(feature = "unchecked"))]
@@ -155,16 +172,13 @@ impl Engine {
                 Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
                 {
                     // Expand to `var = var op rhs`
-                    let (value, ..) = self
+                    *args[0] = self
                         .call_native_fn(
-                            global, caches, lib, op, hash_op, args, true, false, op_pos, level,
+                            global, caches, lib, op, *hash_op, args, true, false, *op_pos, level,
                         )
-                        .map_err(|err| err.fill_position(op_info.pos))?;
-
-                    #[cfg(not(feature = "unchecked"))]
-                    self.check_data_size(&value, root.1)?;
-
-                    *args[0] = value.flatten();
+                        .map_err(|err| err.fill_position(op_info.pos))?
+                        .0
+                        .flatten();
                 }
                 Err(err) => return Err(err),
             }
@@ -269,7 +283,7 @@ impl Engine {
                         let lhs_ptr = &mut lhs_ptr;
 
                         self.eval_op_assignment(
-                            global, caches, lib, *op_info, lhs_ptr, root, rhs_val, level,
+                            global, caches, lib, op_info, lhs_ptr, root, rhs_val, level,
                         )
                         .map(|_| Dynamic::UNIT)
                     } else {
@@ -293,7 +307,7 @@ impl Engine {
                         rhs_val
                     };
 
-                    let _new_val = Some((rhs_val, *op_info));
+                    let _new_val = Some((rhs_val, op_info));
 
                     // Must be either `var[index] op= val` or `var.prop op= val`
                     match lhs {

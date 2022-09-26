@@ -256,10 +256,18 @@ fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
 
     engine.register_custom_syntax_with_state_raw(
         "hello",
-        |stream, _, state| match stream.len() {
+        |stream, look_ahead, state| match stream.len() {
             0 => unreachable!(),
-            1 => Ok(Some("$ident$".into())),
+            1 if look_ahead == "\"world\"" => {
+                *state = Dynamic::TRUE;
+                Ok(Some("$string$".into()))
+            }
+            1 => {
+                *state = Dynamic::FALSE;
+                Ok(Some("$ident$".into()))
+            }
             2 => match stream[1].as_str() {
+                "world" if state.as_bool().unwrap_or(false) => Ok(Some("$$world".into())),
                 "world" => Ok(Some("$$hello".into())),
                 "kitty" => {
                     *state = (42 as INT).into();
@@ -276,16 +284,11 @@ fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
             context.scope_mut().push("foo", 999 as INT);
 
             Ok(match inputs[0].get_string_value().unwrap() {
-                "world"
-                    if inputs
-                        .last()
-                        .unwrap()
-                        .get_string_value()
-                        .map_or(false, |s| s == "$$hello") =>
-                {
-                    0 as INT
-                }
-                "world" => 123 as INT,
+                "world" => match inputs.last().unwrap().get_string_value().unwrap_or("") {
+                    "$$hello" => 0 as INT,
+                    "$$world" => 123456 as INT,
+                    _ => 123 as INT,
+                },
                 "kitty" if inputs.len() > 1 => 999 as INT,
                 "kitty" => state.as_int().unwrap(),
                 _ => unreachable!(),
@@ -294,6 +297,7 @@ fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
         },
     );
 
+    assert_eq!(engine.eval::<INT>(r#"hello "world""#)?, 123456);
     assert_eq!(engine.eval::<INT>("hello world")?, 0);
     assert_eq!(engine.eval::<INT>("hello kitty")?, 42);
     assert_eq!(

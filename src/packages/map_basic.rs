@@ -30,6 +30,20 @@ mod map_functions {
     pub fn is_empty(map: &mut Map) -> bool {
         map.len() == 0
     }
+    /// Returns `true` if the object map contains a specified property.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let m = #{a: 1, b: 2, c: 3};
+    ///
+    /// print(m.contains("b"));     // prints true
+    ///
+    /// print(m.contains("x"));     // prints false
+    /// ```
+    pub fn contains(map: &mut Map, property: &str) -> bool {
+        map.contains_key(property)
+    }
     /// Get the value of the `property` in the object map and return a copy.
     ///
     /// If `property` does not exist in the object map, `()` is returned.

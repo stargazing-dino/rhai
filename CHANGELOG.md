@@ -1,6 +1,18 @@
 Rhai Release Notes
 ==================
 
+Version 1.11.0
+==============
+
+Enhancements
+------------
+
+* The look-ahead symbol for custom syntax now renders a string literal in quotes (instead of the generic term `string`). This facilitates more accurate parsing by separating strings and identifiers.
+* Due to a code refactor, built-in operators for standard types now run even faster, in certain cases by 20-30%.
+* `Scope` is now serializable and deserializable via `serde`.
+* `Scope` now contains a const generic parameter that allows specifying how many entries to be kept inline.
+
+
 Version 1.10.1
 ==============
 
@@ -8,7 +20,7 @@ Bug fixes
 ---------
 
 * Compiling on 32-bit architectures no longer cause a compilation error.
-* Fix type-size test fo 32-bit architectures without the `decimal` feature.
+* Fix type-size test for 32-bit architectures without the `decimal` feature.
 
 Custom syntax with state
 ------------------------

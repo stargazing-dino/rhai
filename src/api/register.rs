@@ -16,12 +16,14 @@ impl Engine {
     /// Get the global namespace module (which is the fist module in `global_modules`).
     #[inline(always)]
     #[allow(dead_code)]
+    #[must_use]
     pub(crate) fn global_namespace(&self) -> &Module {
         self.global_modules.first().unwrap()
     }
     /// Get a mutable reference to the global namespace module
     /// (which is the first module in `global_modules`).
     #[inline(always)]
+    #[must_use]
     pub(crate) fn global_namespace_mut(&mut self) -> &mut Module {
         let module = self.global_modules.first_mut().unwrap();
         Shared::get_mut(module).expect("not shared")

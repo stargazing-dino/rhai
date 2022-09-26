@@ -9,6 +9,7 @@ use crate::engine::{
     KEYWORD_IS_DEF_VAR, KEYWORD_PRINT, KEYWORD_TYPE_OF,
 };
 use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
+use crate::tokenizer::Token;
 use crate::{
     calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Engine, FnArgsVec, FnPtr,
     ImmutableString, Module, OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf,
@@ -191,7 +192,7 @@ impl Engine {
         hash_base: u64,
         args: Option<&mut FnCallArgs>,
         allow_dynamic: bool,
-        is_op_assignment: bool,
+        op_assignment_token: Option<&Token>,
     ) -> Option<&'s FnResolutionCacheEntry> {
         if hash_base == 0 {
             return None;
@@ -279,22 +280,23 @@ impl Engine {
 
                         // Try to find a built-in version
                         let builtin = args.and_then(|args| {
-                            if is_op_assignment {
+                            if let Some(op_assign) = op_assignment_token {
                                 let (first_arg, rest_args) = args.split_first().unwrap();
 
-                                get_builtin_op_assignment_fn(fn_name, *first_arg, rest_args[0]).map(
-                                    |f| FnResolutionCacheEntry {
+                                get_builtin_op_assignment_fn(op_assign, *first_arg, rest_args[0])
+                                    .map(|f| FnResolutionCacheEntry {
                                         func: CallableFunction::from_fn_builtin(f),
                                         source: None,
-                                    },
-                                )
-                            } else {
-                                get_builtin_binary_op_fn(fn_name, args[0], args[1]).map(|f| {
+                                    })
+                            } else if let Some(ref operator) = Token::lookup_from_syntax(fn_name) {
+                                get_builtin_binary_op_fn(operator, args[0], args[1]).map(|f| {
                                     FnResolutionCacheEntry {
                                         func: CallableFunction::from_fn_builtin(f),
                                         source: None,
                                     }
                                 })
+                            } else {
+                                None
                             }
                         });
 
@@ -360,6 +362,11 @@ impl Engine {
         self.inc_operations(&mut global.num_operations, pos)?;
 
         let parent_source = global.source.clone();
+        let op_assign = if is_op_assign {
+            Token::lookup_from_syntax(name)
+        } else {
+            None
+        };
 
         // Check if function access already in the cache
         let local_entry = &mut None;
@@ -373,7 +380,7 @@ impl Engine {
             hash,
             Some(args),
             true,
-            is_op_assign,
+            op_assign.as_ref(),
         );
 
         if func.is_some() {
@@ -653,7 +660,7 @@ impl Engine {
                 hashes.script,
                 None,
                 false,
-                false,
+                None,
             )
             .cloned()
         {
@@ -993,7 +1000,7 @@ impl Engine {
         args_expr: &[Expr],
         hashes: FnCallHashes,
         capture_scope: bool,
-        is_operator: bool,
+        operator_token: Option<&Token>,
         pos: Position,
         level: usize,
     ) -> RhaiResult {
@@ -1006,7 +1013,7 @@ impl Engine {
         let redirected; // Handle call() - Redirect function call
 
         match name {
-            _ if is_operator => (),
+            _ if operator_token.is_some() => (),
 
             // Handle call()
             KEYWORD_FN_PTR_CALL if total_args >= 1 => {

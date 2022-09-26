@@ -6,7 +6,6 @@ mod deserialize;
 mod metadata;
 mod ser;
 mod serialize;
-mod str;
 
-pub use de::from_dynamic;
-pub use ser::to_dynamic;
+pub use de::{from_dynamic, DynamicDeserializer};
+pub use ser::{to_dynamic, DynamicSerializer};

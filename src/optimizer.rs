@@ -1181,8 +1181,8 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     return;
                 }
                 // Overloaded operators can override built-in.
-                _ if x.args.len() == 2 && (state.engine.fast_operators() || !has_native_fn_override(state.engine, x.hashes.native, &arg_types)) => {
-                    if let Some(result) = get_builtin_binary_op_fn(&x.name, &arg_values[0], &arg_values[1])
+                _ if x.args.len() == 2 && x.operator_token.is_some() && (state.engine.fast_operators() || !has_native_fn_override(state.engine, x.hashes.native, &arg_types)) => {
+                    if let Some(result) = get_builtin_binary_op_fn(x.operator_token.as_ref().unwrap(), &arg_values[0], &arg_values[1])
                         .and_then(|f| {
                             #[cfg(not(feature = "no_function"))]
                             let lib = state.lib;
@@ -1229,12 +1229,12 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         => {
             // First search for script-defined functions (can override built-in)
             #[cfg(not(feature = "no_function"))]
-            let has_script_fn = state.lib.iter().copied().any(|m| m.get_script_fn(&x.name, x.args.len()).is_some());
+            let has_script_fn = state.lib.iter().find_map(|&m| m.get_script_fn(&x.name, x.args.len())).is_some();
             #[cfg(feature = "no_function")]
             let has_script_fn = false;
 
             if !has_script_fn {
-                let arg_values = &mut x.args.iter().map(|e| e.get_literal_value().unwrap()).collect::<StaticVec<_>>();
+                let arg_values = &mut x.args.iter().map(Expr::get_literal_value).collect::<Option<StaticVec<_>>>().unwrap();
 
                 let result = match x.name.as_str() {
                     KEYWORD_TYPE_OF if arg_values.len() == 1 => Some(state.engine.map_type_name(arg_values[0].type_name()).into()),

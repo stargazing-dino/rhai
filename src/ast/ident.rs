@@ -28,6 +28,7 @@ impl fmt::Debug for Ident {
 
 impl AsRef<str> for Ident {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &str {
         self.name.as_ref()
     }
@@ -37,6 +38,7 @@ impl Deref for Ident {
     type Target = ImmutableString;
 
     #[inline(always)]
+    #[must_use]
     fn deref(&self) -> &Self::Target {
         &self.name
     }
@@ -44,6 +46,7 @@ impl Deref for Ident {
 
 impl DerefMut for Ident {
     #[inline(always)]
+    #[must_use]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.name
     }

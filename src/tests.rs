@@ -22,15 +22,7 @@ fn check_struct_sizes() {
     );
     assert_eq!(
         size_of::<tokenizer::Token>(),
-        if IS_32_BIT {
-            if cfg!(feature = "decimal") {
-                24
-            } else {
-                16
-            }
-        } else {
-            32
-        }
+        if IS_32_BIT { 8 } else { 16 }
     );
     assert_eq!(size_of::<ast::Expr>(), if PACKED { 12 } else { 16 });
     assert_eq!(size_of::<Option<ast::Expr>>(), if PACKED { 12 } else { 16 });
