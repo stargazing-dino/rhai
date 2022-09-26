@@ -834,7 +834,7 @@ pub mod array_functions {
             return Ok(false);
         }
 
-        for item in array.iter_mut() {
+        for item in array {
             if ctx
                 .call_fn_raw(OP_EQUALS, true, false, &mut [item, &mut value.clone()])
                 .or_else(|err| match *err {

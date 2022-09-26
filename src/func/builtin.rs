@@ -280,7 +280,7 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
                     Token::GreaterThanEqualsTo  => Some(impl_op!(FLOAT => $xx >= $yy)),
                     Token::LessThan             => Some(impl_op!(FLOAT => $xx < $yy)),
                     Token::LessThanEqualsTo     => Some(impl_op!(FLOAT => $xx <= $yy)),
-                    _ => None,
+                    _                           => None,
                 };
             }
         };
@@ -308,7 +308,7 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
                     Token::Divide   => return Some(impl_op!(from Decimal => divide($xx, $yy))),
                     Token::Modulo   => return Some(impl_op!(from Decimal => modulo($xx, $yy))),
                     Token::PowerOf  => return Some(impl_op!(from Decimal => power($xx, $yy))),
-                    _ => ()
+                    _               => ()
                 }
 
                 #[cfg(feature = "unchecked")]
@@ -322,17 +322,17 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
                     Token::Divide   => return Some(impl_op!(from Decimal => $xx / $yy)),
                     Token::Modulo   => return Some(impl_op!(from Decimal => $xx % $yy)),
                     Token::PowerOf  => return Some(impl_op!(from Decimal => $xx.powd($yy))),
-                    _ => ()
+                    _               => ()
                 }
 
                 return match op {
-                     Token::EqualsTo            => Some(impl_op!(from Decimal => $xx == $yy)),
-                     Token::NotEqualsTo         => Some(impl_op!(from Decimal => $xx != $yy)),
-                     Token::GreaterThan         => Some(impl_op!(from Decimal => $xx > $yy)),
-                     Token::GreaterThanEqualsTo => Some(impl_op!(from Decimal => $xx >= $yy)),
-                     Token::LessThan            => Some(impl_op!(from Decimal => $xx < $yy)),
-                     Token::LessThanEqualsTo    => Some(impl_op!(from Decimal => $xx <= $yy)),
-                    _ =>  None
+                    Token::EqualsTo             => Some(impl_op!(from Decimal => $xx == $yy)),
+                    Token::NotEqualsTo          => Some(impl_op!(from Decimal => $xx != $yy)),
+                    Token::GreaterThan          => Some(impl_op!(from Decimal => $xx > $yy)),
+                    Token::GreaterThanEqualsTo  => Some(impl_op!(from Decimal => $xx >= $yy)),
+                    Token::LessThan             => Some(impl_op!(from Decimal => $xx < $yy)),
+                    Token::LessThanEqualsTo     => Some(impl_op!(from Decimal => $xx <= $yy)),
+                    _                           => None
                 };
             }
         };
@@ -680,7 +680,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                     Token::DivideAssign     => Some(impl_op!($x /= $yy)),
                     Token::ModuloAssign     => Some(impl_op!($x %= $yy)),
                     Token::PowerOfAssign    => Some(impl_op!($x => $xx.powf($yy as $x))),
-                    _ => None,
+                    _                       => None,
                 };
             }
         }
@@ -707,7 +707,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                     Token::DivideAssign     => Some(impl_op!(from $x => divide($xx, $yy))),
                     Token::ModuloAssign     => Some(impl_op!(from $x => modulo($xx, $yy))),
                     Token::PowerOfAssign    => Some(impl_op!(from $x => power($xx, $yy))),
-                    _ => None,
+                    _                       => None,
                 };
 
                 #[cfg(feature = "unchecked")]
@@ -715,13 +715,13 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
 
                 #[cfg(feature = "unchecked")]
                 return match op {
-                    Token::PlusAssign     => Some(impl_op!(from $x += $yy)),
-                    Token::MinusAssign    => Some(impl_op!(from $x -= $yy)),
-                    Token::MultiplyAssign => Some(impl_op!(from $x *= $yy)),
-                    Token::DivideAssign   => Some(impl_op!(from $x /= $yy)),
-                    Token::ModuloAssign   => Some(impl_op!(from $x %= $yy)),
-                    Token::PowerOfAssign  => Some(impl_op!(from $x => $xx.powd($yy))),
-                    _ =>  None,
+                    Token::PlusAssign       => Some(impl_op!(from $x += $yy)),
+                    Token::MinusAssign      => Some(impl_op!(from $x -= $yy)),
+                    Token::MultiplyAssign   => Some(impl_op!(from $x *= $yy)),
+                    Token::DivideAssign     => Some(impl_op!(from $x /= $yy)),
+                    Token::ModuloAssign     => Some(impl_op!(from $x %= $yy)),
+                    Token::PowerOfAssign    => Some(impl_op!(from $x => $xx.powd($yy))),
+                    _                       => None,
                 };
             }
         };

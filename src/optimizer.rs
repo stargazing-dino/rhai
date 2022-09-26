@@ -254,7 +254,7 @@ fn optimize_stmt_block(
         });
 
         // Optimize each statement in the block
-        for stmt in statements.iter_mut() {
+        for stmt in &mut statements {
             match stmt {
                 Stmt::Var(x, options, ..) => {
                     if options.contains(ASTFlags::CONSTANT) {
@@ -688,7 +688,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             optimize_expr(match_expr, state, false);
 
             // Optimize blocks
-            for b in expressions.iter_mut() {
+            for b in expressions.as_mut() {
                 optimize_expr(&mut b.condition, state, false);
                 optimize_expr(&mut b.expr, state, false);
 
@@ -1204,7 +1204,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             x.args.iter_mut().for_each(|a| optimize_expr(a, state, false));
 
             // Move constant arguments
-            for arg in x.args.iter_mut() {
+            for arg in &mut x.args {
                 match arg {
                     Expr::DynamicConstant(..) | Expr::Unit(..)
                     | Expr::StringConstant(..) | Expr::CharConstant(..)
@@ -1254,7 +1254,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         }
 
         // id(args ..) or xxx.id(args ..) -> optimize function call arguments
-        Expr::FnCall(x, ..) | Expr::MethodCall(x, ..) => for arg in x.args.iter_mut() {
+        Expr::FnCall(x, ..) | Expr::MethodCall(x, ..) => for arg in &mut x.args {
             optimize_expr(arg, state, false);
 
             // Move constant arguments

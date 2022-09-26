@@ -928,7 +928,7 @@ impl Dynamic {
             #[cfg(not(feature = "no_index"))]
             Union::Array(ref mut a, _, ref mut access) => {
                 *access = typ;
-                for v in a.iter_mut() {
+                for v in a.as_mut() {
                     v.set_access_mode(typ);
                 }
             }
