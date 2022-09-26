@@ -169,6 +169,7 @@ impl Engine {
     /// let mut engine = Engine::new();
     ///
     /// // Register a token mapper.
+    /// # #[allow(deprecated)]
     /// engine.on_parse_token(|token, _, _| {
     ///     match token {
     ///         // Convert all integer literals to strings

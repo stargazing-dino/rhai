@@ -9,6 +9,7 @@ pub mod immutable_string;
 pub mod interner;
 pub mod parse_error;
 pub mod scope;
+pub mod variant;
 
 pub use bloom_filter::BloomFilterU64;
 pub use custom_types::{CustomTypeInfo, CustomTypesCollection};
@@ -21,3 +22,4 @@ pub use immutable_string::ImmutableString;
 pub use interner::StringsInterner;
 pub use parse_error::{LexError, ParseError, ParseErrorType};
 pub use scope::Scope;
+pub use variant::Variant;
