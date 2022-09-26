@@ -74,7 +74,11 @@ impl BuildHasher for StraightHasherBuilder {
 #[inline(always)]
 #[must_use]
 pub fn get_hasher() -> ahash::AHasher {
-    ahash::AHasher::default()
+    if cfg!(feature = "stable_hash") {
+        ahash::RandomState::with_seeds(42, 999, 123, 0).build_hasher()
+    } else {
+        ahash::AHasher::default()
+    }
 }
 
 /// Calculate a non-zero [`u64`] hash key from a namespace-qualified variable name.
