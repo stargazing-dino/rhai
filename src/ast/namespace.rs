@@ -29,6 +29,8 @@ pub struct Namespace {
 }
 
 impl fmt::Debug for Namespace {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_empty() {
             return f.write_str("NONE");

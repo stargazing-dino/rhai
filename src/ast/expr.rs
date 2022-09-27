@@ -117,6 +117,8 @@ pub struct FnCallHashes {
 }
 
 impl fmt::Debug for FnCallHashes {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         #[cfg(not(feature = "no_function"))]
         if self.script != 0 {
@@ -199,6 +201,8 @@ pub struct FnCallExpr {
 }
 
 impl fmt::Debug for FnCallExpr {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ff = f.debug_struct("FnCallExpr");
         #[cfg(not(feature = "no_module"))]
@@ -294,7 +298,8 @@ impl<F: Float> DerefMut for FloatWrapper<F> {
 
 #[cfg(not(feature = "no_float"))]
 impl<F: Float + fmt::Debug> fmt::Debug for FloatWrapper<F> {
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)
     }
@@ -448,6 +453,8 @@ impl Default for Expr {
 }
 
 impl fmt::Debug for Expr {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut display_pos = format!(" @ {:?}", self.start_position());
 

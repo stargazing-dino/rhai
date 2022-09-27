@@ -507,6 +507,8 @@ impl fmt::Display for Dynamic {
 }
 
 impl fmt::Debug for Dynamic {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             Union::Unit(ref v, ..) => fmt::Debug::fmt(v, f),

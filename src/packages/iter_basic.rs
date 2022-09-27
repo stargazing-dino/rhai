@@ -47,6 +47,8 @@ pub struct StepRange<T: Debug + Copy + PartialOrd> {
 }
 
 impl<T: Debug + Copy + PartialOrd> Debug for StepRange<T> {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple(&format!("StepRange<{}>", type_name::<T>()))
             .field(&self.from)

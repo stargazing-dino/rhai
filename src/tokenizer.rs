@@ -241,6 +241,8 @@ impl fmt::Display for Position {
 }
 
 impl fmt::Debug for Position {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_none() {
             f.write_str("none")
@@ -333,7 +335,6 @@ impl Span {
 }
 
 impl fmt::Display for Span {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let _f = f;
 
@@ -360,6 +361,8 @@ impl fmt::Display for Span {
 }
 
 impl fmt::Debug for Span {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
     }

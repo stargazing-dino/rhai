@@ -202,6 +202,8 @@ impl Default for Module {
 }
 
 impl fmt::Debug for Module {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut d = f.debug_struct("Module");
 

@@ -27,6 +27,8 @@ pub enum CallableFunction {
 }
 
 impl fmt::Debug for CallableFunction {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Pure(..) => write!(f, "NativePureFunction"),

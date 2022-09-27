@@ -81,7 +81,6 @@ pub struct Scope<'a, const N: usize = SCOPE_ENTRIES_INLINED> {
 }
 
 impl fmt::Display for Scope<'_> {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, (name, constant, value)) in self.iter_raw().enumerate() {
             #[cfg(not(feature = "no_closure"))]

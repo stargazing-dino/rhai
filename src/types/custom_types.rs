@@ -17,6 +17,8 @@ pub struct CustomTypeInfo {
 pub struct CustomTypesCollection(BTreeMap<Identifier, CustomTypeInfo>);
 
 impl fmt::Debug for CustomTypesCollection {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("CustomTypesCollection ")?;
         f.debug_map().entries(self.0.iter()).finish()

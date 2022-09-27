@@ -354,7 +354,8 @@ impl<K: Into<crate::ImmutableString>, M: Into<crate::Shared<crate::Module>>> Ext
 }
 
 impl fmt::Debug for GlobalRuntimeState<'_> {
-    #[inline]
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut f = f.debug_struct("GlobalRuntimeState");
 

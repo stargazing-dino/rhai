@@ -42,6 +42,8 @@ impl Default for AST {
 }
 
 impl fmt::Debug for AST {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut fp = f.debug_struct("AST");
 

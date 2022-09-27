@@ -106,6 +106,8 @@ impl OpAssignment {
 }
 
 impl fmt::Debug for OpAssignment {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_op_assignment() {
             f.debug_struct("OpAssignment")
@@ -178,7 +180,8 @@ pub enum RangeCase {
 }
 
 impl fmt::Debug for RangeCase {
-    #[inline]
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ExclusiveInt(r, n) => write!(f, "{}..{} => {}", r.start, r.end, n),
@@ -454,6 +457,8 @@ impl AsMut<[Stmt]> for StmtBlock {
 }
 
 impl fmt::Debug for StmtBlock {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Block")?;
         fmt::Debug::fmt(&self.block, f)?;
