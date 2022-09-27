@@ -20,6 +20,8 @@ pub struct Ident {
 }
 
 impl fmt::Debug for Ident {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.name)?;
         self.pos.debug_print(f)

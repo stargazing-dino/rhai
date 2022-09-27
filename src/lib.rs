@@ -83,6 +83,7 @@ use std::prelude::v1::*;
 // Internal modules
 mod api;
 mod ast;
+mod config;
 mod engine;
 mod eval;
 mod func;
@@ -224,7 +225,7 @@ pub mod debugger {
 /// An identifier in Rhai. [`SmartString`](https://crates.io/crates/smartstring) is used because most
 /// identifiers are ASCII and short, fewer than 23 characters, so they can be stored inline.
 #[cfg(not(feature = "internals"))]
-pub(crate) type Identifier = SmartString;
+type Identifier = SmartString;
 
 /// An identifier in Rhai. [`SmartString`](https://crates.io/crates/smartstring) is used because most
 /// identifiers are ASCII and short, fewer than 23 characters, so they can be stored inline.
@@ -237,7 +238,7 @@ pub use func::Shared;
 /// Alias to [`RefCell`][std::cell::RefCell] or [`RwLock`][std::sync::RwLock] depending on the `sync` feature flag.
 pub use func::Locked;
 
-pub(crate) use func::{calc_fn_hash, calc_fn_params_hash, calc_var_hash, combine_hashes};
+use func::{calc_fn_hash, calc_fn_params_hash, calc_var_hash, combine_hashes};
 
 pub use rhai_codegen::*;
 
@@ -429,7 +430,7 @@ type FnArgsVec<T> = smallvec::SmallVec<[T; 5]>;
 #[cfg(feature = "no_closure")]
 type FnArgsVec<T> = crate::StaticVec<T>;
 
-pub(crate) type SmartString = smartstring::SmartString<smartstring::LazyCompact>;
+type SmartString = smartstring::SmartString<smartstring::LazyCompact>;
 
 // Compiler guards against mutually-exclusive feature flags
 

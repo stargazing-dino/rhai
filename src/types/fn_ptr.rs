@@ -23,6 +23,8 @@ pub struct FnPtr {
 }
 
 impl fmt::Debug for FnPtr {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_curried() {
             self.curry

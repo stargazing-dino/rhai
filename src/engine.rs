@@ -150,7 +150,8 @@ pub struct Engine {
 }
 
 impl fmt::Debug for Engine {
-    #[inline]
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut f = f.debug_struct("Engine");
 

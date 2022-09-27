@@ -47,9 +47,6 @@ const NEVER_ENDS: &str = "`Token`";
 /// Unroll `switch` ranges no larger than this.
 const SMALL_SWITCH_RANGE: INT = 16;
 
-/// Number of string interners used: two additional for property getters/setters if not `no_object`
-const NUM_INTERNERS: usize = if cfg!(feature = "no_object") { 1 } else { 3 };
-
 /// _(internals)_ A type that encapsulates the current state of the parser.
 /// Exported under the `internals` feature only.
 pub struct ParseState<'e> {
@@ -58,7 +55,7 @@ pub struct ParseState<'e> {
     /// Controls whether parsing of an expression should stop given the next token.
     pub expr_filter: fn(&Token) -> bool,
     /// String interners.
-    interned_strings: [StringsInterner<'e>; NUM_INTERNERS],
+    interned_strings: StringsInterner<'e>,
     /// External [scope][Scope] with constants.
     pub scope: &'e Scope<'e>,
     /// Global runtime state.
@@ -88,6 +85,8 @@ pub struct ParseState<'e> {
 }
 
 impl fmt::Debug for ParseState<'_> {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut f = f.debug_struct("ParseState");
 
@@ -116,7 +115,7 @@ impl<'e> ParseState<'e> {
     pub fn new(
         engine: &Engine,
         scope: &'e Scope,
-        interned_strings: [StringsInterner<'e>; NUM_INTERNERS],
+        interned_strings: StringsInterner<'e>,
         tokenizer_control: TokenizerControl,
     ) -> Self {
         Self {
@@ -254,7 +253,7 @@ impl<'e> ParseState<'e> {
         &mut self,
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        self.interned_strings[0].get(text)
+        self.interned_strings.get(text)
     }
 
     /// Get an interned property getter, creating one if it is not yet interned.
@@ -265,8 +264,11 @@ impl<'e> ParseState<'e> {
         &mut self,
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        self.interned_strings[1]
-            .get_with_mapper(|s| crate::engine::make_getter(s.as_ref()).into(), text)
+        self.interned_strings.get_with_mapper(
+            crate::engine::FN_GET,
+            |s| crate::engine::make_getter(s.as_ref()).into(),
+            text,
+        )
     }
 
     /// Get an interned property setter, creating one if it is not yet interned.
@@ -277,8 +279,11 @@ impl<'e> ParseState<'e> {
         &mut self,
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        self.interned_strings[2]
-            .get_with_mapper(|s| crate::engine::make_setter(s.as_ref()).into(), text)
+        self.interned_strings.get_with_mapper(
+            crate::engine::FN_SET,
+            |s| crate::engine::make_setter(s.as_ref()).into(),
+            text,
+        )
     }
 }
 

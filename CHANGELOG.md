@@ -7,7 +7,9 @@ Version 1.11.0
 New features
 ------------
 
-* A new feature flag, `stable_hash`, is added that forces hashing to be consistent using a fixed seed.
+### Stable hashing
+
+* It is now possible to specify a fixed _seed_ for use with the `ahash` hasher in order to force stable (i.e. deterministic) hashes for function signatures.
 
 Enhancements
 ------------

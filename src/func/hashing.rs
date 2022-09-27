@@ -1,5 +1,6 @@
 //! Module containing utilities to hash functions and function calls.
 
+use crate::config;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -74,8 +75,8 @@ impl BuildHasher for StraightHasherBuilder {
 #[inline(always)]
 #[must_use]
 pub fn get_hasher() -> ahash::AHasher {
-    if cfg!(feature = "stable_hash") {
-        ahash::RandomState::with_seeds(42, 999, 123, 0).build_hasher()
+    if let Some([seed1, seed2, seed3, seed4]) = config::AHASH_SEED {
+        ahash::RandomState::with_seeds(seed1, seed2, seed3, seed4).build_hasher()
     } else {
         ahash::AHasher::default()
     }
