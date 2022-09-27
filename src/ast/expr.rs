@@ -134,7 +134,7 @@ impl fmt::Debug for FnCallHashes {
 }
 
 impl From<u64> for FnCallHashes {
-    #[inline(always)]
+    #[inline]
     fn from(hash: u64) -> Self {
         let hash = if hash == 0 { ALT_ZERO_HASH } else { hash };
 
@@ -148,7 +148,7 @@ impl From<u64> for FnCallHashes {
 
 impl FnCallHashes {
     /// Create a [`FnCallHashes`] with only the native Rust hash.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn from_native(hash: u64) -> Self {
         Self {
@@ -158,7 +158,7 @@ impl FnCallHashes {
         }
     }
     /// Create a [`FnCallHashes`] with both native Rust and script function hashes.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn from_all(#[cfg(not(feature = "no_function"))] script: u64, native: u64) -> Self {
         Self {
@@ -252,7 +252,7 @@ pub struct FloatWrapper<F>(F);
 
 #[cfg(not(feature = "no_float"))]
 impl Hash for FloatWrapper<crate::FLOAT> {
-    #[inline(always)]
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.to_ne_bytes().hash(state);
     }

@@ -561,14 +561,12 @@ impl Engine {
             }
 
             #[cfg(not(feature = "no_index"))]
-            Expr::Index(..) => {
-                self.eval_dot_index_chain(scope, global, caches, lib, this_ptr, expr, level, None)
-            }
+            Expr::Index(..) => self
+                .eval_dot_index_chain(scope, global, caches, lib, this_ptr, expr, level, &mut None),
 
             #[cfg(not(feature = "no_object"))]
-            Expr::Dot(..) => {
-                self.eval_dot_index_chain(scope, global, caches, lib, this_ptr, expr, level, None)
-            }
+            Expr::Dot(..) => self
+                .eval_dot_index_chain(scope, global, caches, lib, this_ptr, expr, level, &mut None),
 
             _ => unreachable!("expression cannot be evaluated: {:?}", expr),
         };

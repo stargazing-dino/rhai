@@ -87,7 +87,7 @@ impl DerefMut for Namespace {
 }
 
 impl From<Vec<Ident>> for Namespace {
-    #[inline(always)]
+    #[inline]
     fn from(mut path: Vec<Ident>) -> Self {
         path.shrink_to_fit();
         Self {
@@ -98,7 +98,7 @@ impl From<Vec<Ident>> for Namespace {
 }
 
 impl From<StaticVec<Ident>> for Namespace {
-    #[inline(always)]
+    #[inline]
     fn from(mut path: StaticVec<Ident>) -> Self {
         path.shrink_to_fit();
         Self { index: None, path }

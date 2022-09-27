@@ -187,15 +187,6 @@ impl Engine {
             *target.write_lock::<Dynamic>().unwrap() = new_val;
         }
 
-        /*
-        if let Some(mut guard) = target.write_lock::<Dynamic>() {
-            if guard.is::<ImmutableString>() {
-                let s = std::mem::take(&mut *guard).cast::<ImmutableString>();
-                *guard = self.get_interned_string(s).into();
-            }
-        }
-        */
-
         target.propagate_changed_value(op_info.pos)
     }
 
@@ -295,19 +286,25 @@ impl Engine {
             } else {
                 let (op_info, BinaryExpr { lhs, rhs }) = &**x;
 
-                let rhs_result = self
-                    .eval_expr(scope, global, caches, lib, this_ptr, rhs, level)
-                    .map(Dynamic::flatten);
+                let rhs_result = self.eval_expr(scope, global, caches, lib, this_ptr, rhs, level);
 
                 if let Ok(rhs_val) = rhs_result {
-                    let rhs_val = if rhs_val.is::<ImmutableString>() {
-                        self.get_interned_string(rhs_val.cast::<ImmutableString>())
-                            .into()
+                    // Check if the result is a string. If so, intern it.
+                    #[cfg(not(feature = "no_closure"))]
+                    let is_string = !rhs_val.is_shared() && rhs_val.is::<ImmutableString>();
+                    #[cfg(feature = "no_closure")]
+                    let is_string = rhs_val.is::<ImmutableString>();
+
+                    let rhs_val = if is_string {
+                        self.get_interned_string(
+                            rhs_val.into_immutable_string().expect("`ImmutableString`"),
+                        )
+                        .into()
                     } else {
-                        rhs_val
+                        rhs_val.flatten()
                     };
 
-                    let _new_val = Some((rhs_val, op_info));
+                    let _new_val = &mut Some((rhs_val, op_info));
 
                     // Must be either `var[index] op= val` or `var.prop op= val`
                     match lhs {
@@ -317,20 +314,17 @@ impl Engine {
                         }
                         // idx_lhs[idx_expr] op= rhs
                         #[cfg(not(feature = "no_index"))]
-                        Expr::Index(..) => self
-                            .eval_dot_index_chain(
-                                scope, global, caches, lib, this_ptr, lhs, level, _new_val,
-                            )
-                            .map(|_| Dynamic::UNIT),
+                        Expr::Index(..) => self.eval_dot_index_chain(
+                            scope, global, caches, lib, this_ptr, lhs, level, _new_val,
+                        ),
                         // dot_lhs.dot_rhs op= rhs
                         #[cfg(not(feature = "no_object"))]
-                        Expr::Dot(..) => self
-                            .eval_dot_index_chain(
-                                scope, global, caches, lib, this_ptr, lhs, level, _new_val,
-                            )
-                            .map(|_| Dynamic::UNIT),
+                        Expr::Dot(..) => self.eval_dot_index_chain(
+                            scope, global, caches, lib, this_ptr, lhs, level, _new_val,
+                        ),
                         _ => unreachable!("cannot assign to expression: {:?}", lhs),
                     }
+                    .map(|_| Dynamic::UNIT)
                 } else {
                     rhs_result
                 }
