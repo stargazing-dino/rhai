@@ -4,6 +4,11 @@ Rhai Release Notes
 Version 1.11.0
 ==============
 
+New features
+------------
+
+* A new feature flag, `stable_hash`, is added that forces hashing to be consistent using a fixed seed.
+
 Enhancements
 ------------
 
