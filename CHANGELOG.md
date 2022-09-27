@@ -9,7 +9,8 @@ New features
 
 ### Stable hashing
 
-* It is now possible to specify a fixed _seed_ for use with the `ahash` hasher in order to force stable (i.e. deterministic) hashes for function signatures.
+* It is now possible to specify a fixed _seed_ for use with the `ahash` hasher, via an environment variable, in order to force stable (i.e. deterministic) hashes for function signatures. This is necessary when using Rhai across shared-library boundaries.
+* A build script is now used to extract the environment variable (`RHAI_AHASH_SEED`) and splice it into the source code before compilation.
 
 Enhancements
 ------------
