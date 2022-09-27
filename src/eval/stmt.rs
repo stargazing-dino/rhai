@@ -314,17 +314,20 @@ impl Engine {
                         }
                         // idx_lhs[idx_expr] op= rhs
                         #[cfg(not(feature = "no_index"))]
-                        Expr::Index(..) => self.eval_dot_index_chain(
-                            scope, global, caches, lib, this_ptr, lhs, level, _new_val,
-                        ),
+                        Expr::Index(..) => self
+                            .eval_dot_index_chain(
+                                scope, global, caches, lib, this_ptr, lhs, level, _new_val,
+                            )
+                            .map(|_| Dynamic::UNIT),
                         // dot_lhs.dot_rhs op= rhs
                         #[cfg(not(feature = "no_object"))]
-                        Expr::Dot(..) => self.eval_dot_index_chain(
-                            scope, global, caches, lib, this_ptr, lhs, level, _new_val,
-                        ),
+                        Expr::Dot(..) => self
+                            .eval_dot_index_chain(
+                                scope, global, caches, lib, this_ptr, lhs, level, _new_val,
+                            )
+                            .map(|_| Dynamic::UNIT),
                         _ => unreachable!("cannot assign to expression: {:?}", lhs),
                     }
-                    .map(|_| Dynamic::UNIT)
                 } else {
                     rhs_result
                 }
