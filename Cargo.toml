@@ -62,7 +62,6 @@ metadata = ["serde", "serde_json", "rhai_codegen/metadata", "smartstring/serde"]
 internals = []                  # expose internal data structures
 debugging = ["internals"]       # enable debugging
 serde = ["dep:serde", "smartstring/serde", "smallvec/serde"] # implement serde for rhai types
-stable_hash = []                # perform all hashing with fixed seed value
 
 # compiling for no-std
 no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm", "ahash/compile-time-rng", "hashbrown/ahash-compile-time-rng"]
