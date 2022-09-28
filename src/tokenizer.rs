@@ -32,7 +32,7 @@ pub struct TokenizerControlBlock {
 
 impl TokenizerControlBlock {
     /// Create a new `TokenizerControlBlock`.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -97,7 +97,7 @@ impl Position {
     /// # Panics
     ///
     /// Panics if `line` is zero.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn new(line: u16, position: u16) -> Self {
         assert!(line != 0, "line cannot be zero");
@@ -220,6 +220,7 @@ impl Position {
 
 impl Default for Position {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::START
     }
@@ -299,6 +300,8 @@ pub struct Span {
 }
 
 impl Default for Span {
+    #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::NONE
     }
@@ -315,7 +318,7 @@ impl Span {
         Self { start, end }
     }
     /// Is this [`Span`] non-existent?
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn is_none(&self) -> bool {
         self.start.is_none() && self.end.is_none()

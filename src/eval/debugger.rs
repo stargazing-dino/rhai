@@ -48,6 +48,7 @@ pub enum DebuggerCommand {
 
 impl Default for DebuggerCommand {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::Continue
     }

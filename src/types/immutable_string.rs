@@ -53,7 +53,6 @@ impl Deref for ImmutableString {
     type Target = SmartString;
 
     #[inline(always)]
-    #[must_use]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -148,6 +147,7 @@ impl FromStr for ImmutableString {
     type Err = ();
 
     #[inline(always)]
+    #[must_use]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s: SmartString = s.into();
         Ok(Self(s.into()))
@@ -156,6 +156,7 @@ impl FromStr for ImmutableString {
 
 impl FromIterator<char> for ImmutableString {
     #[inline]
+    #[must_use]
     fn from_iter<T: IntoIterator<Item = char>>(iter: T) -> Self {
         Self(iter.into_iter().collect::<SmartString>().into())
     }
@@ -163,6 +164,7 @@ impl FromIterator<char> for ImmutableString {
 
 impl<'a> FromIterator<&'a char> for ImmutableString {
     #[inline]
+    #[must_use]
     fn from_iter<T: IntoIterator<Item = &'a char>>(iter: T) -> Self {
         Self(iter.into_iter().copied().collect::<SmartString>().into())
     }
@@ -170,6 +172,7 @@ impl<'a> FromIterator<&'a char> for ImmutableString {
 
 impl<'a> FromIterator<&'a str> for ImmutableString {
     #[inline]
+    #[must_use]
     fn from_iter<T: IntoIterator<Item = &'a str>>(iter: T) -> Self {
         Self(iter.into_iter().collect::<SmartString>().into())
     }
@@ -177,6 +180,7 @@ impl<'a> FromIterator<&'a str> for ImmutableString {
 
 impl FromIterator<String> for ImmutableString {
     #[inline]
+    #[must_use]
     fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
         Self(iter.into_iter().collect::<SmartString>().into())
     }
@@ -184,6 +188,7 @@ impl FromIterator<String> for ImmutableString {
 
 impl FromIterator<SmartString> for ImmutableString {
     #[inline]
+    #[must_use]
     fn from_iter<T: IntoIterator<Item = SmartString>>(iter: T) -> Self {
         Self(iter.into_iter().collect::<SmartString>().into())
     }

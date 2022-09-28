@@ -196,6 +196,7 @@ pub struct Module {
 
 impl Default for Module {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }

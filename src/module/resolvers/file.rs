@@ -56,6 +56,7 @@ pub struct FileModuleResolver {
 
 impl Default for FileModuleResolver {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }

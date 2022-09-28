@@ -41,6 +41,7 @@ pub struct StraightHasher(u64);
 
 impl Hasher for StraightHasher {
     #[inline(always)]
+    #[must_use]
     fn finish(&self) -> u64 {
         self.0
     }
@@ -66,6 +67,7 @@ impl BuildHasher for StraightHasherBuilder {
     type Hasher = StraightHasher;
 
     #[inline(always)]
+    #[must_use]
     fn build_hasher(&self) -> Self::Hasher {
         StraightHasher(ALT_ZERO_HASH)
     }

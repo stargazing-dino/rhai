@@ -75,6 +75,7 @@ impl Limits {
 
 impl Default for Limits {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }

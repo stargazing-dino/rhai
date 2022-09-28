@@ -110,7 +110,7 @@ impl fmt::Debug for ParseState<'_> {
 
 impl<'e> ParseState<'e> {
     /// Create a new [`ParseState`].
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn new(
         engine: &Engine,
@@ -183,7 +183,6 @@ impl<'e> ParseState<'e> {
     ///
     /// * `is_func_name`: `true` if the variable is actually the name of a function
     ///                   (in which case it will be converted into a function pointer).
-    #[inline]
     #[must_use]
     pub fn access_var(
         &mut self,
@@ -235,7 +234,6 @@ impl<'e> ParseState<'e> {
     ///
     /// Panics when called under `no_module`.
     #[cfg(not(feature = "no_module"))]
-    #[inline]
     #[must_use]
     pub fn find_module(&self, name: &str) -> Option<NonZeroUsize> {
         self.imports
@@ -258,7 +256,7 @@ impl<'e> ParseState<'e> {
 
     /// Get an interned property getter, creating one if it is not yet interned.
     #[cfg(not(feature = "no_object"))]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn get_interned_getter(
         &mut self,
@@ -273,7 +271,7 @@ impl<'e> ParseState<'e> {
 
     /// Get an interned property setter, creating one if it is not yet interned.
     #[cfg(not(feature = "no_object"))]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn get_interned_setter(
         &mut self,
@@ -313,7 +311,7 @@ struct ParseSettings {
 
 impl ParseSettings {
     /// Create a new `ParseSettings` with one higher expression level.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn level_up(&self) -> Self {
         Self {
@@ -417,7 +415,6 @@ impl Expr {
 }
 
 /// Make sure that the next expression is not a statement expression (i.e. wrapped in `{}`).
-#[inline]
 fn ensure_not_statement_expr(
     input: &mut TokenStream,
     type_name: &(impl ToString + ?Sized),
@@ -429,7 +426,6 @@ fn ensure_not_statement_expr(
 }
 
 /// Make sure that the next expression is not a mis-typed assignment (i.e. `a = b` instead of `a == b`).
-#[inline]
 fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
     match input.peek().expect(NEVER_ENDS) {
         (Token::Equals, pos) => Err(LexError::ImproperSymbol(
@@ -446,7 +442,6 @@ fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
 /// # Panics
 ///
 /// Panics if the next token is not the expected one.
-#[inline]
 fn eat_token(input: &mut TokenStream, expected_token: Token) -> Position {
     let (t, pos) = input.next().expect(NEVER_ENDS);
 
@@ -462,7 +457,6 @@ fn eat_token(input: &mut TokenStream, expected_token: Token) -> Position {
 }
 
 /// Match a particular [token][Token], consuming it if matched.
-#[inline]
 fn match_token(input: &mut TokenStream, token: Token) -> (bool, Position) {
     let (t, pos) = input.peek().expect(NEVER_ENDS);
     if *t == token {
@@ -473,7 +467,6 @@ fn match_token(input: &mut TokenStream, token: Token) -> (bool, Position) {
 }
 
 /// Parse a variable name.
-#[inline]
 fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position)> {
     match input.next().expect(NEVER_ENDS) {
         // Variable name
@@ -491,7 +484,6 @@ fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position
 
 /// Parse a symbol.
 #[cfg(not(feature = "no_custom_syntax"))]
-#[inline]
 fn parse_symbol(input: &mut TokenStream) -> ParseResult<(SmartString, Position)> {
     match input.next().expect(NEVER_ENDS) {
         // Symbol

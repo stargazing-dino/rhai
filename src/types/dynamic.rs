@@ -153,7 +153,6 @@ impl<'d, T: Any + Clone> Deref for DynamicWriteLock<'d, T> {
     type Target = T;
 
     #[inline]
-    #[must_use]
     fn deref(&self) -> &Self::Target {
         match self.0 {
             DynamicWriteLockInner::Reference(ref reference) => *reference,
@@ -165,7 +164,6 @@ impl<'d, T: Any + Clone> Deref for DynamicWriteLock<'d, T> {
 
 impl<'d, T: Any + Clone> DerefMut for DynamicWriteLock<'d, T> {
     #[inline]
-    #[must_use]
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self.0 {
             DynamicWriteLockInner::Reference(ref mut reference) => *reference,

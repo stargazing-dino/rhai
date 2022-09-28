@@ -36,6 +36,7 @@ pub struct AST {
 
 impl Default for AST {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::empty()
     }

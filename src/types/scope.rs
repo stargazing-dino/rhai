@@ -128,7 +128,7 @@ impl IntoIterator for Scope<'_> {
     type Item = (String, Dynamic, Vec<Identifier>);
     type IntoIter = Box<dyn Iterator<Item = Self::Item>>;
 
-    #[inline]
+    #[must_use]
     fn into_iter(self) -> Self::IntoIter {
         Box::new(
             self.values
@@ -143,7 +143,7 @@ impl<'a> IntoIterator for &'a Scope<'_> {
     type Item = (&'a Identifier, &'a Dynamic, &'a Vec<Identifier>);
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
-    #[inline]
+    #[must_use]
     fn into_iter(self) -> Self::IntoIter {
         Box::new(
             self.values
@@ -719,7 +719,6 @@ impl Scope<'_> {
         scope
     }
     /// Get an iterator to entries in the [`Scope`].
-    #[inline]
     #[allow(dead_code)]
     pub(crate) fn into_iter(self) -> impl Iterator<Item = (Identifier, Dynamic, Vec<Identifier>)> {
         self.names

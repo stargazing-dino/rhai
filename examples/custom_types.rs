@@ -36,6 +36,8 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         type Item = i64;
         type IntoIter = std::vec::IntoIter<Self::Item>;
 
+        #[inline]
+        #[must_use]
         fn into_iter(self) -> Self::IntoIter {
             vec![self.x - 1, self.x, self.x + 1].into_iter()
         }

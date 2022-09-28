@@ -38,6 +38,7 @@ pub enum OptimizationLevel {
 
 impl Default for OptimizationLevel {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::Simple
     }

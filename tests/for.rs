@@ -337,6 +337,8 @@ impl IntoIterator for MyIterableType {
     type Item = char;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
+    #[inline]
+    #[must_use]
     fn into_iter(self) -> Self::IntoIter {
         self.0.chars().collect::<Vec<_>>().into_iter()
     }

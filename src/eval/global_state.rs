@@ -316,7 +316,6 @@ impl IntoIterator for GlobalRuntimeState<'_> {
         std::iter::Rev<smallvec::IntoIter<[crate::Shared<crate::Module>; 3]>>,
     >;
 
-    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.keys
             .into_iter()
@@ -333,10 +332,8 @@ impl<'a> IntoIterator for &'a GlobalRuntimeState<'_> {
         std::iter::Rev<std::slice::Iter<'a, crate::Shared<crate::Module>>>,
     >;
 
-    #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let x = self.keys.iter().rev().zip(self.modules.iter().rev());
-        x
+        self.keys.iter().rev().zip(self.modules.iter().rev())
     }
 }
 

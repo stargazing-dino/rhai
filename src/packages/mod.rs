@@ -45,11 +45,14 @@ pub use time_basic::BasicTimePackage;
 pub trait Package {
     /// Initialize the package.
     /// Functions should be registered into `module` here.
+    #[cold]
     fn init(module: &mut Module);
 
     /// Initialize the package with an [`Engine`].
     ///
     /// Perform tasks such as registering custom operators/syntax.
+    #[cold]
+    #[inline]
     #[allow(unused_variables)]
     fn init_engine(engine: &mut Engine) {}
 
@@ -65,6 +68,8 @@ pub trait Package {
     ///
     /// package.register_into_engine(&mut engine);
     /// ```
+    #[cold]
+    #[inline]
     fn register_into_engine(&self, engine: &mut Engine) -> &Self {
         Self::init_engine(engine);
         engine.register_global_module(self.as_shared_module());
@@ -84,6 +89,8 @@ pub trait Package {
     /// package.register_into_engine_as(&mut engine, "core");
     /// ```
     #[cfg(not(feature = "no_module"))]
+    #[cold]
+    #[inline]
     fn register_into_engine_as(&self, engine: &mut Engine, name: &str) -> &Self {
         Self::init_engine(engine);
         engine.register_static_module(name, self.as_shared_module());
@@ -133,7 +140,6 @@ macro_rules! def_package {
             fn as_shared_module(&self) -> $crate::Shared<$crate::Module> {
                 self.0.clone()
             }
-            #[inline]
             fn init($lib: &mut $crate::Module) {
                 $($(
                     $(#[$base_meta])* { <$base_pkg>::init($lib); }
@@ -141,7 +147,6 @@ macro_rules! def_package {
 
                 $block
             }
-            #[inline]
             fn init_engine(_engine: &mut $crate::Engine) {
                 $($(
                     $(#[$base_meta])* { <$base_pkg>::init_engine(_engine); }
@@ -156,6 +161,7 @@ macro_rules! def_package {
 
         impl Default for $package {
             #[inline(always)]
+            #[must_use]
             fn default() -> Self {
                 Self::new()
             }
@@ -193,12 +199,16 @@ macro_rules! def_package {
         }
 
         impl Default for $package {
+            #[inline(always)]
+            #[must_use]
             fn default() -> Self {
                 Self::new()
             }
         }
 
         impl $package {
+            #[inline]
+            #[must_use]
             pub fn new() -> Self {
                 let mut module = $root::Module::new();
                 <Self as $root::packages::Package>::init(&mut module);
@@ -229,12 +239,16 @@ macro_rules! def_package {
         }
 
         impl Default for $package {
+            #[inline(always)]
+            #[must_use]
             fn default() -> Self {
                 Self::new()
             }
         }
 
         impl $package {
+            #[inline]
+            #[must_use]
             pub fn new() -> Self {
                 let mut module = $root::Module::new();
                 <Self as $root::packages::Package>::init(&mut module);

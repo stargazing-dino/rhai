@@ -251,12 +251,9 @@ impl Engine {
             // Then check sub-modules
             || self.global_sub_modules.values().any(|m| m.contains_qualified_fn(hash_script));
 
-        if !result {
-            if cache.filter.is_absent(hash_script) {
-                cache.filter.mark(hash_script);
-            } else {
-                cache.map.insert(hash_script, None);
-            }
+        if !result && !cache.filter.is_absent_and_set(hash_script) {
+            // Do not cache "one-hit wonders"
+            cache.map.insert(hash_script, None);
         }
 
         result
