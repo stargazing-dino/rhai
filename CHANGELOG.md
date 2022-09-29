@@ -12,6 +12,11 @@ New features
 * It is now possible to specify a fixed _seed_ for use with the `ahash` hasher, via an environment variable, in order to force stable (i.e. deterministic) hashes for function signatures. This is necessary when using Rhai across shared-library boundaries.
 * A build script is now used to extract the environment variable (`RHAI_AHASH_SEED`) and splice it into the source code before compilation.
 
+Bug fixes
+---------
+
+* `Engine::parse_json` now returns an error on unquoted keys to be consistent with JSON specifications.
+
 Enhancements
 ------------
 
@@ -19,6 +24,7 @@ Enhancements
 * Due to a code refactor, built-in operators for standard types now run even faster, in certain cases by 20-30%.
 * `Scope` is now serializable and deserializable via `serde`.
 * `Scope` now contains a const generic parameter that allows specifying how many entries to be kept inline.
+* `parse_json` function is added to parse a JSON string into an object map.
 
 
 Version 1.10.1

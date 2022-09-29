@@ -287,26 +287,28 @@ impl<'e> ParseState<'e> {
 
 /// A type that encapsulates all the settings for a particular parsing function.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-struct ParseSettings {
+pub(crate) struct ParseSettings {
     /// Is the construct being parsed located at global level?
-    at_global_level: bool,
+    pub at_global_level: bool,
     /// Is the construct being parsed located inside a function definition?
     #[cfg(not(feature = "no_function"))]
-    in_fn_scope: bool,
+    pub in_fn_scope: bool,
     /// Is the construct being parsed located inside a closure definition?
     #[cfg(not(feature = "no_function"))]
     #[cfg(not(feature = "no_closure"))]
-    in_closure: bool,
+    pub in_closure: bool,
     /// Is the construct being parsed located inside a breakable loop?
-    is_breakable: bool,
+    pub is_breakable: bool,
     /// Allow statements in blocks?
-    allow_statements: bool,
+    pub allow_statements: bool,
+    /// Allow unquoted map properties?
+    pub allow_unquoted_map_properties: bool,
     /// Language options in effect (overrides Engine options).
-    options: LangOptions,
+    pub options: LangOptions,
     /// Current expression nesting level.
-    level: usize,
+    pub level: usize,
     /// Current position.
-    pos: Position,
+    pub pos: Position,
 }
 
 impl ParseSettings {
@@ -996,6 +998,9 @@ impl Engine {
             }
 
             let (name, pos) = match input.next().expect(NEVER_ENDS) {
+                (Token::Identifier(..), pos) if !settings.allow_unquoted_map_properties => {
+                    return Err(PERR::PropertyExpected.into_err(pos))
+                }
                 (Token::Identifier(s) | Token::StringConstant(s), pos) => {
                     if map.iter().any(|(p, ..)| **p == *s) {
                         return Err(PERR::DuplicatedProperty(s.to_string()).into_err(pos));
@@ -3326,6 +3331,7 @@ impl Engine {
                             in_closure: false,
                             is_breakable: false,
                             allow_statements: true,
+                            allow_unquoted_map_properties: settings.allow_unquoted_map_properties,
                             level: 0,
                             options,
                             pos,
@@ -3793,6 +3799,7 @@ impl Engine {
         &self,
         input: &mut TokenStream,
         state: &mut ParseState,
+        process_settings: impl Fn(&mut ParseSettings),
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
         let mut functions = StraightHashMap::default();
@@ -3802,7 +3809,7 @@ impl Engine {
         #[cfg(not(feature = "no_function"))]
         options.remove(LangOptions::ANON_FN);
 
-        let settings = ParseSettings {
+        let mut settings = ParseSettings {
             at_global_level: true,
             #[cfg(not(feature = "no_function"))]
             in_fn_scope: false,
@@ -3811,10 +3818,13 @@ impl Engine {
             in_closure: false,
             is_breakable: false,
             allow_statements: false,
+            allow_unquoted_map_properties: true,
             level: 0,
             options,
-            pos: Position::NONE,
+            pos: Position::START,
         };
+        process_settings(&mut settings);
+
         let expr = self.parse_expr(input, state, &mut functions, settings)?;
 
         assert!(functions.is_empty());
@@ -3853,25 +3863,27 @@ impl Engine {
         &self,
         input: &mut TokenStream,
         state: &mut ParseState,
+        process_settings: impl Fn(&mut ParseSettings),
     ) -> ParseResult<(StmtBlockContainer, StaticVec<Shared<ScriptFnDef>>)> {
         let mut statements = StmtBlockContainer::new_const();
         let mut functions = StraightHashMap::default();
+        let mut settings = ParseSettings {
+            at_global_level: true,
+            #[cfg(not(feature = "no_function"))]
+            in_fn_scope: false,
+            #[cfg(not(feature = "no_function"))]
+            #[cfg(not(feature = "no_closure"))]
+            in_closure: false,
+            is_breakable: false,
+            allow_statements: true,
+            allow_unquoted_map_properties: true,
+            options: self.options,
+            level: 0,
+            pos: Position::START,
+        };
+        process_settings(&mut settings);
 
         while !input.peek().expect(NEVER_ENDS).0.is_eof() {
-            let settings = ParseSettings {
-                at_global_level: true,
-                #[cfg(not(feature = "no_function"))]
-                in_fn_scope: false,
-                #[cfg(not(feature = "no_function"))]
-                #[cfg(not(feature = "no_closure"))]
-                in_closure: false,
-                is_breakable: false,
-                allow_statements: true,
-                options: self.options,
-                level: 0,
-                pos: Position::NONE,
-            };
-
             let stmt = self.parse_stmt(input, state, &mut functions, settings)?;
 
             if stmt.is_noop() {
@@ -3918,7 +3930,7 @@ impl Engine {
         state: &mut ParseState,
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
-        let (statements, _lib) = self.parse_global_level(input, state)?;
+        let (statements, _lib) = self.parse_global_level(input, state, |_| {})?;
 
         #[cfg(not(feature = "no_optimize"))]
         return Ok(crate::optimizer::optimize_into_ast(

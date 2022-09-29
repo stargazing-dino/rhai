@@ -277,6 +277,11 @@ fn test_map_json() -> Result<(), Box<EvalAltResult>> {
     ));
 
     assert!(matches!(
+        *engine.parse_json("{a:42}", true).expect_err("should error"),
+        EvalAltResult::ErrorParsing(..)
+    ));
+
+    assert!(matches!(
         *engine
             .parse_json("#{a:123}", true)
             .expect_err("should error"),
