@@ -86,6 +86,7 @@ impl GlobalRuntimeState<'_> {
             modules: crate::StaticVec::new_const(),
             source: Identifier::new_const(),
             num_operations: 0,
+            #[cfg(not(feature = "no_module"))]
             num_modules_loaded: 0,
             scope_level: 0,
             always_search_scope: false,
@@ -361,14 +362,14 @@ impl fmt::Debug for GlobalRuntimeState<'_> {
         f.field("imports", &self.keys.iter().zip(self.modules.iter()));
 
         f.field("source", &self.source)
-            .field("num_operations", &self.num_operations)
-            .field("num_modules_loaded", &self.num_modules_loaded);
+            .field("num_operations", &self.num_operations);
 
         #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
         f.field("fn_hash_indexing", &self.fn_hash_indexing);
 
         #[cfg(not(feature = "no_module"))]
-        f.field("embedded_module_resolver", &self.embedded_module_resolver);
+        f.field("num_modules_loaded", &self.num_modules_loaded)
+            .field("embedded_module_resolver", &self.embedded_module_resolver);
 
         #[cfg(not(feature = "no_module"))]
         #[cfg(not(feature = "no_function"))]
