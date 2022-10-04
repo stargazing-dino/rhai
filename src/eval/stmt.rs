@@ -738,7 +738,7 @@ impl Engine {
 
                             #[cfg(feature = "no_object")]
                             _ => {
-                                err.take_position();
+                                let _ = err.take_position();
                                 err.to_string().into()
                             }
                             #[cfg(not(feature = "no_object"))]
@@ -924,7 +924,6 @@ impl Engine {
                 let (expr, export) = &**x;
 
                 // Guard against too many modules
-                #[cfg(not(feature = "unchecked"))]
                 if global.num_modules_loaded >= self.max_modules() {
                     return Err(ERR::ErrorTooManyModules(*_pos).into());
                 }

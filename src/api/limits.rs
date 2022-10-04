@@ -94,12 +94,14 @@ impl Engine {
     }
     /// The maximum levels of function calls allowed for a script.
     ///
-    /// Not available under `unchecked` or `no_function`.
-    #[cfg(not(feature = "no_function"))]
+    /// Zero under `no_function`.
     #[inline(always)]
     #[must_use]
     pub const fn max_call_levels(&self) -> usize {
-        self.limits.max_call_stack_depth
+        #[cfg(not(feature = "no_function"))]
+        return self.limits.max_call_stack_depth;
+        #[cfg(feature = "no_function")]
+        return 0;
     }
     /// Set the maximum number of operations allowed for a script to run to avoid
     /// consuming too much resources (0 for unlimited).
@@ -133,12 +135,14 @@ impl Engine {
     }
     /// The maximum number of imported [modules][crate::Module] allowed for a script.
     ///
-    /// Not available under `unchecked` or `no_module`.
-    #[cfg(not(feature = "no_module"))]
+    /// Zero under `no_module`.
     #[inline(always)]
     #[must_use]
     pub const fn max_modules(&self) -> usize {
-        self.limits.max_modules
+        #[cfg(not(feature = "no_module"))]
+        return self.limits.max_modules;
+        #[cfg(feature = "no_module")]
+        return 0;
     }
     /// Set the depth limits for expressions (0 for unlimited).
     ///
@@ -157,8 +161,6 @@ impl Engine {
         self
     }
     /// The depth limit for expressions (0 for unlimited).
-    ///
-    /// Not available under `unchecked`.
     #[inline]
     #[must_use]
     pub const fn max_expr_depth(&self) -> usize {
@@ -170,16 +172,18 @@ impl Engine {
     }
     /// The depth limit for expressions in functions (0 for unlimited).
     ///
-    /// Not available under `unchecked` or `no_function`.
-    #[cfg(not(feature = "no_function"))]
+    /// Zero under `no_function`.
     #[inline]
     #[must_use]
     pub const fn max_function_expr_depth(&self) -> usize {
-        if let Some(n) = self.limits.max_function_expr_depth {
+        #[cfg(not(feature = "no_function"))]
+        return if let Some(n) = self.limits.max_function_expr_depth {
             n.get()
         } else {
             0
-        }
+        };
+        #[cfg(feature = "no_function")]
+        return 0;
     }
     /// Set the maximum length of [strings][crate::ImmutableString] (0 for unlimited).
     ///
@@ -190,8 +194,6 @@ impl Engine {
         self
     }
     /// The maximum length of [strings][crate::ImmutableString] (0 for unlimited).
-    ///
-    /// Not available under `unchecked`.
     #[inline]
     #[must_use]
     pub const fn max_string_size(&self) -> usize {
@@ -212,16 +214,18 @@ impl Engine {
     }
     /// The maximum length of [arrays][crate::Array] (0 for unlimited).
     ///
-    /// Not available under `unchecked` or `no_index`.
-    #[cfg(not(feature = "no_index"))]
+    /// Zero under `no_index`.
     #[inline]
     #[must_use]
     pub const fn max_array_size(&self) -> usize {
-        if let Some(n) = self.limits.max_array_size {
+        #[cfg(not(feature = "no_index"))]
+        return if let Some(n) = self.limits.max_array_size {
             n.get()
         } else {
             0
-        }
+        };
+        #[cfg(feature = "no_index")]
+        return 0;
     }
     /// Set the maximum size of [object maps][crate::Map] (0 for unlimited).
     ///
@@ -234,15 +238,17 @@ impl Engine {
     }
     /// The maximum size of [object maps][crate::Map] (0 for unlimited).
     ///
-    /// Not available under `unchecked` or `no_object`.
-    #[cfg(not(feature = "no_object"))]
+    /// Zero under `no_object`.
     #[inline]
     #[must_use]
     pub const fn max_map_size(&self) -> usize {
-        if let Some(n) = self.limits.max_map_size {
+        #[cfg(not(feature = "no_object"))]
+        return if let Some(n) = self.limits.max_map_size {
             n.get()
         } else {
             0
-        }
+        };
+        #[cfg(feature = "no_object")]
+        return 0;
     }
 }

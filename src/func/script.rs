@@ -67,7 +67,6 @@ impl Engine {
         self.inc_operations(&mut global.num_operations, pos)?;
 
         // Check for stack overflow
-        #[cfg(not(feature = "unchecked"))]
         if level > self.max_call_levels() {
             return Err(ERR::ErrorStackOverflow(pos).into());
         }

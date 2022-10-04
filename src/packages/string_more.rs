@@ -1216,7 +1216,6 @@ mod string_functions {
         let _ctx = ctx;
 
         // Check if string will be over max size limit
-        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
             return Err(crate::ERR::ErrorDataTooLarge(
                 "Length of string".to_string(),
@@ -1234,7 +1233,6 @@ mod string_functions {
                 p.push(character);
             }
 
-            #[cfg(not(feature = "unchecked"))]
             if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size()
             {
                 return Err(crate::ERR::ErrorDataTooLarge(
@@ -1278,7 +1276,6 @@ mod string_functions {
         let _ctx = ctx;
 
         // Check if string will be over max size limit
-        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
             return Err(crate::ERR::ErrorDataTooLarge(
                 "Length of string".to_string(),
@@ -1303,7 +1300,6 @@ mod string_functions {
                 }
             }
 
-            #[cfg(not(feature = "unchecked"))]
             if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size()
             {
                 return Err(crate::ERR::ErrorDataTooLarge(

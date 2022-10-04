@@ -25,6 +25,7 @@ Enhancements
 * `Scope` is now serializable and deserializable via `serde`.
 * `Scope` now contains a const generic parameter that allows specifying how many entries to be kept inline.
 * `parse_json` function is added to parse a JSON string into an object map.
+* Methods return maximum limits (e.g. `max_string_len`) are now available even under `unchecked` in order to avoid unnecessary feature flags in third-party library code.
 
 
 Version 1.10.1

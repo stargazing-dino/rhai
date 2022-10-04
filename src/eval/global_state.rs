@@ -36,6 +36,7 @@ pub struct GlobalRuntimeState<'a> {
     /// Number of operations performed.
     pub num_operations: u64,
     /// Number of modules loaded.
+    #[cfg(not(feature = "no_module"))]
     pub num_modules_loaded: usize,
     /// Level of the current scope.
     ///

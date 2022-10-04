@@ -494,12 +494,12 @@ impl Module {
     #[inline(always)]
     pub fn set_custom_type_raw(
         &mut self,
-        type_name: impl Into<Identifier>,
+        type_path: impl Into<Identifier>,
         name: impl Into<Identifier>,
     ) -> &mut Self {
         self.custom_types
             .get_or_insert_with(CustomTypesCollection::new)
-            .add(type_name, name);
+            .add(type_path, name);
         self
     }
     /// Get the display name of a registered custom type.

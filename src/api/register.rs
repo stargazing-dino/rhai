@@ -226,12 +226,12 @@ impl Engine {
     #[inline(always)]
     pub fn register_type_with_name_raw(
         &mut self,
-        fully_qualified_type_path: impl Into<Identifier>,
+        type_path: impl Into<Identifier>,
         name: impl Into<Identifier>,
     ) -> &mut Self {
         // Add the pretty-print type name into the map
         self.global_namespace_mut()
-            .set_custom_type_raw(fully_qualified_type_path, name);
+            .set_custom_type_raw(type_path, name);
         self
     }
     /// Register a type iterator for an iterable type with the [`Engine`].

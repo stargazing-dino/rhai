@@ -79,7 +79,6 @@ pub mod blob_functions {
         let _ctx = ctx;
 
         // Check if blob will be over max size limit
-        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_array_size() > 0 && len > _ctx.engine().max_array_size() {
             return Err(
                 crate::ERR::ErrorDataTooLarge("Size of BLOB".to_string(), Position::NONE).into(),
@@ -364,7 +363,6 @@ pub mod blob_functions {
         let _ctx = ctx;
 
         // Check if blob will be over max size limit
-        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_array_size() > 0 && len > _ctx.engine().max_array_size() {
             return Err(
                 crate::ERR::ErrorDataTooLarge("Size of BLOB".to_string(), Position::NONE).into(),
