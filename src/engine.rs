@@ -413,7 +413,7 @@ impl Engine {
     #[inline(always)]
     pub(crate) const fn track_operation(
         &self,
-        _: &crate::GlobalRuntimeState,
+        _: &crate::eval::GlobalRuntimeState,
         _: Position,
     ) -> crate::RhaiResultOf<()> {
         Ok(())

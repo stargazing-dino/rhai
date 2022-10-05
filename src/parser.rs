@@ -34,10 +34,6 @@ pub type ParseResult<T> = Result<T, ParseError>;
 
 type FnLib = StraightHashMap<Shared<ScriptFnDef>>;
 
-const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
-
-const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
-
 /// Invalid variable name that acts as a search barrier in a [`Scope`].
 const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 
@@ -2468,6 +2464,8 @@ impl Engine {
         pos: Position,
     ) -> ParseResult<Expr> {
         use crate::api::custom_syntax::markers::*;
+        const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
+        const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
 
         let mut settings = settings;
         let mut inputs = StaticVec::new_const();
