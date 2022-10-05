@@ -358,8 +358,7 @@ impl Engine {
         pos: Position,
         level: usize,
     ) -> RhaiResultOf<(Dynamic, bool)> {
-        #[cfg(not(feature = "unchecked"))]
-        self.inc_operations(&mut global.num_operations, pos)?;
+        self.track_operation(global, pos)?;
 
         let parent_source = global.source.clone();
         let op_assign = if is_op_assign {
@@ -1232,8 +1231,7 @@ impl Engine {
                     target = target.into_owned();
                 }
 
-                #[cfg(not(feature = "unchecked"))]
-                self.inc_operations(&mut global.num_operations, _pos)?;
+                self.track_operation(global, _pos)?;
 
                 #[cfg(not(feature = "no_closure"))]
                 let target_is_shared = target.is_shared();
@@ -1312,8 +1310,7 @@ impl Engine {
                 let (target, _pos) =
                     self.search_scope_only(scope, global, lib, this_ptr, first_arg, level)?;
 
-                #[cfg(not(feature = "unchecked"))]
-                self.inc_operations(&mut global.num_operations, _pos)?;
+                self.track_operation(global, _pos)?;
 
                 #[cfg(not(feature = "no_closure"))]
                 let target_is_shared = target.is_shared();
@@ -1350,9 +1347,7 @@ impl Engine {
         let mut func = match module.get_qualified_fn(hash) {
             // Then search native Rust functions
             None => {
-                #[cfg(not(feature = "unchecked"))]
-                self.inc_operations(&mut global.num_operations, pos)?;
-
+                self.track_operation(global, pos)?;
                 let hash_params = calc_fn_params_hash(args.iter().map(|a| a.type_id()));
                 let hash_qualified_fn = combine_hashes(hash, hash_params);
 
@@ -1384,8 +1379,7 @@ impl Engine {
                 }));
                 let hash_qualified_fn = combine_hashes(hash, hash_params);
 
-                #[cfg(not(feature = "unchecked"))]
-                self.inc_operations(&mut global.num_operations, pos)?;
+                self.track_operation(global, pos)?;
 
                 if let Some(f) = module.get_qualified_fn(hash_qualified_fn) {
                     func = Some(f);
@@ -1461,8 +1455,7 @@ impl Engine {
         _pos: Position,
         level: usize,
     ) -> RhaiResult {
-        #[cfg(not(feature = "unchecked"))]
-        self.inc_operations(&mut global.num_operations, _pos)?;
+        self.track_operation(global, _pos)?;
 
         let script = script.trim();
 

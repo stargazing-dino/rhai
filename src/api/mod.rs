@@ -43,28 +43,7 @@ use std::prelude::v1::*;
 
 pub mod default_limits {
     #[cfg(not(feature = "unchecked"))]
-    #[cfg(debug_assertions)]
-    #[cfg(not(feature = "no_function"))]
-    pub const MAX_CALL_STACK_DEPTH: usize = 8;
-    #[cfg(not(feature = "unchecked"))]
-    #[cfg(debug_assertions)]
-    pub const MAX_EXPR_DEPTH: usize = 32;
-    #[cfg(not(feature = "unchecked"))]
-    #[cfg(not(feature = "no_function"))]
-    #[cfg(debug_assertions)]
-    pub const MAX_FUNCTION_EXPR_DEPTH: usize = 16;
-
-    #[cfg(not(feature = "unchecked"))]
-    #[cfg(not(debug_assertions))]
-    #[cfg(not(feature = "no_function"))]
-    pub const MAX_CALL_STACK_DEPTH: usize = 64;
-    #[cfg(not(feature = "unchecked"))]
-    #[cfg(not(debug_assertions))]
-    pub const MAX_EXPR_DEPTH: usize = 64;
-    #[cfg(not(feature = "unchecked"))]
-    #[cfg(not(feature = "no_function"))]
-    #[cfg(not(debug_assertions))]
-    pub const MAX_FUNCTION_EXPR_DEPTH: usize = 32;
+    pub use super::limits::default_limits::*;
 
     pub const MAX_DYNAMIC_PARAMETERS: usize = 16;
 }
@@ -234,57 +213,5 @@ impl Engine {
     pub fn set_default_tag(&mut self, value: impl Into<Dynamic>) -> &mut Self {
         self.def_tag = value.into();
         self
-    }
-}
-
-#[cfg(feature = "unchecked")]
-impl Engine {
-    /// The maximum levels of function calls allowed for a script.
-    #[inline(always)]
-    #[must_use]
-    pub const fn max_call_levels(&self) -> usize {
-        usize::MAX
-    }
-    /// The maximum number of operations allowed for a script to run (0 for unlimited).
-    #[inline]
-    #[must_use]
-    pub const fn max_operations(&self) -> u64 {
-        0
-    }
-    /// The maximum number of imported [modules][crate::Module] allowed for a script.
-    #[inline(always)]
-    #[must_use]
-    pub const fn max_modules(&self) -> usize {
-        usize::MAX
-    }
-    /// The depth limit for expressions (0 for unlimited).
-    #[inline(always)]
-    #[must_use]
-    pub const fn max_expr_depth(&self) -> usize {
-        0
-    }
-    /// The depth limit for expressions in functions (0 for unlimited).
-    #[inline(always)]
-    #[must_use]
-    pub const fn max_function_expr_depth(&self) -> usize {
-        0
-    }
-    /// The maximum length of [strings][crate::ImmutableString] (0 for unlimited).
-    #[inline(always)]
-    #[must_use]
-    pub const fn max_string_size(&self) -> usize {
-        0
-    }
-    /// The maximum length of [arrays][crate::Array] (0 for unlimited).
-    #[inline(always)]
-    #[must_use]
-    pub const fn max_array_size(&self) -> usize {
-        0
-    }
-    /// The maximum size of [object maps][crate::Map] (0 for unlimited).
-    #[inline(always)]
-    #[must_use]
-    pub const fn max_map_size(&self) -> usize {
-        0
     }
 }

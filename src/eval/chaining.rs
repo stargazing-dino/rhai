@@ -131,7 +131,6 @@ impl Engine {
                                 self.eval_op_assignment(
                                     global, caches, lib, op_info, obj_ptr, root, new_val, level,
                                 )?;
-                                #[cfg(not(feature = "unchecked"))]
                                 self.check_data_size(obj_ptr, op_info.pos)?;
                                 None
                             }
@@ -159,7 +158,6 @@ impl Engine {
                                     )?;
                                     // Replace new value
                                     new_val = val.take_or_clone();
-                                    #[cfg(not(feature = "unchecked"))]
                                     self.check_data_size(&new_val, op_info.pos)?;
                                 }
                             }
@@ -246,7 +244,6 @@ impl Engine {
                                 global, caches, lib, op_info, val_target, root, new_val, level,
                             )?;
                         }
-                        #[cfg(not(feature = "unchecked"))]
                         self.check_data_size(target.source(), op_info.pos)?;
                         Ok((Dynamic::UNIT, true))
                     }
@@ -606,9 +603,7 @@ impl Engine {
             Expr::Variable(x, .., var_pos) => {
                 #[cfg(feature = "debugging")]
                 self.run_debugger(scope, global, lib, this_ptr, lhs, level)?;
-
-                #[cfg(not(feature = "unchecked"))]
-                self.inc_operations(&mut global.num_operations, *var_pos)?;
+                self.track_operation(global, *var_pos)?;
 
                 let (mut target, ..) =
                     self.search_namespace(scope, global, lib, this_ptr, lhs, level)?;
@@ -655,8 +650,7 @@ impl Engine {
         idx_values: &mut FnArgsVec<Dynamic>,
         level: usize,
     ) -> RhaiResultOf<()> {
-        #[cfg(not(feature = "unchecked"))]
-        self.inc_operations(&mut global.num_operations, expr.position())?;
+        self.track_operation(global, expr.position())?;
 
         match expr {
             #[cfg(not(feature = "no_object"))]
@@ -814,8 +808,7 @@ impl Engine {
         use_indexers: bool,
         level: usize,
     ) -> RhaiResultOf<Target<'t>> {
-        #[cfg(not(feature = "unchecked"))]
-        self.inc_operations(&mut global.num_operations, Position::NONE)?;
+        self.track_operation(global, Position::NONE)?;
 
         match target {
             #[cfg(not(feature = "no_index"))]

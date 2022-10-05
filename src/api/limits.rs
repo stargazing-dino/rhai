@@ -1,11 +1,30 @@
 //! Settings for [`Engine`]'s limitations.
 #![cfg(not(feature = "unchecked"))]
 
-use super::default_limits;
 use crate::Engine;
 use std::num::{NonZeroU64, NonZeroUsize};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+
+pub mod default_limits {
+    #[cfg(debug_assertions)]
+    #[cfg(not(feature = "no_function"))]
+    pub const MAX_CALL_STACK_DEPTH: usize = 8;
+    #[cfg(debug_assertions)]
+    pub const MAX_EXPR_DEPTH: usize = 32;
+    #[cfg(not(feature = "no_function"))]
+    #[cfg(debug_assertions)]
+    pub const MAX_FUNCTION_EXPR_DEPTH: usize = 16;
+
+    #[cfg(not(debug_assertions))]
+    #[cfg(not(feature = "no_function"))]
+    pub const MAX_CALL_STACK_DEPTH: usize = 64;
+    #[cfg(not(debug_assertions))]
+    pub const MAX_EXPR_DEPTH: usize = 64;
+    #[cfg(not(feature = "no_function"))]
+    #[cfg(not(debug_assertions))]
+    pub const MAX_FUNCTION_EXPR_DEPTH: usize = 32;
+}
 
 /// A type containing all the limits imposed by the [`Engine`].
 ///

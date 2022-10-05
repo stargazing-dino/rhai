@@ -63,8 +63,7 @@ impl Engine {
 
         assert!(fn_def.params.len() == args.len());
 
-        #[cfg(not(feature = "unchecked"))]
-        self.inc_operations(&mut global.num_operations, pos)?;
+        self.track_operation(global, pos)?;
 
         // Check for stack overflow
         if level > self.max_call_levels() {

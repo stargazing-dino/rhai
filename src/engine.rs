@@ -347,13 +347,91 @@ impl Engine {
     }
 
     /// Check a result to ensure that it is valid.
+    #[cfg(not(feature = "unchecked"))]
     #[inline]
     pub(crate) fn check_return_value(&self, result: RhaiResult, _pos: Position) -> RhaiResult {
-        #[cfg(not(feature = "unchecked"))]
         if let Ok(ref r) = result {
             self.check_data_size(r, _pos)?;
         }
 
+        result
+    }
+}
+
+#[cfg(feature = "unchecked")]
+impl Engine {
+    /// The maximum levels of function calls allowed for a script.
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_call_levels(&self) -> usize {
+        usize::MAX
+    }
+    /// The maximum number of operations allowed for a script to run (0 for unlimited).
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_operations(&self) -> u64 {
+        0
+    }
+    /// The maximum number of imported [modules][crate::Module] allowed for a script.
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_modules(&self) -> usize {
+        usize::MAX
+    }
+    /// The depth limit for expressions (0 for unlimited).
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_expr_depth(&self) -> usize {
+        0
+    }
+    /// The depth limit for expressions in functions (0 for unlimited).
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_function_expr_depth(&self) -> usize {
+        0
+    }
+    /// The maximum length of [strings][crate::ImmutableString] (0 for unlimited).
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_string_size(&self) -> usize {
+        0
+    }
+    /// The maximum length of [arrays][crate::Array] (0 for unlimited).
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_array_size(&self) -> usize {
+        0
+    }
+    /// The maximum size of [object maps][crate::Map] (0 for unlimited).
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_map_size(&self) -> usize {
+        0
+    }
+
+    /// Check if the number of operations stay within limit.
+    #[inline(always)]
+    pub(crate) const fn track_operation(
+        &self,
+        _: &crate::GlobalRuntimeState,
+        _: Position,
+    ) -> crate::RhaiResultOf<()> {
+        Ok(())
+    }
+
+    /// Check whether the size of a [`Dynamic`] is within limits.
+    #[inline(always)]
+    pub(crate) const fn check_data_size(
+        &self,
+        _: &Dynamic,
+        _: Position,
+    ) -> crate::RhaiResultOf<()> {
+        Ok(())
+    }
+
+    /// Check a result to ensure that it is valid.
+    #[inline(always)]
+    pub(crate) const fn check_return_value(&self, result: RhaiResult, _: Position) -> RhaiResult {
         result
     }
 }

@@ -1,6 +1,7 @@
 //! Data size checks during evaluation.
 #![cfg(not(feature = "unchecked"))]
 
+use super::GlobalRuntimeState;
 use crate::types::dynamic::Union;
 use crate::{Dynamic, Engine, Position, RhaiResultOf, ERR};
 use std::num::NonZeroUsize;
@@ -15,7 +16,6 @@ impl Engine {
     /// # Panics
     ///
     /// Panics if any interior data is shared (should never happen).
-    #[cfg(not(feature = "unchecked"))]
     pub(crate) fn calc_data_sizes(value: &Dynamic, _top: bool) -> (usize, usize, usize) {
         match value.0 {
             #[cfg(not(feature = "no_index"))]
@@ -71,24 +71,11 @@ impl Engine {
     }
 
     /// Is there a data size limit set?
-    #[cfg(not(feature = "unchecked"))]
     pub(crate) const fn has_data_size_limit(&self) -> bool {
-        let mut _limited = self.limits.max_string_size.is_some();
-
-        #[cfg(not(feature = "no_index"))]
-        {
-            _limited = _limited || self.limits.max_array_size.is_some();
-        }
-        #[cfg(not(feature = "no_object"))]
-        {
-            _limited = _limited || self.limits.max_map_size.is_some();
-        }
-
-        _limited
+        self.max_string_size() > 0 || self.max_array_size() > 0 || self.max_map_size() > 0
     }
 
     /// Raise an error if any data size exceeds limit.
-    #[cfg(not(feature = "unchecked"))]
     pub(crate) fn raise_err_if_over_data_size_limit(
         &self,
         sizes: (usize, usize, usize),
@@ -128,7 +115,6 @@ impl Engine {
     }
 
     /// Check whether the size of a [`Dynamic`] is within limits.
-    #[cfg(not(feature = "unchecked"))]
     pub(crate) fn check_data_size(&self, value: &Dynamic, pos: Position) -> RhaiResultOf<()> {
         // If no data size limits, just return
         if !self.has_data_size_limit() {
@@ -143,29 +129,30 @@ impl Engine {
     /// Raise an error if the size of a [`Dynamic`] is out of limits (if any).
     ///
     /// Not available under `unchecked`.
-    #[cfg(not(feature = "unchecked"))]
     #[inline(always)]
     pub fn ensure_data_size_within_limits(&self, value: &Dynamic) -> RhaiResultOf<()> {
         self.check_data_size(value, Position::NONE)
     }
 
     /// Check if the number of operations stay within limit.
-    #[cfg(not(feature = "unchecked"))]
-    pub(crate) fn inc_operations(
+    pub(crate) fn track_operation(
         &self,
-        num_operations: &mut u64,
+        global: &mut GlobalRuntimeState,
         pos: Position,
     ) -> RhaiResultOf<()> {
-        *num_operations += 1;
+        global.num_operations += 1;
 
         // Guard against too many operations
-        if self.max_operations() > 0 && *num_operations > self.max_operations() {
+        let max = self.max_operations();
+        let num_operations = global.num_operations;
+
+        if max > 0 && num_operations > max {
             return Err(ERR::ErrorTooManyOperations(pos).into());
         }
 
         // Report progress - only in steps
         if let Some(ref progress) = self.progress {
-            if let Some(token) = progress(*num_operations) {
+            if let Some(token) = progress(num_operations) {
                 // Terminate script if progress returns a termination token
                 return Err(ERR::ErrorTerminated(token, pos).into());
             }

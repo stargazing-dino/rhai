@@ -152,7 +152,6 @@ impl Engine {
                     let context = (self, op, None, &*global, lib, *op_pos, level).into();
                     let result = func(context, args).map(|_| ());
 
-                    #[cfg(not(feature = "unchecked"))]
                     self.check_data_size(args[0], root.1)?;
 
                     return result;
@@ -165,10 +164,7 @@ impl Engine {
             match self.call_native_fn(
                 global, caches, lib, op_assign, hash, args, true, true, *op_pos, level,
             ) {
-                Ok(_) => {
-                    #[cfg(not(feature = "unchecked"))]
-                    self.check_data_size(args[0], root.1)?;
-                }
+                Ok(_) => self.check_data_size(args[0], root.1)?,
                 Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
                 {
                     // Expand to `var = var op rhs`
@@ -218,8 +214,7 @@ impl Engine {
 
         // Function calls should account for a relatively larger portion of statements.
         if let Stmt::FnCall(x, ..) = stmt {
-            #[cfg(not(feature = "unchecked"))]
-            self.inc_operations(&mut global.num_operations, stmt.position())?;
+            self.track_operation(global, stmt.position())?;
 
             let result =
                 self.eval_fn_call_expr(scope, global, caches, lib, this_ptr, x, x.pos, level);
@@ -236,8 +231,7 @@ impl Engine {
         if let Stmt::Assignment(x, ..) = stmt {
             let (op_info, BinaryExpr { lhs, rhs }) = &**x;
 
-            #[cfg(not(feature = "unchecked"))]
-            self.inc_operations(&mut global.num_operations, stmt.position())?;
+            self.track_operation(global, stmt.position())?;
 
             let result = if let Expr::Variable(x, ..) = lhs {
                 let rhs_result = self
@@ -267,8 +261,7 @@ impl Engine {
                             );
                         }
 
-                        #[cfg(not(feature = "unchecked"))]
-                        self.inc_operations(&mut global.num_operations, pos)?;
+                        self.track_operation(global, pos)?;
 
                         let root = (var_name, pos);
                         let lhs_ptr = &mut lhs_ptr;
@@ -339,8 +332,7 @@ impl Engine {
             return result;
         }
 
-        #[cfg(not(feature = "unchecked"))]
-        self.inc_operations(&mut global.num_operations, stmt.position())?;
+        self.track_operation(global, stmt.position())?;
 
         let result = match stmt {
             // No-op
@@ -512,8 +504,7 @@ impl Engine {
                 let (.., body) = &**x;
 
                 if body.is_empty() {
-                    #[cfg(not(feature = "unchecked"))]
-                    self.inc_operations(&mut global.num_operations, body.position())?;
+                    self.track_operation(global, body.position())?;
                 } else {
                     match self
                         .eval_stmt_block(scope, global, caches, lib, this_ptr, body, true, level)
@@ -668,10 +659,7 @@ impl Engine {
 
                             *scope.get_mut_by_index(index).write_lock().unwrap() = value;
 
-                            #[cfg(not(feature = "unchecked"))]
-                            if let Err(err) = self
-                                .inc_operations(&mut global.num_operations, statements.position())
-                            {
+                            if let Err(err) = self.track_operation(global, statements.position()) {
                                 loop_result = Err(err);
                                 break;
                             }

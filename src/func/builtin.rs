@@ -298,7 +298,7 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
         ($x:ty, $xx:ident, $y:ty, $yy:ident) => {
             if (type1, type2) == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
                 #[cfg(not(feature = "unchecked"))]
-                use crate::packages::arithmetic::decimal_functions::*;
+                use crate::packages::arithmetic::decimal_functions::builtin::*;
 
                 #[cfg(not(feature = "unchecked"))]
                 match op {
@@ -697,7 +697,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
         ($x:ident, $xx:ident, $y:ty, $yy:ident) => {
             if (type1, type2) == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
                 #[cfg(not(feature = "unchecked"))]
-                use crate::packages::arithmetic::decimal_functions::*;
+                use crate::packages::arithmetic::decimal_functions::builtin::*;
 
                 #[cfg(not(feature = "unchecked"))]
                 return match op {
