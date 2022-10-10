@@ -215,10 +215,9 @@ impl<'de> Deserialize<'de> for Scope<'de> {
             where
                 A: SeqAccess<'de>,
             {
-                let mut scope = if let Some(size) = access.size_hint() {
-                    Scope::with_capacity(size)
-                } else {
-                    Scope::new()
+                let mut scope = match access.size_hint() {
+                    Some(size) => Scope::with_capacity(size),
+                    None => Scope::new(),
                 };
 
                 while let Some(ScopeEntry {

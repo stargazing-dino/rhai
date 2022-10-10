@@ -82,10 +82,11 @@ mod map_functions {
     /// print(m);           // prints "#{a: 1, b: 42, c: 3, x: 0}"
     /// ```
     pub fn set(map: &mut Map, property: &str, value: Dynamic) {
-        if let Some(value_ref) = map.get_mut(property) {
-            *value_ref = value;
-        } else {
-            map.insert(property.into(), value);
+        match map.get_mut(property) {
+            Some(value_ref) => *value_ref = value,
+            _ => {
+                map.insert(property.into(), value);
+            }
         }
     }
     /// Clear the object map.

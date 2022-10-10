@@ -45,7 +45,6 @@ fn print_source(lines: &[String], pos: Position, offset: usize, window: (usize, 
             if n == line {
                 if let Some(pos) = pos.position() {
                     let shift = offset + line_no_len + marker.len() + 2;
-
                     println!("{0:>1$}{2:>3$}", "│ ", shift, "\x1b[36m^\x1b[39m", pos + 10);
                 }
             }
@@ -310,10 +309,11 @@ fn debug_callback(
                 ["node"] => {
                     if pos.is_none() {
                         println!("{:?}", node);
-                    } else if let Some(source) = source {
-                        println!("{:?} {} @ {:?}", node, source, pos);
                     } else {
-                        println!("{:?} @ {:?}", node, pos);
+                        match source {
+                            Some(source) => println!("{:?} {} @ {:?}", node, source, pos),
+                            None => println!("{:?} @ {:?}", node, pos),
+                        }
                     }
                     println!();
                 }
@@ -339,20 +339,14 @@ fn debug_callback(
                 ["over" | "o"] => break Ok(DebuggerCommand::StepOver),
                 ["next" | "n"] => break Ok(DebuggerCommand::Next),
                 ["scope"] => println!("{}", context.scope()),
-                ["print" | "p", "this"] => {
-                    if let Some(value) = context.this_ptr() {
-                        println!("=> {:?}", value);
-                    } else {
-                        println!("`this` pointer is unbound.");
-                    }
-                }
-                ["print" | "p", var_name] => {
-                    if let Some(value) = context.scope().get_value::<Dynamic>(var_name) {
-                        println!("=> {:?}", value);
-                    } else {
-                        eprintln!("Variable not found: {}", var_name);
-                    }
-                }
+                ["print" | "p", "this"] => match context.this_ptr() {
+                    Some(value) => println!("=> {:?}", value),
+                    None => println!("`this` pointer is unbound."),
+                },
+                ["print" | "p", var_name] => match context.scope().get_value::<Dynamic>(var_name) {
+                    Some(value) => println!("=> {:?}", value),
+                    None => eprintln!("Variable not found: {}", var_name),
+                },
                 ["print" | "p"] => {
                     println!("{}", context.scope().clone_visible());
                     if let Some(value) = context.this_ptr() {

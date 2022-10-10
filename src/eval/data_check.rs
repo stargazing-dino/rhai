@@ -4,7 +4,6 @@
 use super::GlobalRuntimeState;
 use crate::types::dynamic::Union;
 use crate::{Dynamic, Engine, Position, RhaiResultOf, ERR};
-use std::num::NonZeroUsize;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -21,40 +20,40 @@ impl Engine {
             #[cfg(not(feature = "no_index"))]
             Union::Array(ref arr, ..) => {
                 arr.iter()
-                    .fold((0, 0, 0), |(arrays, maps, strings), value| match value.0 {
+                    .fold((0, 0, 0), |(ax, mx, sx), value| match value.0 {
                         Union::Array(..) => {
                             let (a, m, s) = Self::calc_data_sizes(value, false);
-                            (arrays + a + 1, maps + m, strings + s)
+                            (ax + a + 1, mx + m, sx + s)
                         }
-                        Union::Blob(ref a, ..) => (arrays + 1 + a.len(), maps, strings),
+                        Union::Blob(ref a, ..) => (ax + 1 + a.len(), mx, sx),
                         #[cfg(not(feature = "no_object"))]
                         Union::Map(..) => {
                             let (a, m, s) = Self::calc_data_sizes(value, false);
-                            (arrays + a + 1, maps + m, strings + s)
+                            (ax + a + 1, mx + m, sx + s)
                         }
-                        Union::Str(ref s, ..) => (arrays + 1, maps, strings + s.len()),
-                        _ => (arrays + 1, maps, strings),
+                        Union::Str(ref s, ..) => (ax + 1, mx, sx + s.len()),
+                        _ => (ax + 1, mx, sx),
                     })
             }
             #[cfg(not(feature = "no_index"))]
-            Union::Blob(ref arr, ..) => (arr.len(), 0, 0),
+            Union::Blob(ref blob, ..) => (blob.len(), 0, 0),
             #[cfg(not(feature = "no_object"))]
             Union::Map(ref map, ..) => {
                 map.values()
-                    .fold((0, 0, 0), |(arrays, maps, strings), value| match value.0 {
+                    .fold((0, 0, 0), |(ax, mx, sx), value| match value.0 {
                         #[cfg(not(feature = "no_index"))]
                         Union::Array(..) => {
                             let (a, m, s) = Self::calc_data_sizes(value, false);
-                            (arrays + a, maps + m + 1, strings + s)
+                            (ax + a, mx + m + 1, sx + s)
                         }
                         #[cfg(not(feature = "no_index"))]
-                        Union::Blob(ref a, ..) => (arrays + a.len(), maps, strings),
+                        Union::Blob(ref a, ..) => (ax + a.len(), mx, sx),
                         Union::Map(..) => {
                             let (a, m, s) = Self::calc_data_sizes(value, false);
-                            (arrays + a, maps + m + 1, strings + s)
+                            (ax + a, mx + m + 1, sx + s)
                         }
-                        Union::Str(ref s, ..) => (arrays, maps + 1, strings + s.len()),
-                        _ => (arrays, maps + 1, strings),
+                        Union::Str(ref s, ..) => (ax, mx + 1, sx + s.len()),
+                        _ => (ax, mx + 1, sx),
                     })
             }
             Union::Str(ref s, ..) => (0, 0, s.len()),
@@ -70,43 +69,34 @@ impl Engine {
         }
     }
 
-    /// Is there a data size limit set?
-    pub(crate) const fn has_data_size_limit(&self) -> bool {
-        self.max_string_size() > 0 || self.max_array_size() > 0 || self.max_map_size() > 0
-    }
-
     /// Raise an error if any data size exceeds limit.
     pub(crate) fn raise_err_if_over_data_size_limit(
         &self,
-        sizes: (usize, usize, usize),
+        (_arr, _map, s): (usize, usize, usize),
         pos: Position,
     ) -> RhaiResultOf<()> {
-        let (_arr, _map, s) = sizes;
-
-        if s > self
+        if self
             .limits
             .max_string_size
-            .map_or(usize::MAX, NonZeroUsize::get)
+            .map_or(false, |max| s > max.get())
         {
             return Err(ERR::ErrorDataTooLarge("Length of string".to_string(), pos).into());
         }
 
         #[cfg(not(feature = "no_index"))]
-        if _arr
-            > self
-                .limits
-                .max_array_size
-                .map_or(usize::MAX, NonZeroUsize::get)
+        if self
+            .limits
+            .max_array_size
+            .map_or(false, |max| _arr > max.get())
         {
             return Err(ERR::ErrorDataTooLarge("Size of array".to_string(), pos).into());
         }
 
         #[cfg(not(feature = "no_object"))]
-        if _map
-            > self
-                .limits
-                .max_map_size
-                .map_or(usize::MAX, NonZeroUsize::get)
+        if self
+            .limits
+            .max_map_size
+            .map_or(false, |max| _map > max.get())
         {
             return Err(ERR::ErrorDataTooLarge("Size of object map".to_string(), pos).into());
         }
