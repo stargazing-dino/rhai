@@ -32,6 +32,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
+
   # typical build with various feature combinations
   build:
     name: Build
@@ -86,6 +87,7 @@ jobs:
       with:
         command: test
         args: ${{matrix.flags}}
+
   # no-std builds are a bit more extensive to test
   no_std_build:
     name: NoStdBuild
@@ -110,32 +112,38 @@ jobs:
       with:
         command: build
         args: --manifest-path=no_std/no_std_test/Cargo.toml ${{matrix.flags}}
+
   wasm:
     name: Check Wasm build
     runs-on: ubuntu-latest
     strategy:
       matrix:
         flags:
+          - "--target wasm32-wasi"
 # These fail currently, future PR should fix them
-#          - ""
-#          - "--features wasm-bindgen"
-          - "--no-default-features"
-          - "--no-default-features --features wasm-bindgen"
+#          - "--target wasm32-unknown-unknown"
+#          - "--target wasm32-unknown-unknown --features wasm-bindgen"
+          - "--target wasm32-unknown-unknown --no-default-features"
+          - "--target wasm32-unknown-unknown --no-default-features --features wasm-bindgen"
       fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Setup Toolchain
+      - name: Setup Wasm Toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ env.RUST_MSRV }}
           override: true
           target: wasm32-unknown-unknown
+      - name: Setup Wasi Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          override: true
+          target: wasm32-wasi
       - name: Build
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --target wasm32-unknown-unknown ${{matrix.flags}}
+          args: ${{matrix.flags}}
 
   rustfmt:
     name: Check Formatting
@@ -160,6 +168,7 @@ jobs:
       with:
         command: clippy
         args: --all -- -Aclippy::all -Dclippy::perf
+
   codegen_build:
     name: Codegen Build
     runs-on: ${{matrix.os}}
