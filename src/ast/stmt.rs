@@ -209,6 +209,7 @@ impl IntoIterator for RangeCase {
     type IntoIter = Box<dyn Iterator<Item = Self::Item>>;
 
     #[inline(always)]
+    #[must_use]
     fn into_iter(self) -> Self::IntoIter {
         match self {
             Self::ExclusiveInt(r, ..) => Box::new(r),
@@ -426,7 +427,6 @@ impl Deref for StmtBlock {
     type Target = StmtBlockContainer;
 
     #[inline(always)]
-    #[must_use]
     fn deref(&self) -> &Self::Target {
         &self.block
     }
@@ -434,7 +434,6 @@ impl Deref for StmtBlock {
 
 impl DerefMut for StmtBlock {
     #[inline(always)]
-    #[must_use]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.block
     }
@@ -607,6 +606,7 @@ pub enum Stmt {
 
 impl Default for Stmt {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::Noop(Position::NONE)
     }

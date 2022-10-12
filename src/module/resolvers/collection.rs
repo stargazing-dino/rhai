@@ -42,7 +42,7 @@ impl ModuleResolversCollection {
     /// ```
     #[inline(always)]
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self(Vec::new())
     }
     /// Append a [module resolver][ModuleResolver] to the end.
@@ -112,6 +112,7 @@ impl IntoIterator for ModuleResolversCollection {
     type IntoIter = IntoIter<Box<dyn ModuleResolver>>;
 
     #[inline(always)]
+    #[must_use]
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }

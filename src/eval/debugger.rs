@@ -48,6 +48,7 @@ pub enum DebuggerCommand {
 
 impl Default for DebuggerCommand {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::Continue
     }
@@ -495,13 +496,10 @@ impl Engine {
 
         let event = match event {
             Some(e) => e,
-            None => {
-                if let Some(bp) = global.debugger.is_break_point(&global.source, node) {
-                    DebuggerEvent::BreakPoint(bp)
-                } else {
-                    return Ok(None);
-                }
-            }
+            None => match global.debugger.is_break_point(&global.source, node) {
+                Some(bp) => DebuggerEvent::BreakPoint(bp),
+                None => return Ok(None),
+            },
         };
 
         self.run_debugger_raw(scope, global, lib, this_ptr, node, event, level)

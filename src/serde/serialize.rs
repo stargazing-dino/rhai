@@ -37,10 +37,9 @@ impl Serialize for Dynamic {
             Union::Decimal(ref x, ..) => {
                 use rust_decimal::prelude::ToPrimitive;
 
-                if let Some(v) = x.to_f64() {
-                    ser.serialize_f64(v)
-                } else {
-                    ser.serialize_str(&x.to_string())
+                match x.to_f64() {
+                    Some(v) => ser.serialize_f64(v),
+                    None => ser.serialize_str(&x.to_string()),
                 }
             }
             #[cfg(feature = "decimal")]
@@ -48,10 +47,9 @@ impl Serialize for Dynamic {
             Union::Decimal(ref x, ..) => {
                 use rust_decimal::prelude::ToPrimitive;
 
-                if let Some(v) = x.to_f32() {
-                    ser.serialize_f32(v)
-                } else {
-                    ser.serialize_str(&x.to_string())
+                match x.to_f32() {
+                    Some(v) => ser.serialize_f32(v),
+                    _ => ser.serialize_str(&x.to_string()),
                 }
             }
 

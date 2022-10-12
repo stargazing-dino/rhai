@@ -23,7 +23,7 @@ impl Engine {
     /// JSON sub-objects are handled transparently.
     ///
     /// This function can be used together with [`format_map_as_json`] to work with JSON texts
-    /// without using the [`serde`](https://crates.io/crates/serde) crate (which is heavy).
+    /// without using the [`serde_json`](https://crates.io/crates/serde_json) crate (which is heavy).
     ///
     /// # Example
     ///
@@ -122,6 +122,7 @@ impl Engine {
         let ast = self.parse_global_expr(
             &mut stream.peekable(),
             &mut state,
+            |s| s.allow_unquoted_map_properties = false,
             #[cfg(not(feature = "no_optimize"))]
             OptimizationLevel::None,
             #[cfg(feature = "no_optimize")]
@@ -137,7 +138,7 @@ impl Engine {
 /// Not available under `no_std`.
 ///
 /// This function can be used together with [`Engine::parse_json`] to work with JSON texts
-/// without using the [`serde`](https://crates.io/crates/serde) crate (which is heavy).
+/// without using the [`serde_json`](https://crates.io/crates/serde_json) crate (which is heavy).
 ///
 /// # Data types
 ///

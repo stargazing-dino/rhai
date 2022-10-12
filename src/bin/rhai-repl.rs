@@ -482,27 +482,30 @@ fn main() {
                 continue;
             }
             "!!" => {
-                if let Some(line) = rl.history().last() {
-                    replacement = Some(line.clone());
-                    replacement_index = history_offset + rl.history().len() - 1;
-                } else {
-                    eprintln!("No lines history!");
+                match rl.history().last() {
+                    Some(line) => {
+                        replacement = Some(line.clone());
+                        replacement_index = history_offset + rl.history().len() - 1;
+                    }
+                    None => eprintln!("No lines history!"),
                 }
                 continue;
             }
             _ if cmd.starts_with("!?") => {
                 let text = cmd[2..].trim();
-                if let Some((n, line)) = rl
+                let history = rl
                     .history()
                     .iter()
                     .rev()
                     .enumerate()
-                    .find(|&(.., h)| h.contains(text))
-                {
-                    replacement = Some(line.clone());
-                    replacement_index = history_offset + (rl.history().len() - 1 - n);
-                } else {
-                    eprintln!("History line not found: {}", text);
+                    .find(|&(.., h)| h.contains(text));
+
+                match history {
+                    Some((n, line)) => {
+                        replacement = Some(line.clone());
+                        replacement_index = history_offset + (rl.history().len() - 1 - n);
+                    }
+                    None => eprintln!("History line not found: {}", text),
                 }
                 continue;
             }

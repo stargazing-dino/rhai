@@ -46,6 +46,7 @@ pub trait Func<ARGS, RET> {
     /// func(123, "hello")? == false;           // call the anonymous function
     /// # Ok(())
     /// # }
+    #[must_use]
     fn create_from_ast(self, ast: AST, entry_point: &str) -> Self::Output;
 
     /// Create a Rust closure from a script.
@@ -79,6 +80,7 @@ pub trait Func<ARGS, RET> {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     fn create_from_script(self, script: &str, entry_point: &str) -> ParseResult<Self::Output>;
 }
 

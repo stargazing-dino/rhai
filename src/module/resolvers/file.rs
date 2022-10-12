@@ -56,6 +56,7 @@ pub struct FileModuleResolver {
 
 impl Default for FileModuleResolver {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }
@@ -321,10 +322,9 @@ impl FileModuleResolver {
 
         let scope = Scope::new();
 
-        let m: Shared<_> = if let Some(global) = global {
-            Module::eval_ast_as_new_raw(engine, scope, global, &ast)
-        } else {
-            Module::eval_ast_as_new(scope, &ast, engine)
+        let m: Shared<_> = match global {
+            Some(global) => Module::eval_ast_as_new_raw(engine, scope, global, &ast),
+            None => Module::eval_ast_as_new(scope, &ast, engine),
         }
         .map_err(|err| Box::new(ERR::ErrorInModule(path.to_string(), err, pos)))?
         .into();

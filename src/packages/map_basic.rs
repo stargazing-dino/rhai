@@ -2,7 +2,7 @@
 
 use crate::engine::OP_EQUALS;
 use crate::plugin::*;
-use crate::{def_package, format_map_as_json, Dynamic, ImmutableString, Map, RhaiResultOf, INT};
+use crate::{def_package, Dynamic, ImmutableString, Map, NativeCallContext, RhaiResultOf, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -82,10 +82,11 @@ mod map_functions {
     /// print(m);           // prints "#{a: 1, b: 42, c: 3, x: 0}"
     /// ```
     pub fn set(map: &mut Map, property: &str, value: Dynamic) {
-        if let Some(value_ref) = map.get_mut(property) {
-            *value_ref = value;
-        } else {
-            map.insert(property.into(), value);
+        match map.get_mut(property) {
+            Some(value_ref) => *value_ref = value,
+            _ => {
+                map.insert(property.into(), value);
+            }
         }
     }
     /// Clear the object map.
@@ -304,6 +305,9 @@ mod map_functions {
     /// print(m.to_json());     // prints {"a":1, "b":2, "c":3}
     /// ```
     pub fn to_json(map: &mut Map) -> String {
-        format_map_as_json(map)
+        #[cfg(feature = "metadata")]
+        return serde_json::to_string(map).unwrap_or_else(|_| "ERROR".into());
+        #[cfg(not(feature = "metadata"))]
+        return crate::format_map_as_json(map);
     }
 }

@@ -88,7 +88,6 @@ mod core_functions {
         #[cfg(feature = "f32_float")]
         std::thread::sleep(std::time::Duration::from_secs_f32(seconds));
     }
-
     /// Block the current thread for a particular number of `seconds`.
     #[cfg(not(feature = "no_std"))]
     pub fn sleep(seconds: INT) {
@@ -96,6 +95,23 @@ mod core_functions {
             return;
         }
         std::thread::sleep(std::time::Duration::from_secs(seconds as u64));
+    }
+
+    /// Parse a JSON string into a value.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let m = parse_json(`{"a":1, "b":2, "c":3}`);
+    ///
+    /// print(m);       // prints #{"a":1, "b":2, "c":3}
+    /// ```
+    #[cfg(not(feature = "no_index"))]
+    #[cfg(not(feature = "no_object"))]
+    #[cfg(feature = "metadata")]
+    #[rhai_fn(return_raw)]
+    pub fn parse_json(_ctx: NativeCallContext, json: &str) -> RhaiResultOf<Dynamic> {
+        serde_json::from_str(json).map_err(|err| err.to_string().into())
     }
 }
 

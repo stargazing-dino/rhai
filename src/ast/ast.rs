@@ -36,6 +36,7 @@ pub struct AST {
 
 impl Default for AST {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::empty()
     }
@@ -69,7 +70,7 @@ impl fmt::Debug for AST {
 impl AST {
     /// Create a new [`AST`].
     #[cfg(not(feature = "internals"))]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub(crate) fn new(
         statements: impl IntoIterator<Item = Stmt>,
@@ -89,7 +90,7 @@ impl AST {
     /// _(internals)_ Create a new [`AST`].
     /// Exported under the `internals` feature only.
     #[cfg(feature = "internals")]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn new(
         statements: impl IntoIterator<Item = Stmt>,
@@ -108,7 +109,7 @@ impl AST {
     }
     /// Create a new [`AST`] with a source name.
     #[cfg(not(feature = "internals"))]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub(crate) fn new_with_source(
         statements: impl IntoIterator<Item = Stmt>,
@@ -126,7 +127,7 @@ impl AST {
     /// _(internals)_ Create a new [`AST`] with a source name.
     /// Exported under the `internals` feature only.
     #[cfg(feature = "internals")]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn new_with_source(
         statements: impl IntoIterator<Item = Stmt>,
@@ -157,7 +158,7 @@ impl AST {
         }
     }
     /// Get the source, if any.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn source(&self) -> Option<&str> {
         if self.source.is_empty() {
@@ -664,7 +665,6 @@ impl AST {
         self.combine_filtered_impl(other, filter)
     }
     /// Combine one [`AST`] with another.  The second [`AST`] is consumed.
-    #[inline]
     fn combine_filtered_impl(
         &mut self,
         other: Self,
@@ -957,19 +957,21 @@ pub enum ASTNode<'a> {
 }
 
 impl<'a> From<&'a Stmt> for ASTNode<'a> {
+    #[inline(always)]
     fn from(stmt: &'a Stmt) -> Self {
         Self::Stmt(stmt)
     }
 }
 
 impl<'a> From<&'a Expr> for ASTNode<'a> {
+    #[inline(always)]
     fn from(expr: &'a Expr) -> Self {
         Self::Expr(expr)
     }
 }
 
 impl PartialEq for ASTNode<'_> {
-    #[inline(always)]
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Stmt(x), Self::Stmt(y)) => ptr::eq(*x, *y),
@@ -986,8 +988,8 @@ impl ASTNode<'_> {
     #[must_use]
     pub fn position(&self) -> Position {
         match self {
-            ASTNode::Stmt(stmt) => stmt.position(),
-            ASTNode::Expr(expr) => expr.position(),
+            Self::Stmt(stmt) => stmt.position(),
+            Self::Expr(expr) => expr.position(),
         }
     }
 }

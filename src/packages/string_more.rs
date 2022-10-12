@@ -239,10 +239,9 @@ mod string_functions {
     /// Clear the string, making it empty.
     pub fn clear(string: &mut ImmutableString) {
         if !string.is_empty() {
-            if let Some(s) = string.get_mut() {
-                s.clear();
-            } else {
-                *string = ImmutableString::new();
+            match string.get_mut() {
+                Some(s) => s.clear(),
+                _ => *string = ImmutableString::new(),
             }
         }
     }
@@ -287,17 +286,20 @@ mod string_functions {
     /// print(text);    // prints "hello"
     /// ```
     pub fn trim(string: &mut ImmutableString) {
-        if let Some(s) = string.get_mut() {
-            let trimmed = s.trim();
+        match string.get_mut() {
+            Some(s) => {
+                let trimmed = s.trim();
 
-            if trimmed != s {
-                *s = trimmed.into();
+                if trimmed != s {
+                    *s = trimmed.into();
+                }
             }
-        } else {
-            let trimmed = string.trim();
+            None => {
+                let trimmed = string.trim();
 
-            if trimmed != string {
-                *string = trimmed.into();
+                if trimmed != string {
+                    *string = trimmed.into();
+                }
             }
         }
     }
@@ -1216,7 +1218,6 @@ mod string_functions {
         let _ctx = ctx;
 
         // Check if string will be over max size limit
-        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
             return Err(crate::ERR::ErrorDataTooLarge(
                 "Length of string".to_string(),
@@ -1234,7 +1235,6 @@ mod string_functions {
                 p.push(character);
             }
 
-            #[cfg(not(feature = "unchecked"))]
             if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size()
             {
                 return Err(crate::ERR::ErrorDataTooLarge(
@@ -1278,7 +1278,6 @@ mod string_functions {
         let _ctx = ctx;
 
         // Check if string will be over max size limit
-        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
             return Err(crate::ERR::ErrorDataTooLarge(
                 "Length of string".to_string(),
@@ -1303,7 +1302,6 @@ mod string_functions {
                 }
             }
 
-            #[cfg(not(feature = "unchecked"))]
             if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size()
             {
                 return Err(crate::ERR::ErrorDataTooLarge(

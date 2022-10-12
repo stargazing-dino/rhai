@@ -50,7 +50,7 @@ impl Engine {
         idx_values: &mut FnArgsVec<Dynamic>,
         chain_type: ChainType,
         level: usize,
-        new_val: Option<(Dynamic, &OpAssignment)>,
+        new_val: &mut Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResultOf<(Dynamic, bool)> {
         let is_ref_mut = target.is_ref();
 
@@ -75,7 +75,7 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(scope, global, lib, this_ptr, _parent, level)?;
 
-                        let idx_val = idx_values.pop().unwrap();
+                        let idx_val = &mut idx_values.pop().unwrap();
                         let mut idx_val_for_setter = idx_val.clone();
                         let idx_pos = x.lhs.start_position();
                         let rhs_chain = rhs.into();
@@ -119,19 +119,18 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(scope, global, lib, this_ptr, _parent, level)?;
 
-                        let (new_val, op_info) = new_val.expect("`Some`");
-                        let idx_val = idx_values.pop().unwrap();
-                        let mut idx_val2 = idx_val.clone();
+                        let (new_val, op_info) = new_val.take().expect("`Some`");
+                        let idx_val = &mut idx_values.pop().unwrap();
+                        let idx = &mut idx_val.clone();
 
                         let try_setter = match self.get_indexed_mut(
-                            global, caches, lib, target, idx_val, pos, true, false, level,
+                            global, caches, lib, target, idx, pos, true, false, level,
                         ) {
                             // Indexed value is not a temp value - update directly
                             Ok(ref mut obj_ptr) => {
                                 self.eval_op_assignment(
                                     global, caches, lib, op_info, obj_ptr, root, new_val, level,
                                 )?;
-                                #[cfg(not(feature = "unchecked"))]
                                 self.check_data_size(obj_ptr, op_info.pos)?;
                                 None
                             }
@@ -143,11 +142,10 @@ impl Engine {
                         };
 
                         if let Some(mut new_val) = try_setter {
-                            let idx = &mut idx_val2;
-
                             // Is this an op-assignment?
                             if op_info.is_op_assignment() {
-                                let idx = &mut idx.clone();
+                                let idx = &mut idx_val.clone();
+
                                 // Call the index getter to get the current value
                                 if let Ok(val) =
                                     self.call_indexer_get(global, caches, lib, target, idx, level)
@@ -160,15 +158,15 @@ impl Engine {
                                     )?;
                                     // Replace new value
                                     new_val = val.take_or_clone();
-                                    #[cfg(not(feature = "unchecked"))]
                                     self.check_data_size(&new_val, op_info.pos)?;
                                 }
                             }
 
                             // Try to call index setter
                             let new_val = &mut new_val;
+
                             self.call_indexer_set(
-                                global, caches, lib, target, idx, new_val, is_ref_mut, level,
+                                global, caches, lib, target, idx_val, new_val, is_ref_mut, level,
                             )?;
                         }
 
@@ -179,7 +177,7 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(scope, global, lib, this_ptr, _parent, level)?;
 
-                        let idx_val = idx_values.pop().unwrap();
+                        let idx_val = &mut idx_values.pop().unwrap();
 
                         self.get_indexed_mut(
                             global, caches, lib, target, idx_val, pos, false, true, level,
@@ -236,8 +234,8 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(scope, global, lib, this_ptr, rhs, level)?;
 
-                        let index = x.2.clone().into();
-                        let (new_val, op_info) = new_val.expect("`Some`");
+                        let index = &mut x.2.clone().into();
+                        let (new_val, op_info) = new_val.take().expect("`Some`");
                         {
                             let val_target = &mut self.get_indexed_mut(
                                 global, caches, lib, target, index, *pos, true, false, level,
@@ -246,7 +244,6 @@ impl Engine {
                                 global, caches, lib, op_info, val_target, root, new_val, level,
                             )?;
                         }
-                        #[cfg(not(feature = "unchecked"))]
                         self.check_data_size(target.source(), op_info.pos)?;
                         Ok((Dynamic::UNIT, true))
                     }
@@ -255,7 +252,7 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(scope, global, lib, this_ptr, rhs, level)?;
 
-                        let index = x.2.clone().into();
+                        let index = &mut x.2.clone().into();
                         let val = self.get_indexed_mut(
                             global, caches, lib, target, index, *pos, false, false, level,
                         )?;
@@ -267,7 +264,7 @@ impl Engine {
                         self.run_debugger(scope, global, lib, this_ptr, rhs, level)?;
 
                         let ((getter, hash_get), (setter, hash_set), name) = &**x;
-                        let (mut new_val, op_info) = new_val.expect("`Some`");
+                        let (mut new_val, op_info) = new_val.take().expect("`Some`");
 
                         if op_info.is_op_assignment() {
                             let args = &mut [target.as_mut()];
@@ -368,7 +365,7 @@ impl Engine {
                                 #[cfg(feature = "debugging")]
                                 self.run_debugger(scope, global, lib, this_ptr, _node, level)?;
 
-                                let index = p.2.clone().into();
+                                let index = &mut p.2.clone().into();
                                 self.get_indexed_mut(
                                     global, caches, lib, target, index, pos, false, true, level,
                                 )?
@@ -558,7 +555,7 @@ impl Engine {
         this_ptr: &mut Option<&mut Dynamic>,
         expr: &Expr,
         level: usize,
-        new_val: Option<(Dynamic, &OpAssignment)>,
+        new_val: &mut Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResult {
         let chain_type = ChainType::from(expr);
         let (crate::ast::BinaryExpr { lhs, rhs }, options, op_pos) = match expr {
@@ -595,7 +592,7 @@ impl Engine {
             // All other patterns - evaluate the arguments chain
             _ => {
                 self.eval_dot_index_chain_arguments(
-                    scope, global, caches, lib, this_ptr, rhs, options, chain_type, idx_values, 0,
+                    scope, global, caches, lib, this_ptr, rhs, options, chain_type, idx_values,
                     level,
                 )?;
             }
@@ -606,9 +603,7 @@ impl Engine {
             Expr::Variable(x, .., var_pos) => {
                 #[cfg(feature = "debugging")]
                 self.run_debugger(scope, global, lib, this_ptr, lhs, level)?;
-
-                #[cfg(not(feature = "unchecked"))]
-                self.inc_operations(&mut global.num_operations, *var_pos)?;
+                self.track_operation(global, *var_pos)?;
 
                 let (mut target, ..) =
                     self.search_namespace(scope, global, lib, this_ptr, lhs, level)?;
@@ -653,11 +648,9 @@ impl Engine {
         parent_options: ASTFlags,
         _parent_chain_type: ChainType,
         idx_values: &mut FnArgsVec<Dynamic>,
-        size: usize,
         level: usize,
     ) -> RhaiResultOf<()> {
-        #[cfg(not(feature = "unchecked"))]
-        self.inc_operations(&mut global.num_operations, expr.position())?;
+        self.track_operation(global, expr.position())?;
 
         match expr {
             #[cfg(not(feature = "no_object"))]
@@ -731,7 +724,7 @@ impl Engine {
 
                 self.eval_dot_index_chain_arguments(
                     scope, global, caches, lib, this_ptr, rhs, *options, chain_type, idx_values,
-                    size, level,
+                    level,
                 )?;
 
                 if !_arg_values.is_empty() {
@@ -809,14 +802,13 @@ impl Engine {
         caches: &mut Caches,
         lib: &[&Module],
         target: &'t mut Dynamic,
-        mut idx: Dynamic,
+        idx: &mut Dynamic,
         idx_pos: Position,
         _add_if_not_found: bool,
         use_indexers: bool,
         level: usize,
     ) -> RhaiResultOf<Target<'t>> {
-        #[cfg(not(feature = "unchecked"))]
-        self.inc_operations(&mut global.num_operations, Position::NONE)?;
+        self.track_operation(global, Position::NONE)?;
 
         match target {
             #[cfg(not(feature = "no_index"))]
@@ -1018,7 +1010,7 @@ impl Engine {
             }
 
             _ if use_indexers => self
-                .call_indexer_get(global, caches, lib, target, &mut idx, level)
+                .call_indexer_get(global, caches, lib, target, idx, level)
                 .map(Into::into),
 
             _ => Err(ERR::ErrorIndexingType(

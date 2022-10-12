@@ -38,6 +38,7 @@ pub enum OptimizationLevel {
 
 impl Default for OptimizationLevel {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::Simple
     }
@@ -550,13 +551,14 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                             // switch const { case if condition => stmt, _ => def } => if condition { stmt } else { def }
                             optimize_expr(&mut b.condition, state, false);
 
-                            let else_stmt = if let Some(index) = def_case {
-                                let mut def_stmt =
-                                    Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
-                                optimize_stmt(&mut def_stmt, state, true);
-                                def_stmt.into()
-                            } else {
-                                StmtBlock::NONE
+                            let else_stmt = match def_case {
+                                Some(index) => {
+                                    let mut def_stmt =
+                                        Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
+                                    optimize_stmt(&mut def_stmt, state, true);
+                                    def_stmt.into()
+                                }
+                                _ => StmtBlock::NONE,
                             };
 
                             *stmt = Stmt::If(
@@ -615,13 +617,14 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                             // switch const { range if condition => stmt, _ => def } => if condition { stmt } else { def }
                             optimize_expr(&mut condition, state, false);
 
-                            let else_stmt = if let Some(index) = def_case {
-                                let mut def_stmt =
-                                    Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
-                                optimize_stmt(&mut def_stmt, state, true);
-                                def_stmt.into()
-                            } else {
-                                StmtBlock::NONE
+                            let else_stmt = match def_case {
+                                Some(index) => {
+                                    let mut def_stmt =
+                                        Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
+                                    optimize_stmt(&mut def_stmt, state, true);
+                                    def_stmt.into()
+                                }
+                                _ => StmtBlock::NONE,
                             };
 
                             let if_stmt =
@@ -664,12 +667,13 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             // Promote the default case
             state.set_dirty();
 
-            if let Some(index) = def_case {
-                let mut def_stmt = Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
-                optimize_stmt(&mut def_stmt, state, true);
-                *stmt = def_stmt;
-            } else {
-                *stmt = StmtBlock::empty(*pos).into();
+            match def_case {
+                Some(index) => {
+                    let mut def_stmt = Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
+                    optimize_stmt(&mut def_stmt, state, true);
+                    *stmt = def_stmt;
+                }
+                _ => *stmt = StmtBlock::empty(*pos).into(),
             }
         }
         // switch

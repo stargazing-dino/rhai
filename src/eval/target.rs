@@ -399,7 +399,6 @@ impl Deref for Target<'_> {
     type Target = Dynamic;
 
     #[inline]
-    #[must_use]
     fn deref(&self) -> &Dynamic {
         match self {
             Self::RefMut(r) => r,
@@ -425,7 +424,6 @@ impl AsRef<Dynamic> for Target<'_> {
 
 impl DerefMut for Target<'_> {
     #[inline]
-    #[must_use]
     fn deref_mut(&mut self) -> &mut Dynamic {
         match self {
             Self::RefMut(r) => r,

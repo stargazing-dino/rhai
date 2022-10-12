@@ -18,7 +18,7 @@ pub enum FnAccess {
 
 impl FnAccess {
     /// Is this function private?
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn is_private(self) -> bool {
         match self {
@@ -27,7 +27,7 @@ impl FnAccess {
         }
     }
     /// Is this function public?
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn is_public(self) -> bool {
         match self {

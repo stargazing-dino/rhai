@@ -318,8 +318,7 @@ impl Engine {
             let reset_debugger =
                 self.run_debugger_with_reset(scope, global, lib, this_ptr, expr, level)?;
 
-            #[cfg(not(feature = "unchecked"))]
-            self.inc_operations(&mut global.num_operations, expr.position())?;
+            self.track_operation(global, expr.position())?;
 
             let result =
                 self.eval_fn_call_expr(scope, global, caches, lib, this_ptr, x, x.pos, level);
@@ -337,8 +336,7 @@ impl Engine {
             #[cfg(feature = "debugging")]
             self.run_debugger(scope, global, lib, this_ptr, expr, level)?;
 
-            #[cfg(not(feature = "unchecked"))]
-            self.inc_operations(&mut global.num_operations, expr.position())?;
+            self.track_operation(global, expr.position())?;
 
             return if index.is_none() && x.0.is_none() && x.3 == KEYWORD_THIS {
                 this_ptr
@@ -355,8 +353,7 @@ impl Engine {
         let reset_debugger =
             self.run_debugger_with_reset(scope, global, lib, this_ptr, expr, level)?;
 
-        #[cfg(not(feature = "unchecked"))]
-        self.inc_operations(&mut global.num_operations, expr.position())?;
+        self.track_operation(global, expr.position())?;
 
         let result = match expr {
             // Constants
@@ -410,7 +407,7 @@ impl Engine {
                 let mut result = Ok(Dynamic::UNIT);
 
                 #[cfg(not(feature = "unchecked"))]
-                let mut sizes = (0, 0, 0);
+                let mut total_data_sizes = (0, 0, 0);
 
                 for item_expr in &**x {
                     let value = match self
@@ -424,19 +421,21 @@ impl Engine {
                     };
 
                     #[cfg(not(feature = "unchecked"))]
-                    let val_sizes = Self::calc_data_sizes(&value, true);
+                    if self.has_data_size_limit() {
+                        let val_sizes = Self::calc_data_sizes(&value, true);
+
+                        total_data_sizes = (
+                            total_data_sizes.0 + val_sizes.0,
+                            total_data_sizes.1 + val_sizes.1,
+                            total_data_sizes.2 + val_sizes.2,
+                        );
+                        self.raise_err_if_over_data_size_limit(
+                            total_data_sizes,
+                            item_expr.position(),
+                        )?;
+                    }
 
                     array.push(value);
-
-                    #[cfg(not(feature = "unchecked"))]
-                    if self.has_data_size_limit() {
-                        sizes = (
-                            sizes.0 + val_sizes.0,
-                            sizes.1 + val_sizes.1,
-                            sizes.2 + val_sizes.2,
-                        );
-                        self.raise_err_if_over_data_size_limit(sizes, item_expr.position())?;
-                    }
                 }
 
                 result.map(|_| array.into())
@@ -448,7 +447,7 @@ impl Engine {
                 let mut result = Ok(Dynamic::UNIT);
 
                 #[cfg(not(feature = "unchecked"))]
-                let mut sizes = (0, 0, 0);
+                let mut total_data_sizes = (0, 0, 0);
 
                 for (key, value_expr) in &x.0 {
                     let value = match self
@@ -462,15 +461,20 @@ impl Engine {
                     };
 
                     #[cfg(not(feature = "unchecked"))]
-                    let delta = Self::calc_data_sizes(&value, true);
+                    if self.has_data_size_limit() {
+                        let delta = Self::calc_data_sizes(&value, true);
+                        total_data_sizes = (
+                            total_data_sizes.0 + delta.0,
+                            total_data_sizes.1 + delta.1,
+                            total_data_sizes.2 + delta.2,
+                        );
+                        self.raise_err_if_over_data_size_limit(
+                            total_data_sizes,
+                            value_expr.position(),
+                        )?;
+                    }
 
                     *map.get_mut(key.as_str()).unwrap() = value;
-
-                    #[cfg(not(feature = "unchecked"))]
-                    if self.has_data_size_limit() {
-                        sizes = (sizes.0 + delta.0, sizes.1 + delta.1, sizes.2 + delta.2);
-                        self.raise_err_if_over_data_size_limit(sizes, value_expr.position())?;
-                    }
                 }
 
                 result.map(|_| map.into())
@@ -561,14 +565,12 @@ impl Engine {
             }
 
             #[cfg(not(feature = "no_index"))]
-            Expr::Index(..) => {
-                self.eval_dot_index_chain(scope, global, caches, lib, this_ptr, expr, level, None)
-            }
+            Expr::Index(..) => self
+                .eval_dot_index_chain(scope, global, caches, lib, this_ptr, expr, level, &mut None),
 
             #[cfg(not(feature = "no_object"))]
-            Expr::Dot(..) => {
-                self.eval_dot_index_chain(scope, global, caches, lib, this_ptr, expr, level, None)
-            }
+            Expr::Dot(..) => self
+                .eval_dot_index_chain(scope, global, caches, lib, this_ptr, expr, level, &mut None),
 
             _ => unreachable!("expression cannot be evaluated: {:?}", expr),
         };

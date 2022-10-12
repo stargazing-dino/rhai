@@ -41,6 +41,7 @@ pub struct StraightHasher(u64);
 
 impl Hasher for StraightHasher {
     #[inline(always)]
+    #[must_use]
     fn finish(&self) -> u64 {
         self.0
     }
@@ -66,6 +67,7 @@ impl BuildHasher for StraightHasherBuilder {
     type Hasher = StraightHasher;
 
     #[inline(always)]
+    #[must_use]
     fn build_hasher(&self) -> Self::Hasher {
         StraightHasher(ALT_ZERO_HASH)
     }
@@ -75,10 +77,11 @@ impl BuildHasher for StraightHasherBuilder {
 #[inline(always)]
 #[must_use]
 pub fn get_hasher() -> ahash::AHasher {
-    if let Some([seed1, seed2, seed3, seed4]) = config::AHASH_SEED {
-        ahash::RandomState::with_seeds(seed1, seed2, seed3, seed4).build_hasher()
-    } else {
-        ahash::AHasher::default()
+    match config::AHASH_SEED {
+        Some([seed1, seed2, seed3, seed4]) if seed1 | seed2 | seed3 | seed4 != 0 => {
+            ahash::RandomState::with_seeds(seed1, seed2, seed3, seed4).build_hasher()
+        }
+        _ => ahash::AHasher::default(),
     }
 }
 

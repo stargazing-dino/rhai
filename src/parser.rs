@@ -34,10 +34,6 @@ pub type ParseResult<T> = Result<T, ParseError>;
 
 type FnLib = StraightHashMap<Shared<ScriptFnDef>>;
 
-const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
-
-const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
-
 /// Invalid variable name that acts as a search barrier in a [`Scope`].
 const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 
@@ -110,7 +106,7 @@ impl fmt::Debug for ParseState<'_> {
 
 impl<'e> ParseState<'e> {
     /// Create a new [`ParseState`].
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn new(
         engine: &Engine,
@@ -183,7 +179,6 @@ impl<'e> ParseState<'e> {
     ///
     /// * `is_func_name`: `true` if the variable is actually the name of a function
     ///                   (in which case it will be converted into a function pointer).
-    #[inline]
     #[must_use]
     pub fn access_var(
         &mut self,
@@ -235,7 +230,6 @@ impl<'e> ParseState<'e> {
     ///
     /// Panics when called under `no_module`.
     #[cfg(not(feature = "no_module"))]
-    #[inline]
     #[must_use]
     pub fn find_module(&self, name: &str) -> Option<NonZeroUsize> {
         self.imports
@@ -258,7 +252,7 @@ impl<'e> ParseState<'e> {
 
     /// Get an interned property getter, creating one if it is not yet interned.
     #[cfg(not(feature = "no_object"))]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn get_interned_getter(
         &mut self,
@@ -273,7 +267,7 @@ impl<'e> ParseState<'e> {
 
     /// Get an interned property setter, creating one if it is not yet interned.
     #[cfg(not(feature = "no_object"))]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn get_interned_setter(
         &mut self,
@@ -289,31 +283,33 @@ impl<'e> ParseState<'e> {
 
 /// A type that encapsulates all the settings for a particular parsing function.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-struct ParseSettings {
+pub(crate) struct ParseSettings {
     /// Is the construct being parsed located at global level?
-    at_global_level: bool,
+    pub at_global_level: bool,
     /// Is the construct being parsed located inside a function definition?
     #[cfg(not(feature = "no_function"))]
-    in_fn_scope: bool,
+    pub in_fn_scope: bool,
     /// Is the construct being parsed located inside a closure definition?
     #[cfg(not(feature = "no_function"))]
     #[cfg(not(feature = "no_closure"))]
-    in_closure: bool,
+    pub in_closure: bool,
     /// Is the construct being parsed located inside a breakable loop?
-    is_breakable: bool,
+    pub is_breakable: bool,
     /// Allow statements in blocks?
-    allow_statements: bool,
+    pub allow_statements: bool,
+    /// Allow unquoted map properties?
+    pub allow_unquoted_map_properties: bool,
     /// Language options in effect (overrides Engine options).
-    options: LangOptions,
+    pub options: LangOptions,
     /// Current expression nesting level.
-    level: usize,
+    pub level: usize,
     /// Current position.
-    pos: Position,
+    pub pos: Position,
 }
 
 impl ParseSettings {
     /// Create a new `ParseSettings` with one higher expression level.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn level_up(&self) -> Self {
         Self {
@@ -417,7 +413,6 @@ impl Expr {
 }
 
 /// Make sure that the next expression is not a statement expression (i.e. wrapped in `{}`).
-#[inline]
 fn ensure_not_statement_expr(
     input: &mut TokenStream,
     type_name: &(impl ToString + ?Sized),
@@ -429,7 +424,6 @@ fn ensure_not_statement_expr(
 }
 
 /// Make sure that the next expression is not a mis-typed assignment (i.e. `a = b` instead of `a == b`).
-#[inline]
 fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
     match input.peek().expect(NEVER_ENDS) {
         (Token::Equals, pos) => Err(LexError::ImproperSymbol(
@@ -446,7 +440,6 @@ fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
 /// # Panics
 ///
 /// Panics if the next token is not the expected one.
-#[inline]
 fn eat_token(input: &mut TokenStream, expected_token: Token) -> Position {
     let (t, pos) = input.next().expect(NEVER_ENDS);
 
@@ -462,7 +455,6 @@ fn eat_token(input: &mut TokenStream, expected_token: Token) -> Position {
 }
 
 /// Match a particular [token][Token], consuming it if matched.
-#[inline]
 fn match_token(input: &mut TokenStream, token: Token) -> (bool, Position) {
     let (t, pos) = input.peek().expect(NEVER_ENDS);
     if *t == token {
@@ -473,7 +465,6 @@ fn match_token(input: &mut TokenStream, token: Token) -> (bool, Position) {
 }
 
 /// Parse a variable name.
-#[inline]
 fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position)> {
     match input.next().expect(NEVER_ENDS) {
         // Variable name
@@ -491,7 +482,6 @@ fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position
 
 /// Parse a symbol.
 #[cfg(not(feature = "no_custom_syntax"))]
-#[inline]
 fn parse_symbol(input: &mut TokenStream) -> ParseResult<(SmartString, Position)> {
     match input.next().expect(NEVER_ENDS) {
         // Symbol
@@ -912,7 +902,6 @@ impl Engine {
         loop {
             const MISSING_RBRACKET: &str = "to end this array literal";
 
-            #[cfg(not(feature = "unchecked"))]
             if self.max_array_size() > 0 && array.len() >= self.max_array_size() {
                 return Err(PERR::LiteralTooLarge(
                     "Size of array literal".to_string(),
@@ -1004,6 +993,9 @@ impl Engine {
             }
 
             let (name, pos) = match input.next().expect(NEVER_ENDS) {
+                (Token::Identifier(..), pos) if !settings.allow_unquoted_map_properties => {
+                    return Err(PERR::PropertyExpected.into_err(pos))
+                }
                 (Token::Identifier(s) | Token::StringConstant(s), pos) => {
                     if map.iter().any(|(p, ..)| **p == *s) {
                         return Err(PERR::DuplicatedProperty(s.to_string()).into_err(pos));
@@ -1046,7 +1038,6 @@ impl Engine {
                 }
             };
 
-            #[cfg(not(feature = "unchecked"))]
             if self.max_map_size() > 0 && map.len() >= self.max_map_size() {
                 return Err(PERR::LiteralTooLarge(
                     "Number of properties in object map literal".to_string(),
@@ -2473,6 +2464,8 @@ impl Engine {
         pos: Position,
     ) -> ParseResult<Expr> {
         use crate::api::custom_syntax::markers::*;
+        const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
+        const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
 
         let mut settings = settings;
         let mut inputs = StaticVec::new_const();
@@ -3334,6 +3327,7 @@ impl Engine {
                             in_closure: false,
                             is_breakable: false,
                             allow_statements: true,
+                            allow_unquoted_map_properties: settings.allow_unquoted_map_properties,
                             level: 0,
                             options,
                             pos,
@@ -3801,6 +3795,7 @@ impl Engine {
         &self,
         input: &mut TokenStream,
         state: &mut ParseState,
+        process_settings: impl Fn(&mut ParseSettings),
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
         let mut functions = StraightHashMap::default();
@@ -3810,7 +3805,7 @@ impl Engine {
         #[cfg(not(feature = "no_function"))]
         options.remove(LangOptions::ANON_FN);
 
-        let settings = ParseSettings {
+        let mut settings = ParseSettings {
             at_global_level: true,
             #[cfg(not(feature = "no_function"))]
             in_fn_scope: false,
@@ -3819,10 +3814,13 @@ impl Engine {
             in_closure: false,
             is_breakable: false,
             allow_statements: false,
+            allow_unquoted_map_properties: true,
             level: 0,
             options,
-            pos: Position::NONE,
+            pos: Position::START,
         };
+        process_settings(&mut settings);
+
         let expr = self.parse_expr(input, state, &mut functions, settings)?;
 
         assert!(functions.is_empty());
@@ -3861,25 +3859,27 @@ impl Engine {
         &self,
         input: &mut TokenStream,
         state: &mut ParseState,
+        process_settings: impl Fn(&mut ParseSettings),
     ) -> ParseResult<(StmtBlockContainer, StaticVec<Shared<ScriptFnDef>>)> {
         let mut statements = StmtBlockContainer::new_const();
         let mut functions = StraightHashMap::default();
+        let mut settings = ParseSettings {
+            at_global_level: true,
+            #[cfg(not(feature = "no_function"))]
+            in_fn_scope: false,
+            #[cfg(not(feature = "no_function"))]
+            #[cfg(not(feature = "no_closure"))]
+            in_closure: false,
+            is_breakable: false,
+            allow_statements: true,
+            allow_unquoted_map_properties: true,
+            options: self.options,
+            level: 0,
+            pos: Position::START,
+        };
+        process_settings(&mut settings);
 
         while !input.peek().expect(NEVER_ENDS).0.is_eof() {
-            let settings = ParseSettings {
-                at_global_level: true,
-                #[cfg(not(feature = "no_function"))]
-                in_fn_scope: false,
-                #[cfg(not(feature = "no_function"))]
-                #[cfg(not(feature = "no_closure"))]
-                in_closure: false,
-                is_breakable: false,
-                allow_statements: true,
-                options: self.options,
-                level: 0,
-                pos: Position::NONE,
-            };
-
             let stmt = self.parse_stmt(input, state, &mut functions, settings)?;
 
             if stmt.is_noop() {
@@ -3926,7 +3926,7 @@ impl Engine {
         state: &mut ParseState,
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
-        let (statements, _lib) = self.parse_global_level(input, state)?;
+        let (statements, _lib) = self.parse_global_level(input, state, |_| {})?;
 
         #[cfg(not(feature = "no_optimize"))]
         return Ok(crate::optimizer::optimize_into_ast(

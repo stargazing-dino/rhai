@@ -152,7 +152,6 @@ impl Engine {
                     let context = (self, op, None, &*global, lib, *op_pos, level).into();
                     let result = func(context, args).map(|_| ());
 
-                    #[cfg(not(feature = "unchecked"))]
                     self.check_data_size(args[0], root.1)?;
 
                     return result;
@@ -165,10 +164,7 @@ impl Engine {
             match self.call_native_fn(
                 global, caches, lib, op_assign, hash, args, true, true, *op_pos, level,
             ) {
-                Ok(_) => {
-                    #[cfg(not(feature = "unchecked"))]
-                    self.check_data_size(args[0], root.1)?;
-                }
+                Ok(_) => self.check_data_size(args[0], root.1)?,
                 Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
                 {
                     // Expand to `var = var op rhs`
@@ -186,15 +182,6 @@ impl Engine {
             // Normal assignment
             *target.write_lock::<Dynamic>().unwrap() = new_val;
         }
-
-        /*
-        if let Some(mut guard) = target.write_lock::<Dynamic>() {
-            if guard.is::<ImmutableString>() {
-                let s = std::mem::take(&mut *guard).cast::<ImmutableString>();
-                *guard = self.get_interned_string(s).into();
-            }
-        }
-        */
 
         target.propagate_changed_value(op_info.pos)
     }
@@ -227,8 +214,7 @@ impl Engine {
 
         // Function calls should account for a relatively larger portion of statements.
         if let Stmt::FnCall(x, ..) = stmt {
-            #[cfg(not(feature = "unchecked"))]
-            self.inc_operations(&mut global.num_operations, stmt.position())?;
+            self.track_operation(global, stmt.position())?;
 
             let result =
                 self.eval_fn_call_expr(scope, global, caches, lib, this_ptr, x, x.pos, level);
@@ -245,8 +231,7 @@ impl Engine {
         if let Stmt::Assignment(x, ..) = stmt {
             let (op_info, BinaryExpr { lhs, rhs }) = &**x;
 
-            #[cfg(not(feature = "unchecked"))]
-            self.inc_operations(&mut global.num_operations, stmt.position())?;
+            self.track_operation(global, stmt.position())?;
 
             let result = if let Expr::Variable(x, ..) = lhs {
                 let rhs_result = self
@@ -276,8 +261,7 @@ impl Engine {
                             );
                         }
 
-                        #[cfg(not(feature = "unchecked"))]
-                        self.inc_operations(&mut global.num_operations, pos)?;
+                        self.track_operation(global, pos)?;
 
                         let root = (var_name, pos);
                         let lhs_ptr = &mut lhs_ptr;
@@ -295,19 +279,25 @@ impl Engine {
             } else {
                 let (op_info, BinaryExpr { lhs, rhs }) = &**x;
 
-                let rhs_result = self
-                    .eval_expr(scope, global, caches, lib, this_ptr, rhs, level)
-                    .map(Dynamic::flatten);
+                let rhs_result = self.eval_expr(scope, global, caches, lib, this_ptr, rhs, level);
 
                 if let Ok(rhs_val) = rhs_result {
-                    let rhs_val = if rhs_val.is::<ImmutableString>() {
-                        self.get_interned_string(rhs_val.cast::<ImmutableString>())
-                            .into()
+                    // Check if the result is a string. If so, intern it.
+                    #[cfg(not(feature = "no_closure"))]
+                    let is_string = !rhs_val.is_shared() && rhs_val.is::<ImmutableString>();
+                    #[cfg(feature = "no_closure")]
+                    let is_string = rhs_val.is::<ImmutableString>();
+
+                    let rhs_val = if is_string {
+                        self.get_interned_string(
+                            rhs_val.into_immutable_string().expect("`ImmutableString`"),
+                        )
+                        .into()
                     } else {
-                        rhs_val
+                        rhs_val.flatten()
                     };
 
-                    let _new_val = Some((rhs_val, op_info));
+                    let _new_val = &mut Some((rhs_val, op_info));
 
                     // Must be either `var[index] op= val` or `var.prop op= val`
                     match lhs {
@@ -342,8 +332,7 @@ impl Engine {
             return result;
         }
 
-        #[cfg(not(feature = "unchecked"))]
-        self.inc_operations(&mut global.num_operations, stmt.position())?;
+        self.track_operation(global, stmt.position())?;
 
         let result = match stmt {
             // No-op
@@ -515,8 +504,7 @@ impl Engine {
                 let (.., body) = &**x;
 
                 if body.is_empty() {
-                    #[cfg(not(feature = "unchecked"))]
-                    self.inc_operations(&mut global.num_operations, body.position())?;
+                    self.track_operation(global, body.position())?;
                 } else {
                     match self
                         .eval_stmt_block(scope, global, caches, lib, this_ptr, body, true, level)
@@ -671,10 +659,7 @@ impl Engine {
 
                             *scope.get_mut_by_index(index).write_lock().unwrap() = value;
 
-                            #[cfg(not(feature = "unchecked"))]
-                            if let Err(err) = self
-                                .inc_operations(&mut global.num_operations, statements.position())
-                            {
+                            if let Err(err) = self.track_operation(global, statements.position()) {
                                 loop_result = Err(err);
                                 break;
                             }
@@ -741,7 +726,7 @@ impl Engine {
 
                             #[cfg(feature = "no_object")]
                             _ => {
-                                err.take_position();
+                                let _ = err.take_position();
                                 err.to_string().into()
                             }
                             #[cfg(not(feature = "no_object"))]
@@ -927,7 +912,6 @@ impl Engine {
                 let (expr, export) = &**x;
 
                 // Guard against too many modules
-                #[cfg(not(feature = "unchecked"))]
                 if global.num_modules_loaded >= self.max_modules() {
                     return Err(ERR::ErrorTooManyModules(*_pos).into());
                 }

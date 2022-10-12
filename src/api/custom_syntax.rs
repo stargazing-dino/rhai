@@ -157,7 +157,6 @@ impl Deref for Expression<'_> {
     type Target = Expr;
 
     #[inline(always)]
-    #[must_use]
     fn deref(&self) -> &Self::Target {
         self.0
     }

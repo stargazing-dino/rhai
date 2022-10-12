@@ -196,6 +196,7 @@ pub struct Module {
 
 impl Default for Module {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }
@@ -493,12 +494,12 @@ impl Module {
     #[inline(always)]
     pub fn set_custom_type_raw(
         &mut self,
-        type_name: impl Into<Identifier>,
+        type_path: impl Into<Identifier>,
         name: impl Into<Identifier>,
     ) -> &mut Self {
         self.custom_types
             .get_or_insert_with(CustomTypesCollection::new)
-            .add(type_name, name);
+            .add(type_path, name);
         self
     }
     /// Get the display name of a registered custom type.
@@ -1741,10 +1742,9 @@ impl Module {
         }
 
         if let Some(ref variables) = other.variables {
-            if let Some(ref mut m) = self.variables {
-                m.extend(variables.iter().map(|(k, v)| (k.clone(), v.clone())));
-            } else {
-                self.variables = other.variables.clone();
+            match self.variables {
+                Some(ref mut m) => m.extend(variables.iter().map(|(k, v)| (k.clone(), v.clone()))),
+                None => self.variables = other.variables.clone(),
             }
         }
 
@@ -1766,10 +1766,9 @@ impl Module {
         self.dynamic_functions_filter += &other.dynamic_functions_filter;
 
         if let Some(ref type_iterators) = other.type_iterators {
-            if let Some(ref mut t) = self.type_iterators {
-                t.extend(type_iterators.iter().map(|(&k, v)| (k, v.clone())));
-            } else {
-                self.type_iterators = other.type_iterators.clone();
+            match self.type_iterators {
+                Some(ref mut t) => t.extend(type_iterators.iter().map(|(&k, v)| (k, v.clone()))),
+                None => self.type_iterators = other.type_iterators.clone(),
             }
         }
         self.all_functions = None;

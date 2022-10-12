@@ -86,8 +86,11 @@ pub trait RegisterNativeFunction<ARGS, RET, RESULT> {
     /// _(metadata)_ Get the type name of this function's return value.
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
+    #[inline(always)]
     #[must_use]
-    fn return_type_name() -> &'static str;
+    fn return_type_name() -> &'static str {
+        std::any::type_name::<RET>()
+    }
 }
 
 const EXPECT_ARGS: &str = "arguments";
@@ -138,7 +141,6 @@ macro_rules! def_register {
             #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { std::any::type_name::<RET>() }
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |_ctx: NativeCallContext, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
@@ -164,7 +166,6 @@ macro_rules! def_register {
             #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { std::any::type_name::<RET>() }
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!

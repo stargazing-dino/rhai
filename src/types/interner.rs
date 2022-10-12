@@ -39,6 +39,7 @@ pub struct StringsInterner<'a> {
 
 impl Default for StringsInterner<'_> {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }

@@ -72,7 +72,6 @@ impl Deref for Namespace {
     type Target = StaticVec<Ident>;
 
     #[inline(always)]
-    #[must_use]
     fn deref(&self) -> &Self::Target {
         &self.path
     }
@@ -80,14 +79,13 @@ impl Deref for Namespace {
 
 impl DerefMut for Namespace {
     #[inline(always)]
-    #[must_use]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.path
     }
 }
 
 impl From<Vec<Ident>> for Namespace {
-    #[inline(always)]
+    #[inline]
     fn from(mut path: Vec<Ident>) -> Self {
         path.shrink_to_fit();
         Self {
@@ -98,7 +96,7 @@ impl From<Vec<Ident>> for Namespace {
 }
 
 impl From<StaticVec<Ident>> for Namespace {
-    #[inline(always)]
+    #[inline]
     fn from(mut path: StaticVec<Ident>) -> Self {
         path.shrink_to_fit();
         Self { index: None, path }

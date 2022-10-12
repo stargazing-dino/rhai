@@ -122,6 +122,7 @@ impl Engine {
         let ast = self.parse_global_expr(
             &mut stream.peekable(),
             &mut state,
+            |_| {},
             #[cfg(not(feature = "no_optimize"))]
             OptimizationLevel::None,
             #[cfg(feature = "no_optimize")]

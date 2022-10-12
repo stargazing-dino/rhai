@@ -10,7 +10,6 @@ fn main() {
 
     f.write_fmt(format_args!(
         "//! Configuration settings for this Rhai build
-#![allow(dead_code)]
 
 "
     ))

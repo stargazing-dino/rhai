@@ -49,6 +49,8 @@ fn build_type() -> Result<(), Box<EvalAltResult>> {
         type Item = INT;
         type IntoIter = std::vec::IntoIter<Self::Item>;
 
+        #[inline]
+        #[must_use]
         fn into_iter(self) -> Self::IntoIter {
             vec![self.x, self.y, self.z].into_iter()
         }

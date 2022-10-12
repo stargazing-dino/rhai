@@ -36,6 +36,7 @@ pub struct GlobalRuntimeState<'a> {
     /// Number of operations performed.
     pub num_operations: u64,
     /// Number of modules loaded.
+    #[cfg(not(feature = "no_module"))]
     pub num_modules_loaded: usize,
     /// Level of the current scope.
     ///
@@ -85,6 +86,7 @@ impl GlobalRuntimeState<'_> {
             modules: crate::StaticVec::new_const(),
             source: Identifier::new_const(),
             num_operations: 0,
+            #[cfg(not(feature = "no_module"))]
             num_modules_loaded: 0,
             scope_level: 0,
             always_search_scope: false,
@@ -105,10 +107,9 @@ impl GlobalRuntimeState<'_> {
                 } else {
                     crate::eval::DebuggerStatus::CONTINUE
                 },
-                if let Some((ref init, ..)) = engine.debugger {
-                    init(engine)
-                } else {
-                    Dynamic::UNIT
+                match engine.debugger {
+                    Some((ref init, ..)) => init(engine),
+                    None => Dynamic::UNIT,
                 },
             ),
 
@@ -316,7 +317,6 @@ impl IntoIterator for GlobalRuntimeState<'_> {
         std::iter::Rev<smallvec::IntoIter<[crate::Shared<crate::Module>; 3]>>,
     >;
 
-    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.keys
             .into_iter()
@@ -333,10 +333,8 @@ impl<'a> IntoIterator for &'a GlobalRuntimeState<'_> {
         std::iter::Rev<std::slice::Iter<'a, crate::Shared<crate::Module>>>,
     >;
 
-    #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        let x = self.keys.iter().rev().zip(self.modules.iter().rev());
-        x
+        self.keys.iter().rev().zip(self.modules.iter().rev())
     }
 }
 
@@ -363,14 +361,14 @@ impl fmt::Debug for GlobalRuntimeState<'_> {
         f.field("imports", &self.keys.iter().zip(self.modules.iter()));
 
         f.field("source", &self.source)
-            .field("num_operations", &self.num_operations)
-            .field("num_modules_loaded", &self.num_modules_loaded);
+            .field("num_operations", &self.num_operations);
 
         #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
         f.field("fn_hash_indexing", &self.fn_hash_indexing);
 
         #[cfg(not(feature = "no_module"))]
-        f.field("embedded_module_resolver", &self.embedded_module_resolver);
+        f.field("num_modules_loaded", &self.num_modules_loaded)
+            .field("embedded_module_resolver", &self.embedded_module_resolver);
 
         #[cfg(not(feature = "no_module"))]
         #[cfg(not(feature = "no_function"))]
