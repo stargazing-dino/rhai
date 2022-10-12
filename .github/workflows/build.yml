@@ -129,14 +129,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Setup Wasm Toolchain
+      - name: Setup Generic Wasm Toolchain
         uses: actions-rs/toolchain@v1
         with:
+          toolchain: stable
           override: true
           target: wasm32-unknown-unknown
       - name: Setup Wasi Toolchain
         uses: actions-rs/toolchain@v1
         with:
+          toolchain: stable
           override: true
           target: wasm32-wasi
       - name: Build
