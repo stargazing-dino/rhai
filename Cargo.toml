@@ -64,7 +64,7 @@ debugging = ["internals"]       # enable debugging
 serde = ["dep:serde", "smartstring/serde", "smallvec/serde"] # implement serde for rhai types
 
 # compiling for no-std
-no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm"]
+no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm", "hashbrown"]
 
 # compiling for WASM
 wasm-bindgen = ["instant/wasm-bindgen"]
