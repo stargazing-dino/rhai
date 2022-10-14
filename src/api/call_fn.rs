@@ -233,6 +233,7 @@ impl Engine {
             arg_values,
         )
     }
+
     /// Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
     fn _call_fn(
         &self,

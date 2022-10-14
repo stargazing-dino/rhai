@@ -835,7 +835,7 @@ pub mod array_functions {
 
         for item in array {
             if ctx
-                .call_fn_raw(OP_EQUALS, true, false, &mut [item, &mut value.clone()])
+                .call_native_fn_raw(OP_EQUALS, true, &mut [item, &mut value.clone()])
                 .or_else(|err| match *err {
                     ERR::ErrorFunctionNotFound(ref fn_sig, ..) if fn_sig.starts_with(OP_EQUALS) => {
                         if item.type_id() == value.type_id() {
@@ -927,7 +927,7 @@ pub mod array_functions {
 
         for (i, item) in array.iter_mut().enumerate().skip(start) {
             if ctx
-                .call_fn_raw(OP_EQUALS, true, false, &mut [item, &mut value.clone()])
+                .call_native_fn_raw(OP_EQUALS, true, &mut [item, &mut value.clone()])
                 .or_else(|err| match *err {
                     ERR::ErrorFunctionNotFound(ref fn_sig, ..) if fn_sig.starts_with(OP_EQUALS) => {
                         if item.type_id() == value.type_id() {
@@ -2313,7 +2313,7 @@ pub mod array_functions {
 
         for (a1, a2) in array1.iter_mut().zip(array2.iter_mut()) {
             if !ctx
-                .call_fn_raw(OP_EQUALS, true, false, &mut [a1, a2])
+                .call_native_fn_raw(OP_EQUALS, true, &mut [a1, a2])
                 .or_else(|err| match *err {
                     ERR::ErrorFunctionNotFound(ref fn_sig, ..) if fn_sig.starts_with(OP_EQUALS) => {
                         if a1.type_id() == a2.type_id() {
