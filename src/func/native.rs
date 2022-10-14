@@ -422,6 +422,7 @@ impl<'a> NativeCallContext<'a> {
                 caches,
                 self.lib,
                 fn_name,
+                false,
                 hash,
                 args,
                 is_ref_mut,

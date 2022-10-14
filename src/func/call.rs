@@ -578,6 +578,7 @@ impl Engine {
         caches: &mut Caches,
         lib: &[&Module],
         fn_name: &str,
+        _native_only: bool,
         hashes: FnCallHashes,
         args: &mut FnCallArgs,
         is_ref_mut: bool,
@@ -644,89 +645,90 @@ impl Engine {
 
         let level = level + 1;
 
-        // Script-defined function call?
         #[cfg(not(feature = "no_function"))]
-        let local_entry = &mut None;
+        if !_native_only {
+            // Script-defined function call?
+            let local_entry = &mut None;
 
-        #[cfg(not(feature = "no_function"))]
-        if let Some(FnResolutionCacheEntry { func, ref source }) = self
-            .resolve_fn(
-                global,
-                caches,
-                local_entry,
-                lib,
-                fn_name,
-                hashes.script,
-                None,
-                false,
-                None,
-            )
-            .cloned()
-        {
-            // Script function call
-            assert!(func.is_script());
-
-            let func = func.get_script_fn_def().expect("script-defined function");
-
-            if func.body.is_empty() {
-                return Ok((Dynamic::UNIT, false));
-            }
-
-            let mut empty_scope;
-            let scope = match _scope {
-                Some(scope) => scope,
-                None => {
-                    empty_scope = Scope::new();
-                    &mut empty_scope
-                }
-            };
-
-            let orig_source = mem::replace(
-                &mut global.source,
-                source
-                    .as_ref()
-                    .map_or(crate::Identifier::new_const(), |s| (**s).clone()),
-            );
-
-            let result = if _is_method_call {
-                // Method call of script function - map first argument to `this`
-                let (first_arg, rest_args) = args.split_first_mut().unwrap();
-
-                self.call_script_fn(
-                    scope,
+            if let Some(FnResolutionCacheEntry { func, ref source }) = self
+                .resolve_fn(
                     global,
                     caches,
+                    local_entry,
                     lib,
-                    &mut Some(*first_arg),
-                    func,
-                    rest_args,
-                    true,
-                    pos,
-                    level,
+                    fn_name,
+                    hashes.script,
+                    None,
+                    false,
+                    None,
                 )
-            } else {
-                // Normal call of script function
-                let mut backup = ArgBackup::new();
+                .cloned()
+            {
+                // Script function call
+                assert!(func.is_script());
 
-                // The first argument is a reference?
-                if is_ref_mut && !args.is_empty() {
-                    backup.change_first_arg_to_copy(args);
+                let func = func.get_script_fn_def().expect("script-defined function");
+
+                if func.body.is_empty() {
+                    return Ok((Dynamic::UNIT, false));
                 }
 
-                let result = self.call_script_fn(
-                    scope, global, caches, lib, &mut None, func, args, true, pos, level,
+                let mut empty_scope;
+                let scope = match _scope {
+                    Some(scope) => scope,
+                    None => {
+                        empty_scope = Scope::new();
+                        &mut empty_scope
+                    }
+                };
+
+                let orig_source = mem::replace(
+                    &mut global.source,
+                    source
+                        .as_ref()
+                        .map_or(crate::Identifier::new_const(), |s| (**s).clone()),
                 );
 
-                // Restore the original reference
-                backup.restore_first_arg(args);
+                let result = if _is_method_call {
+                    // Method call of script function - map first argument to `this`
+                    let (first_arg, rest_args) = args.split_first_mut().unwrap();
 
-                result
-            };
+                    self.call_script_fn(
+                        scope,
+                        global,
+                        caches,
+                        lib,
+                        &mut Some(*first_arg),
+                        func,
+                        rest_args,
+                        true,
+                        pos,
+                        level,
+                    )
+                } else {
+                    // Normal call of script function
+                    let mut backup = ArgBackup::new();
 
-            // Restore the original source
-            global.source = orig_source;
+                    // The first argument is a reference?
+                    if is_ref_mut && !args.is_empty() {
+                        backup.change_first_arg_to_copy(args);
+                    }
 
-            return Ok((result?, false));
+                    let result = self.call_script_fn(
+                        scope, global, caches, lib, &mut None, func, args, true, pos, level,
+                    );
+
+                    // Restore the original reference
+                    backup.restore_first_arg(args);
+
+                    result
+                };
+
+                // Restore the original source
+                global.source = orig_source;
+
+                return Ok((result?, false));
+            }
         }
 
         // Native function call
@@ -836,6 +838,7 @@ impl Engine {
                     caches,
                     lib,
                     fn_name,
+                    false,
                     new_hash,
                     &mut args,
                     false,
@@ -881,6 +884,7 @@ impl Engine {
                     caches,
                     lib,
                     fn_name,
+                    false,
                     new_hash,
                     &mut args,
                     is_ref_mut,
@@ -968,6 +972,7 @@ impl Engine {
                     caches,
                     lib,
                     fn_name,
+                    false,
                     hash,
                     &mut args,
                     is_ref_mut,
@@ -995,6 +1000,7 @@ impl Engine {
         lib: &[&Module],
         this_ptr: &mut Option<&mut Dynamic>,
         fn_name: &str,
+        native_only: bool,
         first_arg: Option<&Expr>,
         args_expr: &[Expr],
         hashes: FnCallHashes,
@@ -1003,6 +1009,7 @@ impl Engine {
         pos: Position,
         level: usize,
     ) -> RhaiResult {
+        let native = native_only;
         let mut first_arg = first_arg;
         let mut a_expr = args_expr;
         let mut total_args = if first_arg.is_some() { 1 } else { 0 } + a_expr.len();
@@ -1199,8 +1206,8 @@ impl Engine {
 
             return self
                 .exec_fn_call(
-                    scope, global, caches, lib, name, hashes, &mut args, is_ref_mut, false, pos,
-                    level,
+                    scope, global, caches, lib, name, native, hashes, &mut args, is_ref_mut, false,
+                    pos, level,
                 )
                 .map(|(v, ..)| v);
         }
@@ -1262,7 +1269,8 @@ impl Engine {
         }
 
         self.exec_fn_call(
-            None, global, caches, lib, name, hashes, &mut args, is_ref_mut, false, pos, level,
+            None, global, caches, lib, name, native, hashes, &mut args, is_ref_mut, false, pos,
+            level,
         )
         .map(|(v, ..)| v)
     }

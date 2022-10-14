@@ -193,7 +193,6 @@ impl<'e> ParseState<'e> {
 
         #[cfg(not(feature = "no_function"))]
         let is_func_name = _lib.values().any(|f| f.name == name);
-
         #[cfg(feature = "no_function")]
         let is_func_name = false;
 
@@ -600,7 +599,9 @@ impl Engine {
                 #[cfg(feature = "no_module")]
                 let hash = calc_fn_hash(None, &id, 0);
 
-                let hashes = if is_valid_function_name(&id) {
+                let is_valid_function_name = is_valid_function_name(&id);
+
+                let hashes = if is_valid_function_name {
                     hash.into()
                 } else {
                     FnCallHashes::from_native(hash)
@@ -612,6 +613,8 @@ impl Engine {
                     name: state.get_interned_string(id),
                     capture_parent_scope,
                     operator_token: None,
+                    #[cfg(not(feature = "no_function"))]
+                    can_be_script: is_valid_function_name,
                     #[cfg(not(feature = "no_module"))]
                     namespace,
                     hashes,
@@ -668,7 +671,9 @@ impl Engine {
                     #[cfg(feature = "no_module")]
                     let hash = calc_fn_hash(None, &id, args.len());
 
-                    let hashes = if is_valid_function_name(&id) {
+                    let is_valid_function_name = is_valid_function_name(&id);
+
+                    let hashes = if is_valid_function_name {
                         hash.into()
                     } else {
                         FnCallHashes::from_native(hash)
@@ -680,6 +685,8 @@ impl Engine {
                         name: state.get_interned_string(id),
                         capture_parent_scope,
                         operator_token: None,
+                        #[cfg(not(feature = "no_function"))]
+                        can_be_script: is_valid_function_name,
                         #[cfg(not(feature = "no_module"))]
                         namespace,
                         hashes,
@@ -1912,12 +1919,14 @@ impl Engine {
                         args.shrink_to_fit();
 
                         Ok(FnCallExpr {
+                            namespace: Default::default(),
                             name: state.get_interned_string("-"),
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "-", 1)),
                             args,
                             pos,
                             operator_token: Some(token),
-                            ..Default::default()
+                            capture_parent_scope: false,
+                            can_be_script: false,
                         }
                         .into_fn_call_expr(pos))
                     }
@@ -1940,12 +1949,14 @@ impl Engine {
                         args.shrink_to_fit();
 
                         Ok(FnCallExpr {
+                            namespace: Default::default(),
                             name: state.get_interned_string("+"),
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "+", 1)),
                             args,
                             pos,
                             operator_token: Some(token),
-                            ..Default::default()
+                            capture_parent_scope: false,
+                            can_be_script: false,
                         }
                         .into_fn_call_expr(pos))
                     }
@@ -1961,12 +1972,14 @@ impl Engine {
                 args.shrink_to_fit();
 
                 Ok(FnCallExpr {
+                    namespace: Default::default(),
                     name: state.get_interned_string("!"),
                     hashes: FnCallHashes::from_native(calc_fn_hash(None, "!", 1)),
                     args,
                     pos,
                     operator_token: Some(token),
-                    ..Default::default()
+                    capture_parent_scope: false,
+                    can_be_script: false,
                 }
                 .into_fn_call_expr(pos))
             }
@@ -2335,18 +2348,22 @@ impl Engine {
 
             let op = op_token.syntax();
             let hash = calc_fn_hash(None, &op, 2);
-            let operator_token = if is_valid_function_name(&op) {
+            let is_function = is_valid_function_name(&op);
+            let operator_token = if is_function {
                 None
             } else {
                 Some(op_token.clone())
             };
 
             let op_base = FnCallExpr {
+                namespace: Default::default(),
                 name: state.get_interned_string(op.as_ref()),
                 hashes: FnCallHashes::from_native(hash),
+                args: StaticVec::new_const(),
                 pos,
                 operator_token,
-                ..Default::default()
+                capture_parent_scope: false,
+                can_be_script: is_function,
             };
 
             let mut args = StaticVec::new_const();
@@ -2432,7 +2449,7 @@ impl Engine {
                     let pos = args[0].start_position();
 
                     FnCallExpr {
-                        hashes: if is_valid_function_name(&s) {
+                        hashes: if is_function {
                             hash.into()
                         } else {
                             FnCallHashes::from_native(hash)
@@ -3659,6 +3676,7 @@ impl Engine {
         );
 
         let expr = FnCallExpr {
+            namespace: Default::default(),
             name: state.get_interned_string(crate::engine::KEYWORD_FN_PTR_CURRY),
             hashes: FnCallHashes::from_native(calc_fn_hash(
                 None,
@@ -3667,7 +3685,9 @@ impl Engine {
             )),
             args,
             pos,
-            ..Default::default()
+            operator_token: None,
+            capture_parent_scope: false,
+            can_be_script: false,
         }
         .into_fn_call_expr(pos);
 

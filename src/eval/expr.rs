@@ -223,8 +223,15 @@ impl Engine {
             hashes,
             args,
             operator_token,
+            #[cfg(not(feature = "no_function"))]
+            can_be_script,
             ..
         } = expr;
+
+        #[cfg(not(feature = "no_function"))]
+        let native = !can_be_script;
+        #[cfg(feature = "no_function")]
+        let native = true;
 
         // Short-circuit native binary operator call if under Fast Operators mode
         if operator_token.is_some() && self.fast_operators() && args.len() == 2 {
@@ -251,7 +258,8 @@ impl Engine {
 
             return self
                 .exec_fn_call(
-                    None, global, caches, lib, name, *hashes, operands, false, false, pos, level,
+                    None, global, caches, lib, name, native, *hashes, operands, false, false, pos,
+                    level,
                 )
                 .map(|(v, ..)| v);
         }
@@ -280,6 +288,7 @@ impl Engine {
             lib,
             this_ptr,
             name,
+            native,
             first_arg,
             args,
             *hashes,
