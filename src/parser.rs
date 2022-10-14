@@ -1919,6 +1919,7 @@ impl Engine {
                         args.shrink_to_fit();
 
                         Ok(FnCallExpr {
+                            #[cfg(not(feature = "no_module"))]
                             namespace: Default::default(),
                             name: state.get_interned_string("-"),
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "-", 1)),
@@ -1926,6 +1927,7 @@ impl Engine {
                             pos,
                             operator_token: Some(token),
                             capture_parent_scope: false,
+                            #[cfg(not(feature = "no_function"))]
                             can_be_script: false,
                         }
                         .into_fn_call_expr(pos))
@@ -1949,6 +1951,7 @@ impl Engine {
                         args.shrink_to_fit();
 
                         Ok(FnCallExpr {
+                            #[cfg(not(feature = "no_module"))]
                             namespace: Default::default(),
                             name: state.get_interned_string("+"),
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "+", 1)),
@@ -1956,6 +1959,7 @@ impl Engine {
                             pos,
                             operator_token: Some(token),
                             capture_parent_scope: false,
+                            #[cfg(not(feature = "no_function"))]
                             can_be_script: false,
                         }
                         .into_fn_call_expr(pos))
@@ -1972,6 +1976,7 @@ impl Engine {
                 args.shrink_to_fit();
 
                 Ok(FnCallExpr {
+                    #[cfg(not(feature = "no_module"))]
                     namespace: Default::default(),
                     name: state.get_interned_string("!"),
                     hashes: FnCallHashes::from_native(calc_fn_hash(None, "!", 1)),
@@ -1979,6 +1984,7 @@ impl Engine {
                     pos,
                     operator_token: Some(token),
                     capture_parent_scope: false,
+                    #[cfg(not(feature = "no_function"))]
                     can_be_script: false,
                 }
                 .into_fn_call_expr(pos))
@@ -2356,6 +2362,7 @@ impl Engine {
             };
 
             let op_base = FnCallExpr {
+                #[cfg(not(feature = "no_module"))]
                 namespace: Default::default(),
                 name: state.get_interned_string(op.as_ref()),
                 hashes: FnCallHashes::from_native(hash),
@@ -2363,6 +2370,7 @@ impl Engine {
                 pos,
                 operator_token,
                 capture_parent_scope: false,
+                #[cfg(not(feature = "no_function"))]
                 can_be_script: is_function,
             };
 
@@ -3676,6 +3684,7 @@ impl Engine {
         );
 
         let expr = FnCallExpr {
+            #[cfg(not(feature = "no_module"))]
             namespace: Default::default(),
             name: state.get_interned_string(crate::engine::KEYWORD_FN_PTR_CURRY),
             hashes: FnCallHashes::from_native(calc_fn_hash(
@@ -3687,6 +3696,7 @@ impl Engine {
             pos,
             operator_token: None,
             capture_parent_scope: false,
+            #[cfg(not(feature = "no_function"))]
             can_be_script: false,
         }
         .into_fn_call_expr(pos);
