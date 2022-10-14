@@ -1137,6 +1137,7 @@ impl Engine {
             KEYWORD_EVAL if total_args == 1 => {
                 // eval - only in function call style
                 let orig_scope_len = scope.len();
+                let orig_imports_len = global.num_imports();
                 let arg = first_arg.unwrap();
                 let (arg_value, pos) =
                     self.get_arg_value(scope, global, caches, lib, this_ptr, arg, level)?;
@@ -1155,7 +1156,8 @@ impl Engine {
 
                 // IMPORTANT! If the eval defines new variables in the current scope,
                 //            all variable offsets from this point on will be mis-aligned.
-                if scope.len() != orig_scope_len {
+                //            The same is true for imports.
+                if scope.len() != orig_scope_len || global.num_imports() != orig_imports_len {
                     global.always_search_scope = true;
                 }
 

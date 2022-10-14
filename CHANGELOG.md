@@ -4,6 +4,12 @@ Rhai Release Notes
 Version 1.11.0
 ==============
 
+Bug fixes
+---------
+
+* `Engine::parse_json` now returns an error on unquoted keys to be consistent with JSON specifications.
+* `import` statements inside `eval` no longer cause errors in subsequent code.
+
 New features
 ------------
 
@@ -11,11 +17,6 @@ New features
 
 * It is now possible to specify a fixed _seed_ for use with the `ahash` hasher, via an environment variable, in order to force stable (i.e. deterministic) hashes for function signatures. This is necessary when using Rhai across shared-library boundaries.
 * A build script is now used to extract the environment variable (`RHAI_AHASH_SEED`) and splice it into the source code before compilation.
-
-Bug fixes
----------
-
-* `Engine::parse_json` now returns an error on unquoted keys to be consistent with JSON specifications.
 
 Enhancements
 ------------
