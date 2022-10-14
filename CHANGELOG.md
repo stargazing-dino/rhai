@@ -9,6 +9,7 @@ Bug fixes
 
 * `Engine::parse_json` now returns an error on unquoted keys to be consistent with JSON specifications.
 * `import` statements inside `eval` no longer cause errors in subsequent code.
+* Functions marked `global` in `import`ed modules with no alias names now work properly.
 
 New features
 ------------

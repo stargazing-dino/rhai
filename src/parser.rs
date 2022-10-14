@@ -2993,24 +2993,24 @@ impl Engine {
         // import expr ...
         let expr = self.parse_expr(input, state, lib, settings.level_up())?;
 
-        // import expr;
-        if !match_token(input, Token::As).0 {
-            let empty = Ident {
+        let export = if !match_token(input, Token::As).0 {
+            // import expr;
+            Ident {
                 name: state.get_interned_string(""),
                 pos: Position::NONE,
-            };
-            return Ok(Stmt::Import((expr, empty).into(), settings.pos));
-        }
+            }
+        } else {
+            // import expr as name ...
+            let (name, pos) = parse_var_name(input)?;
+            Ident {
+                name: state.get_interned_string(name),
+                pos,
+            }
+        };
 
-        // import expr as name ...
-        let (name, pos) = parse_var_name(input)?;
-        let name = state.get_interned_string(name);
-        state.imports.push(name.clone());
+        state.imports.push(export.name.clone());
 
-        Ok(Stmt::Import(
-            (expr, Ident { name, pos }).into(),
-            settings.pos,
-        ))
+        Ok(Stmt::Import((expr, export).into(), settings.pos))
     }
 
     /// Parse an export statement.
