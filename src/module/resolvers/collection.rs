@@ -1,7 +1,10 @@
-use crate::{Engine, Module, ModuleResolver, Position, RhaiResultOf, Shared, ERR};
+use crate::{
+    Engine, Module, ModuleResolver, Position, RhaiResultOf, Shared, StaticVec, ERR,
+    STATIC_VEC_INLINE_SIZE,
+};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{ops::AddAssign, slice::Iter, vec::IntoIter};
+use std::{ops::AddAssign, slice::Iter};
 
 /// [Module] resolution service that holds a collection of module resolvers,
 /// to be searched in sequential order.
@@ -21,7 +24,7 @@ use std::{ops::AddAssign, slice::Iter, vec::IntoIter};
 /// engine.set_module_resolver(collection);
 /// ```
 #[derive(Default)]
-pub struct ModuleResolversCollection(Vec<Box<dyn ModuleResolver>>);
+pub struct ModuleResolversCollection(StaticVec<Box<dyn ModuleResolver>>);
 
 impl ModuleResolversCollection {
     /// Create a new [`ModuleResolversCollection`].
@@ -43,7 +46,7 @@ impl ModuleResolversCollection {
     #[inline(always)]
     #[must_use]
     pub const fn new() -> Self {
-        Self(Vec::new())
+        Self(StaticVec::new_const())
     }
     /// Append a [module resolver][ModuleResolver] to the end.
     #[inline(always)]
@@ -109,7 +112,7 @@ impl ModuleResolversCollection {
 
 impl IntoIterator for ModuleResolversCollection {
     type Item = Box<dyn ModuleResolver>;
-    type IntoIter = IntoIter<Box<dyn ModuleResolver>>;
+    type IntoIter = smallvec::IntoIter<[Box<dyn ModuleResolver>; STATIC_VEC_INLINE_SIZE]>;
 
     #[inline(always)]
     #[must_use]

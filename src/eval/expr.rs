@@ -24,13 +24,13 @@ impl Engine {
 
         let root = namespace.root();
 
-        // Qualified - check if the root module is directly indexed
         let index = if global.always_search_scope {
             None
         } else {
             namespace.index()
         };
 
+        // Qualified - check if the root module is directly indexed
         if let Some(index) = index {
             let offset = global.num_imports() - index.get();
 

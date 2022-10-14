@@ -302,6 +302,10 @@ pub struct TryCatchBlock {
     pub catch_block: StmtBlock,
 }
 
+/// Number of items to keep inline for [`StmtBlockContainer`].
+#[cfg(not(feature = "no_std"))]
+const STMT_BLOCK_INLINE_SIZE: usize = 8;
+
 /// _(internals)_ The underlying container type for [`StmtBlock`].
 /// Exported under the `internals` feature only.
 ///
@@ -309,7 +313,7 @@ pub struct TryCatchBlock {
 /// hold a statements block, with the assumption that most program blocks would container fewer than
 /// 8 statements, and those that do have a lot more statements.
 #[cfg(not(feature = "no_std"))]
-pub type StmtBlockContainer = smallvec::SmallVec<[Stmt; 8]>;
+pub type StmtBlockContainer = smallvec::SmallVec<[Stmt; STMT_BLOCK_INLINE_SIZE]>;
 
 /// _(internals)_ The underlying container type for [`StmtBlock`].
 /// Exported under the `internals` feature only.
@@ -491,9 +495,9 @@ impl From<Stmt> for StmtBlock {
 impl IntoIterator for StmtBlock {
     type Item = Stmt;
     #[cfg(not(feature = "no_std"))]
-    type IntoIter = smallvec::IntoIter<[Stmt; 8]>;
+    type IntoIter = smallvec::IntoIter<[Stmt; STMT_BLOCK_INLINE_SIZE]>;
     #[cfg(feature = "no_std")]
-    type IntoIter = smallvec::IntoIter<[Stmt; 3]>;
+    type IntoIter = smallvec::IntoIter<[Stmt; crate::STATIC_VEC_INLINE_SIZE]>;
 
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {

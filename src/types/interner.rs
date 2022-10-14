@@ -110,7 +110,7 @@ impl StringsInterner<'_> {
 
         // If the interner is over capacity, remove the longest entry that has the lowest count
         if self.cache.len() > self.capacity {
-            // Leave some buffer to grow when shrinking the cache.
+            // Throttle: leave some buffer to grow when shrinking the cache.
             // We leave at least two entries, one for the empty string, and one for the string
             // that has just been inserted.
             let max = if self.capacity < 5 {
