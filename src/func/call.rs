@@ -1137,27 +1137,25 @@ impl Engine {
             KEYWORD_EVAL if total_args == 1 => {
                 // eval - only in function call style
                 let orig_scope_len = scope.len();
+                #[cfg(not(feature = "no_module"))]
                 let orig_imports_len = global.num_imports();
                 let arg = first_arg.unwrap();
                 let (arg_value, pos) =
                     self.get_arg_value(scope, global, caches, lib, this_ptr, arg, level)?;
-                let script = &arg_value
+                let s = &arg_value
                     .into_immutable_string()
                     .map_err(|typ| self.make_type_mismatch_err::<ImmutableString>(typ, pos))?;
-                let result = self.eval_script_expr_in_place(
-                    scope,
-                    global,
-                    caches,
-                    lib,
-                    script,
-                    pos,
-                    level + 1,
-                );
+                let result =
+                    self.eval_script_expr_in_place(scope, global, caches, lib, s, pos, level + 1);
 
                 // IMPORTANT! If the eval defines new variables in the current scope,
                 //            all variable offsets from this point on will be mis-aligned.
                 //            The same is true for imports.
-                if scope.len() != orig_scope_len || global.num_imports() != orig_imports_len {
+                let scope_changed = scope.len() != orig_scope_len;
+                #[cfg(not(feature = "no_module"))]
+                let scope_changed = scope_changed || global.num_imports() != orig_imports_len;
+
+                if scope_changed {
                     global.always_search_scope = true;
                 }
 

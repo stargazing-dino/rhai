@@ -493,6 +493,7 @@ impl fmt::Debug for Expr {
                     }
                 }
                 f.write_str(&x.3)?;
+                #[cfg(not(feature = "no_module"))]
                 if let Some(n) = x.1.index() {
                     write!(f, " #{}", n)?;
                 }

@@ -199,7 +199,7 @@ impl CallableFunction {
             Self::Script(..) => None,
         }
     }
-    /// Create a new [`CallableFunction::Method`] from a [built-in function][`FnBuiltin`].
+    /// Create a new [`CallableFunction::Method`] from a built-in function.
     #[inline(always)]
     #[must_use]
     pub fn from_fn_builtin(func: FnBuiltin) -> Self {
