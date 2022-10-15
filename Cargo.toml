@@ -53,11 +53,11 @@ only_i64 = []                   # set INT=i64 (default) and disable support for 
 decimal = ["rust_decimal"]      # add the Decimal number type
 no_index = []                   # no arrays and indexing
 no_object = []                  # no custom objects
+no_time = []                    # no timestamps
 no_function = ["no_closure"]    # no script-defined functions (meaning no closures)
 no_closure = []                 # no automatic sharing and capture of anonymous functions to external variables
 no_module = []                  # no modules
 no_custom_syntax = []           # no custom syntax or custom operators
-no_time = []                    # no timestamps
 unicode-xid-ident = ["unicode-xid"] # allow Unicode Standard Annex #31 for identifiers.
 metadata = ["serde", "serde_json", "rhai_codegen/metadata", "smartstring/serde"] # enable exporting functions metadata
 internals = []                  # expose internal data structures
@@ -65,7 +65,7 @@ debugging = ["internals"]       # enable debugging
 serde = ["dep:serde", "smartstring/serde", "smallvec/serde"] # implement serde for rhai types
 
 # compiling for no-std
-no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm", "hashbrown"]
+no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm", "hashbrown", "no_time"]
 
 # compiling for WASM
 wasm-bindgen = ["instant/wasm-bindgen"]

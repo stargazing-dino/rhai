@@ -156,7 +156,6 @@ impl<'de> Deserializer<'de> for DynamicDeserializer<'de> {
             #[cfg(not(feature = "no_object"))]
             Union::Map(..) => self.deserialize_map(visitor),
             Union::FnPtr(..) => self.type_error(),
-            #[cfg(not(feature = "no_std"))]
             #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(..) => self.type_error(),
 

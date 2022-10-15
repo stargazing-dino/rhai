@@ -60,10 +60,11 @@ jobs:
           - "--features no_object,serde,metadata,internals,debugging"
           - "--features no_function,serde,metadata,internals,debugging"
           - "--features no_module,serde,metadata,internals,debugging"
+          - "--features no_time,serde,metadata,internals,debugging"
           - "--features no_closure,serde,metadata,internals,debugging"
           - "--features unicode-xid-ident,serde,metadata,internals,debugging"
-          - "--features sync,no_function,no_float,no_position,no_optimize,no_module,no_closure,no_custom_syntax,metadata,serde,unchecked,debugging"
-          - "--features no_function,no_float,no_position,no_index,no_object,no_optimize,no_module,no_closure,no_custom_syntax,unchecked"
+          - "--features sync,no_time,no_function,no_float,no_position,no_optimize,no_module,no_closure,no_custom_syntax,metadata,serde,unchecked,debugging"
+          - "--features no_time,no_function,no_float,no_position,no_index,no_object,no_optimize,no_module,no_closure,no_custom_syntax,unchecked"
         toolchain: [stable]
         experimental: [false]
         include:

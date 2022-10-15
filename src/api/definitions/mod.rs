@@ -555,7 +555,6 @@ fn def_type_name<'a>(ty: &'a str, engine: &'a Engine) -> Cow<'a, str> {
     #[cfg(not(feature = "no_object"))]
     let ty = ty.replace(type_name::<crate::Map>(), "Map");
 
-    #[cfg(not(feature = "no_std"))]
     #[cfg(not(feature = "no_time"))]
     let ty = ty.replace(type_name::<crate::Instant>(), "Instant");
 

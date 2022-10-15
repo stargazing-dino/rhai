@@ -14,7 +14,6 @@ pub mod variant;
 pub use bloom_filter::BloomFilterU64;
 pub use custom_types::{CustomTypeInfo, CustomTypesCollection};
 pub use dynamic::Dynamic;
-#[cfg(not(feature = "no_std"))]
 #[cfg(not(feature = "no_time"))]
 pub use dynamic::Instant;
 pub use error::EvalAltResult;

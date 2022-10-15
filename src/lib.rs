@@ -204,7 +204,6 @@ pub use eval::EvalContext;
 pub use func::{NativeCallContext, RegisterNativeFunction};
 pub use module::{FnNamespace, Module};
 pub use tokenizer::Position;
-#[cfg(not(feature = "no_std"))]
 #[cfg(not(feature = "no_time"))]
 pub use types::Instant;
 pub use types::{
