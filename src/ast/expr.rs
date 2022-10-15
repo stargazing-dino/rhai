@@ -181,7 +181,7 @@ impl FnCallHashes {
 
 /// _(internals)_ A function call.
 /// Exported under the `internals` feature only.
-#[derive(Clone, Default, Hash)]
+#[derive(Clone, Hash)]
 pub struct FnCallExpr {
     /// Namespace of the function, if any.
     #[cfg(not(feature = "no_module"))]
@@ -196,6 +196,9 @@ pub struct FnCallExpr {
     pub capture_parent_scope: bool,
     /// Is this function call a native operator?
     pub operator_token: Option<Token>,
+    /// Can this function call be a scripted function?
+    #[cfg(not(feature = "no_function"))]
+    pub can_be_script: bool,
     /// [Position] of the function name.
     pub pos: Position,
 }
@@ -214,6 +217,10 @@ impl fmt::Debug for FnCallExpr {
         }
         if let Some(ref token) = self.operator_token {
             ff.field("operator_token", token);
+        }
+        #[cfg(not(feature = "no_function"))]
+        if self.can_be_script {
+            ff.field("can_be_script", &self.can_be_script);
         }
         ff.field("hash", &self.hashes)
             .field("name", &self.name)
@@ -493,6 +500,10 @@ impl fmt::Debug for Expr {
                     }
                 }
                 f.write_str(&x.3)?;
+                #[cfg(not(feature = "no_module"))]
+                if let Some(n) = x.1.index() {
+                    write!(f, " #{}", n)?;
+                }
                 if let Some(n) = i.map_or_else(|| x.0, |n| NonZeroUsize::new(n.get() as usize)) {
                     write!(f, " #{}", n)?;
                 }
@@ -680,6 +691,8 @@ impl Expr {
                     args: once(Self::StringConstant(f.fn_name().into(), pos)).collect(),
                     capture_parent_scope: false,
                     operator_token: None,
+                    #[cfg(not(feature = "no_function"))]
+                    can_be_script: true,
                     pos,
                 }
                 .into(),

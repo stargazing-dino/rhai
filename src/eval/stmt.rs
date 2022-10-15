@@ -952,15 +952,19 @@ impl Engine {
                         });
 
                     if let Ok(module) = module_result {
-                        if !export.is_empty() {
-                            if module.is_indexed() {
-                                global.push_import(export.name.clone(), module);
-                            } else {
-                                // Index the module (making a clone copy if necessary) if it is not indexed
-                                let mut m = crate::func::shared_take_or_clone(module);
-                                m.build_index();
-                                global.push_import(export.name.clone(), m);
-                            }
+                        let (export, must_be_indexed) = if !export.is_empty() {
+                            (export.name.clone(), true)
+                        } else {
+                            (self.get_interned_string(""), false)
+                        };
+
+                        if !must_be_indexed || module.is_indexed() {
+                            global.push_import(export, module);
+                        } else {
+                            // Index the module (making a clone copy if necessary) if it is not indexed
+                            let mut m = crate::func::shared_take_or_clone(module);
+                            m.build_index();
+                            global.push_import(export, m);
                         }
 
                         global.num_modules_loaded += 1;

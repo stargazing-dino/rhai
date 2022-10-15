@@ -897,24 +897,17 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         Stmt::Expr(expr) => {
             optimize_expr(expr, state, false);
 
-            match &mut **expr {
-                // func(...)
-                Expr::FnCall(x, pos) => {
-                    state.set_dirty();
-                    *stmt = Stmt::FnCall(mem::take(x), *pos);
-                }
-                // {...};
-                Expr::Stmt(x) => {
-                    if x.is_empty() {
-                        state.set_dirty();
-                        *stmt = Stmt::Noop(x.position());
-                    } else {
-                        state.set_dirty();
-                        *stmt = mem::take(&mut **x).into();
-                    }
-                }
-                // expr;
-                _ => (),
+            if matches!(**expr, Expr::FnCall(..) | Expr::Stmt(..)) {
+                state.set_dirty();
+                *stmt = match *mem::take(expr) {
+                    // func(...);
+                    Expr::FnCall(x, pos) => Stmt::FnCall(x, pos),
+                    // {};
+                    Expr::Stmt(x) if x.is_empty() => Stmt::Noop(x.position()),
+                    // {...};
+                    Expr::Stmt(x) => (*x).into(),
+                    _ => unreachable!(),
+                };
             }
         }
 

@@ -135,7 +135,7 @@ impl<'a, M: AsRef<[&'a Module]> + ?Sized, S: AsRef<str> + 'a + ?Sized>
 
 impl<'a> NativeCallContext<'a> {
     /// _(internals)_ Create a new [`NativeCallContext`].
-    /// Exported under the `metadata` feature only.
+    /// Exported under the `internals` feature only.
     #[deprecated(
         since = "1.3.0",
         note = "`NativeCallContext::new` will be moved under `internals`. Use `FnPtr::call` to call a function pointer directly."
@@ -235,7 +235,7 @@ impl<'a> NativeCallContext<'a> {
     #[inline]
     pub(crate) fn iter_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&crate::ImmutableString, &Shared<Module>)> {
+    ) -> impl Iterator<Item = &(crate::ImmutableString, Shared<Module>)> {
         self.global.iter().flat_map(|&g| g.iter_imports_raw())
     }
     /// _(internals)_ The current [`GlobalRuntimeState`], if any.
@@ -274,7 +274,7 @@ impl<'a> NativeCallContext<'a> {
 
         let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
-        let result = self.call_fn_raw(fn_name, false, false, &mut args)?;
+        let result = self._call_fn_raw(fn_name, false, false, false, &mut args)?;
 
         let typ = self.engine().map_type_name(result.type_name());
 
@@ -283,7 +283,32 @@ impl<'a> NativeCallContext<'a> {
             ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
         })
     }
-    /// Call a function inside the call context.
+    /// Call a registered native Rust function inside the call context with the provided arguments.
+    ///
+    /// This is often useful because Rust functions typically only want to cross-call other
+    /// registered Rust functions and not have to worry about scripted functions hijacking the
+    /// process unknowingly (or deliberately).
+    #[inline]
+    pub fn call_native_fn<T: Variant + Clone>(
+        &self,
+        fn_name: impl AsRef<str>,
+        args: impl FuncArgs,
+    ) -> RhaiResultOf<T> {
+        let mut arg_values = StaticVec::new_const();
+        args.parse(&mut arg_values);
+
+        let mut args: StaticVec<_> = arg_values.iter_mut().collect();
+
+        let result = self._call_fn_raw(fn_name, true, false, false, &mut args)?;
+
+        let typ = self.engine().map_type_name(result.type_name());
+
+        result.try_cast().ok_or_else(|| {
+            let t = self.engine().map_type_name(type_name::<T>()).into();
+            ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+        })
+    }
+    /// Call a function (native Rust or scripted) inside the call context.
     ///
     /// If `is_method_call` is [`true`], the first argument is assumed to be the `this` pointer for
     /// a script-defined function (or the object of a method call).
@@ -302,6 +327,7 @@ impl<'a> NativeCallContext<'a> {
     ///
     /// If `is_ref_mut` is [`true`], the first argument is assumed to be passed by reference and is
     /// not consumed.
+    #[inline(always)]
     pub fn call_fn_raw(
         &self,
         fn_name: impl AsRef<str>,
@@ -309,14 +335,75 @@ impl<'a> NativeCallContext<'a> {
         is_method_call: bool,
         args: &mut [&mut Dynamic],
     ) -> RhaiResult {
-        let mut global = self
+        self._call_fn_raw(fn_name, false, is_ref_mut, is_method_call, args)
+    }
+    /// Call a registered native Rust function inside the call context.
+    ///
+    /// This is often useful because Rust functions typically only want to cross-call other
+    /// registered Rust functions and not have to worry about scripted functions hijacking the
+    /// process unknowingly (or deliberately).
+    ///
+    /// # WARNING - Low Level API
+    ///
+    /// This function is very low level.
+    ///
+    /// # Arguments
+    ///
+    /// All arguments may be _consumed_, meaning that they may be replaced by `()`. This is to avoid
+    /// unnecessarily cloning the arguments.
+    ///
+    /// **DO NOT** reuse the arguments after this call. If they are needed afterwards, clone them
+    /// _before_ calling this function.
+    ///
+    /// If `is_ref_mut` is [`true`], the first argument is assumed to be passed by reference and is
+    /// not consumed.
+    #[inline(always)]
+    pub fn call_native_fn_raw(
+        &self,
+        fn_name: impl AsRef<str>,
+        is_ref_mut: bool,
+        args: &mut [&mut Dynamic],
+    ) -> RhaiResult {
+        self._call_fn_raw(fn_name, true, is_ref_mut, false, args)
+    }
+
+    /// Call a function (native Rust or scripted) inside the call context.
+    fn _call_fn_raw(
+        &self,
+        fn_name: impl AsRef<str>,
+        native_only: bool,
+        is_ref_mut: bool,
+        is_method_call: bool,
+        args: &mut [&mut Dynamic],
+    ) -> RhaiResult {
+        let global = &mut self
             .global
             .cloned()
             .unwrap_or_else(|| GlobalRuntimeState::new(self.engine()));
-        let mut caches = Caches::new();
+        let caches = &mut Caches::new();
 
         let fn_name = fn_name.as_ref();
         let args_len = args.len();
+
+        if native_only {
+            return self
+                .engine()
+                .call_native_fn(
+                    global,
+                    caches,
+                    self.lib,
+                    fn_name,
+                    calc_fn_hash(None, fn_name, args_len),
+                    args,
+                    is_ref_mut,
+                    false,
+                    Position::NONE,
+                    self.level + 1,
+                )
+                .map(|(r, ..)| r);
+        }
+
+        // Native or script
 
         let hash = if is_method_call {
             FnCallHashes::from_all(
@@ -331,10 +418,11 @@ impl<'a> NativeCallContext<'a> {
         self.engine()
             .exec_fn_call(
                 None,
-                &mut global,
-                &mut caches,
+                global,
+                caches,
                 self.lib,
                 fn_name,
+                false,
                 hash,
                 args,
                 is_ref_mut,
