@@ -15,10 +15,12 @@ use std::{
 pub use super::Variant;
 
 #[cfg(not(feature = "no_std"))]
+#[cfg(not(feature = "no_time"))]
 #[cfg(not(target_family = "wasm"))]
 pub use std::time::Instant;
 
 #[cfg(not(feature = "no_std"))]
+#[cfg(not(feature = "no_time"))]
 #[cfg(target_family = "wasm")]
 pub use instant::Instant;
 
@@ -85,6 +87,7 @@ pub enum Union {
     FnPtr(Box<FnPtr>, Tag, AccessMode),
     /// A timestamp value.
     #[cfg(not(feature = "no_std"))]
+    #[cfg(not(feature = "no_time"))]
     TimeStamp(Box<Instant>, Tag, AccessMode),
 
     /// Any type as a trait object.
@@ -195,6 +198,7 @@ impl Dynamic {
             #[cfg(not(feature = "no_object"))]
             Union::Map(_, tag, _) => tag,
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(_, tag, _) => tag,
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(_, tag, _) => tag,
@@ -220,6 +224,7 @@ impl Dynamic {
             #[cfg(not(feature = "no_object"))]
             Union::Map(_, ref mut tag, _) => *tag = value,
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(_, ref mut tag, _) => *tag = value,
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(_, ref mut tag, _) => *tag = value,
@@ -292,6 +297,7 @@ impl Dynamic {
             return matches!(self.0, Union::FnPtr(..));
         }
         #[cfg(not(feature = "no_std"))]
+        #[cfg(not(feature = "no_time"))]
         if TypeId::of::<T>() == TypeId::of::<crate::Instant>() {
             return matches!(self.0, Union::TimeStamp(..));
         }
@@ -324,6 +330,7 @@ impl Dynamic {
             Union::Map(..) => TypeId::of::<crate::Map>(),
             Union::FnPtr(..) => TypeId::of::<FnPtr>(),
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(..) => TypeId::of::<Instant>(),
 
             Union::Variant(ref v, ..) => (***v).type_id(),
@@ -358,6 +365,7 @@ impl Dynamic {
             Union::Map(..) => "map",
             Union::FnPtr(..) => "Fn",
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(..) => "timestamp",
 
             Union::Variant(ref v, ..) => (***v).type_name(),
@@ -408,6 +416,7 @@ impl Hash for Dynamic {
             Union::Variant(..) => unimplemented!("{} cannot be hashed", self.type_name()),
 
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(..) => unimplemented!("{} cannot be hashed", self.type_name()),
         }
     }
@@ -433,6 +442,7 @@ impl fmt::Display for Dynamic {
             Union::Map(..) => fmt::Debug::fmt(self, f),
             Union::FnPtr(ref v, ..) => fmt::Display::fmt(v, f),
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(..) => f.write_str("<timestamp>"),
 
             Union::Variant(ref v, ..) => {
@@ -538,6 +548,7 @@ impl fmt::Debug for Dynamic {
             }
             Union::FnPtr(ref v, ..) => fmt::Debug::fmt(v, f),
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(..) => write!(f, "<timestamp>"),
 
             Union::Variant(ref v, ..) => {
@@ -636,6 +647,7 @@ impl Clone for Dynamic {
             Union::Map(ref v, tag, ..) => Self(Union::Map(v.clone(), tag, ReadWrite)),
             Union::FnPtr(ref v, tag, ..) => Self(Union::FnPtr(v.clone(), tag, ReadWrite)),
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(ref v, tag, ..) => Self(Union::TimeStamp(v.clone(), tag, ReadWrite)),
 
             Union::Variant(ref v, tag, ..) => Self(Union::Variant(
@@ -876,8 +888,9 @@ impl Dynamic {
     }
     /// Create a new [`Dynamic`] from an [`Instant`].
     ///
-    /// Not available under `no-std`.
+    /// Not available under `no-std` or `no_time`.
     #[cfg(not(feature = "no_std"))]
+    #[cfg(not(feature = "no_time"))]
     #[inline(always)]
     #[must_use]
     pub fn from_timestamp(value: Instant) -> Self {
@@ -905,6 +918,7 @@ impl Dynamic {
             #[cfg(not(feature = "no_object"))]
             Union::Map(.., access) => access,
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(.., access) => access,
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(.., access) => access,
@@ -942,6 +956,7 @@ impl Dynamic {
                 }
             }
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(.., ref mut access) => *access = typ,
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(.., ref mut access) => *access = typ,
@@ -1076,6 +1091,7 @@ impl Dynamic {
         reify!(value, |v: FnPtr| return v.into());
 
         #[cfg(not(feature = "no_std"))]
+        #[cfg(not(feature = "no_time"))]
         reify!(value, |v: Instant| return v.into());
         #[cfg(not(feature = "no_closure"))]
         reify!(value, |v: crate::Shared<crate::Locked<Self>>| return v
@@ -1169,6 +1185,7 @@ impl Dynamic {
             Union::Map(v, ..) => reify!(*v => Option<T>),
             Union::FnPtr(v, ..) => reify!(*v => Option<T>),
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(v, ..) => reify!(*v => Option<T>),
             Union::Unit(v, ..) => reify!(v => Option<T>),
             Union::Variant(v, ..) => (*v).as_boxed_any().downcast().ok().map(|x| *x),
@@ -1468,6 +1485,7 @@ impl Dynamic {
             };
         }
         #[cfg(not(feature = "no_std"))]
+        #[cfg(not(feature = "no_time"))]
         if TypeId::of::<T>() == TypeId::of::<Instant>() {
             return match self.0 {
                 Union::TimeStamp(ref v, ..) => v.as_ref().as_any().downcast_ref::<T>(),
@@ -1566,6 +1584,7 @@ impl Dynamic {
             };
         }
         #[cfg(not(feature = "no_std"))]
+        #[cfg(not(feature = "no_time"))]
         if TypeId::of::<T>() == TypeId::of::<Instant>() {
             return match self.0 {
                 Union::TimeStamp(ref mut v, ..) => v.as_mut().as_any_mut().downcast_mut::<T>(),
@@ -1960,6 +1979,7 @@ impl From<FnPtr> for Dynamic {
     }
 }
 #[cfg(not(feature = "no_std"))]
+#[cfg(not(feature = "no_time"))]
 impl From<Instant> for Dynamic {
     #[inline(always)]
     fn from(value: Instant) -> Self {

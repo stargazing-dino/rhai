@@ -25,6 +25,11 @@ New features
 * This is necessary when using Rhai across shared-library boundaries.
 * A build script is used to extract the environment variable (`RHAI_AHASH_SEED`) and splice it into the source code before compilation.
 
+### No Timestamps
+
+* A new feature, `no_time`, is added to disable support timestamps.
+* This may be necessary when building for architectures without time support, such as raw WASM.
+
 ### Serializable `Scope`
 
 * `Scope` is now serializable and deserializable via `serde`.

@@ -1,26 +1,26 @@
-use std::{env, fs::File, io::Write};
-
-const WRITE_ERROR: &str = "cannot write to `config.rs`";
+use std::{
+    env,
+    fs::File,
+    io::{Read, Write},
+};
 
 fn main() {
     // Tell Cargo that if the given environment variable changes, to rerun this build script.
     println!("cargo:rerun-if-env-changed=RHAI_AHASH_SEED");
 
-    let mut f = File::create("src/config.rs").expect("cannot create `config.rs`");
+    let mut contents = String::new();
 
-    f.write_fmt(format_args!(
-        "//! Configuration settings for this Rhai build
-
-"
-    ))
-    .expect(WRITE_ERROR);
+    File::open("build.template")
+        .expect("cannot open `build.template`")
+        .read_to_string(&mut contents)
+        .expect("cannot read from `build.template`");
 
     let seed = env::var("RHAI_AHASH_SEED").map_or_else(|_| "None".into(), |s| format!("Some({s})"));
 
-    f.write_fmt(format_args!(
-        "pub const AHASH_SEED: Option<[u64; 4]> = {seed};\n"
-    ))
-    .expect(WRITE_ERROR);
+    contents = contents.replace("{{AHASH_SEED}}", &seed);
 
-    f.flush().expect("cannot flush `config.rs`");
+    File::create("src/config.rs")
+        .expect("cannot create `config.rs`")
+        .write(contents.as_bytes())
+        .expect("cannot write to `config.rs`");
 }

@@ -10,6 +10,7 @@ use std::prelude::v1::*;
 use serde::ser::SerializeMap;
 
 #[cfg(not(feature = "no_std"))]
+#[cfg(not(feature = "no_time"))]
 use crate::types::dynamic::Variant;
 
 impl Serialize for Dynamic {
@@ -66,6 +67,7 @@ impl Serialize for Dynamic {
             }
             Union::FnPtr(ref f, ..) => ser.serialize_str(f.fn_name()),
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(ref x, ..) => ser.serialize_str(x.as_ref().type_name()),
 
             Union::Variant(ref v, ..) => ser.serialize_str((***v).type_name()),

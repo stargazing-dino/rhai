@@ -57,6 +57,7 @@ no_function = ["no_closure"]    # no script-defined functions (meaning no closur
 no_closure = []                 # no automatic sharing and capture of anonymous functions to external variables
 no_module = []                  # no modules
 no_custom_syntax = []           # no custom syntax or custom operators
+no_time = []                    # no timestamps
 unicode-xid-ident = ["unicode-xid"] # allow Unicode Standard Annex #31 for identifiers.
 metadata = ["serde", "serde_json", "rhai_codegen/metadata", "smartstring/serde"] # enable exporting functions metadata
 internals = []                  # expose internal data structures
