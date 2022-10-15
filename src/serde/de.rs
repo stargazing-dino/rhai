@@ -157,6 +157,7 @@ impl<'de> Deserializer<'de> for DynamicDeserializer<'de> {
             Union::Map(..) => self.deserialize_map(visitor),
             Union::FnPtr(..) => self.type_error(),
             #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(..) => self.type_error(),
 
             Union::Variant(ref value, ..) if value.is::<i8>() => self.deserialize_i8(visitor),
