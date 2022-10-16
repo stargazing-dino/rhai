@@ -212,19 +212,19 @@ impl fmt::Debug for FnCallExpr {
         if !self.namespace.is_empty() {
             ff.field("namespace", &self.namespace);
         }
-        if self.capture_parent_scope {
-            ff.field("capture_parent_scope", &self.capture_parent_scope);
-        }
+        ff.field("hash", &self.hashes)
+            .field("name", &self.name)
+            .field("args", &self.args);
         if let Some(ref token) = self.operator_token {
             ff.field("operator_token", token);
+        }
+        if self.capture_parent_scope {
+            ff.field("capture_parent_scope", &self.capture_parent_scope);
         }
         #[cfg(not(feature = "no_function"))]
         if self.can_be_script {
             ff.field("can_be_script", &self.can_be_script);
         }
-        ff.field("hash", &self.hashes)
-            .field("name", &self.name)
-            .field("args", &self.args);
         ff.field("pos", &self.pos);
         ff.finish()
     }

@@ -3,7 +3,7 @@
 
 use super::GlobalRuntimeState;
 use crate::types::dynamic::Union;
-use crate::{Dynamic, Engine, Position, RhaiResultOf, ERR};
+use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, ERR};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -149,5 +149,15 @@ impl Engine {
         }
 
         Ok(())
+    }
+
+    /// Check a result to ensure that it is valid.
+    #[inline]
+    pub(crate) fn check_return_value(&self, result: RhaiResult, pos: Position) -> RhaiResult {
+        if let Ok(ref r) = result {
+            self.check_data_size(r, pos)?;
+        }
+
+        result
     }
 }

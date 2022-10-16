@@ -175,21 +175,26 @@ fn has_native_fn_override(
 
     // First check the global namespace and packages, but skip modules that are standard because
     // they should never conflict with system functions.
-    let result = engine
+    if engine
         .global_modules
         .iter()
         .filter(|m| !m.standard)
-        .any(|m| m.contains_fn(hash));
+        .any(|m| m.contains_fn(hash))
+    {
+        return true;
+    }
 
-    #[cfg(not(feature = "no_module"))]
     // Then check sub-modules
-    let result = result
-        || engine
-            .global_sub_modules
-            .values()
-            .any(|m| m.contains_qualified_fn(hash));
+    #[cfg(not(feature = "no_module"))]
+    if engine
+        .global_sub_modules
+        .values()
+        .any(|m| m.contains_qualified_fn(hash))
+    {
+        return true;
+    }
 
-    result
+    false
 }
 
 /// Optimize a block of [statements][Stmt].
