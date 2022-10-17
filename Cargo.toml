@@ -33,6 +33,7 @@ serde = { version = "1.0", default-features = false, features = ["derive", "allo
 serde_json = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
 unicode-xid = { version = "0.2", default-features = false, optional = true }
 rust_decimal = { version = "1.16", default-features = false, features = ["maths"], optional = true }
+getrandom = { version = "0.2", optional = true }
 rustyline = { version = "10", optional = true }
 
 [dev-dependencies]
@@ -68,8 +69,8 @@ serde = ["dep:serde", "smartstring/serde", "smallvec/serde"] # implement serde f
 no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm", "hashbrown", "no_time"]
 
 # compiling for WASM
-wasm-bindgen = ["instant/wasm-bindgen"]
-stdweb = ["instant/stdweb"]
+wasm-bindgen = ["getrandom/js", "instant/wasm-bindgen"]
+stdweb = ["getrandom/js", "instant/stdweb"]
 
 # compiling bin tools
 bin-features = ["decimal", "metadata", "serde", "debugging", "rustyline"]
