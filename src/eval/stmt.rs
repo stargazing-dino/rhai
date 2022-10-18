@@ -48,13 +48,11 @@ impl Engine {
             global.scope_level += 1;
         }
 
-        let mut result = Ok(Dynamic::UNIT);
-
-        for stmt in statements {
+        let result = statements.iter().try_fold(Dynamic::UNIT, |_, stmt| {
             #[cfg(not(feature = "no_module"))]
             let imports_len = global.num_imports();
 
-            result = self.eval_stmt(
+            let result = self.eval_stmt(
                 scope,
                 global,
                 caches,
@@ -63,11 +61,7 @@ impl Engine {
                 stmt,
                 restore_orig_state,
                 level,
-            );
-
-            if result.is_err() {
-                break;
-            }
+            )?;
 
             #[cfg(not(feature = "no_module"))]
             if matches!(stmt, Stmt::Import(..)) {
@@ -92,7 +86,9 @@ impl Engine {
                     }
                 }
             }
-        }
+
+            Ok(result)
+        });
 
         // If imports list is modified, pop the functions lookup cache
         caches.rewind_fn_resolution_caches(orig_fn_resolution_caches_len);
@@ -429,16 +425,11 @@ impl Engine {
                                 };
 
                                 match cond_result {
-                                    Ok(true) => {
-                                        result = Ok(Some(&block.expr));
-                                        break;
-                                    }
-                                    Ok(false) => (),
-                                    _ => {
-                                        result = cond_result.map(|_| None);
-                                        break;
-                                    }
+                                    Ok(true) => result = Ok(Some(&block.expr)),
+                                    Ok(false) => continue,
+                                    _ => result = cond_result.map(|_| None),
                                 }
+                                break;
                             }
 
                             result
@@ -469,7 +460,6 @@ impl Engine {
                                     Ok(false) => continue,
                                     _ => result = cond_result.map(|_| None),
                                 }
-
                                 break;
                             }
 
@@ -626,68 +616,58 @@ impl Engine {
                         scope.push(var_name.name.clone(), ());
                         let index = scope.len() - 1;
 
-                        let mut loop_result = Ok(Dynamic::UNIT);
+                        let loop_result = func(iter_obj)
+                            .enumerate()
+                            .try_for_each(|(x, iter_value)| {
+                                // Increment counter
+                                if counter_index < usize::MAX {
+                                    // As the variable increments from 0, this should always work
+                                    // since any overflow will first be caught below.
+                                    let index_value = x as INT;
 
-                        for (x, iter_value) in func(iter_obj).enumerate() {
-                            // Increment counter
-                            if counter_index < usize::MAX {
-                                // As the variable increments from 0, this should always work
-                                // since any overflow will first be caught below.
-                                let index_value = x as INT;
-
-                                #[cfg(not(feature = "unchecked"))]
-                                if index_value > crate::MAX_USIZE_INT {
-                                    loop_result = Err(ERR::ErrorArithmetic(
-                                        format!("for-loop counter overflow: {x}"),
-                                        counter.pos,
-                                    )
-                                    .into());
-                                    break;
-                                }
-
-                                *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
-                                    Dynamic::from_int(index_value);
-                            }
-
-                            let value = match iter_value {
-                                Ok(v) => v.flatten(),
-                                Err(err) => {
-                                    loop_result = Err(err.fill_position(expr.position()));
-                                    break;
-                                }
-                            };
-
-                            *scope.get_mut_by_index(index).write_lock().unwrap() = value;
-
-                            if let Err(err) = self.track_operation(global, statements.position()) {
-                                loop_result = Err(err);
-                                break;
-                            }
-
-                            if statements.is_empty() {
-                                continue;
-                            }
-
-                            let result = self.eval_stmt_block(
-                                scope, global, caches, lib, this_ptr, statements, true, level,
-                            );
-
-                            match result {
-                                Ok(_) => (),
-                                Err(err) => match *err {
-                                    ERR::LoopBreak(false, ..) => (),
-                                    ERR::LoopBreak(true, ..) => break,
-                                    _ => {
-                                        loop_result = Err(err);
-                                        break;
+                                    #[cfg(not(feature = "unchecked"))]
+                                    if index_value > crate::MAX_USIZE_INT {
+                                        return Err(ERR::ErrorArithmetic(
+                                            format!("for-loop counter overflow: {x}"),
+                                            counter.pos,
+                                        )
+                                        .into());
                                     }
-                                },
-                            }
-                        }
+
+                                    *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
+                                        Dynamic::from_int(index_value);
+                                }
+
+                                let value = match iter_value {
+                                    Ok(v) => v.flatten(),
+                                    Err(err) => return Err(err.fill_position(expr.position())),
+                                };
+
+                                *scope.get_mut_by_index(index).write_lock().unwrap() = value;
+
+                                self.track_operation(global, statements.position())?;
+
+                                if statements.is_empty() {
+                                    return Ok(());
+                                }
+
+                                self.eval_stmt_block(
+                                    scope, global, caches, lib, this_ptr, statements, true, level,
+                                )
+                                .map(|_| ())
+                                .or_else(|err| match *err {
+                                    ERR::LoopBreak(false, ..) => Ok(()),
+                                    _ => Err(err),
+                                })
+                            })
+                            .or_else(|err| match *err {
+                                ERR::LoopBreak(true, ..) => Ok(()),
+                                _ => Err(err),
+                            });
 
                         scope.rewind(orig_scope_len);
 
-                        loop_result
+                        loop_result.map(|_| Dynamic::UNIT)
                     } else {
                         Err(ERR::ErrorFor(expr.start_position()).into())
                     }

@@ -440,18 +440,16 @@ impl Module {
             }
             first = false;
 
-            if f.access == FnAccess::Private {
-                continue;
+            if f.access != FnAccess::Private {
+                #[cfg(not(feature = "no_custom_syntax"))]
+                let operator = def.engine.custom_keywords.contains_key(&f.name)
+                    || (!f.name.contains('$') && !is_valid_function_name(&f.name));
+
+                #[cfg(feature = "no_custom_syntax")]
+                let operator = !f.name.contains('$') && !is_valid_function_name(&f.name);
+
+                f.write_definition(writer, def, operator)?;
             }
-
-            #[cfg(not(feature = "no_custom_syntax"))]
-            let operator = def.engine.custom_keywords.contains_key(&f.name)
-                || (!f.name.contains('$') && !is_valid_function_name(&f.name));
-
-            #[cfg(feature = "no_custom_syntax")]
-            let operator = !f.name.contains('$') && !is_valid_function_name(&f.name);
-
-            f.write_definition(writer, def, operator)?;
         }
 
         Ok(())
