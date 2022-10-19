@@ -2,10 +2,10 @@
 #![cfg(not(feature = "no_module"))]
 
 use rhai::plugin::*;
-use rhai::{Engine, EvalAltResult, INT};
+use rhai::{Engine, EvalAltResult, Scope, INT};
 
 mod test {
-    use rhai::plugin::*;
+    use super::*;
 
     #[export_module]
     pub mod special_array_package {
@@ -169,4 +169,57 @@ fn test_plugins_parameters() -> Result<(), Box<EvalAltResult>> {
     );
 
     Ok(())
+}
+
+#[cfg(target_pointer_width = "64")]
+mod handle {
+    use super::*;
+
+    #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
+    pub struct WorldHandle(usize);
+    pub type World = Vec<i64>;
+
+    impl From<&mut World> for WorldHandle {
+        fn from(world: &mut World) -> Self {
+            Self::new(world)
+        }
+    }
+
+    impl AsMut<World> for WorldHandle {
+        fn as_mut(&mut self) -> &mut World {
+            unsafe { std::mem::transmute(self.0) }
+        }
+    }
+
+    impl WorldHandle {
+        pub fn new(world: &mut World) -> Self {
+            Self(unsafe { std::mem::transmute(world) })
+        }
+    }
+
+    #[export_module]
+    pub mod handle_module {
+        pub type Handle = WorldHandle;
+
+        #[rhai_fn(get = "len")]
+        pub fn len(world: &mut Handle) -> INT {
+            world.as_mut().len() as INT
+        }
+    }
+
+    #[test]
+    fn test_module_handle() -> Result<(), Box<EvalAltResult>> {
+        let mut engine = Engine::new();
+
+        engine.register_global_module(exported_module!(handle_module).into());
+
+        let mut scope = Scope::new();
+
+        let world: &mut World = &mut vec![42];
+        scope.push("world", WorldHandle::from(world));
+
+        assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "world.len")?, 1);
+
+        Ok(())
+    }
 }
