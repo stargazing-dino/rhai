@@ -146,11 +146,7 @@ impl Engine {
                     // Built-in found
                     let op = op_assign.literal_syntax();
                     let context = (self, op, None, &*global, lib, *op_pos, level).into();
-                    let result = func(context, args).map(|_| ());
-
-                    self.check_data_size(args[0], root.1)?;
-
-                    return result;
+                    return func(context, args).map(|_| ());
                 }
             }
 

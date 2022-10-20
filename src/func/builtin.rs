@@ -196,7 +196,19 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
 
         if type1 == TypeId::of::<ImmutableString>() {
             return match op {
-                Token::Plus => Some(impl_op!(ImmutableString + ImmutableString)),
+                Token::Plus => Some(|_ctx, args| {
+                    let s1 = &*args[0].read_lock::<ImmutableString>().expect(BUILTIN);
+                    let s2 = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
+
+                    #[cfg(not(feature = "unchecked"))]
+                    if !s1.is_empty() && !s2.is_empty() {
+                        let total_len = s1.len() + s2.len();
+                        _ctx.engine()
+                            .raise_err_if_over_data_size_limit((0, 0, total_len))?;
+                    }
+
+                    Ok((s1 + s2).into())
+                }),
                 Token::Minus => Some(impl_op!(ImmutableString - ImmutableString)),
                 Token::EqualsTo => Some(impl_op!(ImmutableString == ImmutableString)),
                 Token::NotEqualsTo => Some(impl_op!(ImmutableString != ImmutableString)),
@@ -210,10 +222,17 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
 
         if type1 == TypeId::of::<char>() {
             return match op {
-                Token::Plus => Some(|_, args| {
+                Token::Plus => Some(|_ctx, args| {
                     let x = args[0].as_char().expect(BUILTIN);
                     let y = args[1].as_char().expect(BUILTIN);
-                    Ok(format!("{x}{y}").into())
+
+                    let result = format!("{x}{y}");
+
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.engine()
+                        .raise_err_if_over_data_size_limit((0, 0, result.len()))?;
+
+                    Ok(result.into())
                 }),
                 Token::EqualsTo => Some(impl_op!(char => as_char == as_char)),
                 Token::NotEqualsTo => Some(impl_op!(char => as_char != as_char)),
@@ -230,7 +249,7 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
             use crate::Blob;
 
             return match op {
-                Token::Plus => Some(|_, args| {
+                Token::Plus => Some(|_ctx, args| {
                     let blob1 = &*args[0].read_lock::<Blob>().expect(BUILTIN);
                     let blob2 = &*args[1].read_lock::<Blob>().expect(BUILTIN);
 
@@ -239,6 +258,13 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
                     } else if blob1.is_empty() {
                         blob2.clone()
                     } else {
+                        #[cfg(not(feature = "unchecked"))]
+                        _ctx.engine().raise_err_if_over_data_size_limit((
+                            blob1.len() + blob2.len(),
+                            0,
+                            0,
+                        ))?;
+
                         let mut blob = blob1.clone();
                         blob.extend(blob2);
                         blob
@@ -357,10 +383,16 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
         }
 
         return match op {
-            Token::Plus => Some(|_, args| {
+            Token::Plus => Some(|_ctx, args| {
                 let x = args[0].as_char().expect(BUILTIN);
                 let y = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
-                Ok(format!("{x}{y}").into())
+                let result = format!("{x}{y}");
+
+                #[cfg(not(feature = "unchecked"))]
+                _ctx.engine()
+                    .raise_err_if_over_data_size_limit((0, 0, result.len()))?;
+
+                Ok(result.into())
             }),
             Token::EqualsTo => Some(impl_op!(get_s1s2(==))),
             Token::NotEqualsTo => Some(impl_op!(get_s1s2(!=))),
@@ -383,10 +415,16 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
         }
 
         return match op {
-            Token::Plus => Some(|_, args| {
+            Token::Plus => Some(|_ctx, args| {
                 let x = &*args[0].read_lock::<ImmutableString>().expect(BUILTIN);
                 let y = args[1].as_char().expect(BUILTIN);
-                Ok((x + y).into())
+                let result = x + y;
+
+                #[cfg(not(feature = "unchecked"))]
+                _ctx.engine()
+                    .raise_err_if_over_data_size_limit((0, 0, result.len()))?;
+
+                Ok(result.into())
             }),
             Token::Minus => Some(|_, args| {
                 let x = &*args[0].read_lock::<ImmutableString>().expect(BUILTIN);
@@ -436,10 +474,18 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
 
         if type2 == TypeId::of::<char>() {
             return match op {
-                Token::Plus => Some(|_, args| {
+                Token::Plus => Some(|_ctx, args| {
                     let mut buf = [0_u8; 4];
                     let mut blob = args[0].read_lock::<Blob>().expect(BUILTIN).clone();
-                    let x = args[1].as_char().expect("`char`").encode_utf8(&mut buf);
+                    let x = args[1].as_char().expect(BUILTIN).encode_utf8(&mut buf);
+
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.engine().raise_err_if_over_data_size_limit((
+                        blob.len() + x.len(),
+                        0,
+                        0,
+                    ))?;
+
                     blob.extend(x.as_bytes());
                     Ok(Dynamic::from_blob(blob))
                 }),
@@ -638,10 +684,18 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
 
         if type1 == TypeId::of::<ImmutableString>() {
             return match op {
-                Token::PlusAssign => Some(|_, args| {
+                Token::PlusAssign => Some(|_ctx, args| {
                     let (first, second) = args.split_first_mut().expect(BUILTIN);
                     let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
                     let y = std::mem::take(second[0]).cast::<ImmutableString>();
+
+                    #[cfg(not(feature = "unchecked"))]
+                    if !x.is_empty() && !y.is_empty() {
+                        let total_len = x.len() + y.len();
+                        _ctx.engine()
+                            .raise_err_if_over_data_size_limit((0, 0, total_len))?;
+                    }
+
                     Ok((*x += y).into())
                 }),
                 Token::MinusAssign => Some(|_, args| {
@@ -655,13 +709,55 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
         }
 
         #[cfg(not(feature = "no_index"))]
+        if type1 == TypeId::of::<crate::Array>() {
+            use crate::packages::array_basic::array_functions::*;
+            use crate::Array;
+
+            return match op {
+                Token::PlusAssign => Some(|_ctx, args| {
+                    let x = std::mem::take(args[1]).cast::<Array>();
+
+                    if x.is_empty() {
+                        return Ok(Dynamic::UNIT);
+                    }
+
+                    let _array_was_empty = {
+                        let array = &mut &mut *args[0].write_lock::<Array>().expect(BUILTIN);
+                        let array_is_empty = array.is_empty();
+                        append(array, x);
+                        array_is_empty
+                    };
+
+                    #[cfg(not(feature = "unchecked"))]
+                    if !_array_was_empty {
+                        _ctx.engine().check_data_size(
+                            &*args[0].read_lock().expect(BUILTIN),
+                            crate::Position::NONE,
+                        )?;
+                    }
+
+                    Ok(Dynamic::UNIT)
+                }),
+                _ => None,
+            };
+        }
+
+        #[cfg(not(feature = "no_index"))]
         if type1 == TypeId::of::<crate::Blob>() {
             use crate::Blob;
 
             return match op {
-                Token::PlusAssign => Some(|_, args| {
+                Token::PlusAssign => Some(|_ctx, args| {
                     let blob2 = std::mem::take(args[1]).cast::<Blob>();
                     let blob1 = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
+
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.engine().raise_err_if_over_data_size_limit((
+                        blob1.len() + blob2.len(),
+                        0,
+                        0,
+                    ))?;
+
                     Ok(crate::packages::blob_basic::blob_functions::append(blob1, blob2).into())
                 }),
                 _ => None,
@@ -736,7 +832,17 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
     // string op= char
     if (type1, type2) == (TypeId::of::<ImmutableString>(), TypeId::of::<char>()) {
         return match op {
-            Token::PlusAssign => Some(impl_op!(ImmutableString += as_char as char)),
+            Token::PlusAssign => Some(|_ctx, args| {
+                let mut buf = [0_u8; 4];
+                let ch = &*args[1].as_char().expect(BUILTIN).encode_utf8(&mut buf);
+                let mut x = args[0].write_lock::<ImmutableString>().expect(BUILTIN);
+
+                #[cfg(not(feature = "unchecked"))]
+                _ctx.engine()
+                    .raise_err_if_over_data_size_limit((0, 0, x.len() + ch.len()))?;
+
+                Ok((*x += ch).into())
+            }),
             Token::MinusAssign => Some(impl_op!(ImmutableString -= as_char as char)),
             _ => None,
         };
@@ -744,17 +850,27 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
     // char op= string
     if (type1, type2) == (TypeId::of::<char>(), TypeId::of::<ImmutableString>()) {
         return match op {
-            Token::PlusAssign => Some(|_, args| {
-                let mut ch = args[0].as_char().expect(BUILTIN).to_string();
-                ch.push_str(
-                    args[1]
-                        .read_lock::<ImmutableString>()
-                        .expect(BUILTIN)
-                        .as_str(),
-                );
+            Token::PlusAssign => Some(|_ctx, args| {
+                let ch = {
+                    let s = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
 
-                let mut x = args[0].write_lock::<Dynamic>().expect(BUILTIN);
-                Ok((*x = ch.into()).into())
+                    if s.is_empty() {
+                        return Ok(Dynamic::UNIT);
+                    }
+
+                    let mut ch = args[0].as_char().expect(BUILTIN).to_string();
+
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.engine()
+                        .raise_err_if_over_data_size_limit((0, 0, ch.len() + s.len()))?;
+
+                    ch.push_str(s);
+                    ch
+                };
+
+                *args[0].write_lock::<Dynamic>().expect(BUILTIN) = ch.into();
+
+                Ok(Dynamic::UNIT)
             }),
             _ => None,
         };
@@ -766,21 +882,21 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
         use crate::packages::array_basic::array_functions::*;
         use crate::Array;
 
-        if type2 == TypeId::of::<crate::Array>() {
-            return match op {
-                Token::PlusAssign => Some(|_, args| {
-                    let array2 = std::mem::take(args[1]).cast::<Array>();
-                    let array1 = &mut *args[0].write_lock::<Array>().expect(BUILTIN);
-                    Ok(append(array1, array2).into())
-                }),
-                _ => None,
-            };
-        }
         return match op {
-            Token::PlusAssign => Some(|_, args| {
-                let x = std::mem::take(args[1]);
-                let array = &mut *args[0].write_lock::<Array>().expect(BUILTIN);
-                Ok(push(array, x).into())
+            Token::PlusAssign => Some(|_ctx, args| {
+                {
+                    let x = std::mem::take(args[1]);
+                    let array = &mut *args[0].write_lock::<Array>().expect(BUILTIN);
+                    push(array, x);
+                }
+
+                #[cfg(not(feature = "unchecked"))]
+                _ctx.engine().check_data_size(
+                    &*args[0].read_lock().expect(BUILTIN),
+                    crate::Position::NONE,
+                )?;
+
+                Ok(Dynamic::UNIT)
             }),
             _ => None,
         };
@@ -793,9 +909,14 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
         // blob op= int
         if (type1, type2) == (TypeId::of::<Blob>(), TypeId::of::<INT>()) {
             return match op {
-                Token::PlusAssign => Some(|_, args| {
-                    let x = args[1].as_int().expect("`INT`");
+                Token::PlusAssign => Some(|_ctx, args| {
+                    let x = args[1].as_int().expect(BUILTIN);
                     let blob = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
+
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.engine()
+                        .raise_err_if_over_data_size_limit((blob.len() + 1, 0, 0))?;
+
                     Ok(crate::packages::blob_basic::blob_functions::push(blob, x).into())
                 }),
                 _ => None,
@@ -805,9 +926,14 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
         // blob op= char
         if (type1, type2) == (TypeId::of::<Blob>(), TypeId::of::<char>()) {
             return match op {
-                Token::PlusAssign => Some(|_, args| {
-                    let x = args[1].as_char().expect("`char`");
+                Token::PlusAssign => Some(|_ctx, args| {
+                    let x = args[1].as_char().expect(BUILTIN);
                     let blob = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
+
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.engine()
+                        .raise_err_if_over_data_size_limit((blob.len() + 1, 0, 0))?;
+
                     Ok(crate::packages::blob_basic::blob_functions::append_char(blob, x).into())
                 }),
                 _ => None,
@@ -817,9 +943,22 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
         // blob op= string
         if (type1, type2) == (TypeId::of::<Blob>(), TypeId::of::<ImmutableString>()) {
             return match op {
-                Token::PlusAssign => Some(|_, args| {
+                Token::PlusAssign => Some(|_ctx, args| {
                     let s = std::mem::take(args[1]).cast::<ImmutableString>();
+
+                    if s.is_empty() {
+                        return Ok(Dynamic::UNIT);
+                    }
+
                     let blob = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
+
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.engine().raise_err_if_over_data_size_limit((
+                        blob.len() + s.len(),
+                        0,
+                        0,
+                    ))?;
+
                     Ok(crate::packages::blob_basic::blob_functions::append_str(blob, &s).into())
                 }),
                 _ => None,

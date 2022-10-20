@@ -252,8 +252,7 @@ impl Engine {
             {
                 // Built-in found
                 let context = (self, name, None, &*global, lib, pos, level + 1).into();
-                let result = func(context, operands);
-                return self.check_return_value(result, pos);
+                return func(context, operands);
             }
 
             return self
@@ -422,10 +421,8 @@ impl Engine {
                                     total_data_sizes.1 + val_sizes.1,
                                     total_data_sizes.2 + val_sizes.2,
                                 );
-                                self.raise_err_if_over_data_size_limit(
-                                    total_data_sizes,
-                                    item_expr.position(),
-                                )?;
+                                self.raise_err_if_over_data_size_limit(total_data_sizes)
+                                    .map_err(|err| err.fill_position(item_expr.position()))?;
                             }
 
                             array.push(value);
@@ -455,10 +452,8 @@ impl Engine {
                                 total_data_sizes.1 + delta.1,
                                 total_data_sizes.2 + delta.2,
                             );
-                            self.raise_err_if_over_data_size_limit(
-                                total_data_sizes,
-                                value_expr.position(),
-                            )?;
+                            self.raise_err_if_over_data_size_limit(total_data_sizes)
+                                .map_err(|err| err.fill_position(value_expr.position()))?;
                         }
 
                         *map.get_mut(key.as_str()).unwrap() = value;

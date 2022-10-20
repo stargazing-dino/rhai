@@ -73,14 +73,15 @@ impl Engine {
     pub(crate) fn raise_err_if_over_data_size_limit(
         &self,
         (_arr, _map, s): (usize, usize, usize),
-        pos: Position,
     ) -> RhaiResultOf<()> {
         if self
             .limits
             .max_string_size
             .map_or(false, |max| s > max.get())
         {
-            return Err(ERR::ErrorDataTooLarge("Length of string".to_string(), pos).into());
+            return Err(
+                ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
+            );
         }
 
         #[cfg(not(feature = "no_index"))]
@@ -89,7 +90,9 @@ impl Engine {
             .max_array_size
             .map_or(false, |max| _arr > max.get())
         {
-            return Err(ERR::ErrorDataTooLarge("Size of array".to_string(), pos).into());
+            return Err(
+                ERR::ErrorDataTooLarge("Size of array/BLOB".to_string(), Position::NONE).into(),
+            );
         }
 
         #[cfg(not(feature = "no_object"))]
@@ -98,7 +101,9 @@ impl Engine {
             .max_map_size
             .map_or(false, |max| _map > max.get())
         {
-            return Err(ERR::ErrorDataTooLarge("Size of object map".to_string(), pos).into());
+            return Err(
+                ERR::ErrorDataTooLarge("Size of object map".to_string(), Position::NONE).into(),
+            );
         }
 
         Ok(())
@@ -113,7 +118,8 @@ impl Engine {
 
         let sizes = Self::calc_data_sizes(value, true);
 
-        self.raise_err_if_over_data_size_limit(sizes, pos)
+        self.raise_err_if_over_data_size_limit(sizes)
+            .map_err(|err| err.fill_position(pos))
     }
 
     /// Raise an error if the size of a [`Dynamic`] is out of limits (if any).
