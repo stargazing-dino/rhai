@@ -7,6 +7,7 @@ use crate::{calc_fn_hash, Position, StaticVec, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
+    borrow::Borrow,
     collections::BTreeMap,
     fmt,
     hash::Hash,
@@ -440,6 +441,14 @@ impl DerefMut for StmtBlock {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.block
+    }
+}
+
+impl Borrow<[Stmt]> for StmtBlock {
+    #[inline(always)]
+    #[must_use]
+    fn borrow(&self) -> &[Stmt] {
+        &self.block
     }
 }
 

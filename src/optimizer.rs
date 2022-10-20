@@ -1191,7 +1191,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                             #[cfg(feature = "no_function")]
                             let lib = &[];
 
-                            let context = (state.engine, &x.name, lib).into();
+                            let context = (state.engine, x.name.as_str(), lib).into();
                             let (first, second) = arg_values.split_first_mut().unwrap();
                             (f)(context, &mut [ first, &mut second[0] ]).ok()
                         }) {

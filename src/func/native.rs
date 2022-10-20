@@ -81,13 +81,13 @@ pub struct NativeCallContext<'a> {
     level: usize,
 }
 
-impl<'a, M: AsRef<[&'a Module]> + ?Sized, S: AsRef<str> + 'a + ?Sized>
+impl<'a>
     From<(
         &'a Engine,
-        &'a S,
-        Option<&'a S>,
+        &'a str,
+        Option<&'a str>,
         &'a GlobalRuntimeState<'a>,
-        &'a M,
+        &'a [&Module],
         Position,
         usize,
     )> for NativeCallContext<'a>
@@ -96,37 +96,35 @@ impl<'a, M: AsRef<[&'a Module]> + ?Sized, S: AsRef<str> + 'a + ?Sized>
     fn from(
         value: (
             &'a Engine,
-            &'a S,
-            Option<&'a S>,
+            &'a str,
+            Option<&'a str>,
             &'a GlobalRuntimeState,
-            &'a M,
+            &'a [&Module],
             Position,
             usize,
         ),
     ) -> Self {
         Self {
             engine: value.0,
-            fn_name: value.1.as_ref(),
-            source: value.2.map(<_>::as_ref),
+            fn_name: value.1,
+            source: value.2,
             global: Some(value.3),
-            lib: value.4.as_ref(),
+            lib: value.4,
             pos: value.5,
             level: value.6,
         }
     }
 }
 
-impl<'a, M: AsRef<[&'a Module]> + ?Sized, S: AsRef<str> + 'a + ?Sized>
-    From<(&'a Engine, &'a S, &'a M)> for NativeCallContext<'a>
-{
+impl<'a> From<(&'a Engine, &'a str, &'a [&'a Module])> for NativeCallContext<'a> {
     #[inline(always)]
-    fn from(value: (&'a Engine, &'a S, &'a M)) -> Self {
+    fn from(value: (&'a Engine, &'a str, &'a [&Module])) -> Self {
         Self {
             engine: value.0,
-            fn_name: value.1.as_ref(),
+            fn_name: value.1,
             source: None,
             global: None,
-            lib: value.2.as_ref(),
+            lib: value.2,
             pos: Position::NONE,
             level: 0,
         }
@@ -142,14 +140,10 @@ impl<'a> NativeCallContext<'a> {
     )]
     #[inline(always)]
     #[must_use]
-    pub fn new(
-        engine: &'a Engine,
-        fn_name: &'a (impl AsRef<str> + 'a + ?Sized),
-        lib: &'a [&Module],
-    ) -> Self {
+    pub fn new(engine: &'a Engine, fn_name: &'a str, lib: &'a [&Module]) -> Self {
         Self {
             engine,
-            fn_name: fn_name.as_ref(),
+            fn_name,
             source: None,
             global: None,
             lib,
@@ -167,8 +161,8 @@ impl<'a> NativeCallContext<'a> {
     #[must_use]
     pub fn new_with_all_fields(
         engine: &'a Engine,
-        fn_name: &'a (impl AsRef<str> + 'a + ?Sized),
-        source: Option<&'a (impl AsRef<str> + 'a + ?Sized)>,
+        fn_name: &'a str,
+        source: Option<&'a str>,
         global: &'a GlobalRuntimeState,
         lib: &'a [&Module],
         pos: Position,
@@ -176,8 +170,8 @@ impl<'a> NativeCallContext<'a> {
     ) -> Self {
         Self {
             engine,
-            fn_name: fn_name.as_ref(),
-            source: source.map(<_>::as_ref),
+            fn_name,
+            source,
             global: Some(global),
             lib,
             pos,

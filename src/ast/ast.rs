@@ -5,6 +5,7 @@ use crate::{Dynamic, FnNamespace, Identifier, Position};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
+    borrow::Borrow,
     fmt,
     hash::Hash,
     ops::{Add, AddAssign},
@@ -919,6 +920,14 @@ impl<A: Into<Self>> AddAssign<A> for AST {
     }
 }
 
+impl Borrow<[Stmt]> for AST {
+    #[inline(always)]
+    #[must_use]
+    fn borrow(&self) -> &[Stmt] {
+        self.statements()
+    }
+}
+
 impl AsRef<[Stmt]> for AST {
     #[inline(always)]
     #[must_use]
@@ -928,11 +937,29 @@ impl AsRef<[Stmt]> for AST {
 }
 
 #[cfg(not(feature = "no_function"))]
+impl Borrow<crate::Module> for AST {
+    #[inline(always)]
+    #[must_use]
+    fn borrow(&self) -> &crate::Module {
+        &self.shared_lib()
+    }
+}
+
+#[cfg(not(feature = "no_function"))]
 impl AsRef<crate::Module> for AST {
     #[inline(always)]
     #[must_use]
     fn as_ref(&self) -> &crate::Module {
         self.shared_lib().as_ref()
+    }
+}
+
+#[cfg(not(feature = "no_function"))]
+impl Borrow<crate::Shared<crate::Module>> for AST {
+    #[inline(always)]
+    #[must_use]
+    fn borrow(&self) -> &crate::Shared<crate::Module> {
+        self.shared_lib()
     }
 }
 

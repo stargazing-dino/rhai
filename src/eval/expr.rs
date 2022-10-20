@@ -251,7 +251,7 @@ impl Engine {
                 get_builtin_binary_op_fn(operator_token.as_ref().unwrap(), operands[0], operands[1])
             {
                 // Built-in found
-                let context = (self, name, None, &*global, lib, pos, level + 1).into();
+                let context = (self, name.as_str(), None, &*global, lib, pos, level + 1).into();
                 return func(context, operands);
             }
 
