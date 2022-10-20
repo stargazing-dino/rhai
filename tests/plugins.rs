@@ -218,6 +218,7 @@ mod handle {
         let world: &mut World = &mut vec![42];
         scope.push("world", WorldHandle::from(world));
 
+        #[cfg(not(feature = "no_object"))]
         assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "world.len")?, 1);
 
         Ok(())
