@@ -160,7 +160,7 @@ impl Engine {
             match self.call_native_fn(
                 global, caches, lib, op_assign, hash, args, true, true, *op_pos, level,
             ) {
-                Ok(_) => self.check_data_size(args[0], root.1)?,
+                Ok(_) => (),
                 Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
                 {
                     // Expand to `var = var op rhs`
@@ -174,6 +174,8 @@ impl Engine {
                 }
                 Err(err) => return Err(err),
             }
+
+            self.check_data_size(args[0], root.1)?;
         } else {
             // Normal assignment
             *target.write_lock::<Dynamic>().unwrap() = new_val;
