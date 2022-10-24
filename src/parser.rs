@@ -1441,7 +1441,7 @@ impl Engine {
                     ..settings
                 };
 
-                let result = self.parse_anon_fn(input, &mut new_state, lib, new_settings);
+                let result = self.parse_anon_fn(input, &mut new_state, state, lib, new_settings);
 
                 // Restore parse state
                 state.interned_strings = new_state.interned_strings;
@@ -1464,7 +1464,7 @@ impl Engine {
                             // Under Strict Variables mode, this is not allowed.
                             Err(PERR::VariableUndefined(name.to_string()).into_err(*pos))
                         } else {
-                            Ok::<_, ParseError>(())
+                            Ok(())
                         }
                     },
                 )?;
@@ -3655,6 +3655,8 @@ impl Engine {
     #[cfg(not(feature = "no_closure"))]
     fn make_curry_from_externals(
         state: &mut ParseState,
+        parent: &mut ParseState,
+        lib: &FnLib,
         fn_expr: Expr,
         externals: StaticVec<crate::ast::Ident>,
         pos: Position,
@@ -3674,12 +3676,14 @@ impl Engine {
                 .iter()
                 .cloned()
                 .map(|crate::ast::Ident { name, pos }| {
-                    #[cfg(not(feature = "no_module"))]
-                    let ns = crate::ast::Namespace::NONE;
-                    #[cfg(feature = "no_module")]
-                    let ns = ();
-
-                    Expr::Variable((None, ns, 0, name).into(), None, pos)
+                    let (index, is_func) = parent.access_var(&name, lib, pos);
+                    let idx = match index {
+                        Some(n) if !is_func && n.get() <= u8::MAX as usize => {
+                            NonZeroU8::new(n.get() as u8)
+                        }
+                        _ => None,
+                    };
+                    Expr::Variable((index, Default::default(), 0, name).into(), idx, pos)
                 }),
         );
 
@@ -3719,6 +3723,7 @@ impl Engine {
         &self,
         input: &mut TokenStream,
         state: &mut ParseState,
+        parent: &mut ParseState,
         lib: &mut FnLib,
         settings: ParseSettings,
     ) -> ParseResult<(Expr, ScriptFnDef)> {
@@ -3815,7 +3820,8 @@ impl Engine {
         let expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), settings.pos);
 
         #[cfg(not(feature = "no_closure"))]
-        let expr = Self::make_curry_from_externals(state, expr, externals, settings.pos);
+        let expr =
+            Self::make_curry_from_externals(state, parent, lib, expr, externals, settings.pos);
 
         Ok((expr, script))
     }
