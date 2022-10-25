@@ -959,7 +959,7 @@ impl Engine {
             Stmt::Export(x, ..) => {
                 let (Ident { name, pos, .. }, Ident { name: alias, .. }) = &**x;
                 // Mark scope variables as public
-                if let Some((index, ..)) = scope.get_index(name) {
+                if let Some(index) = scope.get_index(name) {
                     let alias = if alias.is_empty() { name } else { alias }.clone();
                     scope.add_alias_by_index(index, alias.into());
                     Ok(Dynamic::UNIT)
@@ -971,7 +971,7 @@ impl Engine {
             // Share statement
             #[cfg(not(feature = "no_closure"))]
             Stmt::Share(name, pos) => {
-                if let Some((index, ..)) = scope.get_index(name) {
+                if let Some(index) = scope.get_index(name) {
                     let val = scope.get_mut_by_index(index);
 
                     if !val.is_shared() {

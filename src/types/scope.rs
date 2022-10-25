@@ -407,7 +407,7 @@ impl Scope<'_> {
     /// Find an entry in the [`Scope`], starting from the last.
     #[inline]
     #[must_use]
-    pub(crate) fn get_index(&self, name: &str) -> Option<(usize, AccessMode)> {
+    pub(crate) fn get_index(&self, name: &str) -> Option<usize> {
         let len = self.len();
 
         self.names
@@ -417,7 +417,7 @@ impl Scope<'_> {
             .find_map(|(i, key)| {
                 if name == key {
                     let index = len - 1 - i;
-                    Some((index, self.values[index].access_mode()))
+                    Some(index)
                 } else {
                     None
                 }
@@ -467,10 +467,11 @@ impl Scope<'_> {
     #[inline]
     #[must_use]
     pub fn is_constant(&self, name: &str) -> Option<bool> {
-        self.get_index(name).map(|(.., access)| match access {
-            AccessMode::ReadWrite => false,
-            AccessMode::ReadOnly => true,
-        })
+        self.get_index(name)
+            .map(|n| match self.values[n].access_mode() {
+                AccessMode::ReadWrite => false,
+                AccessMode::ReadOnly => true,
+            })
     }
     /// Update the value of the named entry in the [`Scope`] if it already exists and is not constant.
     /// Push a new entry with the value into the [`Scope`] if the name doesn't exist or if the
@@ -503,7 +504,10 @@ impl Scope<'_> {
         name: impl AsRef<str> + Into<Identifier>,
         value: impl Variant + Clone,
     ) -> &mut Self {
-        match self.get_index(name.as_ref()) {
+        match self
+            .get_index(name.as_ref())
+            .map(|n| (n, self.values[n].access_mode()))
+        {
             None | Some((.., AccessMode::ReadOnly)) => {
                 self.push(name, value);
             }
@@ -542,7 +546,10 @@ impl Scope<'_> {
         name: impl AsRef<str> + Into<Identifier>,
         value: impl Variant + Clone,
     ) -> &mut Self {
-        match self.get_index(name.as_ref()) {
+        match self
+            .get_index(name.as_ref())
+            .map(|n| (n, self.values[n].access_mode()))
+        {
             None => {
                 self.push(name, value);
             }
@@ -576,7 +583,7 @@ impl Scope<'_> {
     #[inline(always)]
     #[must_use]
     pub fn get(&self, name: &str) -> Option<&Dynamic> {
-        self.get_index(name).map(|(index, _)| &self.values[index])
+        self.get_index(name).map(|index| &self.values[index])
     }
     /// Remove the last entry in the [`Scope`] by the specified name and return its value.
     ///
@@ -607,7 +614,7 @@ impl Scope<'_> {
     #[inline(always)]
     #[must_use]
     pub fn remove<T: Variant + Clone>(&mut self, name: &str) -> Option<T> {
-        self.get_index(name).and_then(|(index, _)| {
+        self.get_index(name).and_then(|index| {
             self.names.remove(index);
             self.aliases.remove(index);
             self.values.remove(index).try_cast()
@@ -640,8 +647,8 @@ impl Scope<'_> {
     #[must_use]
     pub fn get_mut(&mut self, name: &str) -> Option<&mut Dynamic> {
         self.get_index(name)
-            .and_then(move |(index, access)| match access {
-                AccessMode::ReadWrite => Some(self.get_mut_by_index(index)),
+            .and_then(move |n| match self.values[n].access_mode() {
+                AccessMode::ReadWrite => Some(self.get_mut_by_index(n)),
                 AccessMode::ReadOnly => None,
             })
     }
@@ -685,7 +692,7 @@ impl Scope<'_> {
         name: impl AsRef<str> + Into<Identifier>,
         alias: impl Into<Identifier>,
     ) {
-        if let Some((index, ..)) = self.get_index(name.as_ref()) {
+        if let Some(index) = self.get_index(name.as_ref()) {
             let alias = match alias.into() {
                 x if x.is_empty() => name.into(),
                 x => x,
