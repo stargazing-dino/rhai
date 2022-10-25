@@ -407,7 +407,7 @@ impl Scope<'_> {
     /// Find an entry in the [`Scope`], starting from the last.
     #[inline]
     #[must_use]
-    pub(crate) fn get_index(&self, name: &str) -> Option<usize> {
+    pub(crate) fn search(&self, name: &str) -> Option<usize> {
         let len = self.len();
 
         self.names
@@ -467,7 +467,7 @@ impl Scope<'_> {
     #[inline]
     #[must_use]
     pub fn is_constant(&self, name: &str) -> Option<bool> {
-        self.get_index(name)
+        self.search(name)
             .map(|n| match self.values[n].access_mode() {
                 AccessMode::ReadWrite => false,
                 AccessMode::ReadOnly => true,
@@ -505,7 +505,7 @@ impl Scope<'_> {
         value: impl Variant + Clone,
     ) -> &mut Self {
         match self
-            .get_index(name.as_ref())
+            .search(name.as_ref())
             .map(|n| (n, self.values[n].access_mode()))
         {
             None | Some((.., AccessMode::ReadOnly)) => {
@@ -547,7 +547,7 @@ impl Scope<'_> {
         value: impl Variant + Clone,
     ) -> &mut Self {
         match self
-            .get_index(name.as_ref())
+            .search(name.as_ref())
             .map(|n| (n, self.values[n].access_mode()))
         {
             None => {
@@ -583,7 +583,7 @@ impl Scope<'_> {
     #[inline(always)]
     #[must_use]
     pub fn get(&self, name: &str) -> Option<&Dynamic> {
-        self.get_index(name).map(|index| &self.values[index])
+        self.search(name).map(|index| &self.values[index])
     }
     /// Remove the last entry in the [`Scope`] by the specified name and return its value.
     ///
@@ -614,7 +614,7 @@ impl Scope<'_> {
     #[inline(always)]
     #[must_use]
     pub fn remove<T: Variant + Clone>(&mut self, name: &str) -> Option<T> {
-        self.get_index(name).and_then(|index| {
+        self.search(name).and_then(|index| {
             self.names.remove(index);
             self.aliases.remove(index);
             self.values.remove(index).try_cast()
@@ -646,7 +646,7 @@ impl Scope<'_> {
     #[inline]
     #[must_use]
     pub fn get_mut(&mut self, name: &str) -> Option<&mut Dynamic> {
-        self.get_index(name)
+        self.search(name)
             .and_then(move |n| match self.values[n].access_mode() {
                 AccessMode::ReadWrite => Some(self.get_mut_by_index(n)),
                 AccessMode::ReadOnly => None,
@@ -692,7 +692,7 @@ impl Scope<'_> {
         name: impl AsRef<str> + Into<Identifier>,
         alias: impl Into<Identifier>,
     ) {
-        if let Some(index) = self.get_index(name.as_ref()) {
+        if let Some(index) = self.search(name.as_ref()) {
             let alias = match alias.into() {
                 x if x.is_empty() => name.into(),
                 x => x,

@@ -3711,7 +3711,10 @@ impl Engine {
         statements.extend(
             externals
                 .into_iter()
-                .map(|crate::ast::Ident { name, pos }| Stmt::Share(name, pos)),
+                .map(|crate::ast::Ident { name, pos }| {
+                    let (index, _) = parent.access_var(&name, lib, pos);
+                    Stmt::Share((name, index).into(), pos)
+                }),
         );
         statements.push(Stmt::Expr(expr.into()));
         Expr::Stmt(crate::ast::StmtBlock::new(statements, pos, Position::NONE).into())

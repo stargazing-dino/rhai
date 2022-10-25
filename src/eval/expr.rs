@@ -188,7 +188,7 @@ impl Engine {
             // Find the variable in the scope
             let var_name = expr.get_variable_name(true).expect("`Expr::Variable`");
 
-            match scope.get_index(var_name) {
+            match scope.search(var_name) {
                 Some(index) => index,
                 None => {
                     return match self.global_modules.iter().find_map(|m| m.get_var(var_name)) {
