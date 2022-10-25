@@ -1,4 +1,6 @@
 //! Configuration settings for this Rhai build
+//!
+//! This file is auto-generated from `build.template`
 
 /// Fixed hashing seeds for stable hashing.
 /// Set to [`None`] to disable stable hashing.
