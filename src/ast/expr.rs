@@ -465,13 +465,13 @@ impl fmt::Debug for Expr {
         let mut display_pos = format!(" @ {:?}", self.start_position());
 
         match self {
-            Self::DynamicConstant(value, ..) => write!(f, "{:?}", value),
-            Self::BoolConstant(value, ..) => write!(f, "{:?}", value),
-            Self::IntegerConstant(value, ..) => write!(f, "{:?}", value),
+            Self::DynamicConstant(value, ..) => write!(f, "{value:?}"),
+            Self::BoolConstant(value, ..) => write!(f, "{value:?}"),
+            Self::IntegerConstant(value, ..) => write!(f, "{value:?}"),
             #[cfg(not(feature = "no_float"))]
-            Self::FloatConstant(value, ..) => write!(f, "{:?}", value),
-            Self::CharConstant(value, ..) => write!(f, "{:?}", value),
-            Self::StringConstant(value, ..) => write!(f, "{:?}", value),
+            Self::FloatConstant(value, ..) => write!(f, "{value:?}"),
+            Self::CharConstant(value, ..) => write!(f, "{value:?}"),
+            Self::StringConstant(value, ..) => write!(f, "{value:?}"),
             Self::Unit(..) => f.write_str("()"),
 
             Self::InterpolatedString(x, ..) => {
@@ -502,10 +502,10 @@ impl fmt::Debug for Expr {
                 f.write_str(&x.3)?;
                 #[cfg(not(feature = "no_module"))]
                 if let Some(n) = x.1.index() {
-                    write!(f, " #{}", n)?;
+                    write!(f, " #{n}")?;
                 }
                 if let Some(n) = i.map_or_else(|| x.0, |n| NonZeroUsize::new(n.get() as usize)) {
-                    write!(f, " #{}", n)?;
+                    write!(f, " #{n}")?;
                 }
                 f.write_str(")")
             }

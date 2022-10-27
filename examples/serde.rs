@@ -36,13 +36,13 @@ fn main() {
             },
         };
 
-        println!("Source struct: {:#?}", x);
+        println!("Source struct: {x:#?}");
 
         // Convert the 'MyStruct' into a 'Dynamic'
         let map: Dynamic = to_dynamic(x).unwrap();
 
         assert!(map.is::<Map>());
-        println!("Serialized to Dynamic: {:#?}", map);
+        println!("Serialized to Dynamic: {map:#?}");
     }
 
     pub fn de() {
@@ -60,7 +60,7 @@ fn main() {
             )
             .unwrap();
 
-        println!("Source Dynamic: {:#?}", result);
+        println!("Source Dynamic: {result:#?}");
 
         // Convert the 'Dynamic' object map into 'MyStruct'
         let x: MyStruct = from_dynamic(&result).unwrap();
@@ -77,7 +77,7 @@ fn main() {
                 },
             }
         );
-        println!("Deserialized to struct: {:#?}", x);
+        println!("Deserialized to struct: {x:#?}");
     }
 
     ser();

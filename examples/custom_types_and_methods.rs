@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         engine
             .gen_fn_signatures(false)
             .into_iter()
-            .for_each(|func| println!("{}", func));
+            .for_each(|func| println!("{func}"));
 
         println!();
     }
@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         ",
     )?;
 
-    println!("result: {}", result); // prints 1085764
+    println!("result: {result}"); // prints 1085764
 
     Ok(())
 }

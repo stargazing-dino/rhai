@@ -78,12 +78,12 @@ pub fn main() {
     scope.push_constant("MY_CONSTANT", 42_i64);
 
     // Compile the handler script.
-    println!("> Loading script file: {}", path);
+    println!("> Loading script file: {path}");
 
     let ast = match engine.compile_file_with_scope(&mut scope, path.into()) {
         Ok(ast) => ast,
         Err(err) => {
-            eprintln!("! Error: {}", err);
+            eprintln!("! Error: {err}");
             println!("Cannot continue. Bye!");
             return;
         }
@@ -101,7 +101,7 @@ pub fn main() {
     let result = engine.call_fn_raw(&mut scope, &ast, false, true, "init", Some(&mut states), []);
 
     if let Err(err) = result {
-        eprintln!("! {}", err)
+        eprintln!("! {err}")
     }
 
     // Create handler instance
@@ -152,7 +152,7 @@ pub fn main() {
                     engine.call_fn_raw(scope, ast, false, true, event, this_ptr, [arg.into()]);
 
                 if let Err(err) = result {
-                    eprintln!("! {}", err)
+                    eprintln!("! {err}")
                 }
             }
         }

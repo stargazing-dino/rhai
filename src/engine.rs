@@ -85,7 +85,7 @@ pub const OP_INCLUSIVE_RANGE: &str = Token::InclusiveRange.literal_syntax();
 ///
 /// let result = engine.eval::<i64>("40 + 2")?;
 ///
-/// println!("Answer: {}", result);  // prints 42
+/// println!("Answer: {result}");   // prints 42
 /// # Ok(())
 /// # }
 /// ```
@@ -236,18 +236,12 @@ impl Engine {
         #[cfg(not(feature = "no_std"))]
         #[cfg(not(target_family = "wasm"))]
         {
-            engine.print = Box::new(|s| println!("{}", s));
-            engine.debug = Box::new(|s, source, pos| {
-                source.map_or_else(
-                    || {
-                        if pos.is_none() {
-                            println!("{s}");
-                        } else {
-                            println!("{pos:?} | {s}");
-                        }
-                    },
-                    |source| println!("{source} @ {pos:?} | {s}"),
-                )
+            engine.print = Box::new(|s| println!("{s}"));
+            engine.debug = Box::new(|s, source, pos| match (source, pos) {
+                (Some(source), crate::Position::NONE) => println!("{source} | {s}"),
+                (Some(source), pos) => println!("{source} @ {pos:?} | {s}"),
+                (None, crate::Position::NONE) => println!("{s}"),
+                (None, pos) => println!("{pos:?} | {s}"),
             });
         }
 

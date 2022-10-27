@@ -416,7 +416,7 @@ impl Hash for Dynamic {
 impl fmt::Display for Dynamic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
-            Union::Unit(..) => write!(f, ""),
+            Union::Unit(..) => Ok(()),
             Union::Bool(ref v, ..) => fmt::Display::fmt(v, f),
             Union::Str(ref v, ..) => fmt::Display::fmt(v, f),
             Union::Char(ref v, ..) => fmt::Display::fmt(v, f),
@@ -527,7 +527,7 @@ impl fmt::Debug for Dynamic {
                     if i > 0 && i % 8 == 0 {
                         f.write_str(" ")?;
                     }
-                    write!(f, "{:02x}", v)
+                    write!(f, "{v:02x}")
                 })?;
                 f.write_str("]")
             }

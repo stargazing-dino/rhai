@@ -185,8 +185,8 @@ impl fmt::Debug for RangeCase {
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ExclusiveInt(r, n) => write!(f, "{}..{} => {}", r.start, r.end, n),
-            Self::InclusiveInt(r, n) => write!(f, "{}..={} => {}", *r.start(), *r.end(), n),
+            Self::ExclusiveInt(r, n) => write!(f, "{}..{} => {n}", r.start, r.end),
+            Self::InclusiveInt(r, n) => write!(f, "{}..={} => {n}", *r.start(), *r.end()),
         }
     }
 }

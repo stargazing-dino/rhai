@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
     for _ in 0..10 {
         let result = engine.eval_with_scope::<i64>(&mut scope, "x += 1; x")?;
 
-        println!("result: {}", result);
+        println!("result: {result}");
     }
 
     println!("x = {}", scope.get_value::<i64>("x").unwrap());

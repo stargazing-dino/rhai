@@ -7,12 +7,11 @@ fn eprint_error(input: &str, mut err: EvalAltResult) {
         let line = pos.line().unwrap();
         let line_no = format!("{line}: ");
 
-        eprintln!("{}{}", line_no, lines[line - 1]);
+        eprintln!("{line_no}{}", lines[line - 1]);
         eprintln!(
-            "{:>1$} {2}",
+            "{:>1$} {err_msg}",
             "^",
             line_no.len() + pos.position().unwrap(),
-            err_msg
         );
         eprintln!();
     }
@@ -24,7 +23,7 @@ fn eprint_error(input: &str, mut err: EvalAltResult) {
 
     if pos.is_none() {
         // No position
-        eprintln!("{}", err);
+        eprintln!("{err}");
     } else {
         // Specific position
         eprint_line(&lines, pos, &err.to_string())
@@ -37,7 +36,7 @@ fn main() {
     for filename in env::args().skip(1) {
         let filename = match Path::new(&filename).canonicalize() {
             Err(err) => {
-                eprintln!("Error script file path: {}\n{}", filename, err);
+                eprintln!("Error script file path: {filename}\n{err}");
                 exit(1);
             }
             Ok(f) => match f.strip_prefix(std::env::current_dir().unwrap().canonicalize().unwrap())
@@ -94,7 +93,7 @@ fn main() {
             let filename = filename.to_string_lossy();
 
             eprintln!("{:=<1$}", "", filename.len());
-            eprintln!("{}", filename);
+            eprintln!("{filename}");
             eprintln!("{:=<1$}", "", filename.len());
             eprintln!();
 

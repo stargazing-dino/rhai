@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
     let r2 = func(1, 2);
     let r3 = func(1, 2);
 
-    println!("The Answers: {}, {}, {}", r1, r2, r3); // prints 40, 42, 44
+    println!("The Answers: {r1}, {r2}, {r3}"); // prints 40, 42, 44
 
     Ok(())
 }
