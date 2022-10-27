@@ -1,6 +1,5 @@
 //! Module containing error definitions for the evaluation process.
 
-use crate::engine::{FN_GET, FN_IDX_GET, FN_IDX_SET, FN_SET};
 use crate::{Dynamic, ImmutableString, ParseErrorType, Position, INT};
 #[cfg(feature = "no_std")]
 use core_error::Error;
@@ -184,22 +183,32 @@ impl fmt::Display for EvalAltResult {
             }
             Self::ErrorRuntime(d, ..) => write!(f, "Runtime error: {d}")?,
 
-            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s.starts_with(FN_GET) => {
-                let prop = &s[FN_GET.len()..];
+            #[cfg(not(feature = "no_object"))]
+            Self::ErrorNonPureMethodCallOnConstant(s, ..)
+                if s.starts_with(crate::engine::FN_GET) =>
+            {
+                let prop = &s[crate::engine::FN_GET.len()..];
                 write!(
                     f,
                     "Property {prop} is not pure and cannot be accessed on a constant"
                 )?
             }
-            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s.starts_with(FN_SET) => {
-                let prop = &s[FN_SET.len()..];
+            #[cfg(not(feature = "no_object"))]
+            Self::ErrorNonPureMethodCallOnConstant(s, ..)
+                if s.starts_with(crate::engine::FN_SET) =>
+            {
+                let prop = &s[crate::engine::FN_SET.len()..];
                 write!(f, "Cannot modify property {prop} of constant")?
             }
-            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == FN_IDX_GET => write!(
-                f,
-                "Indexer is not pure and cannot be accessed on a constant"
-            )?,
-            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == FN_IDX_SET => {
+            #[cfg(not(feature = "no_index"))]
+            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == crate::engine::FN_IDX_GET => {
+                write!(
+                    f,
+                    "Indexer is not pure and cannot be accessed on a constant"
+                )?
+            }
+            #[cfg(not(feature = "no_index"))]
+            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == crate::engine::FN_IDX_SET => {
                 write!(f, "Cannot assign to indexer of constant")?
             }
             Self::ErrorNonPureMethodCallOnConstant(s, ..) => {
