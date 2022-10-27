@@ -23,9 +23,12 @@ pub type GlobalConstants =
 // corresponds to that key.
 #[derive(Clone)]
 pub struct GlobalRuntimeState<'a> {
+    /// Names of imported [modules][crate::Module].
+    #[cfg(not(feature = "no_module"))]
+    imports: crate::StaticVec<crate::ImmutableString>,
     /// Stack of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    modules: crate::StaticVec<(crate::ImmutableString, crate::Shared<crate::Module>)>,
+    modules: crate::StaticVec<crate::Shared<crate::Module>>,
     /// Source of the current context.
     ///
     /// No source if the string is empty.
@@ -78,6 +81,8 @@ impl GlobalRuntimeState<'_> {
     pub fn new(engine: &Engine) -> Self {
         Self {
             #[cfg(not(feature = "no_module"))]
+            imports: crate::StaticVec::new_const(),
+            #[cfg(not(feature = "no_module"))]
             modules: crate::StaticVec::new_const(),
             source: Identifier::new_const(),
             num_operations: 0,
@@ -127,7 +132,7 @@ impl GlobalRuntimeState<'_> {
     #[inline(always)]
     #[must_use]
     pub fn get_shared_import(&self, index: usize) -> Option<crate::Shared<crate::Module>> {
-        self.modules.get(index).map(|(_, m)| m).cloned()
+        self.modules.get(index).cloned()
     }
     /// Get a mutable reference to the globally-imported [module][crate::Module] at a
     /// particular index.
@@ -141,7 +146,7 @@ impl GlobalRuntimeState<'_> {
         &mut self,
         index: usize,
     ) -> Option<&mut crate::Shared<crate::Module>> {
-        self.modules.get_mut(index).map(|(_, m)| m)
+        self.modules.get_mut(index)
     }
     /// Get the index of a globally-imported [module][crate::Module] by name.
     ///
@@ -150,13 +155,11 @@ impl GlobalRuntimeState<'_> {
     #[inline]
     #[must_use]
     pub fn find_import(&self, name: &str) -> Option<usize> {
-        let len = self.modules.len();
-
-        self.modules
+        self.imports
             .iter()
             .rev()
-            .position(|(key, _)| key.as_str() == name)
-            .map(|i| len - 1 - i)
+            .position(|key| key.as_str() == name)
+            .map(|i| self.imports.len() - 1 - i)
     }
     /// Push an imported [module][crate::Module] onto the stack.
     ///
@@ -168,7 +171,8 @@ impl GlobalRuntimeState<'_> {
         name: impl Into<crate::ImmutableString>,
         module: impl Into<crate::Shared<crate::Module>>,
     ) {
-        self.modules.push((name.into(), module.into()));
+        self.imports.push(name.into());
+        self.modules.push(module.into());
     }
     /// Truncate the stack of globally-imported [modules][crate::Module] to a particular length.
     ///
@@ -176,17 +180,18 @@ impl GlobalRuntimeState<'_> {
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     pub fn truncate_imports(&mut self, size: usize) {
+        self.imports.truncate(size);
         self.modules.truncate(size);
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in reverse order.
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
-    #[allow(dead_code)]
     #[inline]
     pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &crate::Module)> {
-        self.modules
+        self.imports
             .iter()
+            .zip(self.modules.iter())
             .rev()
             .map(|(name, module)| (name.as_str(), &**module))
     }
@@ -194,23 +199,32 @@ impl GlobalRuntimeState<'_> {
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
-    #[allow(dead_code)]
     #[inline]
     pub(crate) fn iter_imports_raw(
         &self,
-    ) -> impl Iterator<Item = &(crate::ImmutableString, crate::Shared<crate::Module>)> {
-        self.modules.iter().rev()
+    ) -> impl Iterator<Item = (&crate::ImmutableString, &crate::Shared<crate::Module>)> {
+        self.imports.iter().zip(self.modules.iter()).rev()
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in forward order.
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
-    #[allow(dead_code)]
     #[inline]
     pub fn scan_imports_raw(
         &self,
-    ) -> impl Iterator<Item = &(crate::ImmutableString, crate::Shared<crate::Module>)> {
-        self.modules.iter()
+    ) -> impl Iterator<Item = (&crate::ImmutableString, &crate::Shared<crate::Module>)> {
+        self.imports.iter().zip(self.modules.iter())
+    }
+    /// Can the particular function with [`Dynamic`] parameter(s) exist in the stack of
+    /// globally-imported [modules][crate::Module]?
+    ///
+    /// Not available under `no_module`.
+    #[cfg(not(feature = "no_module"))]
+    #[inline(always)]
+    pub(crate) fn may_contain_dynamic_fn(&self, hash_script: u64) -> bool {
+        self.modules
+            .iter()
+            .any(|m| m.may_contain_dynamic_fn(hash_script))
     }
     /// Does the specified function hash key exist in the stack of globally-imported
     /// [modules][crate::Module]?
@@ -221,9 +235,7 @@ impl GlobalRuntimeState<'_> {
     #[inline]
     #[must_use]
     pub fn contains_qualified_fn(&self, hash: u64) -> bool {
-        self.modules
-            .iter()
-            .any(|(_, m)| m.contains_qualified_fn(hash))
+        self.modules.iter().any(|m| m.contains_qualified_fn(hash))
     }
     /// Get the specified function via its hash key from the stack of globally-imported
     /// [modules][crate::Module].
@@ -239,7 +251,7 @@ impl GlobalRuntimeState<'_> {
         self.modules
             .iter()
             .rev()
-            .find_map(|(_, m)| m.get_qualified_fn(hash).map(|f| (f, m.id())))
+            .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id())))
     }
     /// Does the specified [`TypeId`][std::any::TypeId] iterator exist in the stack of
     /// globally-imported [modules][crate::Module]?
@@ -250,9 +262,7 @@ impl GlobalRuntimeState<'_> {
     #[inline]
     #[must_use]
     pub fn contains_iter(&self, id: std::any::TypeId) -> bool {
-        self.modules
-            .iter()
-            .any(|(_, m)| m.contains_qualified_iter(id))
+        self.modules.iter().any(|m| m.contains_qualified_iter(id))
     }
     /// Get the specified [`TypeId`][std::any::TypeId] iterator from the stack of globally-imported
     /// [modules][crate::Module].
@@ -265,7 +275,7 @@ impl GlobalRuntimeState<'_> {
         self.modules
             .iter()
             .rev()
-            .find_map(|(_, m)| m.get_qualified_iter(id))
+            .find_map(|m| m.get_qualified_iter(id))
     }
     /// Get the current source.
     #[inline]
@@ -309,25 +319,29 @@ impl GlobalRuntimeState<'_> {
 impl IntoIterator for GlobalRuntimeState<'_> {
     type Item = (crate::ImmutableString, crate::Shared<crate::Module>);
     type IntoIter = std::iter::Rev<
-        smallvec::IntoIter<
-            [(crate::ImmutableString, crate::Shared<crate::Module>); crate::STATIC_VEC_INLINE_SIZE],
+        std::iter::Zip<
+            smallvec::IntoIter<[crate::ImmutableString; crate::STATIC_VEC_INLINE_SIZE]>,
+            smallvec::IntoIter<[crate::Shared<crate::Module>; crate::STATIC_VEC_INLINE_SIZE]>,
         >,
     >;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.modules.into_iter().rev()
+        self.imports.into_iter().zip(self.modules.into_iter()).rev()
     }
 }
 
 #[cfg(not(feature = "no_module"))]
 impl<'a> IntoIterator for &'a GlobalRuntimeState<'_> {
-    type Item = &'a (crate::ImmutableString, crate::Shared<crate::Module>);
+    type Item = (&'a crate::ImmutableString, &'a crate::Shared<crate::Module>);
     type IntoIter = std::iter::Rev<
-        std::slice::Iter<'a, (crate::ImmutableString, crate::Shared<crate::Module>)>,
+        std::iter::Zip<
+            std::slice::Iter<'a, crate::ImmutableString>,
+            std::slice::Iter<'a, crate::Shared<crate::Module>>,
+        >,
     >;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.modules.iter().rev()
+        self.imports.iter().zip(self.modules.iter()).rev()
     }
 }
 
@@ -338,7 +352,8 @@ impl<K: Into<crate::ImmutableString>, M: Into<crate::Shared<crate::Module>>> Ext
     #[inline]
     fn extend<T: IntoIterator<Item = (K, M)>>(&mut self, iter: T) {
         for (k, m) in iter {
-            self.modules.push((k.into(), m.into()));
+            self.imports.push(k.into());
+            self.modules.push(m.into());
         }
     }
 }
@@ -350,7 +365,7 @@ impl fmt::Debug for GlobalRuntimeState<'_> {
         let mut f = f.debug_struct("GlobalRuntimeState");
 
         #[cfg(not(feature = "no_module"))]
-        f.field("imports", &self.modules);
+        f.field("imports", &self.scan_imports_raw().collect::<Vec<_>>());
 
         f.field("source", &self.source)
             .field("num_operations", &self.num_operations);

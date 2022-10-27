@@ -258,9 +258,7 @@ impl Engine {
 
                         #[cfg(not(feature = "no_module"))]
                         let is_dynamic = is_dynamic
-                            || _global
-                                .iter_imports_raw()
-                                .any(|(_, m)| m.may_contain_dynamic_fn(hash_base))
+                            || _global.may_contain_dynamic_fn(hash_base)
                             || self
                                 .global_sub_modules
                                 .values()
