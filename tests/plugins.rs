@@ -119,7 +119,7 @@ fn test_plugins_package() -> Result<(), Box<EvalAltResult>> {
 
         assert!(
             matches!(*engine.run("const A = [1, 2, 3]; A.test(42);").expect_err("should error"),
-            EvalAltResult::ErrorAssignmentToConstant(x, ..) if x == "array")
+            EvalAltResult::ErrorNonPureMethodCallOnConstant(x, ..) if x == "test")
         )
     }
 

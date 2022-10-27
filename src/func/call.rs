@@ -1234,8 +1234,12 @@ impl Engine {
                         .map(|(value, ..)| arg_values.push(value.flatten()))
                 })?;
 
-                let (target, _pos) =
+                let (mut target, _pos) =
                     self.search_namespace(scope, global, lib, this_ptr, first_expr, level)?;
+
+                if target.is_read_only() {
+                    target = target.into_owned();
+                }
 
                 self.track_operation(global, _pos)?;
 
