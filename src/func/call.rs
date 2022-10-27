@@ -418,7 +418,12 @@ impl Engine {
                 let context = (self, name, source, &*global, lib, pos, level).into();
 
                 let result = if func.is_plugin_fn() {
-                    func.get_plugin_fn().unwrap().call(context, args)
+                    let f = func.get_plugin_fn().unwrap();
+                    if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
+                        Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
+                    } else {
+                        f.call(context, args)
+                    }
                 } else {
                     func.get_native_fn().unwrap()(context, args)
                 };
@@ -1229,12 +1234,8 @@ impl Engine {
                         .map(|(value, ..)| arg_values.push(value.flatten()))
                 })?;
 
-                let (mut target, _pos) =
+                let (target, _pos) =
                     self.search_namespace(scope, global, lib, this_ptr, first_expr, level)?;
-
-                if target.is_read_only() {
-                    target = target.into_owned();
-                }
 
                 self.track_operation(global, _pos)?;
 
@@ -1425,11 +1426,12 @@ impl Engine {
 
             Some(f) if f.is_plugin_fn() => {
                 let context = (self, fn_name, module.id(), &*global, lib, pos, level).into();
-                let result = f
-                    .get_plugin_fn()
-                    .expect("plugin function")
-                    .clone()
-                    .call(context, &mut args);
+                let f = f.get_plugin_fn().expect("plugin function");
+                let result = if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
+                    Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
+                } else {
+                    f.call(context, &mut args)
+                };
                 self.check_return_value(result, pos)
             }
 

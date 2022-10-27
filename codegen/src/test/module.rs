@@ -390,6 +390,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
             }
         };
@@ -467,6 +468,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
             }
         };
@@ -525,6 +527,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
             }
         };
@@ -582,6 +585,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
             }
         };
@@ -653,6 +657,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
 
                 #[allow(non_camel_case_types)]
@@ -672,6 +677,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
             }
         };
@@ -730,6 +736,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
             }
         };
@@ -795,6 +802,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
             }
         };
@@ -864,14 +872,12 @@ mod generate_tests {
                 impl PluginFunction for get_mystic_number_token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg0 = &mut args[0usize].write_lock::<Hello>().unwrap();
                         Ok(Dynamic::from(get_mystic_number(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
             }
         };
@@ -1080,6 +1086,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
             }
         };
@@ -1170,6 +1177,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
             }
         };
@@ -1227,6 +1235,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
             }
         };
@@ -1286,6 +1295,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
             }
         };
@@ -1338,14 +1348,12 @@ mod generate_tests {
                 impl PluginFunction for increment_token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg0 = &mut args[0usize].write_lock::<FLOAT>().unwrap();
                         Ok(Dynamic::from(increment(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
             }
         };
@@ -1401,14 +1409,12 @@ mod generate_tests {
                     impl PluginFunction for increment_token {
                         #[inline(always)]
                         fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                            if args[0usize].is_read_only() {
-                                return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                            }
                             let arg0 = &mut args[0usize].write_lock::<FLOAT>().unwrap();
                             Ok(Dynamic::from(increment(arg0)))
                         }
 
                         #[inline(always)] fn is_method_call(&self) -> bool { true }
+                        #[inline(always)] fn is_pure(&self) -> bool { false }
                     }
                 }
                 #[allow(unused_imports)]
@@ -1487,14 +1493,12 @@ mod generate_tests {
                     impl PluginFunction for increment_token {
                         #[inline(always)]
                         fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                            if args[0usize].is_read_only() {
-                                return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                            }
                             let arg0 = &mut args[0usize].write_lock::<FLOAT>().unwrap();
                             Ok(Dynamic::from(increment(arg0)))
                         }
 
                         #[inline(always)] fn is_method_call(&self) -> bool { true }
+                        #[inline(always)] fn is_pure(&self) -> bool { false }
                     }
                 }
                 #[allow(unused_imports)]
@@ -1574,14 +1578,12 @@ mod generate_tests {
                 impl PluginFunction for int_foo_token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg0 = &mut args[0usize].write_lock::<u64>().unwrap();
                         Ok(Dynamic::from(int_foo(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
             }
         };
@@ -1638,14 +1640,12 @@ mod generate_tests {
                 impl PluginFunction for int_foo_token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg0 = &mut args[0usize].write_lock::<u64>().unwrap();
                         Ok(Dynamic::from(int_foo(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
             }
         };
@@ -1699,15 +1699,13 @@ mod generate_tests {
                 impl PluginFunction for int_foo_token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg0 = &mut args[0usize].write_lock::<u64>().unwrap();
                         Ok(Dynamic::from(int_foo(arg0, arg1)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
             }
         };
@@ -1764,15 +1762,13 @@ mod generate_tests {
                 impl PluginFunction for int_foo_token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg0 = &mut args[0usize].write_lock::<u64>().unwrap();
                         Ok(Dynamic::from(int_foo(arg0, arg1)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
             }
         };
@@ -1826,15 +1822,13 @@ mod generate_tests {
                 impl PluginFunction for get_by_index_token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg0 = &mut args[0usize].write_lock::<MyCollection>().unwrap();
                         Ok(Dynamic::from(get_by_index(arg0, arg1)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
             }
         };
@@ -1896,15 +1890,13 @@ mod generate_tests {
                 impl PluginFunction for get_by_index_token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg0 = &mut args[0usize].write_lock::<MyCollection>().unwrap();
                         Ok(Dynamic::from(get_by_index(arg0, arg1)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
             }
         };
@@ -1961,15 +1953,13 @@ mod generate_tests {
                 impl PluginFunction for get_by_index_token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg0 = &mut args[0usize].write_lock::<MyCollection>().unwrap();
                         Ok(Dynamic::from(get_by_index(arg0, arg1)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
             }
         };
@@ -2023,9 +2013,6 @@ mod generate_tests {
                 impl PluginFunction for set_by_index_token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg2 = mem::take(args[2usize]).cast::<FLOAT>();
                         let arg0 = &mut args[0usize].write_lock::<MyCollection>().unwrap();
@@ -2033,6 +2020,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
             }
         };
@@ -2089,9 +2077,6 @@ mod generate_tests {
                 impl PluginFunction for set_by_index_token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg2 = mem::take(args[2usize]).cast::<FLOAT>();
                         let arg0 = &mut args[0usize].write_lock::<MyCollection>().unwrap();
@@ -2099,6 +2084,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
             }
         };

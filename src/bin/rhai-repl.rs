@@ -309,7 +309,13 @@ fn main() {
     }
 
     // Register sample functions
-    engine.register_global_module(exported_module!(sample_functions).into());
+    engine
+        .register_global_module(exported_module!(sample_functions).into())
+        .register_get_set(
+            "test",
+            |x: &mut INT| *x % 2 == 0,
+            |x: &mut INT, y: bool| if y { *x *= 2 } else { *x /= 2 },
+        );
 
     // Create scope
     let mut scope = Scope::new();

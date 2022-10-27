@@ -96,26 +96,27 @@ pub trait RegisterNativeFunction<ARGS, RET, RESULT> {
 const EXPECT_ARGS: &str = "arguments";
 
 macro_rules! check_constant {
-    ($ctx:ident, $args:ident) => {
+    ($abi:ident, $ctx:ident, $args:ident) => {
         #[cfg(any(not(feature = "no_object"), not(feature = "no_index")))]
-        {
-            let args_len = $args.len();
-
-            if args_len > 0 && $args[0].is_read_only() {
-                let deny = match $ctx.fn_name() {
-                    #[cfg(not(feature = "no_object"))]
-                    f if args_len == 2 && f.starts_with(crate::engine::FN_SET) => true,
-                    #[cfg(not(feature = "no_index"))]
-                    crate::engine::FN_IDX_SET if args_len == 3 => true,
-                    _ => false,
-                };
-                if deny {
-                    return Err(crate::ERR::ErrorAssignmentToConstant(
-                        String::new(),
-                        crate::Position::NONE,
-                    )
-                    .into());
+        if stringify!($abi) == "Method" && !$args.is_empty() {
+            let deny = match $args.len() {
+                #[cfg(not(feature = "no_index"))]
+                3 if $ctx.fn_name() == crate::engine::FN_IDX_SET && $args[0].is_read_only() => true,
+                #[cfg(not(feature = "no_object"))]
+                2 if $ctx.fn_name().starts_with(crate::engine::FN_SET)
+                    && $args[0].is_read_only() =>
+                {
+                    true
                 }
+                _ => false,
+            };
+
+            if deny {
+                return Err(crate::ERR::ErrorNonPureMethodCallOnConstant(
+                    $ctx.fn_name().to_string(),
+                    crate::Position::NONE,
+                )
+                .into());
             }
         }
     };
@@ -144,7 +145,7 @@ macro_rules! def_register {
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |_ctx: NativeCallContext, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!(_ctx, args);
+                    check_constant!($abi, _ctx, args);
 
                     let mut _drain = args.iter_mut();
                     $($let $par = ($clone)(_drain.next().expect(EXPECT_ARGS)); )*
@@ -169,7 +170,7 @@ macro_rules! def_register {
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!(ctx, args);
+                    check_constant!($abi, ctx, args);
 
                     let mut _drain = args.iter_mut();
                     $($let $par = ($clone)(_drain.next().expect(EXPECT_ARGS)); )*
@@ -195,7 +196,7 @@ macro_rules! def_register {
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |_ctx: NativeCallContext, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!(_ctx, args);
+                    check_constant!($abi, _ctx, args);
 
                     let mut _drain = args.iter_mut();
                     $($let $par = ($clone)(_drain.next().expect(EXPECT_ARGS)); )*
@@ -218,7 +219,7 @@ macro_rules! def_register {
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!(ctx, args);
+                    check_constant!($abi, ctx, args);
 
                     let mut _drain = args.iter_mut();
                     $($let $par = ($clone)(_drain.next().expect(EXPECT_ARGS)); )*

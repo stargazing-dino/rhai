@@ -1,5 +1,6 @@
 //! Module containing error definitions for the evaluation process.
 
+use crate::engine::{FN_GET, FN_IDX_GET, FN_IDX_SET, FN_SET};
 use crate::{Dynamic, ImmutableString, ParseErrorType, Position, INT};
 #[cfg(feature = "no_std")]
 use core_error::Error;
@@ -84,6 +85,8 @@ pub enum EvalAltResult {
 
     /// Data race detected when accessing a variable. Wrapped value is the variable name.
     ErrorDataRace(String, Position),
+    /// Calling a non-pure method on a constant.  Wrapped value is the function name.
+    ErrorNonPureMethodCallOnConstant(String, Position),
     /// Assignment to a constant variable. Wrapped value is the variable name.
     ErrorAssignmentToConstant(String, Position),
     /// Inappropriate property access. Wrapped value is the property name.
@@ -181,7 +184,29 @@ impl fmt::Display for EvalAltResult {
             }
             Self::ErrorRuntime(d, ..) => write!(f, "Runtime error: {d}")?,
 
-            Self::ErrorAssignmentToConstant(s, ..) => write!(f, "Cannot modify constant: {s}")?,
+            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s.starts_with(FN_GET) => {
+                let prop = &s[FN_GET.len()..];
+                write!(
+                    f,
+                    "Property {prop} is not pure and cannot be accessed on a constant"
+                )?
+            }
+            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s.starts_with(FN_SET) => {
+                let prop = &s[FN_SET.len()..];
+                write!(f, "Cannot modify property {prop} of constant")?
+            }
+            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == FN_IDX_GET => write!(
+                f,
+                "Indexer is not pure and cannot be accessed on a constant"
+            )?,
+            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == FN_IDX_SET => {
+                write!(f, "Cannot assign to indexer of constant")?
+            }
+            Self::ErrorNonPureMethodCallOnConstant(s, ..) => {
+                write!(f, "Non-pure method {s} cannot be called on constant")?
+            }
+
+            Self::ErrorAssignmentToConstant(s, ..) => write!(f, "Cannot modify constant {s}")?,
             Self::ErrorMismatchOutputType(e, a, ..) => match (a.as_str(), e.as_str()) {
                 ("", e) => write!(f, "Output type incorrect, expecting {e}"),
                 (a, "") => write!(f, "Output type incorrect: {a}"),
@@ -296,6 +321,7 @@ impl EvalAltResult {
             | Self::ErrorIndexNotFound(..)
             | Self::ErrorModuleNotFound(..)
             | Self::ErrorDataRace(..)
+            | Self::ErrorNonPureMethodCallOnConstant(..)
             | Self::ErrorAssignmentToConstant(..)
             | Self::ErrorMismatchOutputType(..)
             | Self::ErrorDotExpr(..)
@@ -364,7 +390,7 @@ impl EvalAltResult {
             | Self::ErrorStackOverflow(..)
             | Self::ErrorRuntime(..) => (),
 
-            Self::ErrorFunctionNotFound(f, ..) => {
+            Self::ErrorFunctionNotFound(f, ..) | Self::ErrorNonPureMethodCallOnConstant(f, ..) => {
                 map.insert("function".into(), f.into());
             }
             Self::ErrorInFunctionCall(f, s, ..) => {
@@ -459,6 +485,7 @@ impl EvalAltResult {
             | Self::ErrorIndexNotFound(.., pos)
             | Self::ErrorModuleNotFound(.., pos)
             | Self::ErrorDataRace(.., pos)
+            | Self::ErrorNonPureMethodCallOnConstant(.., pos)
             | Self::ErrorAssignmentToConstant(.., pos)
             | Self::ErrorMismatchOutputType(.., pos)
             | Self::ErrorDotExpr(.., pos)
@@ -518,6 +545,7 @@ impl EvalAltResult {
             | Self::ErrorIndexNotFound(.., pos)
             | Self::ErrorModuleNotFound(.., pos)
             | Self::ErrorDataRace(.., pos)
+            | Self::ErrorNonPureMethodCallOnConstant(.., pos)
             | Self::ErrorAssignmentToConstant(.., pos)
             | Self::ErrorMismatchOutputType(.., pos)
             | Self::ErrorDotExpr(.., pos)
