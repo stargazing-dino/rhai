@@ -440,18 +440,16 @@ impl Module {
             }
             first = false;
 
-            if f.access == FnAccess::Private {
-                continue;
+            if f.access != FnAccess::Private {
+                #[cfg(not(feature = "no_custom_syntax"))]
+                let operator = def.engine.custom_keywords.contains_key(&f.name)
+                    || (!f.name.contains('$') && !is_valid_function_name(&f.name));
+
+                #[cfg(feature = "no_custom_syntax")]
+                let operator = !f.name.contains('$') && !is_valid_function_name(&f.name);
+
+                f.write_definition(writer, def, operator)?;
             }
-
-            #[cfg(not(feature = "no_custom_syntax"))]
-            let operator = def.engine.custom_keywords.contains_key(&f.name)
-                || (!f.name.contains('$') && !is_valid_function_name(&f.name));
-
-            #[cfg(feature = "no_custom_syntax")]
-            let operator = !f.name.contains('$') && !is_valid_function_name(&f.name);
-
-            f.write_definition(writer, def, operator)?;
         }
 
         Ok(())
@@ -555,7 +553,6 @@ fn def_type_name<'a>(ty: &'a str, engine: &'a Engine) -> Cow<'a, str> {
     #[cfg(not(feature = "no_object"))]
     let ty = ty.replace(type_name::<crate::Map>(), "Map");
 
-    #[cfg(not(feature = "no_std"))]
     #[cfg(not(feature = "no_time"))]
     let ty = ty.replace(type_name::<crate::Instant>(), "Instant");
 

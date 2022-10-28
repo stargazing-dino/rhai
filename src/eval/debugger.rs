@@ -148,35 +148,30 @@ impl fmt::Display for BreakPoint {
                 pos,
                 enabled,
             } => {
-                if source.is_empty() {
-                    write!(f, "@ {:?}", pos)?;
-                } else {
-                    write!(f, "{} @ {:?}", source, pos)?;
+                if !source.is_empty() {
+                    write!(f, "{source} ")?;
                 }
+                write!(f, "@ {pos:?}")?;
                 if !*enabled {
                     f.write_str(" (disabled)")?;
                 }
                 Ok(())
             }
-            Self::AtFunctionName {
-                name: fn_name,
-                enabled,
-            } => {
-                write!(f, "{} (...)", fn_name)?;
+            Self::AtFunctionName { name, enabled } => {
+                write!(f, "{name} (...)")?;
                 if !*enabled {
                     f.write_str(" (disabled)")?;
                 }
                 Ok(())
             }
             Self::AtFunctionCall {
-                name: fn_name,
+                name,
                 args,
                 enabled,
             } => {
                 write!(
                     f,
-                    "{} ({})",
-                    fn_name,
+                    "{name} ({})",
                     repeat("_").take(*args).collect::<Vec<_>>().join(", ")
                 )?;
                 if !*enabled {
@@ -185,11 +180,8 @@ impl fmt::Display for BreakPoint {
                 Ok(())
             }
             #[cfg(not(feature = "no_object"))]
-            Self::AtProperty {
-                name: prop,
-                enabled,
-            } => {
-                write!(f, ".{}", prop)?;
+            Self::AtProperty { name, enabled } => {
+                write!(f, ".{name}")?;
                 if !*enabled {
                     f.write_str(" (disabled)")?;
                 }
@@ -251,11 +243,10 @@ impl fmt::Display for CallStackFrame {
         fp.finish()?;
 
         if !self.pos.is_none() {
-            if self.source.is_empty() {
-                write!(f, " @ {:?}", self.pos)?;
-            } else {
-                write!(f, ": {} @ {:?}", self.source, self.pos)?;
+            if !self.source.is_empty() {
+                write!(f, ": {}", self.source)?;
             }
+            write!(f, " @ {:?}", self.pos)?;
         }
 
         Ok(())

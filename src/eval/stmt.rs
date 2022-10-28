@@ -48,13 +48,11 @@ impl Engine {
             global.scope_level += 1;
         }
 
-        let mut result = Ok(Dynamic::UNIT);
-
-        for stmt in statements {
+        let result = statements.iter().try_fold(Dynamic::UNIT, |_, stmt| {
             #[cfg(not(feature = "no_module"))]
             let imports_len = global.num_imports();
 
-            result = self.eval_stmt(
+            let result = self.eval_stmt(
                 scope,
                 global,
                 caches,
@@ -63,11 +61,7 @@ impl Engine {
                 stmt,
                 restore_orig_state,
                 level,
-            );
-
-            if result.is_err() {
-                break;
-            }
+            )?;
 
             #[cfg(not(feature = "no_module"))]
             if matches!(stmt, Stmt::Import(..)) {
@@ -92,7 +86,9 @@ impl Engine {
                     }
                 }
             }
-        }
+
+            Ok(result)
+        });
 
         // If imports list is modified, pop the functions lookup cache
         caches.rewind_fn_resolution_caches(orig_fn_resolution_caches_len);
@@ -150,11 +146,7 @@ impl Engine {
                     // Built-in found
                     let op = op_assign.literal_syntax();
                     let context = (self, op, None, &*global, lib, *op_pos, level).into();
-                    let result = func(context, args).map(|_| ());
-
-                    self.check_data_size(args[0], root.1)?;
-
-                    return result;
+                    return func(context, args).map(|_| ());
                 }
             }
 
@@ -164,7 +156,7 @@ impl Engine {
             match self.call_native_fn(
                 global, caches, lib, op_assign, hash, args, true, true, *op_pos, level,
             ) {
-                Ok(_) => self.check_data_size(args[0], root.1)?,
+                Ok(_) => (),
                 Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
                 {
                     // Expand to `var = var op rhs`
@@ -178,6 +170,8 @@ impl Engine {
                 }
                 Err(err) => return Err(err),
             }
+
+            self.check_data_size(args[0], root.1)?;
         } else {
             // Normal assignment
             *target.write_lock::<Dynamic>().unwrap() = new_val;
@@ -362,24 +356,14 @@ impl Engine {
                     });
 
                 match guard_val {
-                    Ok(true) => {
-                        if if_block.is_empty() {
-                            Ok(Dynamic::UNIT)
-                        } else {
-                            self.eval_stmt_block(
-                                scope, global, caches, lib, this_ptr, if_block, true, level,
-                            )
-                        }
-                    }
-                    Ok(false) => {
-                        if else_block.is_empty() {
-                            Ok(Dynamic::UNIT)
-                        } else {
-                            self.eval_stmt_block(
-                                scope, global, caches, lib, this_ptr, else_block, true, level,
-                            )
-                        }
-                    }
+                    Ok(true) if if_block.is_empty() => Ok(Dynamic::UNIT),
+                    Ok(true) => self.eval_stmt_block(
+                        scope, global, caches, lib, this_ptr, if_block, true, level,
+                    ),
+                    Ok(false) if else_block.is_empty() => Ok(Dynamic::UNIT),
+                    Ok(false) => self.eval_stmt_block(
+                        scope, global, caches, lib, this_ptr, else_block, true, level,
+                    ),
                     err => err.map(Into::into),
                 }
             }
@@ -429,16 +413,11 @@ impl Engine {
                                 };
 
                                 match cond_result {
-                                    Ok(true) => {
-                                        result = Ok(Some(&block.expr));
-                                        break;
-                                    }
-                                    Ok(false) => (),
-                                    _ => {
-                                        result = cond_result.map(|_| None);
-                                        break;
-                                    }
+                                    Ok(true) => result = Ok(Some(&block.expr)),
+                                    Ok(false) => continue,
+                                    _ => result = cond_result.map(|_| None),
                                 }
+                                break;
                             }
 
                             result
@@ -469,7 +448,6 @@ impl Engine {
                                     Ok(false) => continue,
                                     _ => result = cond_result.map(|_| None),
                                 }
-
                                 break;
                             }
 
@@ -500,41 +478,15 @@ impl Engine {
             }
 
             // Loop
-            Stmt::While(x, ..) if matches!(x.0, Expr::Unit(..)) => loop {
+            Stmt::While(x, ..) if matches!(x.0, Expr::Unit(..) | Expr::BoolConstant(true, ..)) => {
                 let (.., body) = &**x;
 
                 if body.is_empty() {
-                    self.track_operation(global, body.position())?;
-                } else {
-                    match self
-                        .eval_stmt_block(scope, global, caches, lib, this_ptr, body, true, level)
-                    {
-                        Ok(_) => (),
-                        Err(err) => match *err {
-                            ERR::LoopBreak(false, ..) => (),
-                            ERR::LoopBreak(true, ..) => break Ok(Dynamic::UNIT),
-                            _ => break Err(err),
-                        },
+                    loop {
+                        self.track_operation(global, body.position())?;
                     }
-                }
-            },
-
-            // While loop
-            Stmt::While(x, ..) => loop {
-                let (expr, body) = &**x;
-
-                let condition = self
-                    .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
-                    .and_then(|v| {
-                        v.as_bool().map_err(|typ| {
-                            self.make_type_mismatch_err::<bool>(typ, expr.position())
-                        })
-                    });
-
-                match condition {
-                    Ok(false) => break Ok(Dynamic::UNIT),
-                    Ok(true) if body.is_empty() => (),
-                    Ok(true) => {
+                } else {
+                    loop {
                         match self.eval_stmt_block(
                             scope, global, caches, lib, this_ptr, body, true, level,
                         ) {
@@ -546,42 +498,76 @@ impl Engine {
                             },
                         }
                     }
-                    err => break err.map(|_| Dynamic::UNIT),
                 }
-            },
+            }
+
+            // While loop
+            Stmt::While(x, ..) => {
+                let (expr, body) = &**x;
+
+                loop {
+                    let condition = self
+                        .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                        .and_then(|v| {
+                            v.as_bool().map_err(|typ| {
+                                self.make_type_mismatch_err::<bool>(typ, expr.position())
+                            })
+                        });
+
+                    match condition {
+                        Ok(false) => break Ok(Dynamic::UNIT),
+                        Ok(true) if body.is_empty() => (),
+                        Ok(true) => {
+                            match self.eval_stmt_block(
+                                scope, global, caches, lib, this_ptr, body, true, level,
+                            ) {
+                                Ok(_) => (),
+                                Err(err) => match *err {
+                                    ERR::LoopBreak(false, ..) => (),
+                                    ERR::LoopBreak(true, ..) => break Ok(Dynamic::UNIT),
+                                    _ => break Err(err),
+                                },
+                            }
+                        }
+                        err => break err.map(|_| Dynamic::UNIT),
+                    }
+                }
+            }
 
             // Do loop
-            Stmt::Do(x, options, ..) => loop {
+            Stmt::Do(x, options, ..) => {
                 let (expr, body) = &**x;
                 let is_while = !options.contains(ASTFlags::NEGATED);
 
-                if !body.is_empty() {
-                    match self
-                        .eval_stmt_block(scope, global, caches, lib, this_ptr, body, true, level)
-                    {
+                loop {
+                    if !body.is_empty() {
+                        match self.eval_stmt_block(
+                            scope, global, caches, lib, this_ptr, body, true, level,
+                        ) {
+                            Ok(_) => (),
+                            Err(err) => match *err {
+                                ERR::LoopBreak(false, ..) => continue,
+                                ERR::LoopBreak(true, ..) => break Ok(Dynamic::UNIT),
+                                _ => break Err(err),
+                            },
+                        }
+                    }
+
+                    let condition = self
+                        .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                        .and_then(|v| {
+                            v.as_bool().map_err(|typ| {
+                                self.make_type_mismatch_err::<bool>(typ, expr.position())
+                            })
+                        });
+
+                    match condition {
+                        Ok(condition) if condition ^ is_while => break Ok(Dynamic::UNIT),
                         Ok(_) => (),
-                        Err(err) => match *err {
-                            ERR::LoopBreak(false, ..) => continue,
-                            ERR::LoopBreak(true, ..) => break Ok(Dynamic::UNIT),
-                            _ => break Err(err),
-                        },
+                        err => break err.map(|_| Dynamic::UNIT),
                     }
                 }
-
-                let condition = self
-                    .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
-                    .and_then(|v| {
-                        v.as_bool().map_err(|typ| {
-                            self.make_type_mismatch_err::<bool>(typ, expr.position())
-                        })
-                    });
-
-                match condition {
-                    Ok(condition) if condition ^ is_while => break Ok(Dynamic::UNIT),
-                    Ok(_) => (),
-                    err => break err.map(|_| Dynamic::UNIT),
-                }
-            },
+            }
 
             // For loop
             Stmt::For(x, ..) => {
@@ -626,68 +612,58 @@ impl Engine {
                         scope.push(var_name.name.clone(), ());
                         let index = scope.len() - 1;
 
-                        let mut loop_result = Ok(Dynamic::UNIT);
+                        let loop_result = func(iter_obj)
+                            .enumerate()
+                            .try_for_each(|(x, iter_value)| {
+                                // Increment counter
+                                if counter_index < usize::MAX {
+                                    // As the variable increments from 0, this should always work
+                                    // since any overflow will first be caught below.
+                                    let index_value = x as INT;
 
-                        for (x, iter_value) in func(iter_obj).enumerate() {
-                            // Increment counter
-                            if counter_index < usize::MAX {
-                                // As the variable increments from 0, this should always work
-                                // since any overflow will first be caught below.
-                                let index_value = x as INT;
-
-                                #[cfg(not(feature = "unchecked"))]
-                                if index_value > crate::MAX_USIZE_INT {
-                                    loop_result = Err(ERR::ErrorArithmetic(
-                                        format!("for-loop counter overflow: {x}"),
-                                        counter.pos,
-                                    )
-                                    .into());
-                                    break;
-                                }
-
-                                *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
-                                    Dynamic::from_int(index_value);
-                            }
-
-                            let value = match iter_value {
-                                Ok(v) => v.flatten(),
-                                Err(err) => {
-                                    loop_result = Err(err.fill_position(expr.position()));
-                                    break;
-                                }
-                            };
-
-                            *scope.get_mut_by_index(index).write_lock().unwrap() = value;
-
-                            if let Err(err) = self.track_operation(global, statements.position()) {
-                                loop_result = Err(err);
-                                break;
-                            }
-
-                            if statements.is_empty() {
-                                continue;
-                            }
-
-                            let result = self.eval_stmt_block(
-                                scope, global, caches, lib, this_ptr, statements, true, level,
-                            );
-
-                            match result {
-                                Ok(_) => (),
-                                Err(err) => match *err {
-                                    ERR::LoopBreak(false, ..) => (),
-                                    ERR::LoopBreak(true, ..) => break,
-                                    _ => {
-                                        loop_result = Err(err);
-                                        break;
+                                    #[cfg(not(feature = "unchecked"))]
+                                    if index_value > crate::MAX_USIZE_INT {
+                                        return Err(ERR::ErrorArithmetic(
+                                            format!("for-loop counter overflow: {x}"),
+                                            counter.pos,
+                                        )
+                                        .into());
                                     }
-                                },
-                            }
-                        }
+
+                                    *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
+                                        Dynamic::from_int(index_value);
+                                }
+
+                                let value = match iter_value {
+                                    Ok(v) => v.flatten(),
+                                    Err(err) => return Err(err.fill_position(expr.position())),
+                                };
+
+                                *scope.get_mut_by_index(index).write_lock().unwrap() = value;
+
+                                self.track_operation(global, statements.position())?;
+
+                                if statements.is_empty() {
+                                    return Ok(());
+                                }
+
+                                self.eval_stmt_block(
+                                    scope, global, caches, lib, this_ptr, statements, true, level,
+                                )
+                                .map(|_| ())
+                                .or_else(|err| match *err {
+                                    ERR::LoopBreak(false, ..) => Ok(()),
+                                    _ => Err(err),
+                                })
+                            })
+                            .or_else(|err| match *err {
+                                ERR::LoopBreak(true, ..) => Ok(()),
+                                _ => Err(err),
+                            });
 
                         scope.rewind(orig_scope_len);
 
-                        loop_result
+                        loop_result.map(|_| Dynamic::UNIT)
                     } else {
                         Err(ERR::ErrorFor(expr.start_position()).into())
                     }
@@ -983,7 +959,7 @@ impl Engine {
             Stmt::Export(x, ..) => {
                 let (Ident { name, pos, .. }, Ident { name: alias, .. }) = &**x;
                 // Mark scope variables as public
-                if let Some((index, ..)) = scope.get_index(name) {
+                if let Some(index) = scope.search(name) {
                     let alias = if alias.is_empty() { name } else { alias }.clone();
                     scope.add_alias_by_index(index, alias.into());
                     Ok(Dynamic::UNIT)
@@ -994,8 +970,13 @@ impl Engine {
 
             // Share statement
             #[cfg(not(feature = "no_closure"))]
-            Stmt::Share(name, pos) => {
-                if let Some((index, ..)) = scope.get_index(name) {
+            Stmt::Share(x, pos) => {
+                let (name, index) = &**x;
+
+                if let Some(index) = index
+                    .map(|n| scope.len() - n.get())
+                    .or_else(|| scope.search(name))
+                {
                     let val = scope.get_mut_by_index(index);
 
                     if !val.is_shared() {

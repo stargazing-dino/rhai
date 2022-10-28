@@ -3,7 +3,7 @@ members = [".", "codegen"]
 
 [package]
 name = "rhai"
-version = "1.10.1"
+version = "1.11.0"
 rust-version = "1.61.0"
 edition = "2018"
 resolver = "2"
@@ -33,6 +33,7 @@ serde = { version = "1.0", default-features = false, features = ["derive", "allo
 serde_json = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
 unicode-xid = { version = "0.2", default-features = false, optional = true }
 rust_decimal = { version = "1.16", default-features = false, features = ["maths"], optional = true }
+getrandom = { version = "0.2", optional = true }
 rustyline = { version = "10", optional = true }
 
 [dev-dependencies]
@@ -53,11 +54,11 @@ only_i64 = []                   # set INT=i64 (default) and disable support for 
 decimal = ["rust_decimal"]      # add the Decimal number type
 no_index = []                   # no arrays and indexing
 no_object = []                  # no custom objects
+no_time = []                    # no timestamps
 no_function = ["no_closure"]    # no script-defined functions (meaning no closures)
 no_closure = []                 # no automatic sharing and capture of anonymous functions to external variables
 no_module = []                  # no modules
 no_custom_syntax = []           # no custom syntax or custom operators
-no_time = []                    # no timestamps
 unicode-xid-ident = ["unicode-xid"] # allow Unicode Standard Annex #31 for identifiers.
 metadata = ["serde", "serde_json", "rhai_codegen/metadata", "smartstring/serde"] # enable exporting functions metadata
 internals = []                  # expose internal data structures
@@ -65,11 +66,11 @@ debugging = ["internals"]       # enable debugging
 serde = ["dep:serde", "smartstring/serde", "smallvec/serde"] # implement serde for rhai types
 
 # compiling for no-std
-no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm", "hashbrown"]
+no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm", "hashbrown", "no_time"]
 
 # compiling for WASM
-wasm-bindgen = ["instant/wasm-bindgen"]
-stdweb = ["instant/stdweb"]
+wasm-bindgen = ["getrandom/js", "instant/wasm-bindgen"]
+stdweb = ["getrandom/js", "instant/stdweb"]
 
 # compiling bin tools
 bin-features = ["decimal", "metadata", "serde", "debugging", "rustyline"]

@@ -10,9 +10,9 @@ use crate::{
     reify, Dynamic, Engine, EvalContext, Identifier, ImmutableString, LexError, Position,
     RhaiResult, StaticVec,
 };
-use std::ops::Deref;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+use std::{borrow::Borrow, ops::Deref};
 
 /// Collection of special markers for custom syntax definition.
 pub mod markers {
@@ -142,6 +142,14 @@ impl Expression<'_> {
 
             _ => None,
         }
+    }
+}
+
+impl Borrow<Expr> for Expression<'_> {
+    #[inline(always)]
+    #[must_use]
+    fn borrow(&self) -> &Expr {
+        self.0
     }
 }
 

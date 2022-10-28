@@ -87,7 +87,7 @@ fn test_constant_mut() -> Result<(), Box<EvalAltResult>> {
                 "
             )
             .expect_err("should error"),
-        EvalAltResult::ErrorAssignmentToConstant(..)
+        EvalAltResult::ErrorNonPureMethodCallOnConstant(..)
     ));
 
     let mut scope = Scope::new();
@@ -120,7 +120,7 @@ fn test_constant_mut() -> Result<(), Box<EvalAltResult>> {
         *engine
             .run_with_scope(&mut scope, "MY_NUMBER.value = 42;")
             .expect_err("should error"),
-        EvalAltResult::ErrorAssignmentToConstant(..)
+        EvalAltResult::ErrorNonPureMethodCallOnConstant(..)
     ));
 
     Ok(())

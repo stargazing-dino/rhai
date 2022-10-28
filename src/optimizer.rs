@@ -175,21 +175,26 @@ fn has_native_fn_override(
 
     // First check the global namespace and packages, but skip modules that are standard because
     // they should never conflict with system functions.
-    let result = engine
+    if engine
         .global_modules
         .iter()
         .filter(|m| !m.standard)
-        .any(|m| m.contains_fn(hash));
+        .any(|m| m.contains_fn(hash))
+    {
+        return true;
+    }
 
-    #[cfg(not(feature = "no_module"))]
     // Then check sub-modules
-    let result = result
-        || engine
-            .global_sub_modules
-            .values()
-            .any(|m| m.contains_qualified_fn(hash));
+    #[cfg(not(feature = "no_module"))]
+    if engine
+        .global_sub_modules
+        .values()
+        .any(|m| m.contains_qualified_fn(hash))
+    {
+        return true;
+    }
 
-    result
+    false
 }
 
 /// Optimize a block of [statements][Stmt].
@@ -1184,9 +1189,9 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                             #[cfg(not(feature = "no_function"))]
                             let lib = state.lib;
                             #[cfg(feature = "no_function")]
-                            let lib = &[];
+                            let lib = &[][..];
 
-                            let context = (state.engine, &x.name, lib).into();
+                            let context = (state.engine, x.name.as_str(), lib).into();
                             let (first, second) = arg_values.split_first_mut().unwrap();
                             (f)(context, &mut [ first, &mut second[0] ]).ok()
                         }) {

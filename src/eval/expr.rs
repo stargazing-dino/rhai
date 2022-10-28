@@ -188,8 +188,8 @@ impl Engine {
             // Find the variable in the scope
             let var_name = expr.get_variable_name(true).expect("`Expr::Variable`");
 
-            match scope.get_index(var_name) {
-                Some((index, _)) => index,
+            match scope.search(var_name) {
+                Some(index) => index,
                 None => {
                     return match self.global_modules.iter().find_map(|m| m.get_var(var_name)) {
                         Some(val) => Ok((val.into(), var_pos)),
@@ -251,9 +251,8 @@ impl Engine {
                 get_builtin_binary_op_fn(operator_token.as_ref().unwrap(), operands[0], operands[1])
             {
                 // Built-in found
-                let context = (self, name, None, &*global, lib, pos, level + 1).into();
-                let result = func(context, operands);
-                return self.check_return_value(result, pos);
+                let context = (self, name.as_str(), None, &*global, lib, pos, level + 1).into();
+                return func(context, operands);
             }
 
             return self
@@ -379,114 +378,89 @@ impl Engine {
             Expr::InterpolatedString(x, _) => {
                 let mut concat = self.get_interned_string("").into();
                 let target = &mut concat;
-                let mut result = Ok(Dynamic::UNIT);
 
                 let mut op_info = OpAssignment::new_op_assignment(OP_CONCAT, Position::NONE);
                 let root = ("", Position::NONE);
 
-                for expr in &**x {
-                    let item =
-                        match self.eval_expr(scope, global, caches, lib, this_ptr, expr, level) {
-                            Ok(r) => r,
-                            err => {
-                                result = err;
-                                break;
-                            }
-                        };
+                let result = x
+                    .iter()
+                    .try_for_each(|expr| {
+                        let item =
+                            self.eval_expr(scope, global, caches, lib, this_ptr, expr, level)?;
 
-                    op_info.pos = expr.start_position();
+                        op_info.pos = expr.start_position();
 
-                    if let Err(err) = self.eval_op_assignment(
-                        global, caches, lib, &op_info, target, root, item, level,
-                    ) {
-                        result = Err(err);
-                        break;
-                    }
-                }
+                        self.eval_op_assignment(
+                            global, caches, lib, &op_info, target, root, item, level,
+                        )
+                    })
+                    .map(|_| concat.take_or_clone());
 
-                self.check_return_value(
-                    result.map(|_| concat.take_or_clone()),
-                    expr.start_position(),
-                )
+                self.check_return_value(result, expr.start_position())
             }
 
             #[cfg(not(feature = "no_index"))]
             Expr::Array(x, ..) => {
-                let mut array = crate::Array::with_capacity(x.len());
-                let mut result = Ok(Dynamic::UNIT);
-
                 #[cfg(not(feature = "unchecked"))]
                 let mut total_data_sizes = (0, 0, 0);
 
-                for item_expr in &**x {
-                    let value = match self
-                        .eval_expr(scope, global, caches, lib, this_ptr, item_expr, level)
-                    {
-                        Ok(r) => r.flatten(),
-                        err => {
-                            result = err;
-                            break;
-                        }
-                    };
+                x.iter()
+                    .try_fold(
+                        crate::Array::with_capacity(x.len()),
+                        |mut array, item_expr| {
+                            let value = self
+                                .eval_expr(scope, global, caches, lib, this_ptr, item_expr, level)?
+                                .flatten();
 
-                    #[cfg(not(feature = "unchecked"))]
-                    if self.has_data_size_limit() {
-                        let val_sizes = Self::calc_data_sizes(&value, true);
+                            #[cfg(not(feature = "unchecked"))]
+                            if self.has_data_size_limit() {
+                                let val_sizes = Self::calc_data_sizes(&value, true);
 
-                        total_data_sizes = (
-                            total_data_sizes.0 + val_sizes.0,
-                            total_data_sizes.1 + val_sizes.1,
-                            total_data_sizes.2 + val_sizes.2,
-                        );
-                        self.raise_err_if_over_data_size_limit(
-                            total_data_sizes,
-                            item_expr.position(),
-                        )?;
-                    }
+                                total_data_sizes = (
+                                    total_data_sizes.0 + val_sizes.0,
+                                    total_data_sizes.1 + val_sizes.1,
+                                    total_data_sizes.2 + val_sizes.2,
+                                );
+                                self.raise_err_if_over_data_size_limit(total_data_sizes)
+                                    .map_err(|err| err.fill_position(item_expr.position()))?;
+                            }
 
-                    array.push(value);
-                }
+                            array.push(value);
 
-                result.map(|_| array.into())
+                            Ok(array)
+                        },
+                    )
+                    .map(Into::into)
             }
 
             #[cfg(not(feature = "no_object"))]
             Expr::Map(x, ..) => {
-                let mut map = x.1.clone();
-                let mut result = Ok(Dynamic::UNIT);
-
                 #[cfg(not(feature = "unchecked"))]
                 let mut total_data_sizes = (0, 0, 0);
 
-                for (key, value_expr) in &x.0 {
-                    let value = match self
-                        .eval_expr(scope, global, caches, lib, this_ptr, value_expr, level)
-                    {
-                        Ok(r) => r.flatten(),
-                        err => {
-                            result = err;
-                            break;
+                x.0.iter()
+                    .try_fold(x.1.clone(), |mut map, (key, value_expr)| {
+                        let value = self
+                            .eval_expr(scope, global, caches, lib, this_ptr, value_expr, level)?
+                            .flatten();
+
+                        #[cfg(not(feature = "unchecked"))]
+                        if self.has_data_size_limit() {
+                            let delta = Self::calc_data_sizes(&value, true);
+                            total_data_sizes = (
+                                total_data_sizes.0 + delta.0,
+                                total_data_sizes.1 + delta.1,
+                                total_data_sizes.2 + delta.2,
+                            );
+                            self.raise_err_if_over_data_size_limit(total_data_sizes)
+                                .map_err(|err| err.fill_position(value_expr.position()))?;
                         }
-                    };
 
-                    #[cfg(not(feature = "unchecked"))]
-                    if self.has_data_size_limit() {
-                        let delta = Self::calc_data_sizes(&value, true);
-                        total_data_sizes = (
-                            total_data_sizes.0 + delta.0,
-                            total_data_sizes.1 + delta.1,
-                            total_data_sizes.2 + delta.2,
-                        );
-                        self.raise_err_if_over_data_size_limit(
-                            total_data_sizes,
-                            value_expr.position(),
-                        )?;
-                    }
+                        *map.get_mut(key.as_str()).unwrap() = value;
 
-                    *map.get_mut(key.as_str()).unwrap() = value;
-                }
-
-                result.map(|_| map.into())
+                        Ok(map)
+                    })
+                    .map(Into::into)
             }
 
             Expr::And(x, ..) => {
@@ -498,17 +472,17 @@ impl Engine {
                         })
                     });
 
-                if let Ok(true) = lhs {
-                    self.eval_expr(scope, global, caches, lib, this_ptr, &x.rhs, level)
+                match lhs {
+                    Ok(true) => self
+                        .eval_expr(scope, global, caches, lib, this_ptr, &x.rhs, level)
                         .and_then(|v| {
                             v.as_bool()
                                 .map_err(|typ| {
                                     self.make_type_mismatch_err::<bool>(typ, x.rhs.position())
                                 })
                                 .map(Into::into)
-                        })
-                } else {
-                    lhs.map(Into::into)
+                        }),
+                    _ => lhs.map(Into::into),
                 }
             }
 
@@ -521,17 +495,17 @@ impl Engine {
                         })
                     });
 
-                if let Ok(false) = lhs {
-                    self.eval_expr(scope, global, caches, lib, this_ptr, &x.rhs, level)
+                match lhs {
+                    Ok(false) => self
+                        .eval_expr(scope, global, caches, lib, this_ptr, &x.rhs, level)
                         .and_then(|v| {
                             v.as_bool()
                                 .map_err(|typ| {
                                     self.make_type_mismatch_err::<bool>(typ, x.rhs.position())
                                 })
                                 .map(Into::into)
-                        })
-                } else {
-                    lhs.map(Into::into)
+                        }),
+                    _ => lhs.map(Into::into),
                 }
             }
 
@@ -542,7 +516,7 @@ impl Engine {
                     Ok(value) if value.is::<()>() => {
                         self.eval_expr(scope, global, caches, lib, this_ptr, &x.rhs, level)
                     }
-                    Ok(_) | Err(_) => lhs,
+                    _ => lhs,
                 }
             }
 

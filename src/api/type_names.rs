@@ -44,7 +44,6 @@ fn map_std_type_name(name: &str, shorthands: bool) -> &str {
     if name == type_name::<crate::Map>() || name == "Map" {
         return if shorthands { "map" } else { "Map" };
     }
-    #[cfg(not(feature = "no_std"))]
     #[cfg(not(feature = "no_time"))]
     if name == type_name::<crate::Instant>() || name == "Instant" {
         return if shorthands { "timestamp" } else { "Instant" };

@@ -258,9 +258,7 @@ impl Engine {
 
                         #[cfg(not(feature = "no_module"))]
                         let is_dynamic = is_dynamic
-                            || _global
-                                .iter_imports_raw()
-                                .any(|(_, m)| m.may_contain_dynamic_fn(hash_base))
+                            || _global.may_contain_dynamic_fn(hash_base)
                             || self
                                 .global_sub_modules
                                 .values()
@@ -420,7 +418,12 @@ impl Engine {
                 let context = (self, name, source, &*global, lib, pos, level).into();
 
                 let result = if func.is_plugin_fn() {
-                    func.get_plugin_fn().unwrap().call(context, args)
+                    let f = func.get_plugin_fn().unwrap();
+                    if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
+                        Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
+                    } else {
+                        f.call(context, args)
+                    }
                 } else {
                     func.get_native_fn().unwrap()(context, args)
                 };
@@ -1427,11 +1430,12 @@ impl Engine {
 
             Some(f) if f.is_plugin_fn() => {
                 let context = (self, fn_name, module.id(), &*global, lib, pos, level).into();
-                let result = f
-                    .get_plugin_fn()
-                    .expect("plugin function")
-                    .clone()
-                    .call(context, &mut args);
+                let f = f.get_plugin_fn().expect("plugin function");
+                let result = if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
+                    Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
+                } else {
+                    f.call(context, &mut args)
+                };
                 self.check_return_value(result, pos)
             }
 

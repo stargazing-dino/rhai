@@ -7,6 +7,7 @@ use crate::{calc_fn_hash, Position, StaticVec, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
+    borrow::Borrow,
     collections::BTreeMap,
     fmt,
     hash::Hash,
@@ -184,8 +185,8 @@ impl fmt::Debug for RangeCase {
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ExclusiveInt(r, n) => write!(f, "{}..{} => {}", r.start, r.end, n),
-            Self::InclusiveInt(r, n) => write!(f, "{}..={} => {}", *r.start(), *r.end(), n),
+            Self::ExclusiveInt(r, n) => write!(f, "{}..{} => {n}", r.start, r.end),
+            Self::InclusiveInt(r, n) => write!(f, "{}..={} => {n}", *r.start(), *r.end()),
         }
     }
 }
@@ -443,6 +444,14 @@ impl DerefMut for StmtBlock {
     }
 }
 
+impl Borrow<[Stmt]> for StmtBlock {
+    #[inline(always)]
+    #[must_use]
+    fn borrow(&self) -> &[Stmt] {
+        &self.block
+    }
+}
+
 impl AsRef<[Stmt]> for StmtBlock {
     #[inline(always)]
     #[must_use]
@@ -605,7 +614,10 @@ pub enum Stmt {
     /// This variant does not map to any language structure.  It is currently only used only to
     /// convert a normal variable into a shared variable when the variable is _captured_ by a closure.
     #[cfg(not(feature = "no_closure"))]
-    Share(crate::ImmutableString, Position),
+    Share(
+        Box<(crate::ImmutableString, Option<NonZeroUsize>)>,
+        Position,
+    ),
 }
 
 impl Default for Stmt {

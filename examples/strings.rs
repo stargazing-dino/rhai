@@ -37,10 +37,10 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         .register_fn("index_of", find_substring)
         // Register string functions using closures
         .register_fn("display", |label: &str, value: i64| {
-            println!("{}: {}", label, value)
+            println!("{label}: {value}")
         })
         .register_fn("display", |label: ImmutableString, value: &str| {
-            println!(r#"{}: "{}""#, label, value) // Quote the input string
+            println!(r#"{label}: "{value}""#) // Quote the input string
         });
 
     let mut scope = Scope::new();

@@ -29,4 +29,14 @@ pub trait PluginFunction {
     /// Is this plugin function a method?
     #[must_use]
     fn is_method_call(&self) -> bool;
+
+    /// Is this plugin function pure?
+    ///
+    /// This defaults to `true` such that any old implementation that has constant-checking code
+    /// inside the function itself will continue to work.
+    #[inline(always)]
+    #[must_use]
+    fn is_pure(&self) -> bool {
+        true
+    }
 }

@@ -38,11 +38,11 @@ impl Error for LexError {}
 impl fmt::Display for LexError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnexpectedInput(s) => write!(f, "Unexpected '{}'", s),
-            Self::MalformedEscapeSequence(s) => write!(f, "Invalid escape sequence: '{}'", s),
-            Self::MalformedNumber(s) => write!(f, "Invalid number: '{}'", s),
-            Self::MalformedChar(s) => write!(f, "Invalid character: '{}'", s),
-            Self::MalformedIdentifier(s) => write!(f, "Variable name is not proper: '{}'", s),
+            Self::UnexpectedInput(s) => write!(f, "Unexpected '{s}'"),
+            Self::MalformedEscapeSequence(s) => write!(f, "Invalid escape sequence: '{s}'"),
+            Self::MalformedNumber(s) => write!(f, "Invalid number: '{s}'"),
+            Self::MalformedChar(s) => write!(f, "Invalid character: '{s}'"),
+            Self::MalformedIdentifier(s) => write!(f, "Variable name is not proper: '{s}'"),
             Self::UnterminatedString => f.write_str("Open string is not terminated"),
             Self::StringTooLong(max) => write!(
                 f,
@@ -50,7 +50,7 @@ impl fmt::Display for LexError {
                 max
             ),
             Self::ImproperSymbol(s, d) if d.is_empty() => {
-                write!(f, "Invalid symbol encountered: '{}'", s)
+                write!(f, "Invalid symbol encountered: '{s}'")
             }
             Self::ImproperSymbol(.., d) => f.write_str(d),
         }

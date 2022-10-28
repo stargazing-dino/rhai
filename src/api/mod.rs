@@ -35,9 +35,6 @@ pub mod definitions;
 
 use crate::{Dynamic, Engine, Identifier};
 
-#[cfg(not(feature = "no_custom_syntax"))]
-use crate::{engine::Precedence, tokenizer::Token};
-
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -150,8 +147,10 @@ impl Engine {
         keyword: impl AsRef<str>,
         precedence: u8,
     ) -> Result<&mut Self, String> {
-        let precedence =
-            Precedence::new(precedence).ok_or_else(|| "precedence cannot be zero".to_string())?;
+        use crate::tokenizer::Token;
+
+        let precedence = crate::engine::Precedence::new(precedence)
+            .ok_or_else(|| "precedence cannot be zero".to_string())?;
 
         let keyword = keyword.as_ref();
 
@@ -213,5 +212,73 @@ impl Engine {
     pub fn set_default_tag(&mut self, value: impl Into<Dynamic>) -> &mut Self {
         self.def_tag = value.into();
         self
+    }
+}
+
+#[cfg(feature = "unchecked")]
+impl Engine {
+    /// The maximum levels of function calls allowed for a script.
+    ///
+    /// Always returns [`usize::MAX`] under `unchecked`.
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_call_levels(&self) -> usize {
+        usize::MAX
+    }
+    /// The maximum number of operations allowed for a script to run (0 for unlimited).
+    ///
+    /// Always returns zero under `unchecked`.
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_operations(&self) -> u64 {
+        0
+    }
+    /// The maximum number of imported [modules][crate::Module] allowed for a script.
+    ///
+    /// Always returns [`usize::MAX`] under `unchecked`.
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_modules(&self) -> usize {
+        usize::MAX
+    }
+    /// The depth limit for expressions (0 for unlimited).
+    ///
+    /// Always returns zero under `unchecked`.
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_expr_depth(&self) -> usize {
+        0
+    }
+    /// The depth limit for expressions in functions (0 for unlimited).
+    ///
+    /// Always returns zero under `unchecked`.
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_function_expr_depth(&self) -> usize {
+        0
+    }
+    /// The maximum length of [strings][crate::ImmutableString] (0 for unlimited).
+    ///
+    /// Always returns zero under `unchecked`.
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_string_size(&self) -> usize {
+        0
+    }
+    /// The maximum length of [arrays][crate::Array] (0 for unlimited).
+    ///
+    /// Always returns zero under `unchecked`.
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_array_size(&self) -> usize {
+        0
+    }
+    /// The maximum size of [object maps][crate::Map] (0 for unlimited).
+    ///
+    /// Always returns zero under `unchecked`.
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_map_size(&self) -> usize {
+        0
     }
 }

@@ -673,6 +673,7 @@ impl ExportedFn {
         let sig_name = self.name().clone();
         let arg_count = self.arg_count();
         let is_method_call = self.mutable_receiver();
+        let is_pure = !self.mutable_receiver() || self.params().pure.is_some();
 
         let mut unpack_statements = Vec::new();
         let mut unpack_exprs = Vec::new();
@@ -713,18 +714,6 @@ impl ExportedFn {
                         })
                         .unwrap(),
                     );
-                    if self.params().pure.is_none() {
-                        let arg_lit_str =
-                            syn::LitStr::new(&pat.to_token_stream().to_string(), pat.span());
-                        unpack_statements.push(
-                        syn::parse2::<syn::Stmt>(quote! {
-                            if args[0usize].is_read_only() {
-                                return Err(EvalAltResult::ErrorAssignmentToConstant(#arg_lit_str.to_string(), Position::NONE).into());
-                            }
-                        })
-                        .unwrap(),
-                    );
-                    }
                     #[cfg(feature = "metadata")]
                     input_type_names.push(arg_name);
                     input_type_exprs.push(
@@ -877,6 +866,7 @@ impl ExportedFn {
                 }
 
                 #[inline(always)] fn is_method_call(&self) -> bool { #is_method_call }
+                #[inline(always)] fn is_pure(&self) -> bool { #is_pure }
             }
         }
     }

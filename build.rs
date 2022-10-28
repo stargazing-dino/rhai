@@ -6,6 +6,7 @@ use std::{
 
 fn main() {
     // Tell Cargo that if the given environment variable changes, to rerun this build script.
+    println!("cargo:rerun-if-changed=build.template");
     println!("cargo:rerun-if-env-changed=RHAI_AHASH_SEED");
 
     let mut contents = String::new();

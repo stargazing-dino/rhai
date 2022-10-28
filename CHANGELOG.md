@@ -54,6 +54,7 @@ Enhancements
 ------------
 
 * `parse_json` function is added to parse a JSON string into an object map.
+* `Error::ErrorNonPureMethodCallOnConstant` is added which is raised when a non-pure method is called on a constant value.
 
 
 Version 1.10.1

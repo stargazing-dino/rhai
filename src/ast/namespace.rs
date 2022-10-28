@@ -37,7 +37,7 @@ impl fmt::Debug for Namespace {
         }
 
         if let Some(index) = self.index {
-            write!(f, "{} -> ", index)?;
+            write!(f, "{index} -> ")?;
         }
 
         f.write_str(
