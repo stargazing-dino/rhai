@@ -218,7 +218,7 @@ impl Engine {
                         .iter()
                         .copied()
                         .chain(self.global_modules.iter().map(|m| m.as_ref()))
-                        .find_map(|m| m.get_fn(hash).map(|f| (f, m.id())));
+                        .find_map(|m| m.get_fn(hash).map(|f| (f, m.id_raw())));
 
                     #[cfg(not(feature = "no_module"))]
                     let func = if args.is_none() {
@@ -228,7 +228,7 @@ impl Engine {
                         func.or_else(|| _global.get_qualified_fn(hash)).or_else(|| {
                             self.global_sub_modules
                                 .values()
-                                .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id())))
+                                .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id_raw())))
                         })
                     };
 
@@ -236,7 +236,7 @@ impl Engine {
                         // Specific version found
                         let new_entry = Some(FnResolutionCacheEntry {
                             func: f.clone(),
-                            source: s.map(|s| Box::new(s.into())),
+                            source: s.cloned(),
                         });
                         return if cache.filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
@@ -358,7 +358,6 @@ impl Engine {
     ) -> RhaiResultOf<(Dynamic, bool)> {
         self.track_operation(global, pos)?;
 
-        let parent_source = global.source.clone();
         let op_assign = if is_op_assign {
             Token::lookup_from_syntax(name)
         } else {
@@ -398,24 +397,19 @@ impl Engine {
                     backup.change_first_arg_to_copy(args);
                 }
 
-                let source = match (source, parent_source.as_str()) {
-                    (None, "") => None,
-                    (None, s) => Some(s),
-                    (Some(s), ..) => Some(s.as_str()),
-                };
-
                 #[cfg(feature = "debugging")]
                 if self.debugger.is_some() {
                     global.debugger.push_call_stack_frame(
                         name,
                         args.iter().map(|v| (*v).clone()).collect(),
-                        source.unwrap_or(""),
+                        source.clone().or_else(|| global.source.clone()),
                         pos,
                     );
                 }
 
                 // Run external function
-                let context = (self, name, source, &*global, lib, pos, level).into();
+                let src = source.as_ref().map(|s| s.as_str());
+                let context = (self, name, src, &*global, lib, pos, level).into();
 
                 let result = if func.is_plugin_fn() {
                     let f = func.get_plugin_fn().unwrap();
@@ -484,12 +478,7 @@ impl Engine {
                         let t = self.map_type_name(type_name::<ImmutableString>()).into();
                         ERR::ErrorMismatchOutputType(t, typ.into(), pos)
                     })?;
-                    let source = if global.source.is_empty() {
-                        None
-                    } else {
-                        Some(global.source.as_str())
-                    };
-                    ((*self.debug)(&text, source, pos).into(), false)
+                    ((*self.debug)(&text, global.source(), pos).into(), false)
                 }
                 _ => (result, is_method),
             });
@@ -685,12 +674,7 @@ impl Engine {
                     }
                 };
 
-                let orig_source = mem::replace(
-                    &mut global.source,
-                    source
-                        .as_ref()
-                        .map_or(crate::Identifier::new_const(), |s| (**s).clone()),
-                );
+                let orig_source = mem::replace(&mut global.source, source.clone());
 
                 let result = if _is_method_call {
                     // Method call of script function - map first argument to `this`
@@ -1172,7 +1156,7 @@ impl Engine {
                 return result.map_err(|err| {
                     ERR::ErrorInFunctionCall(
                         KEYWORD_EVAL.to_string(),
-                        global.source.to_string(),
+                        global.source().unwrap_or("").to_string(),
                         err,
                         pos,
                     )
@@ -1416,14 +1400,13 @@ impl Engine {
             Some(f) if f.is_script() => {
                 let fn_def = f.get_script_fn_def().expect("script-defined function");
                 let new_scope = &mut Scope::new();
-                let mut source = module.id_raw().clone();
-                mem::swap(&mut global.source, &mut source);
+                let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
 
                 let result = self.call_script_fn(
                     new_scope, global, caches, lib, &mut None, fn_def, &mut args, true, pos, level,
                 );
 
-                global.source = source;
+                global.source = orig_source;
 
                 result
             }

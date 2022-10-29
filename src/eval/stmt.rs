@@ -719,8 +719,8 @@ impl Engine {
 
                                 err_map.insert("message".into(), err.to_string().into());
 
-                                if !global.source.is_empty() {
-                                    err_map.insert("source".into(), global.source.clone().into());
+                                if let Some(ref source) = global.source {
+                                    err_map.insert("source".into(), source.into());
                                 }
 
                                 if !err_pos.is_none() {

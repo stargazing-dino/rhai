@@ -160,8 +160,7 @@ pub fn calc_native_fn_hash<'a>(
 #[derive(Clone)]
 pub struct Module {
     /// ID identifying the module.
-    /// No ID if string is empty.
-    id: Identifier,
+    id: Option<ImmutableString>,
     /// Module documentation.
     #[cfg(feature = "metadata")]
     doc: crate::SmartString,
@@ -292,7 +291,7 @@ impl Module {
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            id: Identifier::new_const(),
+            id: None,
             #[cfg(feature = "metadata")]
             doc: crate::SmartString::new_const(),
             internal: false,
@@ -324,18 +323,14 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn id(&self) -> Option<&str> {
-        if self.id_raw().is_empty() {
-            None
-        } else {
-            Some(self.id_raw())
-        }
+        self.id.as_ref().map(|s| s.as_str())
     }
 
     /// Get the ID of the [`Module`] as an [`Identifier`], if any.
     #[inline(always)]
     #[must_use]
-    pub(crate) const fn id_raw(&self) -> &Identifier {
-        &self.id
+    pub(crate) const fn id_raw(&self) -> Option<&ImmutableString> {
+        self.id.as_ref()
     }
 
     /// Set the ID of the [`Module`].
@@ -351,8 +346,15 @@ impl Module {
     /// assert_eq!(module.id(), Some("hello"));
     /// ```
     #[inline(always)]
-    pub fn set_id(&mut self, id: impl Into<Identifier>) -> &mut Self {
-        self.id = id.into();
+    pub fn set_id(&mut self, id: impl Into<ImmutableString>) -> &mut Self {
+        let id = id.into();
+
+        if id.is_empty() {
+            self.id = None;
+        } else {
+            self.id = Some(id);
+        }
+
         self
     }
 
@@ -370,7 +372,7 @@ impl Module {
     /// ```
     #[inline(always)]
     pub fn clear_id(&mut self) -> &mut Self {
-        self.id.clear();
+        self.id = None;
         self
     }
 
@@ -434,7 +436,7 @@ impl Module {
     /// Clear the [`Module`].
     #[inline(always)]
     pub fn clear(&mut self) {
-        self.id.clear();
+        self.id = None;
         #[cfg(feature = "metadata")]
         self.doc.clear();
         self.internal = false;
@@ -2078,7 +2080,7 @@ impl Module {
                 });
         }
 
-        module.set_id(ast.source_raw().clone());
+        module.id = ast.source_raw().cloned();
 
         #[cfg(feature = "metadata")]
         module.set_doc(ast.doc());

@@ -1,6 +1,6 @@
 //! Global runtime state.
 
-use crate::{Dynamic, Engine, Identifier};
+use crate::{Dynamic, Engine, ImmutableString};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{fmt, marker::PhantomData};
@@ -9,7 +9,7 @@ use std::{fmt, marker::PhantomData};
 #[cfg(not(feature = "no_module"))]
 #[cfg(not(feature = "no_function"))]
 pub type GlobalConstants =
-    crate::Shared<crate::Locked<std::collections::BTreeMap<crate::ImmutableString, Dynamic>>>;
+    crate::Shared<crate::Locked<std::collections::BTreeMap<ImmutableString, Dynamic>>>;
 
 /// _(internals)_ Global runtime states.
 /// Exported under the `internals` feature only.
@@ -25,14 +25,14 @@ pub type GlobalConstants =
 pub struct GlobalRuntimeState<'a> {
     /// Names of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    imports: crate::StaticVec<crate::ImmutableString>,
+    imports: crate::StaticVec<ImmutableString>,
     /// Stack of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
     modules: crate::StaticVec<crate::Shared<crate::Module>>,
     /// Source of the current context.
     ///
     /// No source if the string is empty.
-    pub source: Identifier,
+    pub source: Option<ImmutableString>,
     /// Number of operations performed.
     pub num_operations: u64,
     /// Number of modules loaded.
@@ -84,7 +84,7 @@ impl GlobalRuntimeState<'_> {
             imports: crate::StaticVec::new_const(),
             #[cfg(not(feature = "no_module"))]
             modules: crate::StaticVec::new_const(),
-            source: Identifier::new_const(),
+            source: None,
             num_operations: 0,
             #[cfg(not(feature = "no_module"))]
             num_modules_loaded: 0,
@@ -168,7 +168,7 @@ impl GlobalRuntimeState<'_> {
     #[inline(always)]
     pub fn push_import(
         &mut self,
-        name: impl Into<crate::ImmutableString>,
+        name: impl Into<ImmutableString>,
         module: impl Into<crate::Shared<crate::Module>>,
     ) {
         self.imports.push(name.into());
@@ -202,7 +202,7 @@ impl GlobalRuntimeState<'_> {
     #[inline]
     pub(crate) fn iter_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&crate::ImmutableString, &crate::Shared<crate::Module>)> {
+    ) -> impl Iterator<Item = (&ImmutableString, &crate::Shared<crate::Module>)> {
         self.imports.iter().zip(self.modules.iter()).rev()
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in forward order.
@@ -212,7 +212,7 @@ impl GlobalRuntimeState<'_> {
     #[inline]
     pub fn scan_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&crate::ImmutableString, &crate::Shared<crate::Module>)> {
+    ) -> impl Iterator<Item = (&ImmutableString, &crate::Shared<crate::Module>)> {
         self.imports.iter().zip(self.modules.iter())
     }
     /// Can the particular function with [`Dynamic`] parameter(s) exist in the stack of
@@ -247,11 +247,11 @@ impl GlobalRuntimeState<'_> {
     pub fn get_qualified_fn(
         &self,
         hash: u64,
-    ) -> Option<(&crate::func::CallableFunction, Option<&str>)> {
+    ) -> Option<(&crate::func::CallableFunction, Option<&ImmutableString>)> {
         self.modules
             .iter()
             .rev()
-            .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id())))
+            .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id_raw())))
     }
     /// Does the specified [`TypeId`][std::any::TypeId] iterator exist in the stack of
     /// globally-imported [modules][crate::Module]?
@@ -278,14 +278,16 @@ impl GlobalRuntimeState<'_> {
             .find_map(|m| m.get_qualified_iter(id))
     }
     /// Get the current source.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn source(&self) -> Option<&str> {
-        if self.source.is_empty() {
-            None
-        } else {
-            Some(self.source.as_str())
-        }
+        self.source.as_ref().map(|s| s.as_str())
+    }
+    /// Get the current source.
+    #[inline(always)]
+    #[must_use]
+    pub(crate) const fn source_raw(&self) -> Option<&ImmutableString> {
+        self.source.as_ref()
     }
     /// Get the pre-calculated index getter hash.
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
@@ -317,10 +319,10 @@ impl GlobalRuntimeState<'_> {
 
 #[cfg(not(feature = "no_module"))]
 impl IntoIterator for GlobalRuntimeState<'_> {
-    type Item = (crate::ImmutableString, crate::Shared<crate::Module>);
+    type Item = (ImmutableString, crate::Shared<crate::Module>);
     type IntoIter = std::iter::Rev<
         std::iter::Zip<
-            smallvec::IntoIter<[crate::ImmutableString; crate::STATIC_VEC_INLINE_SIZE]>,
+            smallvec::IntoIter<[ImmutableString; crate::STATIC_VEC_INLINE_SIZE]>,
             smallvec::IntoIter<[crate::Shared<crate::Module>; crate::STATIC_VEC_INLINE_SIZE]>,
         >,
     >;
@@ -332,10 +334,10 @@ impl IntoIterator for GlobalRuntimeState<'_> {
 
 #[cfg(not(feature = "no_module"))]
 impl<'a> IntoIterator for &'a GlobalRuntimeState<'_> {
-    type Item = (&'a crate::ImmutableString, &'a crate::Shared<crate::Module>);
+    type Item = (&'a ImmutableString, &'a crate::Shared<crate::Module>);
     type IntoIter = std::iter::Rev<
         std::iter::Zip<
-            std::slice::Iter<'a, crate::ImmutableString>,
+            std::slice::Iter<'a, ImmutableString>,
             std::slice::Iter<'a, crate::Shared<crate::Module>>,
         >,
     >;
@@ -346,7 +348,7 @@ impl<'a> IntoIterator for &'a GlobalRuntimeState<'_> {
 }
 
 #[cfg(not(feature = "no_module"))]
-impl<K: Into<crate::ImmutableString>, M: Into<crate::Shared<crate::Module>>> Extend<(K, M)>
+impl<K: Into<ImmutableString>, M: Into<crate::Shared<crate::Module>>> Extend<(K, M)>
     for GlobalRuntimeState<'_>
 {
     #[inline]

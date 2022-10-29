@@ -1,7 +1,7 @@
 //! Module defining the AST (abstract syntax tree).
 
 use super::{ASTFlags, Expr, FnAccess, Stmt, StmtBlock, StmtBlockContainer};
-use crate::{Dynamic, FnNamespace, Identifier, Position};
+use crate::{Dynamic, FnNamespace, ImmutableString, Position};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -20,8 +20,7 @@ use std::{
 #[derive(Clone)]
 pub struct AST {
     /// Source of the [`AST`].
-    /// No source if string is empty.
-    source: Identifier,
+    source: Option<ImmutableString>,
     /// [`AST`] documentation.
     #[cfg(feature = "metadata")]
     doc: crate::SmartString,
@@ -98,7 +97,7 @@ impl AST {
         #[cfg(not(feature = "no_function"))] functions: impl Into<crate::Shared<crate::Module>>,
     ) -> Self {
         Self {
-            source: Identifier::new_const(),
+            source: None,
             #[cfg(feature = "metadata")]
             doc: crate::SmartString::new_const(),
             body: StmtBlock::new(statements, Position::NONE, Position::NONE),
@@ -133,7 +132,7 @@ impl AST {
     pub fn new_with_source(
         statements: impl IntoIterator<Item = Stmt>,
         #[cfg(not(feature = "no_function"))] functions: impl Into<crate::Shared<crate::Module>>,
-        source: impl Into<Identifier>,
+        source: impl Into<ImmutableString>,
     ) -> Self {
         let mut ast = Self::new(
             statements,
@@ -148,7 +147,7 @@ impl AST {
     #[must_use]
     pub fn empty() -> Self {
         Self {
-            source: Identifier::new_const(),
+            source: None,
             #[cfg(feature = "metadata")]
             doc: crate::SmartString::new_const(),
             body: StmtBlock::NONE,
@@ -159,36 +158,39 @@ impl AST {
         }
     }
     /// Get the source, if any.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn source(&self) -> Option<&str> {
-        if self.source.is_empty() {
-            None
-        } else {
-            Some(self.source.as_str())
-        }
+        self.source.as_ref().map(|s| s.as_str())
     }
     /// Get a reference to the source.
     #[inline(always)]
     #[must_use]
-    pub(crate) const fn source_raw(&self) -> &Identifier {
-        &self.source
+    pub(crate) const fn source_raw(&self) -> Option<&ImmutableString> {
+        self.source.as_ref()
     }
     /// Set the source.
     #[inline]
-    pub fn set_source(&mut self, source: impl Into<Identifier>) -> &mut Self {
+    pub fn set_source(&mut self, source: impl Into<ImmutableString>) -> &mut Self {
         let source = source.into();
+
         #[cfg(not(feature = "no_function"))]
         crate::Shared::get_mut(&mut self.lib)
             .as_mut()
             .map(|m| m.set_id(source.clone()));
-        self.source = source;
+
+        if source.is_empty() {
+            self.source = None;
+        } else {
+            self.source = Some(source);
+        }
+
         self
     }
     /// Clear the source.
     #[inline(always)]
     pub fn clear_source(&mut self) -> &mut Self {
-        self.source.clear();
+        self.source = None;
         self
     }
     /// Get the documentation (if any).
@@ -559,18 +561,18 @@ impl AST {
             lib
         };
 
-        let mut _ast = if other.source.is_empty() {
-            Self::new(
-                merged,
-                #[cfg(not(feature = "no_function"))]
-                lib,
-            )
-        } else {
+        let mut _ast = if let Some(ref source) = other.source {
             Self::new_with_source(
                 merged,
                 #[cfg(not(feature = "no_function"))]
                 lib,
-                other.source.clone(),
+                source.clone(),
+            )
+        } else {
+            Self::new(
+                merged,
+                #[cfg(not(feature = "no_function"))]
+                lib,
             )
         };
 

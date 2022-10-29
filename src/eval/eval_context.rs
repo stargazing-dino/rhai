@@ -58,11 +58,7 @@ impl<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'pg, '
     #[inline(always)]
     #[must_use]
     pub fn source(&self) -> Option<&str> {
-        if self.global.source.is_empty() {
-            None
-        } else {
-            Some(self.global.source.as_str())
-        }
+        self.global.source()
     }
     /// The current [`Scope`].
     #[inline(always)]

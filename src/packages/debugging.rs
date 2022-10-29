@@ -62,8 +62,8 @@ mod debugging_functions {
                                     Dynamic::from_array(_args.clone().to_vec()),
                                 );
                             }
-                            if !_source.is_empty() {
-                                map.insert("source".into(), _source.into());
+                            if let Some(source) = _source {
+                                map.insert("source".into(), source.into());
                             }
                             if !_pos.is_none() {
                                 map.insert(

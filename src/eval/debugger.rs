@@ -3,7 +3,10 @@
 
 use super::{EvalContext, GlobalRuntimeState};
 use crate::ast::{ASTNode, Expr, Stmt};
-use crate::{Dynamic, Engine, EvalAltResult, Identifier, Module, Position, RhaiResultOf, Scope};
+use crate::{
+    Dynamic, Engine, EvalAltResult, Identifier, ImmutableString, Module, Position, RhaiResultOf,
+    Scope,
+};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{fmt, iter::repeat, mem};
@@ -226,8 +229,8 @@ pub struct CallStackFrame {
     pub fn_name: Identifier,
     /// Copies of function call arguments, if any.
     pub args: crate::StaticVec<Dynamic>,
-    /// Source of the function, empty if none.
-    pub source: Identifier,
+    /// Source of the function.
+    pub source: Option<ImmutableString>,
     /// [Position][`Position`] of the function call.
     pub pos: Position,
 }
@@ -243,8 +246,8 @@ impl fmt::Display for CallStackFrame {
         fp.finish()?;
 
         if !self.pos.is_none() {
-            if !self.source.is_empty() {
-                write!(f, ": {}", self.source)?;
+            if let Some(ref source) = self.source {
+                write!(f, ": {source}")?;
             }
             write!(f, " @ {:?}", self.pos)?;
         }
@@ -295,13 +298,13 @@ impl Debugger {
         &mut self,
         fn_name: impl Into<Identifier>,
         args: crate::StaticVec<Dynamic>,
-        source: impl Into<Identifier>,
+        source: Option<ImmutableString>,
         pos: Position,
     ) {
         self.call_stack.push(CallStackFrame {
             fn_name: fn_name.into(),
             args,
-            source: source.into(),
+            source,
             pos,
         });
     }
@@ -487,7 +490,10 @@ impl Engine {
 
         let event = match event {
             Some(e) => e,
-            None => match global.debugger.is_break_point(&global.source, node) {
+            None => match global
+                .debugger
+                .is_break_point(global.source().unwrap_or(""), node)
+            {
                 Some(bp) => DebuggerEvent::BreakPoint(bp),
                 None => return Ok(None),
             },
@@ -512,17 +518,12 @@ impl Engine {
         event: DebuggerEvent,
         level: usize,
     ) -> Result<Option<DebuggerStatus>, Box<crate::EvalAltResult>> {
-        let source = global.source.clone();
-        let source = if source.is_empty() {
-            None
-        } else {
-            Some(source.as_str())
-        };
-
+        let src = global.source_raw().cloned();
+        let src = src.as_ref().map(|s| s.as_str());
         let context = crate::EvalContext::new(self, scope, global, None, lib, this_ptr, level);
 
         if let Some((.., ref on_debugger)) = self.debugger {
-            let command = on_debugger(context, event, node, source, node.position())?;
+            let command = on_debugger(context, event, node, src, node.position())?;
 
             match command {
                 DebuggerCommand::Continue => {
