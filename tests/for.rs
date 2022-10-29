@@ -233,10 +233,12 @@ fn test_for_loop() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_index"))]
     #[cfg(not(feature = "no_object"))]
+    #[cfg(not(feature = "only_i32"))]
+    #[cfg(not(feature = "no_float"))]
     assert_eq!(
         engine.eval::<INT>(
             r#"
-                let a = [123, 999, 42, 0, true, "hello", "world!"];
+                let a = [123, 999, 42, 0, true, "hello", "world!", 987.654];
 
                 for (item, count) in a {
                     switch item.type_of() {
