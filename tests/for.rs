@@ -241,8 +241,8 @@ fn test_for_loop() -> Result<(), Box<EvalAltResult>> {
 
                 for (item, count) in a {
                     switch item.type_of() {
-                        "i64" | "i32 if item.is_even => break count,
-                        "f64" | "f32 if item.to_int().is_even => break count,
+                        "i64" | "i32" if item.is_even => break count,
+                        "f64" | "f32" if item.to_int().is_even => break count,
                     }
                 }
             "#
