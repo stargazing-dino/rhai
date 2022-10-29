@@ -581,14 +581,14 @@ pub enum Stmt {
     TryCatch(Box<TryCatchBlock>, Position),
     /// [expression][Expr]
     Expr(Box<Expr>),
-    /// `continue`/`break`
+    /// `continue`/`break` expr
     ///
     /// ### Flags
     ///
     /// * [`NONE`][ASTFlags::NONE] = `continue`
     /// * [`BREAK`][ASTFlags::BREAK] = `break`
-    BreakLoop(ASTFlags, Position),
-    /// `return`/`throw`
+    BreakLoop(Option<Box<Expr>>, ASTFlags, Position),
+    /// `return`/`throw` expr
     ///
     /// ### Flags
     ///

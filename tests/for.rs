@@ -231,6 +231,22 @@ fn test_for_loop() -> Result<(), Box<EvalAltResult>> {
         );
     }
 
+    assert_eq!(
+        engine.eval::<INT>(
+            r#"
+                let a = [123, 999, 42, 0, true, "hello", "world!", 987.6543];
+
+                for (item, count) in a {
+                    switch item.type_of() {
+                        "i64" if item.is_even => break count,
+                        "f64" if item.to_int().is_even => break count,
+                    }
+                }
+            "#
+        )?,
+        2
+    );
+
     Ok(())
 }
 

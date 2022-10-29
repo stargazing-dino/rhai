@@ -8,7 +8,7 @@ use crate::engine::{KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_PRINT, 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::builtin::get_builtin_binary_op_fn;
 use crate::func::hashing::get_hasher;
-use crate::tokenizer::{Span, Token};
+use crate::tokenizer::Token;
 use crate::types::dynamic::AccessMode;
 use crate::{
     calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Engine, FnPtr, Identifier,
@@ -785,50 +785,6 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                 *condition = Expr::Unit(*pos);
             }
             **body = optimize_stmt_block(mem::take(&mut **body), state, false, true, false);
-
-            if body.len() == 1 {
-                match body[0] {
-                    // while expr { break; } -> { expr; }
-                    Stmt::BreakLoop(options, pos) if options.contains(ASTFlags::BREAK) => {
-                        // Only a single break statement - turn into running the guard expression once
-                        state.set_dirty();
-                        if condition.is_unit() {
-                            *stmt = Stmt::Noop(pos);
-                        } else {
-                            let mut statements = vec![Stmt::Expr(mem::take(condition).into())];
-                            if preserve_result {
-                                statements.push(Stmt::Noop(pos));
-                            }
-                            *stmt = (statements, Span::new(pos, Position::NONE)).into();
-                        };
-                    }
-                    _ => (),
-                }
-            }
-        }
-        // do { block } until true -> { block }
-        Stmt::Do(x, options, ..)
-            if matches!(x.0, Expr::BoolConstant(true, ..))
-                && options.contains(ASTFlags::NEGATED) =>
-        {
-            state.set_dirty();
-            *stmt = (
-                optimize_stmt_block(mem::take(&mut *x.1), state, false, true, false),
-                x.1.span(),
-            )
-                .into();
-        }
-        // do { block } while false -> { block }
-        Stmt::Do(x, options, ..)
-            if matches!(x.0, Expr::BoolConstant(false, ..))
-                && !options.contains(ASTFlags::NEGATED) =>
-        {
-            state.set_dirty();
-            *stmt = (
-                optimize_stmt_block(mem::take(&mut *x.1), state, false, true, false),
-                x.1.span(),
-            )
-                .into();
         }
         // do { block } while|until expr
         Stmt::Do(x, ..) => {
@@ -915,6 +871,9 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                 };
             }
         }
+
+        // break expr;
+        Stmt::BreakLoop(Some(ref mut expr), ..) => optimize_expr(expr, state, false),
 
         // return expr;
         Stmt::Return(Some(ref mut expr), ..) => optimize_expr(expr, state, false),

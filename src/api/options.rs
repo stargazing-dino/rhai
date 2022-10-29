@@ -12,23 +12,25 @@ bitflags! {
         const IF_EXPR = 0b_0000_0000_0001;
         /// Is `switch` expression allowed?
         const SWITCH_EXPR = 0b_0000_0000_0010;
+        /// Are loop expressions allowed?
+        const LOOP_EXPR = 0b_0000_0000_0100;
         /// Is statement-expression allowed?
-        const STMT_EXPR = 0b_0000_0000_0100;
+        const STMT_EXPR = 0b_0000_0000_1000;
         /// Is anonymous function allowed?
         #[cfg(not(feature = "no_function"))]
-        const ANON_FN = 0b_0000_0000_1000;
+        const ANON_FN = 0b_0000_0001_0000;
         /// Is looping allowed?
-        const LOOPING = 0b_0000_0001_0000;
+        const LOOPING = 0b_0000_0010_0000;
         /// Is variables shadowing allowed?
-        const SHADOW = 0b_0000_0010_0000;
+        const SHADOW = 0b_0000_0100_0000;
         /// Strict variables mode?
-        const STRICT_VAR = 0b_0000_0100_0000;
+        const STRICT_VAR = 0b_0000_1000_0000;
         /// Raise error if an object map property does not exist?
         /// Returns `()` if `false`.
         #[cfg(not(feature = "no_object"))]
-        const FAIL_ON_INVALID_MAP_PROPERTY = 0b_0000_1000_0000;
+        const FAIL_ON_INVALID_MAP_PROPERTY = 0b_0001_0000_0000;
         /// Fast operators mode?
-        const FAST_OPS = 0b_0001_0000_0000;
+        const FAST_OPS = 0b_0010_0000_0000;
     }
 }
 
@@ -80,6 +82,18 @@ impl Engine {
     #[inline(always)]
     pub fn set_allow_switch_expression(&mut self, enable: bool) {
         self.options.set(LangOptions::SWITCH_EXPR, enable);
+    }
+    /// Are loop expressions allowed?
+    /// Default is `true`.
+    #[inline(always)]
+    #[must_use]
+    pub const fn allow_loop_expressions(&self) -> bool {
+        self.options.contains(LangOptions::LOOP_EXPR)
+    }
+    /// Set whether loop expressions are allowed.
+    #[inline(always)]
+    pub fn set_allow_loop_expressions(&mut self, enable: bool) {
+        self.options.set(LangOptions::LOOP_EXPR, enable);
     }
     /// Is statement-expression allowed?
     /// Default is `true`.
