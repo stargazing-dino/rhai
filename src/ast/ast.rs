@@ -77,7 +77,7 @@ impl AST {
         #[cfg(not(feature = "no_function"))] functions: impl Into<crate::Shared<crate::Module>>,
     ) -> Self {
         Self {
-            source: Identifier::new_const(),
+            source: None,
             #[cfg(feature = "metadata")]
             doc: crate::SmartString::new_const(),
             body: StmtBlock::new(statements, Position::NONE, Position::NONE),
@@ -114,7 +114,7 @@ impl AST {
     pub(crate) fn new_with_source(
         statements: impl IntoIterator<Item = Stmt>,
         #[cfg(not(feature = "no_function"))] functions: impl Into<crate::Shared<crate::Module>>,
-        source: impl Into<Identifier>,
+        source: impl Into<ImmutableString>,
     ) -> Self {
         let mut ast = Self::new(
             statements,
