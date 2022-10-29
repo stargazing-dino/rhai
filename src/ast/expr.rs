@@ -609,7 +609,7 @@ impl Expr {
                 let mut s = SmartString::new_const();
                 for segment in x.iter() {
                     let v = segment.get_literal_value().unwrap();
-                    write!(&mut s, "{}", v).unwrap();
+                    write!(&mut s, "{v}").unwrap();
                 }
                 s.into()
             }
