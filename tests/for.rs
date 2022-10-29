@@ -231,10 +231,12 @@ fn test_for_loop() -> Result<(), Box<EvalAltResult>> {
         );
     }
 
+    #[cfg(not(feature = "no_index"))]
+    #[cfg(not(feature = "no_object"))]
     assert_eq!(
         engine.eval::<INT>(
             r#"
-                let a = [123, 999, 42, 0, true, "hello", "world!", 987.6543];
+                let a = [123, 999, 42, 0, true, "hello", "world!"];
 
                 for (item, count) in a {
                     switch item.type_of() {
