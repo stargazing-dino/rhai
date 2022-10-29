@@ -45,8 +45,8 @@ impl Engine {
         target: &mut Target,
         root: (&str, Position),
         _parent: &Expr,
+        parent_options: ASTFlags,
         rhs: &Expr,
-        _parent_options: ASTFlags,
         idx_values: &mut FnArgsVec<Dynamic>,
         chain_type: ChainType,
         level: usize,
@@ -61,7 +61,7 @@ impl Engine {
             #[cfg(not(feature = "no_index"))]
             ChainType::Indexing => {
                 // Check for existence with the null conditional operator
-                if _parent_options.contains(ASTFlags::NEGATED) && target.is::<()>() {
+                if parent_options.contains(ASTFlags::NEGATED) && target.is::<()>() {
                     return Ok((Dynamic::UNIT, false));
                 }
 
@@ -70,7 +70,7 @@ impl Engine {
                 match rhs {
                     // xxx[idx].expr... | xxx[idx][expr]...
                     Expr::Dot(x, options, x_pos) | Expr::Index(x, options, x_pos)
-                        if !_parent_options.contains(ASTFlags::BREAK) =>
+                        if !parent_options.contains(ASTFlags::BREAK) =>
                     {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(scope, global, lib, this_ptr, _parent, level)?;
@@ -88,8 +88,8 @@ impl Engine {
                             let obj_ptr = &mut obj;
 
                             match self.eval_dot_index_chain_helper(
-                                global, caches, lib, this_ptr, obj_ptr, root, rhs, &x.rhs,
-                                *options, idx_values, rhs_chain, level, new_val,
+                                global, caches, lib, this_ptr, obj_ptr, root, rhs, *options,
+                                &x.rhs, idx_values, rhs_chain, level, new_val,
                             ) {
                                 Ok((result, true)) if is_obj_temp_val => {
                                     (Some(obj.take_or_clone()), (result, true))
@@ -190,7 +190,7 @@ impl Engine {
             #[cfg(not(feature = "no_object"))]
             ChainType::Dotting => {
                 // Check for existence with the Elvis operator
-                if _parent_options.contains(ASTFlags::NEGATED) && target.is::<()>() {
+                if parent_options.contains(ASTFlags::NEGATED) && target.is::<()>() {
                     return Ok((Dynamic::UNIT, false));
                 }
 
@@ -407,7 +407,7 @@ impl Engine {
                         let rhs_chain = rhs.into();
 
                         self.eval_dot_index_chain_helper(
-                            global, caches, lib, this_ptr, val_target, root, rhs, &x.rhs, *options,
+                            global, caches, lib, this_ptr, val_target, root, rhs, *options, &x.rhs,
                             idx_values, rhs_chain, level, new_val,
                         )
                         .map_err(|err| err.fill_position(*x_pos))
@@ -455,8 +455,8 @@ impl Engine {
 
                                 let (result, may_be_changed) = self
                                     .eval_dot_index_chain_helper(
-                                        global, caches, lib, this_ptr, val, root, rhs, &x.rhs,
-                                        *options, idx_values, rhs_chain, level, new_val,
+                                        global, caches, lib, this_ptr, val, root, rhs, *options,
+                                        &x.rhs, idx_values, rhs_chain, level, new_val,
                                     )
                                     .map_err(|err| err.fill_position(*x_pos))?;
 
@@ -525,8 +525,8 @@ impl Engine {
                                 let val = &mut val.into();
 
                                 self.eval_dot_index_chain_helper(
-                                    global, caches, lib, this_ptr, val, root, rhs, &x.rhs,
-                                    *options, idx_values, rhs_chain, level, new_val,
+                                    global, caches, lib, this_ptr, val, root, rhs, *options,
+                                    &x.rhs, idx_values, rhs_chain, level, new_val,
                                 )
                                 .map_err(|err| err.fill_position(pos))
                             }
@@ -612,7 +612,7 @@ impl Engine {
                 let root = (x.3.as_str(), *var_pos);
 
                 self.eval_dot_index_chain_helper(
-                    global, caches, lib, &mut None, obj_ptr, root, expr, rhs, options, idx_values,
+                    global, caches, lib, &mut None, obj_ptr, root, expr, options, rhs, idx_values,
                     chain_type, level, new_val,
                 )
             }
@@ -627,7 +627,7 @@ impl Engine {
                 let root = ("", expr.start_position());
 
                 self.eval_dot_index_chain_helper(
-                    global, caches, lib, this_ptr, obj_ptr, root, expr, rhs, options, idx_values,
+                    global, caches, lib, this_ptr, obj_ptr, root, expr, options, rhs, idx_values,
                     chain_type, level, new_val,
                 )
             }
@@ -646,7 +646,7 @@ impl Engine {
         this_ptr: &mut Option<&mut Dynamic>,
         expr: &Expr,
         parent_options: ASTFlags,
-        _parent_chain_type: ChainType,
+        parent_chain_type: ChainType,
         idx_values: &mut FnArgsVec<Dynamic>,
         level: usize,
     ) -> RhaiResultOf<()> {
@@ -655,7 +655,7 @@ impl Engine {
         match expr {
             #[cfg(not(feature = "no_object"))]
             Expr::MethodCall(x, ..)
-                if _parent_chain_type == ChainType::Dotting && !x.is_qualified() =>
+                if parent_chain_type == ChainType::Dotting && !x.is_qualified() =>
             {
                 for arg_expr in &x.args {
                     idx_values.push(
@@ -666,12 +666,12 @@ impl Engine {
                 }
             }
             #[cfg(not(feature = "no_object"))]
-            Expr::MethodCall(..) if _parent_chain_type == ChainType::Dotting => {
+            Expr::MethodCall(..) if parent_chain_type == ChainType::Dotting => {
                 unreachable!("function call in dot chain should not be namespace-qualified")
             }
 
             #[cfg(not(feature = "no_object"))]
-            Expr::Property(..) if _parent_chain_type == ChainType::Dotting => (),
+            Expr::Property(..) if parent_chain_type == ChainType::Dotting => (),
             Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
 
             Expr::Index(x, options, ..) | Expr::Dot(x, options, ..)
@@ -684,12 +684,12 @@ impl Engine {
                 // Evaluate in left-to-right order
                 match lhs {
                     #[cfg(not(feature = "no_object"))]
-                    Expr::Property(..) if _parent_chain_type == ChainType::Dotting => (),
+                    Expr::Property(..) if parent_chain_type == ChainType::Dotting => (),
                     Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
 
                     #[cfg(not(feature = "no_object"))]
                     Expr::MethodCall(x, ..)
-                        if _parent_chain_type == ChainType::Dotting && !x.is_qualified() =>
+                        if parent_chain_type == ChainType::Dotting && !x.is_qualified() =>
                     {
                         for arg_expr in &x.args {
                             _arg_values.push(
@@ -702,15 +702,15 @@ impl Engine {
                         }
                     }
                     #[cfg(not(feature = "no_object"))]
-                    Expr::MethodCall(..) if _parent_chain_type == ChainType::Dotting => {
+                    Expr::MethodCall(..) if parent_chain_type == ChainType::Dotting => {
                         unreachable!("function call in dot chain should not be namespace-qualified")
                     }
                     #[cfg(not(feature = "no_object"))]
-                    expr if _parent_chain_type == ChainType::Dotting => {
+                    expr if parent_chain_type == ChainType::Dotting => {
                         unreachable!("invalid dot expression: {:?}", expr);
                     }
                     #[cfg(not(feature = "no_index"))]
-                    _ if _parent_chain_type == ChainType::Indexing => {
+                    _ if parent_chain_type == ChainType::Indexing => {
                         _arg_values.push(
                             self.eval_expr(scope, global, caches, lib, this_ptr, lhs, level)?
                                 .flatten(),
@@ -733,11 +733,11 @@ impl Engine {
             }
 
             #[cfg(not(feature = "no_object"))]
-            _ if _parent_chain_type == ChainType::Dotting => {
+            _ if parent_chain_type == ChainType::Dotting => {
                 unreachable!("invalid dot expression: {:?}", expr);
             }
             #[cfg(not(feature = "no_index"))]
-            _ if _parent_chain_type == ChainType::Indexing => idx_values.push(
+            _ if parent_chain_type == ChainType::Indexing => idx_values.push(
                 self.eval_expr(scope, global, caches, lib, this_ptr, expr, level)?
                     .flatten(),
             ),

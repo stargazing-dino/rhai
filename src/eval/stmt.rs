@@ -493,7 +493,7 @@ impl Engine {
                             Ok(_) => (),
                             Err(err) => match *err {
                                 ERR::LoopBreak(false, ..) => (),
-                                ERR::LoopBreak(true, ..) => break Ok(Dynamic::UNIT),
+                                ERR::LoopBreak(true, value, ..) => break Ok(value),
                                 _ => break Err(err),
                             },
                         }
@@ -524,7 +524,7 @@ impl Engine {
                                 Ok(_) => (),
                                 Err(err) => match *err {
                                     ERR::LoopBreak(false, ..) => (),
-                                    ERR::LoopBreak(true, ..) => break Ok(Dynamic::UNIT),
+                                    ERR::LoopBreak(true, value, ..) => break Ok(value),
                                     _ => break Err(err),
                                 },
                             }
@@ -547,7 +547,7 @@ impl Engine {
                             Ok(_) => (),
                             Err(err) => match *err {
                                 ERR::LoopBreak(false, ..) => continue,
-                                ERR::LoopBreak(true, ..) => break Ok(Dynamic::UNIT),
+                                ERR::LoopBreak(true, value, ..) => break Ok(value),
                                 _ => break Err(err),
                             },
                         }
@@ -614,7 +614,7 @@ impl Engine {
 
                         let loop_result = func(iter_obj)
                             .enumerate()
-                            .try_for_each(|(x, iter_value)| {
+                            .try_fold(Dynamic::UNIT, |_, (x, iter_value)| {
                                 // Increment counter
                                 if counter_index < usize::MAX {
                                     // As the variable increments from 0, this should always work
@@ -644,26 +644,26 @@ impl Engine {
                                 self.track_operation(global, statements.position())?;
 
                                 if statements.is_empty() {
-                                    return Ok(());
+                                    return Ok(Dynamic::UNIT);
                                 }
 
                                 self.eval_stmt_block(
                                     scope, global, caches, lib, this_ptr, statements, true, level,
                                 )
-                                .map(|_| ())
+                                .map(|_| Dynamic::UNIT)
                                 .or_else(|err| match *err {
-                                    ERR::LoopBreak(false, ..) => Ok(()),
+                                    ERR::LoopBreak(false, ..) => Ok(Dynamic::UNIT),
                                     _ => Err(err),
                                 })
                             })
                             .or_else(|err| match *err {
-                                ERR::LoopBreak(true, ..) => Ok(()),
+                                ERR::LoopBreak(true, value, ..) => Ok(value),
                                 _ => Err(err),
                             });
 
                         scope.rewind(orig_scope_len);
 
-                        loop_result.map(|_| Dynamic::UNIT)
+                        loop_result
                     } else {
                         Err(ERR::ErrorFor(expr.start_position()).into())
                     }
@@ -673,8 +673,15 @@ impl Engine {
             }
 
             // Continue/Break statement
-            Stmt::BreakLoop(options, pos) => {
-                Err(ERR::LoopBreak(options.contains(ASTFlags::BREAK), *pos).into())
+            Stmt::BreakLoop(expr, options, pos) => {
+                let is_break = options.contains(ASTFlags::BREAK);
+
+                if let Some(ref expr) = expr {
+                    self.eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                        .and_then(|v| ERR::LoopBreak(is_break, v, *pos).into())
+                } else {
+                    Err(ERR::LoopBreak(is_break, Dynamic::UNIT, *pos).into())
+                }
             }
 
             // Try/Catch statement
@@ -712,8 +719,8 @@ impl Engine {
 
                                 err_map.insert("message".into(), err.to_string().into());
 
-                                if !global.source.is_empty() {
-                                    err_map.insert("source".into(), global.source.clone().into());
+                                if let Some(ref source) = global.source {
+                                    err_map.insert("source".into(), source.into());
                                 }
 
                                 if !err_pos.is_none() {
@@ -970,23 +977,25 @@ impl Engine {
 
             // Share statement
             #[cfg(not(feature = "no_closure"))]
-            Stmt::Share(x, pos) => {
-                let (name, index) = &**x;
+            Stmt::Share(x) => {
+                x.iter()
+                    .try_for_each(|(name, index, pos)| {
+                        if let Some(index) = index
+                            .map(|n| scope.len() - n.get())
+                            .or_else(|| scope.search(name))
+                        {
+                            let val = scope.get_mut_by_index(index);
 
-                if let Some(index) = index
-                    .map(|n| scope.len() - n.get())
-                    .or_else(|| scope.search(name))
-                {
-                    let val = scope.get_mut_by_index(index);
-
-                    if !val.is_shared() {
-                        // Replace the variable with a shared value.
-                        *val = std::mem::take(val).into_shared();
-                    }
-                    Ok(Dynamic::UNIT)
-                } else {
-                    Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into())
-                }
+                            if !val.is_shared() {
+                                // Replace the variable with a shared value.
+                                *val = std::mem::take(val).into_shared();
+                            }
+                            Ok(())
+                        } else {
+                            Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into())
+                        }
+                    })
+                    .map(|_| Dynamic::UNIT)
             }
 
             _ => unreachable!("statement cannot be evaluated: {:?}", stmt),

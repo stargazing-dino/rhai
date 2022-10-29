@@ -110,6 +110,7 @@ impl Engine {
     }
 
     /// Check whether the size of a [`Dynamic`] is within limits.
+    #[inline]
     pub(crate) fn check_data_size(&self, value: &Dynamic, pos: Position) -> RhaiResultOf<()> {
         // If no data size limits, just return
         if !self.has_data_size_limit() {

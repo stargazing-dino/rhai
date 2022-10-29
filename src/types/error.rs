@@ -117,7 +117,7 @@ pub enum EvalAltResult {
     /// Breaking out of loops - not an error if within a loop.
     /// The wrapped value, if true, means breaking clean out of the loop (i.e. a `break` statement).
     /// The wrapped value, if false, means breaking the current context (i.e. a `continue` statement).
-    LoopBreak(bool, Position),
+    LoopBreak(bool, Dynamic, Position),
     /// Not an error: Value returned from a script via the `return` keyword.
     /// Wrapped value is the result value.
     Return(Dynamic, Position),

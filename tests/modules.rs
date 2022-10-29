@@ -578,7 +578,7 @@ fn test_module_context() -> Result<(), Box<EvalAltResult>> {
             let new_context = NativeCallContext::new_with_all_fields(
                 engine,
                 &fn_name,
-                source.as_ref().map(|s| s.as_str()),
+                source.as_ref().map(String::as_str),
                 &global,
                 &lib,
                 pos,

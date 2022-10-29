@@ -54,7 +54,7 @@ impl Engine {
 
             Err(ERR::ErrorInFunctionCall(
                 name,
-                source.unwrap_or_else(|| global.source.to_string()),
+                source.unwrap_or_else(|| global.source().unwrap_or("").to_string()),
                 err,
                 pos,
             )

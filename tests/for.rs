@@ -231,6 +231,25 @@ fn test_for_loop() -> Result<(), Box<EvalAltResult>> {
         );
     }
 
+    #[cfg(not(feature = "no_index"))]
+    #[cfg(not(feature = "no_object"))]
+    #[cfg(not(feature = "no_float"))]
+    assert_eq!(
+        engine.eval::<INT>(
+            r#"
+                let a = [123, 999, 42, 0, true, "hello", "world!", 987.654];
+
+                for (item, count) in a {
+                    switch item.type_of() {
+                        "i64" | "i32" if item.is_even => break count,
+                        "f64" | "f32" if item.to_int().is_even => break count,
+                    }
+                }
+            "#
+        )?,
+        2
+    );
+
     Ok(())
 }
 

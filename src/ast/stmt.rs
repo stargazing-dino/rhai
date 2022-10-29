@@ -581,14 +581,14 @@ pub enum Stmt {
     TryCatch(Box<TryCatchBlock>, Position),
     /// [expression][Expr]
     Expr(Box<Expr>),
-    /// `continue`/`break`
+    /// `continue`/`break` expr
     ///
     /// ### Flags
     ///
     /// * [`NONE`][ASTFlags::NONE] = `continue`
     /// * [`BREAK`][ASTFlags::BREAK] = `break`
-    BreakLoop(ASTFlags, Position),
-    /// `return`/`throw`
+    BreakLoop(Option<Box<Expr>>, ASTFlags, Position),
+    /// `return`/`throw` expr
     ///
     /// ### Flags
     ///
@@ -605,19 +605,16 @@ pub enum Stmt {
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
     Export(Box<(Ident, Ident)>, Position),
-    /// Convert a variable to shared.
+    /// Convert a list of variables to shared.
     ///
     /// Not available under `no_closure`.
     ///
     /// # Notes
     ///
     /// This variant does not map to any language structure.  It is currently only used only to
-    /// convert a normal variable into a shared variable when the variable is _captured_ by a closure.
+    /// convert normal variables into shared variables when they are _captured_ by a closure.
     #[cfg(not(feature = "no_closure"))]
-    Share(
-        Box<(crate::ImmutableString, Option<NonZeroUsize>)>,
-        Position,
-    ),
+    Share(Box<crate::FnArgsVec<(crate::ImmutableString, Option<NonZeroUsize>, Position)>>),
 }
 
 impl Default for Stmt {
@@ -684,7 +681,7 @@ impl Stmt {
             Self::Export(.., pos) => *pos,
 
             #[cfg(not(feature = "no_closure"))]
-            Self::Share(.., pos) => *pos,
+            Self::Share(x) => x[0].2,
         }
     }
     /// Override the [position][Position] of this statement.
@@ -716,7 +713,7 @@ impl Stmt {
             Self::Export(.., pos) => *pos = new_pos,
 
             #[cfg(not(feature = "no_closure"))]
-            Self::Share(.., pos) => *pos = new_pos,
+            Self::Share(x) => x.iter_mut().for_each(|(_, _, pos)| *pos = new_pos),
         }
 
         self

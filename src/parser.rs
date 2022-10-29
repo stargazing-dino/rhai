@@ -1380,6 +1380,23 @@ impl Engine {
                 self.parse_if(input, state, lib, settings.level_up())?
                     .into(),
             )),
+            // Loops are allowed to act as expressions
+            Token::While | Token::Loop if settings.options.contains(LangOptions::LOOP_EXPR) => {
+                Expr::Stmt(Box::new(
+                    self.parse_while_loop(input, state, lib, settings.level_up())?
+                        .into(),
+                ))
+            }
+            Token::Do if settings.options.contains(LangOptions::LOOP_EXPR) => Expr::Stmt(Box::new(
+                self.parse_do(input, state, lib, settings.level_up())?
+                    .into(),
+            )),
+            Token::For if settings.options.contains(LangOptions::LOOP_EXPR) => {
+                Expr::Stmt(Box::new(
+                    self.parse_for(input, state, lib, settings.level_up())?
+                        .into(),
+                ))
+            }
             // Switch statement is allowed to act as expressions
             Token::Switch if settings.options.contains(LangOptions::SWITCH_EXPR) => {
                 Expr::Stmt(Box::new(
@@ -3411,11 +3428,26 @@ impl Engine {
 
             Token::Continue if self.allow_looping() && settings.is_breakable => {
                 let pos = eat_token(input, Token::Continue);
-                Ok(Stmt::BreakLoop(ASTFlags::NONE, pos))
+                Ok(Stmt::BreakLoop(None, ASTFlags::NONE, pos))
             }
             Token::Break if self.allow_looping() && settings.is_breakable => {
                 let pos = eat_token(input, Token::Break);
-                Ok(Stmt::BreakLoop(ASTFlags::BREAK, pos))
+
+                let expr = match input.peek().expect(NEVER_ENDS) {
+                    // `break` at <EOF>
+                    (Token::EOF, ..) => None,
+                    // `break` at end of block
+                    (Token::RightBrace, ..) => None,
+                    // `break;`
+                    (Token::SemiColon, ..) => None,
+                    // `break`  with expression
+                    _ => Some(
+                        self.parse_expr(input, state, lib, settings.level_up())?
+                            .into(),
+                    ),
+                };
+
+                Ok(Stmt::BreakLoop(expr, ASTFlags::BREAK, pos))
             }
             Token::Continue | Token::Break if self.allow_looping() => {
                 Err(PERR::LoopBreak.into_err(token_pos))
@@ -3707,15 +3739,17 @@ impl Engine {
 
         // Convert the entire expression into a statement block, then insert the relevant
         // [`Share`][Stmt::Share] statements.
-        let mut statements = StaticVec::with_capacity(externals.len() + 1);
-        statements.extend(
+        let mut statements = StaticVec::with_capacity(2);
+        statements.push(Stmt::Share(
             externals
                 .into_iter()
                 .map(|crate::ast::Ident { name, pos }| {
                     let (index, _) = parent.access_var(&name, lib, pos);
-                    Stmt::Share((name, index).into(), pos)
-                }),
-        );
+                    (name, index, pos)
+                })
+                .collect::<crate::FnArgsVec<_>>()
+                .into(),
+        ));
         statements.push(Stmt::Expr(expr.into()));
         Expr::Stmt(crate::ast::StmtBlock::new(statements, pos, Position::NONE).into())
     }
@@ -3840,7 +3874,7 @@ impl Engine {
         let mut functions = StraightHashMap::default();
 
         let mut options = self.options;
-        options.remove(LangOptions::STMT_EXPR);
+        options.remove(LangOptions::STMT_EXPR | LangOptions::LOOP_EXPR);
         #[cfg(not(feature = "no_function"))]
         options.remove(LangOptions::ANON_FN);
 

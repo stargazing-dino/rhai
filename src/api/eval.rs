@@ -217,7 +217,7 @@ impl Engine {
         level: usize,
     ) -> RhaiResult {
         let mut caches = Caches::new();
-        global.source = ast.source_raw().clone();
+        global.source = ast.source_raw().cloned();
 
         #[cfg(not(feature = "no_module"))]
         let orig_embedded_module_resolver = std::mem::replace(

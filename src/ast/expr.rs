@@ -609,7 +609,7 @@ impl Expr {
                 let mut s = SmartString::new_const();
                 for segment in x.iter() {
                     let v = segment.get_literal_value().unwrap();
-                    write!(&mut s, "{}", v).unwrap();
+                    write!(&mut s, "{v}").unwrap();
                 }
                 s.into()
             }
@@ -619,7 +619,7 @@ impl Expr {
                 if !x.is_qualified() && x.args.len() == 1 && x.name == KEYWORD_FN_PTR =>
             {
                 if let Self::StringConstant(ref s, ..) = x.args[0] {
-                    FnPtr::new(s).ok()?.into()
+                    FnPtr::new(s.clone()).ok()?.into()
                 } else {
                     return None;
                 }

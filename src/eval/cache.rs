@@ -2,7 +2,7 @@
 
 use crate::func::{CallableFunction, StraightHashMap};
 use crate::types::BloomFilterU64;
-use crate::{Identifier, StaticVec};
+use crate::{ImmutableString, StaticVec};
 use std::marker::PhantomData;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -14,7 +14,7 @@ pub struct FnResolutionCacheEntry {
     /// Function.
     pub func: CallableFunction,
     /// Optional source.
-    pub source: Option<Box<Identifier>>,
+    pub source: Option<ImmutableString>,
 }
 
 /// _(internals)_ A function resolution cache with a bloom filter.

@@ -239,8 +239,10 @@ impl Engine {
             engine.print = Box::new(|s| println!("{s}"));
             engine.debug = Box::new(|s, source, pos| match (source, pos) {
                 (Some(source), crate::Position::NONE) => println!("{source} | {s}"),
+                #[cfg(not(feature = "no_position"))]
                 (Some(source), pos) => println!("{source} @ {pos:?} | {s}"),
                 (None, crate::Position::NONE) => println!("{s}"),
+                #[cfg(not(feature = "no_position"))]
                 (None, pos) => println!("{pos:?} | {s}"),
             });
         }

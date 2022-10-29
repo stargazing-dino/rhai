@@ -89,21 +89,21 @@ fn test_optimizer_parse() -> Result<(), Box<EvalAltResult>> {
 
     assert_eq!(
         format!("{ast:?}"),
-        r#"AST { source: "", doc: "", resolver: None, body: [Expr(123 @ 1:53)] }"#
+        r#"AST { source: None, doc: "", resolver: None, body: [Expr(123 @ 1:53)] }"#
     );
 
     let ast = engine.compile("const DECISION = false; if DECISION { 42 } else { 123 }")?;
 
     assert_eq!(
         format!("{ast:?}"),
-        r#"AST { source: "", doc: "", resolver: None, body: [Var(("DECISION" @ 1:7, false @ 1:18, None), CONSTANT, 1:1), Expr(123 @ 1:51)] }"#
+        r#"AST { source: None, doc: "", resolver: None, body: [Var(("DECISION" @ 1:7, false @ 1:18, None), CONSTANT, 1:1), Expr(123 @ 1:51)] }"#
     );
 
     let ast = engine.compile("if 1 == 2 { 42 }")?;
 
     assert_eq!(
         format!("{ast:?}"),
-        r#"AST { source: "", doc: "", resolver: None, body: [] }"#
+        r#"AST { source: None, doc: "", resolver: None, body: [] }"#
     );
 
     engine.set_optimization_level(OptimizationLevel::Full);
@@ -112,14 +112,14 @@ fn test_optimizer_parse() -> Result<(), Box<EvalAltResult>> {
 
     assert_eq!(
         format!("{ast:?}"),
-        r#"AST { source: "", doc: "", resolver: None, body: [Expr(42 @ 1:1)] }"#
+        r#"AST { source: None, doc: "", resolver: None, body: [Expr(42 @ 1:1)] }"#
     );
 
     let ast = engine.compile("NUMBER")?;
 
     assert_eq!(
         format!("{ast:?}"),
-        r#"AST { source: "", doc: "", resolver: None, body: [Expr(Variable(NUMBER) @ 1:1)] }"#
+        r#"AST { source: None, doc: "", resolver: None, body: [Expr(Variable(NUMBER) @ 1:1)] }"#
     );
 
     let mut module = Module::new();
@@ -131,7 +131,7 @@ fn test_optimizer_parse() -> Result<(), Box<EvalAltResult>> {
 
     assert_eq!(
         format!("{ast:?}"),
-        r#"AST { source: "", doc: "", resolver: None, body: [Expr(42 @ 1:1)] }"#
+        r#"AST { source: None, doc: "", resolver: None, body: [Expr(42 @ 1:1)] }"#
     );
 
     Ok(())

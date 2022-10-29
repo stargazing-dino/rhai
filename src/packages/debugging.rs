@@ -40,7 +40,7 @@ mod debugging_functions {
                 .iter()
                 .rev()
                 .filter(|crate::debugger::CallStackFrame { fn_name, args, .. }| {
-                    fn_name != "back_trace" || !args.is_empty()
+                    fn_name.as_str() != "back_trace" || !args.is_empty()
                 })
                 .map(
                     |frame @ crate::debugger::CallStackFrame {
@@ -62,8 +62,8 @@ mod debugging_functions {
                                     Dynamic::from_array(_args.clone().to_vec()),
                                 );
                             }
-                            if !_source.is_empty() {
-                                map.insert("source".into(), _source.into());
+                            if let Some(source) = _source {
+                                map.insert("source".into(), source.into());
                             }
                             if !_pos.is_none() {
                                 map.insert(

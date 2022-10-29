@@ -10,6 +10,7 @@ Bug fixes
 * `Engine::parse_json` now returns an error on unquoted keys to be consistent with JSON specifications.
 * `import` statements inside `eval` no longer cause errors in subsequent code.
 * Functions marked `global` in `import`ed modules with no alias names now work properly.
+* Incorrect loop optimizations that are too aggressive (e.g. unrolling a `do { ... } until true` with a `break` statement inside) and cause crashes are removed.
 
 Speed Improvements
 ------------------
@@ -18,6 +19,12 @@ Speed Improvements
 
 New features
 ------------
+
+### Loop expressions
+
+* Loops (such as `loop`, `do`, `while` and `for`) can now act as _expressions_, with the `break` statement returning an optional value.
+* Normal loops return `()` as the value.
+* Loop expressions can be enabled/disabled via `Engine::set_allow_loop_expressions`
 
 ### Stable hashing
 

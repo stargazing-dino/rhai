@@ -113,7 +113,7 @@ impl Engine {
     pub fn run_ast_with_scope(&self, scope: &mut Scope, ast: &AST) -> RhaiResultOf<()> {
         let caches = &mut Caches::new();
         let global = &mut GlobalRuntimeState::new(self);
-        global.source = ast.source_raw().clone();
+        global.source = ast.source_raw().cloned();
 
         #[cfg(not(feature = "no_module"))]
         {
