@@ -122,7 +122,7 @@ impl<T: Debug + Copy + PartialOrd> FusedIterator for StepRange<T> {}
 
 // Bit-field iterator with step
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct BitRange(INT, INT, usize);
+pub struct BitRange(INT, usize);
 
 impl BitRange {
     pub fn new(value: INT, from: INT, len: INT) -> RhaiResultOf<Self> {
@@ -138,7 +138,7 @@ impl BitRange {
             len as usize
         };
 
-        Ok(Self(value, 1 << from, len))
+        Ok(Self(value >> from, len))
     }
 }
 
@@ -146,19 +146,19 @@ impl Iterator for BitRange {
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.2 == 0 {
+        if self.1 == 0 {
             None
         } else {
-            let r = (self.0 & self.1) != 0;
-            self.1 <<= 1;
-            self.2 -= 1;
+            let r = (self.0 & 0x0001) != 0;
+            self.0 >>= 1;
+            self.1 -= 1;
             Some(r)
         }
     }
 
     #[inline(always)]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.2, Some(self.2))
+        (self.1, Some(self.1))
     }
 }
 
@@ -167,7 +167,7 @@ impl FusedIterator for BitRange {}
 impl ExactSizeIterator for BitRange {
     #[inline(always)]
     fn len(&self) -> usize {
-        self.2
+        self.1
     }
 }
 
