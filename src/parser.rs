@@ -3739,15 +3739,17 @@ impl Engine {
 
         // Convert the entire expression into a statement block, then insert the relevant
         // [`Share`][Stmt::Share] statements.
-        let mut statements = StaticVec::with_capacity(externals.len() + 1);
-        statements.extend(
+        let mut statements = StaticVec::with_capacity(2);
+        statements.push(Stmt::Share(
             externals
                 .into_iter()
                 .map(|crate::ast::Ident { name, pos }| {
                     let (index, _) = parent.access_var(&name, lib, pos);
-                    Stmt::Share((name, index).into(), pos)
-                }),
-        );
+                    (name, index, pos)
+                })
+                .collect::<crate::FnArgsVec<_>>()
+                .into(),
+        ));
         statements.push(Stmt::Expr(expr.into()));
         Expr::Stmt(crate::ast::StmtBlock::new(statements, pos, Position::NONE).into())
     }

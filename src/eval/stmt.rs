@@ -977,23 +977,25 @@ impl Engine {
 
             // Share statement
             #[cfg(not(feature = "no_closure"))]
-            Stmt::Share(x, pos) => {
-                let (name, index) = &**x;
+            Stmt::Share(x) => {
+                x.iter()
+                    .try_for_each(|(name, index, pos)| {
+                        if let Some(index) = index
+                            .map(|n| scope.len() - n.get())
+                            .or_else(|| scope.search(name))
+                        {
+                            let val = scope.get_mut_by_index(index);
 
-                if let Some(index) = index
-                    .map(|n| scope.len() - n.get())
-                    .or_else(|| scope.search(name))
-                {
-                    let val = scope.get_mut_by_index(index);
-
-                    if !val.is_shared() {
-                        // Replace the variable with a shared value.
-                        *val = std::mem::take(val).into_shared();
-                    }
-                    Ok(Dynamic::UNIT)
-                } else {
-                    Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into())
-                }
+                            if !val.is_shared() {
+                                // Replace the variable with a shared value.
+                                *val = std::mem::take(val).into_shared();
+                            }
+                            Ok(())
+                        } else {
+                            Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into())
+                        }
+                    })
+                    .map(|_| Dynamic::UNIT)
             }
 
             _ => unreachable!("statement cannot be evaluated: {:?}", stmt),
