@@ -400,7 +400,7 @@ impl Engine {
                 #[cfg(feature = "debugging")]
                 if self.debugger.is_some() {
                     global.debugger.push_call_stack_frame(
-                        name,
+                        self.get_interned_string(name),
                         args.iter().map(|v| (*v).clone()).collect(),
                         source.clone().or_else(|| global.source.clone()),
                         pos,

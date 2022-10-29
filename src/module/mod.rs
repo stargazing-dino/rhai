@@ -72,7 +72,7 @@ pub struct FuncInfo {
     /// Function access mode.
     pub access: FnAccess,
     /// Function name.
-    pub name: Identifier,
+    pub name: ImmutableString,
     /// Number of parameters.
     pub num_params: usize,
     /// Parameter types (if applicable).

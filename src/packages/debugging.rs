@@ -40,7 +40,7 @@ mod debugging_functions {
                 .iter()
                 .rev()
                 .filter(|crate::debugger::CallStackFrame { fn_name, args, .. }| {
-                    fn_name != "back_trace" || !args.is_empty()
+                    fn_name.as_str() != "back_trace" || !args.is_empty()
                 })
                 .map(
                     |frame @ crate::debugger::CallStackFrame {

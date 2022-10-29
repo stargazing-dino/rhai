@@ -619,7 +619,7 @@ impl Expr {
                 if !x.is_qualified() && x.args.len() == 1 && x.name == KEYWORD_FN_PTR =>
             {
                 if let Self::StringConstant(ref s, ..) = x.args[0] {
-                    FnPtr::new(s).ok()?.into()
+                    FnPtr::new(s.clone()).ok()?.into()
                 } else {
                     return None;
                 }

@@ -4,8 +4,7 @@
 use super::{EvalContext, GlobalRuntimeState};
 use crate::ast::{ASTNode, Expr, Stmt};
 use crate::{
-    Dynamic, Engine, EvalAltResult, Identifier, ImmutableString, Module, Position, RhaiResultOf,
-    Scope,
+    Dynamic, Engine, EvalAltResult, ImmutableString, Module, Position, RhaiResultOf, Scope,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -103,12 +102,10 @@ pub enum BreakPoint {
     /// Break at a particular position under a particular source.
     ///
     /// Not available under `no_position`.
-    ///
-    /// Source is empty if not available.
     #[cfg(not(feature = "no_position"))]
     AtPosition {
         /// Source (empty if not available) of the break-point.
-        source: Identifier,
+        source: Option<ImmutableString>,
         /// [Position] of the break-point.
         pos: Position,
         /// Is the break-point enabled?
@@ -117,14 +114,14 @@ pub enum BreakPoint {
     /// Break at a particular function call.
     AtFunctionName {
         /// Function name.
-        name: Identifier,
+        name: ImmutableString,
         /// Is the break-point enabled?
         enabled: bool,
     },
     /// Break at a particular function call with a particular number of arguments.
     AtFunctionCall {
         /// Function name.
-        name: Identifier,
+        name: ImmutableString,
         /// Number of arguments.
         args: usize,
         /// Is the break-point enabled?
@@ -136,7 +133,7 @@ pub enum BreakPoint {
     #[cfg(not(feature = "no_object"))]
     AtProperty {
         /// Property name.
-        name: Identifier,
+        name: ImmutableString,
         /// Is the break-point enabled?
         enabled: bool,
     },
@@ -151,7 +148,7 @@ impl fmt::Display for BreakPoint {
                 pos,
                 enabled,
             } => {
-                if !source.is_empty() {
+                if let Some(ref source) = source {
                     write!(f, "{source} ")?;
                 }
                 write!(f, "@ {pos:?}")?;
@@ -226,7 +223,7 @@ impl BreakPoint {
 #[derive(Debug, Clone, Hash)]
 pub struct CallStackFrame {
     /// Function name.
-    pub fn_name: Identifier,
+    pub fn_name: ImmutableString,
     /// Copies of function call arguments, if any.
     pub args: crate::StaticVec<Dynamic>,
     /// Source of the function.
@@ -296,7 +293,7 @@ impl Debugger {
     #[inline(always)]
     pub(crate) fn push_call_stack_frame(
         &mut self,
-        fn_name: impl Into<Identifier>,
+        fn_name: ImmutableString,
         args: crate::StaticVec<Dynamic>,
         source: Option<ImmutableString>,
         pos: Position,
@@ -331,7 +328,7 @@ impl Debugger {
     }
     /// Returns the first break-point triggered by a particular [`AST` Node][ASTNode].
     #[must_use]
-    pub fn is_break_point(&self, src: &str, node: ASTNode) -> Option<usize> {
+    pub fn is_break_point(&self, src: Option<&str>, node: ASTNode) -> Option<usize> {
         let _src = src;
 
         self.break_points()
@@ -343,11 +340,12 @@ impl Debugger {
                 BreakPoint::AtPosition { pos, .. } if pos.is_none() => false,
                 #[cfg(not(feature = "no_position"))]
                 BreakPoint::AtPosition { source, pos, .. } if pos.is_beginning_of_line() => {
-                    node.position().line().unwrap_or(0) == pos.line().unwrap() && _src == source
+                    node.position().line().unwrap_or(0) == pos.line().unwrap()
+                        && _src == source.as_ref().map(|s| s.as_str())
                 }
                 #[cfg(not(feature = "no_position"))]
                 BreakPoint::AtPosition { source, pos, .. } => {
-                    node.position() == *pos && _src == source
+                    node.position() == *pos && _src == source.as_ref().map(|s| s.as_str())
                 }
                 BreakPoint::AtFunctionName { name, .. } => match node {
                     ASTNode::Expr(Expr::FnCall(x, ..)) | ASTNode::Stmt(Stmt::FnCall(x, ..)) => {
@@ -490,10 +488,7 @@ impl Engine {
 
         let event = match event {
             Some(e) => e,
-            None => match global
-                .debugger
-                .is_break_point(global.source().unwrap_or(""), node)
-            {
+            None => match global.debugger.is_break_point(global.source(), node) {
                 Some(bp) => DebuggerEvent::BreakPoint(bp),
                 None => return Ok(None),
             },

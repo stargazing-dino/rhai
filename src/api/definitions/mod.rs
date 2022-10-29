@@ -442,8 +442,8 @@ impl Module {
 
             if f.access != FnAccess::Private {
                 #[cfg(not(feature = "no_custom_syntax"))]
-                let operator = def.engine.custom_keywords.contains_key(&f.name)
-                    || (!f.name.contains('$') && !is_valid_function_name(&f.name));
+                let operator = def.engine.custom_keywords.contains_key(f.name.as_str())
+                    || (!f.name.contains('$') && !is_valid_function_name(f.name.as_str()));
 
                 #[cfg(feature = "no_custom_syntax")]
                 let operator = !f.name.contains('$') && !is_valid_function_name(&f.name);

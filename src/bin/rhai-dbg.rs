@@ -516,7 +516,7 @@ fn debug_callback(
 
                     if range.contains(&n) {
                         let bp = rhai::debugger::BreakPoint::AtPosition {
-                            source: source.unwrap_or("").into(),
+                            source: source.map(|s| s.into()),
                             pos: Position::new(n as u16, 0),
                             enabled: true,
                         };
@@ -546,7 +546,7 @@ fn debug_callback(
                 #[cfg(not(feature = "no_position"))]
                 ["break" | "b"] => {
                     let bp = rhai::debugger::BreakPoint::AtPosition {
-                        source: source.unwrap_or("").into(),
+                        source: source.map(|s| s.into()),
                         pos,
                         enabled: true,
                     };

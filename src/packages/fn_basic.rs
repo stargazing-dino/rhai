@@ -27,7 +27,7 @@ mod fn_ptr_functions {
     /// ```
     #[rhai_fn(name = "name", get = "name", pure)]
     pub fn name(fn_ptr: &mut FnPtr) -> ImmutableString {
-        fn_ptr.fn_name_raw().into()
+        fn_ptr.fn_name_raw().clone()
     }
 
     /// Return `true` if the function is an anonymous function.

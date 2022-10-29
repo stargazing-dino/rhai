@@ -3,7 +3,7 @@
 use crate::tokenizer::is_valid_identifier;
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, FuncArgs, Identifier, Module, NativeCallContext, Position, RhaiError,
+    Dynamic, Engine, FuncArgs, ImmutableString, Module, NativeCallContext, Position, RhaiError,
     RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
@@ -18,7 +18,7 @@ use std::{
 /// to be passed onto a function during a call.
 #[derive(Clone, Hash)]
 pub struct FnPtr {
-    name: Identifier,
+    name: ImmutableString,
     curry: StaticVec<Dynamic>,
 }
 
@@ -42,13 +42,16 @@ impl fmt::Debug for FnPtr {
 impl FnPtr {
     /// Create a new function pointer.
     #[inline(always)]
-    pub fn new(name: impl Into<Identifier>) -> RhaiResultOf<Self> {
+    pub fn new(name: impl Into<ImmutableString>) -> RhaiResultOf<Self> {
         name.into().try_into()
     }
     /// Create a new function pointer without checking its parameters.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn new_unchecked(name: impl Into<Identifier>, curry: StaticVec<Dynamic>) -> Self {
+    pub(crate) fn new_unchecked(
+        name: impl Into<ImmutableString>,
+        curry: StaticVec<Dynamic>,
+    ) -> Self {
         Self {
             name: name.into(),
             curry,
@@ -63,13 +66,13 @@ impl FnPtr {
     /// Get the name of the function.
     #[inline(always)]
     #[must_use]
-    pub(crate) const fn fn_name_raw(&self) -> &Identifier {
+    pub(crate) const fn fn_name_raw(&self) -> &ImmutableString {
         &self.name
     }
     /// Get the underlying data of the function pointer.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn take_data(self) -> (Identifier, StaticVec<Dynamic>) {
+    pub(crate) fn take_data(self) -> (ImmutableString, StaticVec<Dynamic>) {
         (self.name, self.curry)
     }
     /// Get the curried arguments.
@@ -246,11 +249,11 @@ impl fmt::Display for FnPtr {
     }
 }
 
-impl TryFrom<Identifier> for FnPtr {
+impl TryFrom<ImmutableString> for FnPtr {
     type Error = RhaiError;
 
-    #[inline]
-    fn try_from(value: Identifier) -> RhaiResultOf<Self> {
+    #[inline(always)]
+    fn try_from(value: ImmutableString) -> RhaiResultOf<Self> {
         if is_valid_identifier(value.chars()) {
             Ok(Self {
                 name: value,
@@ -259,45 +262,5 @@ impl TryFrom<Identifier> for FnPtr {
         } else {
             Err(ERR::ErrorFunctionNotFound(value.to_string(), Position::NONE).into())
         }
-    }
-}
-
-impl TryFrom<crate::ImmutableString> for FnPtr {
-    type Error = RhaiError;
-
-    #[inline(always)]
-    fn try_from(value: crate::ImmutableString) -> RhaiResultOf<Self> {
-        let s: Identifier = value.into();
-        Self::try_from(s)
-    }
-}
-
-impl TryFrom<String> for FnPtr {
-    type Error = RhaiError;
-
-    #[inline(always)]
-    fn try_from(value: String) -> RhaiResultOf<Self> {
-        let s: Identifier = value.into();
-        Self::try_from(s)
-    }
-}
-
-impl TryFrom<Box<str>> for FnPtr {
-    type Error = RhaiError;
-
-    #[inline(always)]
-    fn try_from(value: Box<str>) -> RhaiResultOf<Self> {
-        let s: Identifier = value.into();
-        Self::try_from(s)
-    }
-}
-
-impl TryFrom<&str> for FnPtr {
-    type Error = RhaiError;
-
-    #[inline(always)]
-    fn try_from(value: &str) -> RhaiResultOf<Self> {
-        let s: Identifier = value.into();
-        Self::try_from(s)
     }
 }

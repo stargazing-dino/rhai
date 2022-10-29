@@ -1,7 +1,7 @@
 //! Module that defines the [`Scope`] type representing a function call-stack scope.
 
 use super::dynamic::{AccessMode, Variant};
-use crate::{Dynamic, Identifier};
+use crate::{Dynamic, Identifier, ImmutableString};
 use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -75,7 +75,7 @@ pub struct Scope<'a, const N: usize = SCOPE_ENTRIES_INLINED> {
     /// Name of the entry.
     names: SmallVec<[Identifier; SCOPE_ENTRIES_INLINED]>,
     /// Aliases of the entry.
-    aliases: SmallVec<[Vec<Identifier>; SCOPE_ENTRIES_INLINED]>,
+    aliases: SmallVec<[Vec<ImmutableString>; SCOPE_ENTRIES_INLINED]>,
     /// Phantom to keep the lifetime parameter in order not to break existing code.
     dummy: PhantomData<&'a ()>,
 }
@@ -125,7 +125,7 @@ impl Clone for Scope<'_> {
 }
 
 impl IntoIterator for Scope<'_> {
-    type Item = (String, Dynamic, Vec<Identifier>);
+    type Item = (String, Dynamic, Vec<ImmutableString>);
     type IntoIter = Box<dyn Iterator<Item = Self::Item>>;
 
     #[must_use]
@@ -140,7 +140,7 @@ impl IntoIterator for Scope<'_> {
 }
 
 impl<'a> IntoIterator for &'a Scope<'_> {
-    type Item = (&'a Identifier, &'a Dynamic, &'a Vec<Identifier>);
+    type Item = (&'a Identifier, &'a Dynamic, &'a Vec<ImmutableString>);
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     #[must_use]
@@ -669,7 +669,7 @@ impl Scope<'_> {
     /// Panics if the index is out of bounds.
     #[cfg(not(feature = "no_module"))]
     #[inline]
-    pub(crate) fn add_alias_by_index(&mut self, index: usize, alias: Identifier) -> &mut Self {
+    pub(crate) fn add_alias_by_index(&mut self, index: usize, alias: ImmutableString) -> &mut Self {
         let aliases = self.aliases.get_mut(index).unwrap();
         if aliases.is_empty() || !aliases.contains(&alias) {
             aliases.push(alias);
@@ -690,11 +690,11 @@ impl Scope<'_> {
     pub fn set_alias(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
-        alias: impl Into<Identifier>,
+        alias: impl Into<ImmutableString>,
     ) {
         if let Some(index) = self.search(name.as_ref()) {
             let alias = match alias.into() {
-                x if x.is_empty() => name.into(),
+                x if x.is_empty() => name.into().into(),
                 x => x,
             };
             self.add_alias_by_index(index, alias);
@@ -727,7 +727,9 @@ impl Scope<'_> {
     }
     /// Get an iterator to entries in the [`Scope`].
     #[allow(dead_code)]
-    pub(crate) fn into_iter(self) -> impl Iterator<Item = (Identifier, Dynamic, Vec<Identifier>)> {
+    pub(crate) fn into_iter(
+        self,
+    ) -> impl Iterator<Item = (Identifier, Dynamic, Vec<ImmutableString>)> {
         self.names
             .into_iter()
             .zip(self.values.into_iter().zip(self.aliases.into_iter()))
