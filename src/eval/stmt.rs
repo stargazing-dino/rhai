@@ -130,8 +130,8 @@ impl Engine {
             let OpAssignment {
                 hash_op_assign,
                 hash_op,
-                op_assign,
-                op,
+                op_assign: op_assign_token,
+                op: op_token,
                 pos: op_pos,
             } = op_info;
 
@@ -142,27 +142,31 @@ impl Engine {
             let level = level + 1;
 
             if self.fast_operators() {
-                if let Some(func) = get_builtin_op_assignment_fn(op_assign, args[0], args[1]) {
+                if let Some(func) = get_builtin_op_assignment_fn(op_assign_token, args[0], args[1])
+                {
                     // Built-in found
-                    let op = op_assign.literal_syntax();
+                    let op = op_assign_token.literal_syntax();
                     let context = (self, op, None, &*global, lib, *op_pos, level).into();
                     return func(context, args).map(|_| ());
                 }
             }
 
-            let op_assign = op_assign.literal_syntax();
-            let op = op.literal_syntax();
+            let op_assign = op_assign_token.literal_syntax();
+            let op = op_token.literal_syntax();
+            let token = Some(op_assign_token);
 
             match self.exec_native_fn_call(
-                global, caches, lib, op_assign, hash, args, true, true, *op_pos, level,
+                global, caches, lib, op_assign, token, hash, args, true, *op_pos, level,
             ) {
                 Ok(_) => (),
                 Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
                 {
                     // Expand to `var = var op rhs`
+                    let token = Some(op_token);
+
                     *args[0] = self
                         .exec_native_fn_call(
-                            global, caches, lib, op, *hash_op, args, true, false, *op_pos, level,
+                            global, caches, lib, op, token, *hash_op, args, true, *op_pos, level,
                         )
                         .map_err(|err| err.fill_position(op_info.pos))?
                         .0

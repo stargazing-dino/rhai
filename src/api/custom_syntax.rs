@@ -228,7 +228,13 @@ impl Engine {
                 continue;
             }
 
-            let token = Token::lookup_from_syntax(s);
+            let token = Token::lookup_symbol_from_syntax(s).or_else(|| {
+                if Token::is_reserved_keyword(s) {
+                    Some(Token::Reserved(Box::new(s.into())))
+                } else {
+                    None
+                }
+            });
 
             let seg = match s {
                 // Markers not in first position

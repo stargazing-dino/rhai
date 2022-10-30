@@ -61,7 +61,10 @@ impl OpAssignment {
     #[must_use]
     #[inline(always)]
     pub fn new_op_assignment(name: &str, pos: Position) -> Self {
-        Self::new_op_assignment_from_token(&Token::lookup_from_syntax(name).expect("operator"), pos)
+        Self::new_op_assignment_from_token(
+            &Token::lookup_symbol_from_syntax(name).expect("operator"),
+            pos,
+        )
     }
     /// Create a new [`OpAssignment`] from a [`Token`].
     ///
@@ -90,7 +93,7 @@ impl OpAssignment {
     #[inline(always)]
     pub fn new_op_assignment_from_base(name: &str, pos: Position) -> Self {
         Self::new_op_assignment_from_base_token(
-            &Token::lookup_from_syntax(name).expect("operator"),
+            &Token::lookup_symbol_from_syntax(name).expect("operator"),
             pos,
         )
     }

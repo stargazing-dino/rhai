@@ -377,6 +377,8 @@ impl<'a> NativeCallContext<'a> {
         let caches = &mut Caches::new();
 
         let fn_name = fn_name.as_ref();
+        let op_token = Token::lookup_symbol_from_syntax(fn_name);
+        let op_token = op_token.as_ref();
         let args_len = args.len();
 
         if native_only {
@@ -387,10 +389,10 @@ impl<'a> NativeCallContext<'a> {
                     caches,
                     self.lib,
                     fn_name,
+                    op_token,
                     calc_fn_hash(None, fn_name, args_len),
                     args,
                     is_ref_mut,
-                    false,
                     Position::NONE,
                     self.level + 1,
                 )
@@ -416,6 +418,7 @@ impl<'a> NativeCallContext<'a> {
                 caches,
                 self.lib,
                 fn_name,
+                op_token,
                 hash,
                 args,
                 is_ref_mut,

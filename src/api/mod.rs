@@ -154,7 +154,7 @@ impl Engine {
 
         let keyword = keyword.as_ref();
 
-        match Token::lookup_from_syntax(keyword) {
+        match Token::lookup_symbol_from_syntax(keyword) {
             // Standard identifiers and reserved keywords are OK
             None | Some(Token::Reserved(..)) => (),
             // custom keywords are OK

@@ -152,9 +152,9 @@ impl<'a> OptimizerState<'a> {
                 &mut self.caches,
                 lib,
                 fn_name,
+                None,
                 calc_fn_hash(None, fn_name, arg_values.len()),
                 &mut arg_values.iter_mut().collect::<StaticVec<_>>(),
-                false,
                 false,
                 Position::NONE,
                 0,
@@ -438,7 +438,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             if !x.0.is_op_assignment()
                 && x.1.lhs.is_variable_access(true)
                 && matches!(&x.1.rhs, Expr::FnCall(x2, ..)
-                        if Token::lookup_from_syntax(&x2.name).map_or(false, |t| t.has_op_assignment())
+                        if Token::lookup_symbol_from_syntax(&x2.name).map_or(false, |t| t.has_op_assignment())
                         && x2.args.len() == 2
                         && x2.args[0].get_variable_name(true) == x.1.lhs.get_variable_name(true)
                 ) =>

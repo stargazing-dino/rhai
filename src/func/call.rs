@@ -127,48 +127,24 @@ pub fn ensure_no_data_race(fn_name: &str, args: &FnCallArgs, is_ref_mut: bool) -
     Ok(())
 }
 
-/// Generate the signature for a function call.
-#[inline]
-#[must_use]
-fn gen_fn_call_signature(engine: &Engine, fn_name: &str, args: &[&mut Dynamic]) -> String {
-    format!(
-        "{fn_name} ({})",
-        args.iter()
-            .map(|a| if a.is::<ImmutableString>() {
-                "&str | ImmutableString | String"
-            } else {
-                engine.map_type_name(a.type_name())
-            })
-            .collect::<FnArgsVec<_>>()
-            .join(", ")
-    )
-}
-
-/// Generate the signature for a namespace-qualified function call.
-///
-/// Not available under `no_module`.
-#[cfg(not(feature = "no_module"))]
-#[inline]
-#[must_use]
-fn gen_qualified_fn_call_signature(
-    engine: &Engine,
-    namespace: &crate::ast::Namespace,
-    fn_name: &str,
-    args: &[&mut Dynamic],
-) -> String {
-    let (ns, sep) = (
-        namespace.to_string(),
-        if namespace.is_empty() {
-            ""
-        } else {
-            crate::tokenizer::Token::DoubleColon.literal_syntax()
-        },
-    );
-
-    format!("{ns}{sep}{}", gen_fn_call_signature(engine, fn_name, args))
-}
-
 impl Engine {
+    /// Generate the signature for a function call.
+    #[inline]
+    #[must_use]
+    fn gen_fn_call_signature(&self, fn_name: &str, args: &[&mut Dynamic]) -> String {
+        format!(
+            "{fn_name} ({})",
+            args.iter()
+                .map(|a| if a.is::<ImmutableString>() {
+                    "&str | ImmutableString | String"
+                } else {
+                    self.map_type_name(a.type_name())
+                })
+                .collect::<FnArgsVec<_>>()
+                .join(", ")
+        )
+    }
+
     /// Resolve a normal (non-qualified) function call.
     ///
     /// Search order:
@@ -184,11 +160,10 @@ impl Engine {
         caches: &'s mut Caches,
         local_entry: &'s mut Option<FnResolutionCacheEntry>,
         lib: &[&Module],
-        fn_name: &str,
+        op_token: Option<&Token>,
         hash_base: u64,
         args: Option<&mut FnCallArgs>,
         allow_dynamic: bool,
-        op_assignment_token: Option<&Token>,
     ) -> Option<&'s FnResolutionCacheEntry> {
         if hash_base == 0 {
             return None;
@@ -273,26 +248,25 @@ impl Engine {
                         }
 
                         // Try to find a built-in version
-                        let builtin = args.and_then(|args| {
-                            if let Some(op_assign) = op_assignment_token {
-                                let (first_arg, rest_args) = args.split_first().unwrap();
+                        let builtin =
+                            args.and_then(|args| match op_token {
+                                Some(token) if token.is_op_assignment() => {
+                                    let (first_arg, rest_args) = args.split_first().unwrap();
 
-                                get_builtin_op_assignment_fn(op_assign, *first_arg, rest_args[0])
+                                    get_builtin_op_assignment_fn(token, *first_arg, rest_args[0])
+                                        .map(|f| FnResolutionCacheEntry {
+                                            func: CallableFunction::from_fn_builtin(f),
+                                            source: None,
+                                        })
+                                }
+                                Some(token) => get_builtin_binary_op_fn(token, args[0], args[1])
                                     .map(|f| FnResolutionCacheEntry {
                                         func: CallableFunction::from_fn_builtin(f),
                                         source: None,
-                                    })
-                            } else if let Some(ref operator) = Token::lookup_from_syntax(fn_name) {
-                                get_builtin_binary_op_fn(operator, args[0], args[1]).map(|f| {
-                                    FnResolutionCacheEntry {
-                                        func: CallableFunction::from_fn_builtin(f),
-                                        source: None,
-                                    }
-                                })
-                            } else {
-                                None
-                            }
-                        });
+                                    }),
+
+                                None => None,
+                            });
 
                         return if cache.filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
@@ -345,20 +319,14 @@ impl Engine {
         caches: &mut Caches,
         lib: &[&Module],
         name: &str,
+        op_token: Option<&Token>,
         hash: u64,
         args: &mut FnCallArgs,
         is_ref_mut: bool,
-        is_op_assign: bool,
         pos: Position,
         level: usize,
     ) -> RhaiResultOf<(Dynamic, bool)> {
         self.track_operation(global, pos)?;
-
-        let op_assign = if is_op_assign {
-            Token::lookup_from_syntax(name)
-        } else {
-            None
-        };
 
         // Check if function access already in the cache
         let local_entry = &mut None;
@@ -368,11 +336,10 @@ impl Engine {
             caches,
             local_entry,
             lib,
-            name,
+            op_token,
             hash,
             Some(args),
             true,
-            op_assign.as_ref(),
         );
 
         if func.is_some() {
@@ -543,7 +510,7 @@ impl Engine {
 
             // Raise error
             _ => {
-                Err(ERR::ErrorFunctionNotFound(gen_fn_call_signature(self, name, args), pos).into())
+                Err(ERR::ErrorFunctionNotFound(self.gen_fn_call_signature(name, args), pos).into())
             }
         }
     }
@@ -566,6 +533,7 @@ impl Engine {
         caches: &mut Caches,
         lib: &[&Module],
         fn_name: &str,
+        op_token: Option<&Token>,
         hashes: FnCallHashes,
         args: &mut FnCallArgs,
         is_ref_mut: bool,
@@ -646,11 +614,10 @@ impl Engine {
                     caches,
                     local_entry,
                     lib,
-                    fn_name,
+                    None,
                     hashes.script(),
                     None,
                     false,
-                    None,
                 )
                 .cloned()
             {
@@ -718,8 +685,9 @@ impl Engine {
 
         // Native function call
         let hash = hashes.native();
+
         self.exec_native_fn_call(
-            global, caches, lib, fn_name, hash, args, is_ref_mut, false, pos, level,
+            global, caches, lib, fn_name, op_token, hash, args, is_ref_mut, pos, level,
         )
     }
 
@@ -810,6 +778,7 @@ impl Engine {
                     caches,
                     lib,
                     fn_name,
+                    None,
                     new_hash,
                     &mut args,
                     false,
@@ -865,6 +834,7 @@ impl Engine {
                     caches,
                     lib,
                     &fn_name,
+                    None,
                     new_hash,
                     &mut args,
                     is_ref_mut,
@@ -965,6 +935,7 @@ impl Engine {
                     caches,
                     lib,
                     fn_name,
+                    None,
                     hash,
                     &mut args,
                     is_ref_mut,
@@ -992,10 +963,10 @@ impl Engine {
         lib: &[&Module],
         this_ptr: &mut Option<&mut Dynamic>,
         fn_name: &str,
+        op_token: Option<&Token>,
         first_arg: Option<&Expr>,
         args_expr: &[Expr],
         hashes: FnCallHashes,
-        is_operator_call: bool,
         capture_scope: bool,
         pos: Position,
         level: usize,
@@ -1009,7 +980,7 @@ impl Engine {
         let redirected; // Handle call() - Redirect function call
 
         match name {
-            _ if is_operator_call => (),
+            _ if op_token.is_some() => (),
 
             // Handle call()
             KEYWORD_FN_PTR_CALL if total_args >= 1 => {
@@ -1204,8 +1175,8 @@ impl Engine {
 
             return self
                 .exec_fn_call(
-                    scope, global, caches, lib, name, hashes, &mut args, is_ref_mut, false, pos,
-                    level,
+                    scope, global, caches, lib, name, op_token, hashes, &mut args, is_ref_mut,
+                    false, pos, level,
                 )
                 .map(|(v, ..)| v);
         }
@@ -1267,7 +1238,8 @@ impl Engine {
         }
 
         self.exec_fn_call(
-            None, global, caches, lib, name, hashes, &mut args, is_ref_mut, false, pos, level,
+            None, global, caches, lib, name, op_token, hashes, &mut args, is_ref_mut, false, pos,
+            level,
         )
         .map(|(v, ..)| v)
     }
@@ -1441,11 +1413,19 @@ impl Engine {
 
             Some(f) => unreachable!("unknown function type: {:?}", f),
 
-            None => Err(ERR::ErrorFunctionNotFound(
-                gen_qualified_fn_call_signature(self, namespace, fn_name, &args),
-                pos,
-            )
-            .into()),
+            None => {
+                let sig = if namespace.is_empty() {
+                    self.gen_fn_call_signature(fn_name, &args)
+                } else {
+                    format!(
+                        "{namespace}{}{}",
+                        crate::tokenizer::Token::DoubleColon.literal_syntax(),
+                        self.gen_fn_call_signature(fn_name, &args)
+                    )
+                };
+
+                Err(ERR::ErrorFunctionNotFound(sig, pos).into())
+            }
         }
     }
 
@@ -1507,12 +1487,17 @@ impl Engine {
         level: usize,
     ) -> RhaiResult {
         let FnCallExpr {
+            #[cfg(not(feature = "no_module"))]
+            namespace,
             name,
             hashes,
             args,
             op_token,
+            capture_parent_scope: capture,
             ..
         } = expr;
+
+        let op_token = op_token.as_ref();
 
         // Short-circuit native binary operator call if under Fast Operators mode
         if op_token.is_some() && self.fast_operators() && args.len() == 2 {
@@ -1538,16 +1523,16 @@ impl Engine {
 
             return self
                 .exec_fn_call(
-                    None, global, caches, lib, name, *hashes, operands, false, false, pos, level,
+                    None, global, caches, lib, name, op_token, *hashes, operands, false, false,
+                    pos, level,
                 )
                 .map(|(v, ..)| v);
         }
 
         #[cfg(not(feature = "no_module"))]
-        if !expr.namespace.is_empty() {
+        if !namespace.is_empty() {
             // Qualified function call
             let hash = hashes.native();
-            let namespace = &expr.namespace;
 
             return self.make_qualified_function_call(
                 scope, global, caches, lib, this_ptr, namespace, name, args, hash, pos, level,
@@ -1561,19 +1546,8 @@ impl Engine {
         );
 
         self.make_function_call(
-            scope,
-            global,
-            caches,
-            lib,
-            this_ptr,
-            name,
-            first_arg,
-            args,
-            *hashes,
-            expr.op_token.is_some(),
-            expr.capture_parent_scope,
-            pos,
-            level,
+            scope, global, caches, lib, this_ptr, name, op_token, first_arg, args, *hashes,
+            *capture, pos, level,
         )
     }
 }
