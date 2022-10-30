@@ -469,7 +469,7 @@ fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position
         // Variable name
         (Token::Identifier(s), pos) => Ok((*s, pos)),
         // Reserved keyword
-        (Token::Reserved(s), pos) if is_valid_identifier(s.chars()) => {
+        (Token::Reserved(s), pos) if is_valid_identifier(s.as_str()) => {
             Err(PERR::Reserved(s.to_string()).into_err(pos))
         }
         // Bad identifier
@@ -486,7 +486,7 @@ fn parse_symbol(input: &mut TokenStream) -> ParseResult<(SmartString, Position)>
         // Symbol
         (token, pos) if token.is_standard_symbol() => Ok((token.literal_syntax().into(), pos)),
         // Reserved symbol
-        (Token::Reserved(s), pos) if !is_valid_identifier(s.chars()) => Ok((*s, pos)),
+        (Token::Reserved(s), pos) if !is_valid_identifier(s.as_str()) => Ok((*s, pos)),
         // Bad symbol
         (Token::LexError(err), pos) => Err(err.into_err(pos)),
         // Not a symbol
@@ -599,9 +599,7 @@ impl Engine {
                 #[cfg(feature = "no_module")]
                 let hash = calc_fn_hash(None, &id, 0);
 
-                let is_valid_function_name = is_valid_function_name(&id);
-
-                let hashes = if is_valid_function_name {
+                let hashes = if is_valid_function_name(&id) {
                     hash.into()
                 } else {
                     FnCallHashes::from_native(hash)
@@ -613,8 +611,6 @@ impl Engine {
                     name: state.get_interned_string(id),
                     capture_parent_scope,
                     operator_token: None,
-                    #[cfg(not(feature = "no_function"))]
-                    can_be_script: is_valid_function_name,
                     #[cfg(not(feature = "no_module"))]
                     namespace,
                     hashes,
@@ -671,9 +667,7 @@ impl Engine {
                     #[cfg(feature = "no_module")]
                     let hash = calc_fn_hash(None, &id, args.len());
 
-                    let is_valid_function_name = is_valid_function_name(&id);
-
-                    let hashes = if is_valid_function_name {
+                    let hashes = if is_valid_function_name(&id) {
                         hash.into()
                     } else {
                         FnCallHashes::from_native(hash)
@@ -685,8 +679,6 @@ impl Engine {
                         name: state.get_interned_string(id),
                         capture_parent_scope,
                         operator_token: None,
-                        #[cfg(not(feature = "no_function"))]
-                        can_be_script: is_valid_function_name,
                         #[cfg(not(feature = "no_module"))]
                         namespace,
                         hashes,
@@ -1012,7 +1004,7 @@ impl Engine {
                 (Token::InterpolatedString(..), pos) => {
                     return Err(PERR::PropertyExpected.into_err(pos))
                 }
-                (Token::Reserved(s), pos) if is_valid_identifier(s.chars()) => {
+                (Token::Reserved(s), pos) if is_valid_identifier(s.as_str()) => {
                     return Err(PERR::Reserved(s.to_string()).into_err(pos));
                 }
                 (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -1944,8 +1936,6 @@ impl Engine {
                             pos,
                             operator_token: Some(token),
                             capture_parent_scope: false,
-                            #[cfg(not(feature = "no_function"))]
-                            can_be_script: false,
                         }
                         .into_fn_call_expr(pos))
                     }
@@ -1976,8 +1966,6 @@ impl Engine {
                             pos,
                             operator_token: Some(token),
                             capture_parent_scope: false,
-                            #[cfg(not(feature = "no_function"))]
-                            can_be_script: false,
                         }
                         .into_fn_call_expr(pos))
                     }
@@ -2001,8 +1989,6 @@ impl Engine {
                     pos,
                     operator_token: Some(token),
                     capture_parent_scope: false,
-                    #[cfg(not(feature = "no_function"))]
-                    can_be_script: false,
                 }
                 .into_fn_call_expr(pos))
             }
@@ -2217,11 +2203,15 @@ impl Engine {
             // lhs.func(...)
             (lhs, Expr::FnCall(mut func, func_pos)) => {
                 // Recalculate hash
-                func.hashes = FnCallHashes::from_all(
-                    #[cfg(not(feature = "no_function"))]
-                    calc_fn_hash(None, &func.name, func.args.len()),
-                    calc_fn_hash(None, &func.name, func.args.len() + 1),
-                );
+                func.hashes = if is_valid_function_name(&func.name) {
+                    FnCallHashes::from_all(
+                        #[cfg(not(feature = "no_function"))]
+                        calc_fn_hash(None, &func.name, func.args.len()),
+                        calc_fn_hash(None, &func.name, func.args.len() + 1),
+                    )
+                } else {
+                    FnCallHashes::from_native(calc_fn_hash(None, &func.name, func.args.len() + 1))
+                };
 
                 let rhs = Expr::MethodCall(func, func_pos);
                 Ok(Expr::Dot(BinaryExpr { lhs, rhs }.into(), op_flags, op_pos))
@@ -2263,11 +2253,19 @@ impl Engine {
                     // lhs.func().dot_rhs or lhs.func()[idx_rhs]
                     Expr::FnCall(mut func, func_pos) => {
                         // Recalculate hash
-                        func.hashes = FnCallHashes::from_all(
-                            #[cfg(not(feature = "no_function"))]
-                            calc_fn_hash(None, &func.name, func.args.len()),
-                            calc_fn_hash(None, &func.name, func.args.len() + 1),
-                        );
+                        func.hashes = if is_valid_function_name(&func.name) {
+                            FnCallHashes::from_all(
+                                #[cfg(not(feature = "no_function"))]
+                                calc_fn_hash(None, &func.name, func.args.len()),
+                                calc_fn_hash(None, &func.name, func.args.len() + 1),
+                            )
+                        } else {
+                            FnCallHashes::from_native(calc_fn_hash(
+                                None,
+                                &func.name,
+                                func.args.len() + 1,
+                            ))
+                        };
 
                         let new_lhs = BinaryExpr {
                             lhs: Expr::MethodCall(func, func_pos),
@@ -2322,7 +2320,7 @@ impl Engine {
                     .get(&**c)
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*current_pos))?,
-                Token::Reserved(c) if !is_valid_identifier(c.chars()) => {
+                Token::Reserved(c) if !is_valid_identifier(c) => {
                     return Err(PERR::UnknownOperator(c.to_string()).into_err(*current_pos))
                 }
                 _ => current_op.precedence(),
@@ -2347,7 +2345,7 @@ impl Engine {
                     .get(&**c)
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*next_pos))?,
-                Token::Reserved(c) if !is_valid_identifier(c.chars()) => {
+                Token::Reserved(c) if !is_valid_identifier(c) => {
                     return Err(PERR::UnknownOperator(c.to_string()).into_err(*next_pos))
                 }
                 _ => next_op.precedence(),
@@ -2371,8 +2369,8 @@ impl Engine {
 
             let op = op_token.syntax();
             let hash = calc_fn_hash(None, &op, 2);
-            let is_function = is_valid_function_name(&op);
-            let operator_token = if is_function {
+            let is_valid_script_function = is_valid_function_name(&op);
+            let operator_token = if is_valid_script_function {
                 None
             } else {
                 Some(op_token.clone())
@@ -2387,8 +2385,6 @@ impl Engine {
                 pos,
                 operator_token,
                 capture_parent_scope: false,
-                #[cfg(not(feature = "no_function"))]
-                can_be_script: is_function,
             };
 
             let mut args = StaticVec::new_const();
@@ -2474,7 +2470,7 @@ impl Engine {
                     let pos = args[0].start_position();
 
                     FnCallExpr {
-                        hashes: if is_function {
+                        hashes: if is_valid_script_function {
                             hash.into()
                         } else {
                             FnCallHashes::from_native(hash)
@@ -3732,8 +3728,6 @@ impl Engine {
             pos,
             operator_token: None,
             capture_parent_scope: false,
-            #[cfg(not(feature = "no_function"))]
-            can_be_script: false,
         }
         .into_fn_call_expr(pos);
 

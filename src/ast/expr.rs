@@ -111,9 +111,11 @@ impl CustomExpr {
 pub struct FnCallHashes {
     /// Pre-calculated hash for a script-defined function (zero if native functions only).
     #[cfg(not(feature = "no_function"))]
-    pub script: u64,
+    script: u64,
     /// Pre-calculated hash for a native Rust function with no parameter types.
-    pub native: u64,
+    ///
+    /// This hash can never be zero.
+    native: u64,
 }
 
 impl fmt::Debug for FnCallHashes {
@@ -148,7 +150,7 @@ impl From<u64> for FnCallHashes {
 
 impl FnCallHashes {
     /// Create a [`FnCallHashes`] with only the native Rust hash.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub const fn from_native(hash: u64) -> Self {
         Self {
@@ -158,7 +160,7 @@ impl FnCallHashes {
         }
     }
     /// Create a [`FnCallHashes`] with both native Rust and script function hashes.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub const fn from_all(#[cfg(not(feature = "no_function"))] script: u64, native: u64) -> Self {
         Self {
@@ -167,15 +169,28 @@ impl FnCallHashes {
             native: if native == 0 { ALT_ZERO_HASH } else { native },
         }
     }
-    /// Is this [`FnCallHashes`] native Rust only?
+    /// Is this [`FnCallHashes`] native-only?
     #[inline(always)]
     #[must_use]
     pub const fn is_native_only(&self) -> bool {
         #[cfg(not(feature = "no_function"))]
         return self.script == 0;
-
         #[cfg(feature = "no_function")]
         return true;
+    }
+    /// Get the native hash.
+    #[inline(always)]
+    #[must_use]
+    pub const fn native(&self) -> u64 {
+        self.native
+    }
+    /// Get the script hash.
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    #[must_use]
+    pub const fn script(&self) -> u64 {
+        assert!(self.script != 0);
+        self.script
     }
 }
 
@@ -196,9 +211,6 @@ pub struct FnCallExpr {
     pub capture_parent_scope: bool,
     /// Is this function call a native operator?
     pub operator_token: Option<Token>,
-    /// Can this function call be a scripted function?
-    #[cfg(not(feature = "no_function"))]
-    pub can_be_script: bool,
     /// [Position] of the function name.
     pub pos: Position,
 }
@@ -220,10 +232,6 @@ impl fmt::Debug for FnCallExpr {
         }
         if self.capture_parent_scope {
             ff.field("capture_parent_scope", &self.capture_parent_scope);
-        }
-        #[cfg(not(feature = "no_function"))]
-        if self.can_be_script {
-            ff.field("can_be_script", &self.can_be_script);
         }
         ff.field("pos", &self.pos);
         ff.finish()
@@ -691,8 +699,6 @@ impl Expr {
                     args: once(Self::StringConstant(f.fn_name().into(), pos)).collect(),
                     capture_parent_scope: false,
                     operator_token: None,
-                    #[cfg(not(feature = "no_function"))]
-                    can_be_script: true,
                     pos,
                 }
                 .into(),

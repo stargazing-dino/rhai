@@ -2199,7 +2199,7 @@ fn get_identifier(
         }
     }
 
-    let is_valid_identifier = is_valid_identifier(identifier.chars());
+    let is_valid_identifier = is_valid_identifier(&identifier);
 
     if let Some(token) = Token::lookup_from_syntax(&identifier) {
         return (token, start_pos);
@@ -2233,10 +2233,10 @@ pub fn is_keyword_function(name: &str) -> bool {
 /// _(internals)_ Is a text string a valid identifier?
 /// Exported under the `internals` feature only.
 #[must_use]
-pub fn is_valid_identifier(name: impl Iterator<Item = char>) -> bool {
+pub fn is_valid_identifier(name: &str) -> bool {
     let mut first_alphabetic = false;
 
-    for ch in name {
+    for ch in name.chars() {
         match ch {
             '_' => (),
             _ if is_id_first_alphabetic(ch) => first_alphabetic = true,
@@ -2254,7 +2254,7 @@ pub fn is_valid_identifier(name: impl Iterator<Item = char>) -> bool {
 #[inline(always)]
 #[must_use]
 pub fn is_valid_function_name(name: &str) -> bool {
-    is_valid_identifier(name.chars())
+    is_valid_identifier(name) && !is_keyword_function(name)
 }
 
 /// Is a character valid to start an identifier?
@@ -2433,7 +2433,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 (.., true) => unreachable!("no custom operators"),
                 // Reserved keyword that is not custom and disabled.
                 (token, false) if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token) => {
-                    let msg = format!("reserved {} '{token}' is disabled", if is_valid_identifier(token.chars()) { "keyword"} else {"symbol"});
+                    let msg = format!("reserved {} '{token}' is disabled", if is_valid_identifier(token) { "keyword"} else {"symbol"});
                     Token::LexError(LERR::ImproperSymbol(s.to_string(), msg).into())
                 },
                 // Reserved keyword/operator that is not custom.

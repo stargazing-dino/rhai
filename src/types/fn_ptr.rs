@@ -1,10 +1,9 @@
 //! The `FnPtr` type.
 
-use crate::tokenizer::is_valid_identifier;
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, FuncArgs, ImmutableString, Module, NativeCallContext, Position, RhaiError,
-    RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
+    is_valid_function_name, Dynamic, Engine, FuncArgs, ImmutableString, Module, NativeCallContext,
+    Position, RhaiError, RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -254,7 +253,7 @@ impl TryFrom<ImmutableString> for FnPtr {
 
     #[inline(always)]
     fn try_from(value: ImmutableString) -> RhaiResultOf<Self> {
-        if is_valid_identifier(value.chars()) {
+        if is_valid_function_name(&value) {
             Ok(Self {
                 name: value,
                 curry: StaticVec::new_const(),

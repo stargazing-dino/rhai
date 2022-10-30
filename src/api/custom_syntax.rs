@@ -273,7 +273,7 @@ impl Engine {
                     .into_err(Position::NONE));
                 }
                 // Identifier in first position
-                _ if segments.is_empty() && is_valid_identifier(s.chars()) => {
+                _ if segments.is_empty() && is_valid_identifier(s) => {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if (!self.disabled_symbols.is_empty() && self.disabled_symbols.contains(s))
                         || token.map_or(false, |v| v.is_reserved())

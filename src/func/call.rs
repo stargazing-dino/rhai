@@ -11,9 +11,9 @@ use crate::engine::{
 use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::Token;
 use crate::{
-    calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Engine, FnArgsVec, FnPtr,
-    ImmutableString, Module, OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf,
-    Scope, ERR,
+    calc_fn_hash, calc_fn_params_hash, combine_hashes, is_valid_function_name, Dynamic, Engine,
+    FnArgsVec, FnPtr, ImmutableString, Module, OptimizationLevel, Position, RhaiError, RhaiResult,
+    RhaiResultOf, Scope, ERR,
 };
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
@@ -570,7 +570,6 @@ impl Engine {
         caches: &mut Caches,
         lib: &[&Module],
         fn_name: &str,
-        _native_only: bool,
         hashes: FnCallHashes,
         args: &mut FnCallArgs,
         is_ref_mut: bool,
@@ -590,55 +589,58 @@ impl Engine {
         #[cfg(not(feature = "no_closure"))]
         ensure_no_data_race(fn_name, args, is_ref_mut)?;
 
-        // These may be redirected from method style calls.
-        match fn_name {
-            // Handle type_of()
-            KEYWORD_TYPE_OF if args.len() == 1 => {
-                let typ = self.map_type_name(args[0].type_name()).to_string().into();
-                return Ok((typ, false));
-            }
-
-            // Handle is_def_fn()
-            #[cfg(not(feature = "no_function"))]
-            crate::engine::KEYWORD_IS_DEF_FN
-                if args.len() == 2 && args[0].is::<FnPtr>() && args[1].is::<crate::INT>() =>
-            {
-                let fn_name = args[0].read_lock::<ImmutableString>().expect("`FnPtr`");
-                let num_params = args[1].as_int().expect("`INT`");
-
-                return Ok((
-                    if num_params < 0 || num_params > crate::MAX_USIZE_INT {
-                        false
-                    } else {
-                        let hash_script = calc_fn_hash(None, fn_name.as_str(), num_params as usize);
-                        self.has_script_fn(Some(global), caches, lib, hash_script)
-                    }
-                    .into(),
-                    false,
-                ));
-            }
-
-            // Handle is_shared()
-            #[cfg(not(feature = "no_closure"))]
-            crate::engine::KEYWORD_IS_SHARED if args.len() == 1 => {
-                return no_method_err(fn_name, pos)
-            }
-
-            KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR if args.len() == 1 => {
-                return no_method_err(fn_name, pos)
-            }
-
-            KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY if !args.is_empty() => {
-                return no_method_err(fn_name, pos)
-            }
-
-            _ => (),
-        }
-
         let level = level + 1;
 
+        // These may be redirected from method style calls.
+        if hashes.is_native_only() {
+            match fn_name {
+                // Handle type_of()
+                KEYWORD_TYPE_OF if args.len() == 1 => {
+                    let typ = self.map_type_name(args[0].type_name()).to_string().into();
+                    return Ok((typ, false));
+                }
+
+                // Handle is_def_fn()
+                #[cfg(not(feature = "no_function"))]
+                crate::engine::KEYWORD_IS_DEF_FN
+                    if args.len() == 2 && args[0].is::<FnPtr>() && args[1].is::<crate::INT>() =>
+                {
+                    let fn_name = args[0].read_lock::<ImmutableString>().expect("`FnPtr`");
+                    let num_params = args[1].as_int().expect("`INT`");
+
+                    return Ok((
+                        if num_params < 0 || num_params > crate::MAX_USIZE_INT {
+                            false
+                        } else {
+                            let hash_script =
+                                calc_fn_hash(None, fn_name.as_str(), num_params as usize);
+                            self.has_script_fn(Some(global), caches, lib, hash_script)
+                        }
+                        .into(),
+                        false,
+                    ));
+                }
+
+                // Handle is_shared()
+                #[cfg(not(feature = "no_closure"))]
+                crate::engine::KEYWORD_IS_SHARED if args.len() == 1 => {
+                    return no_method_err(fn_name, pos)
+                }
+
+                KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR if args.len() == 1 => {
+                    return no_method_err(fn_name, pos)
+                }
+
+                KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY if !args.is_empty() => {
+                    return no_method_err(fn_name, pos)
+                }
+
+                _ => (),
+            }
+        }
+
         #[cfg(not(feature = "no_function"))]
-        if !_native_only {
+        if !hashes.is_native_only() {
             // Script-defined function call?
             let local_entry = &mut None;
 
@@ -649,7 +651,7 @@ impl Engine {
                     local_entry,
                     lib,
                     fn_name,
-                    hashes.script,
+                    hashes.script(),
                     None,
                     false,
                     None,
@@ -719,7 +721,7 @@ impl Engine {
         }
 
         // Native function call
-        let hash = hashes.native;
+        let hash = hashes.native();
         self.call_native_fn(
             global, caches, lib, fn_name, hash, args, is_ref_mut, false, pos, level,
         )
@@ -808,9 +810,13 @@ impl Engine {
                 let fn_ptr = target.read_lock::<FnPtr>().expect("`FnPtr`");
                 // Redirect function name
                 let fn_name = fn_ptr.fn_name();
-                let args_len = call_args.len() + fn_ptr.curry().len();
                 // Recalculate hashes
-                let new_hash = calc_fn_hash(None, fn_name, args_len).into();
+                let args_len = call_args.len() + fn_ptr.curry().len();
+                let new_hash = if !fn_ptr.is_anonymous() && !is_valid_function_name(fn_name) {
+                    FnCallHashes::from_native(calc_fn_hash(None, fn_name, args_len))
+                } else {
+                    calc_fn_hash(None, fn_name, args_len).into()
+                };
                 // Arguments are passed as-is, adding the curried arguments
                 let mut curry = FnArgsVec::with_capacity(fn_ptr.curry().len());
                 curry.extend(fn_ptr.curry().iter().cloned());
@@ -825,7 +831,6 @@ impl Engine {
                     caches,
                     lib,
                     fn_name,
-                    false,
                     new_hash,
                     &mut args,
                     false,
@@ -845,20 +850,25 @@ impl Engine {
 
                 // FnPtr call on object
                 let fn_ptr = mem::take(&mut call_args[0]).cast::<FnPtr>();
+                let is_anon = fn_ptr.is_anonymous();
                 call_args = &mut call_args[1..];
 
                 // Redirect function name
-                let fn_name = fn_ptr.fn_name();
-                let args_len = call_args.len() + fn_ptr.curry().len();
+                let (fn_name, fn_curry) = fn_ptr.take_data();
                 // Recalculate hash
-                let new_hash = FnCallHashes::from_all(
-                    #[cfg(not(feature = "no_function"))]
-                    calc_fn_hash(None, fn_name, args_len),
-                    calc_fn_hash(None, fn_name, args_len + 1),
-                );
+                let args_len = call_args.len() + fn_curry.len();
+                let new_hash = if !is_anon && !is_valid_function_name(&fn_name) {
+                    FnCallHashes::from_native(calc_fn_hash(None, &fn_name, args_len + 1))
+                } else {
+                    FnCallHashes::from_all(
+                        #[cfg(not(feature = "no_function"))]
+                        calc_fn_hash(None, &fn_name, args_len),
+                        calc_fn_hash(None, &fn_name, args_len + 1),
+                    )
+                };
                 // Replace the first argument with the object pointer, adding the curried arguments
-                let mut curry = FnArgsVec::with_capacity(fn_ptr.curry().len());
-                curry.extend(fn_ptr.curry().iter().cloned());
+                let mut curry = FnArgsVec::with_capacity(fn_curry.len());
+                curry.extend(fn_curry.into_iter());
                 let mut args = FnArgsVec::with_capacity(curry.len() + call_args.len() + 1);
                 args.push(target.as_mut());
                 args.extend(curry.iter_mut());
@@ -870,8 +880,7 @@ impl Engine {
                     global,
                     caches,
                     lib,
-                    fn_name,
-                    false,
+                    &fn_name,
                     new_hash,
                     &mut args,
                     is_ref_mut,
@@ -939,11 +948,19 @@ impl Engine {
                                 call_args = &mut _arg_values;
                             }
                             // Recalculate the hash based on the new function name and new arguments
-                            hash = FnCallHashes::from_all(
-                                #[cfg(not(feature = "no_function"))]
-                                calc_fn_hash(None, fn_name, call_args.len()),
-                                calc_fn_hash(None, fn_name, call_args.len() + 1),
-                            );
+                            hash = if !fn_ptr.is_anonymous() && !is_valid_function_name(&fn_name) {
+                                FnCallHashes::from_native(calc_fn_hash(
+                                    None,
+                                    fn_name,
+                                    call_args.len() + 1,
+                                ))
+                            } else {
+                                FnCallHashes::from_all(
+                                    #[cfg(not(feature = "no_function"))]
+                                    calc_fn_hash(None, fn_name, call_args.len()),
+                                    calc_fn_hash(None, fn_name, call_args.len() + 1),
+                                )
+                            };
                         }
                     }
                 };
@@ -959,7 +976,6 @@ impl Engine {
                     caches,
                     lib,
                     fn_name,
-                    false,
                     hash,
                     &mut args,
                     is_ref_mut,
@@ -987,7 +1003,6 @@ impl Engine {
         lib: &[&Module],
         this_ptr: &mut Option<&mut Dynamic>,
         fn_name: &str,
-        native_only: bool,
         first_arg: Option<&Expr>,
         args_expr: &[Expr],
         hashes: FnCallHashes,
@@ -996,7 +1011,6 @@ impl Engine {
         pos: Position,
         level: usize,
     ) -> RhaiResult {
-        let native = native_only;
         let mut first_arg = first_arg;
         let mut a_expr = args_expr;
         let mut total_args = if first_arg.is_some() { 1 } else { 0 } + a_expr.len();
@@ -1020,10 +1034,12 @@ impl Engine {
                 }
 
                 let fn_ptr = arg_value.cast::<FnPtr>();
-                curry.extend(fn_ptr.curry().iter().cloned());
+                let is_anon = fn_ptr.is_anonymous();
+                let (fn_name, fn_curry) = fn_ptr.take_data();
+                curry.extend(fn_curry.into_iter());
 
                 // Redirect function name
-                redirected = fn_ptr.take_data().0;
+                redirected = fn_name;
                 name = &redirected;
 
                 // Shift the arguments
@@ -1035,7 +1051,8 @@ impl Engine {
 
                 // Recalculate hash
                 let args_len = total_args + curry.len();
-                hashes = if hashes.is_native_only() {
+
+                hashes = if !is_anon && !is_valid_function_name(name) {
                     FnCallHashes::from_native(calc_fn_hash(None, name, args_len))
                 } else {
                     calc_fn_hash(None, name, args_len).into()
@@ -1193,8 +1210,8 @@ impl Engine {
 
             return self
                 .exec_fn_call(
-                    scope, global, caches, lib, name, native, hashes, &mut args, is_ref_mut, false,
-                    pos, level,
+                    scope, global, caches, lib, name, hashes, &mut args, is_ref_mut, false, pos,
+                    level,
                 )
                 .map(|(v, ..)| v);
         }
@@ -1256,8 +1273,7 @@ impl Engine {
         }
 
         self.exec_fn_call(
-            None, global, caches, lib, name, native, hashes, &mut args, is_ref_mut, false, pos,
-            level,
+            None, global, caches, lib, name, hashes, &mut args, is_ref_mut, false, pos, level,
         )
         .map(|(v, ..)| v)
     }
