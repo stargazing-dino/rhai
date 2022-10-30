@@ -1,9 +1,10 @@
 //! The `FnPtr` type.
 
+use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
-    is_valid_function_name, Dynamic, Engine, FuncArgs, ImmutableString, Module, NativeCallContext,
-    Position, RhaiError, RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
+    Dynamic, Engine, FuncArgs, ImmutableString, Module, NativeCallContext, Position, RhaiError,
+    RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;

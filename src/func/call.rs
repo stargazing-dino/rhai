@@ -9,11 +9,11 @@ use crate::engine::{
     KEYWORD_IS_DEF_VAR, KEYWORD_PRINT, KEYWORD_TYPE_OF,
 };
 use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
-use crate::tokenizer::Token;
+use crate::tokenizer::{is_valid_function_name, Token};
 use crate::{
-    calc_fn_hash, calc_fn_params_hash, combine_hashes, is_valid_function_name, Dynamic, Engine,
-    FnArgsVec, FnPtr, ImmutableString, Module, OptimizationLevel, Position, RhaiError, RhaiResult,
-    RhaiResultOf, Scope, ERR,
+    calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Engine, FnArgsVec, FnPtr,
+    ImmutableString, Module, OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf,
+    Scope, ERR,
 };
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
@@ -808,11 +808,17 @@ impl Engine {
             KEYWORD_FN_PTR_CALL if target.is::<FnPtr>() => {
                 // FnPtr call
                 let fn_ptr = target.read_lock::<FnPtr>().expect("`FnPtr`");
+
+                #[cfg(not(feature = "no_function"))]
+                let is_anon = fn_ptr.is_anonymous();
+                #[cfg(feature = "no_function")]
+                let is_anon = false;
+
                 // Redirect function name
                 let fn_name = fn_ptr.fn_name();
                 // Recalculate hashes
                 let args_len = call_args.len() + fn_ptr.curry().len();
-                let new_hash = if !fn_ptr.is_anonymous() && !is_valid_function_name(fn_name) {
+                let new_hash = if !is_anon && !is_valid_function_name(fn_name) {
                     FnCallHashes::from_native(calc_fn_hash(None, fn_name, args_len))
                 } else {
                     calc_fn_hash(None, fn_name, args_len).into()
@@ -850,7 +856,12 @@ impl Engine {
 
                 // FnPtr call on object
                 let fn_ptr = mem::take(&mut call_args[0]).cast::<FnPtr>();
+
+                #[cfg(not(feature = "no_function"))]
                 let is_anon = fn_ptr.is_anonymous();
+                #[cfg(feature = "no_function")]
+                let is_anon = false;
+
                 call_args = &mut call_args[1..];
 
                 // Redirect function name
@@ -934,6 +945,11 @@ impl Engine {
                 if let Some(map) = target.read_lock::<crate::Map>() {
                     if let Some(val) = map.get(fn_name) {
                         if let Some(fn_ptr) = val.read_lock::<FnPtr>() {
+                            #[cfg(not(feature = "no_function"))]
+                            let is_anon = fn_ptr.is_anonymous();
+                            #[cfg(feature = "no_function")]
+                            let is_anon = false;
+
                             // Remap the function name
                             _redirected = fn_ptr.fn_name_raw().clone();
                             fn_name = &_redirected;
@@ -948,7 +964,7 @@ impl Engine {
                                 call_args = &mut _arg_values;
                             }
                             // Recalculate the hash based on the new function name and new arguments
-                            hash = if !fn_ptr.is_anonymous() && !is_valid_function_name(&fn_name) {
+                            hash = if !is_anon && !is_valid_function_name(&fn_name) {
                                 FnCallHashes::from_native(calc_fn_hash(
                                     None,
                                     fn_name,
@@ -1034,7 +1050,12 @@ impl Engine {
                 }
 
                 let fn_ptr = arg_value.cast::<FnPtr>();
+
+                #[cfg(not(feature = "no_function"))]
                 let is_anon = fn_ptr.is_anonymous();
+                #[cfg(feature = "no_function")]
+                let is_anon = false;
+
                 let (fn_name, fn_curry) = fn_ptr.take_data();
                 curry.extend(fn_curry.into_iter());
 
