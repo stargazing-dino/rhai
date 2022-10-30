@@ -261,6 +261,16 @@ impl FnCallExpr {
     pub fn into_fn_call_expr(self, pos: Position) -> Expr {
         Expr::FnCall(self.into(), pos)
     }
+    /// Are all arguments constant?
+    #[inline]
+    #[must_use]
+    pub fn constant_args(&self) -> bool {
+        if self.args.is_empty() {
+            true
+        } else {
+            self.args.iter().all(Expr::is_constant)
+        }
+    }
 }
 
 /// A type that wraps a floating-point number and implements [`Hash`].

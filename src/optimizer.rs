@@ -139,6 +139,7 @@ impl<'a> OptimizerState<'a> {
     pub fn call_fn_with_constant_arguments(
         &mut self,
         fn_name: &str,
+        op_token: Option<&Token>,
         arg_values: &mut [Dynamic],
     ) -> Option<Dynamic> {
         #[cfg(not(feature = "no_function"))]
@@ -152,7 +153,7 @@ impl<'a> OptimizerState<'a> {
                 &mut self.caches,
                 lib,
                 fn_name,
-                None,
+                op_token,
                 calc_fn_hash(None, fn_name, arg_values.len()),
                 &mut arg_values.iter_mut().collect::<StaticVec<_>>(),
                 false,
@@ -1098,7 +1099,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             && state.optimization_level == OptimizationLevel::Simple // simple optimizations
             && x.args.len() == 1
             && x.name == KEYWORD_FN_PTR
-            && x.args[0].is_constant()
+            && x.constant_args()
         => {
             let fn_name = match x.args[0] {
                 Expr::StringConstant(ref s, ..) => s.clone().into(),
@@ -1122,8 +1123,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         Expr::FnCall(x, pos)
                 if !x.is_qualified() // Non-qualified
                 && state.optimization_level == OptimizationLevel::Simple // simple optimizations
-                && x.args.iter().all(Expr::is_constant) // all arguments are constants
-                //&& !is_valid_identifier(x.chars()) // cannot be scripted
+                && x.constant_args() // all arguments are constants
         => {
             let arg_values = &mut x.args.iter().map(|e| e.get_literal_value().unwrap()).collect::<StaticVec<_>>();
             let arg_types: StaticVec<_> = arg_values.iter().map(Dynamic::type_id).collect();
@@ -1186,11 +1186,11 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         Expr::FnCall(x, pos)
                 if !x.is_qualified() // non-qualified
                 && state.optimization_level == OptimizationLevel::Full // full optimizations
-                && x.args.iter().all(Expr::is_constant) // all arguments are constants
+                && x.constant_args() // all arguments are constants
         => {
             // First search for script-defined functions (can override built-in)
             #[cfg(not(feature = "no_function"))]
-            let has_script_fn = state.lib.iter().find_map(|&m| m.get_script_fn(&x.name, x.args.len())).is_some();
+            let has_script_fn = !x.hashes.is_native_only() && state.lib.iter().find_map(|&m| m.get_script_fn(&x.name, x.args.len())).is_some();
             #[cfg(feature = "no_function")]
             let has_script_fn = false;
 
@@ -1201,7 +1201,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     KEYWORD_TYPE_OF if arg_values.len() == 1 => Some(state.engine.map_type_name(arg_values[0].type_name()).into()),
                     #[cfg(not(feature = "no_closure"))]
                     crate::engine::KEYWORD_IS_SHARED if arg_values.len() == 1 => Some(Dynamic::FALSE),
-                    _ => state.call_fn_with_constant_arguments(&x.name, arg_values)
+                    _ => state.call_fn_with_constant_arguments(&x.name, x.op_token.as_ref(), arg_values)
                 };
 
                 if let Some(result) = result {
