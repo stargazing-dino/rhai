@@ -14,8 +14,7 @@ pub mod script;
 pub use args::FuncArgs;
 pub use builtin::{get_builtin_binary_op_fn, get_builtin_op_assignment_fn};
 #[cfg(not(feature = "no_module"))]
-pub use call::gen_qualified_fn_call_signature;
-pub use call::{gen_fn_call_signature, FnCallArgs};
+pub use call::{ensure_no_data_race, FnCallArgs};
 pub use callable_function::CallableFunction;
 #[cfg(not(feature = "no_function"))]
 pub use func::Func;

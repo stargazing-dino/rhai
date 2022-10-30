@@ -430,7 +430,7 @@ impl Engine {
     }
     /// Run the debugger callback if there is a debugging interface registered.
     ///
-    /// Returns `Some` if the debugger needs to be reactivated at the end of the block, statement or
+    /// Returns [`Some`] if the debugger needs to be reactivated at the end of the block, statement or
     /// function call.
     ///
     /// It is up to the [`Engine`] to reactivate the debugger.
@@ -452,7 +452,7 @@ impl Engine {
     }
     /// Run the debugger callback.
     ///
-    /// Returns `Some` if the debugger needs to be reactivated at the end of the block, statement or
+    /// Returns [`Some`] if the debugger needs to be reactivated at the end of the block, statement or
     /// function call.
     ///
     /// It is up to the [`Engine`] to reactivate the debugger.
@@ -498,7 +498,7 @@ impl Engine {
     }
     /// Run the debugger callback unconditionally.
     ///
-    /// Returns `Some` if the debugger needs to be reactivated at the end of the block, statement or
+    /// Returns [`Some`] if the debugger needs to be reactivated at the end of the block, statement or
     /// function call.
     ///
     /// It is up to the [`Engine`] to reactivate the debugger.

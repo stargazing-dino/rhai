@@ -1,9 +1,8 @@
 //! Implement function-calling mechanism for [`Engine`].
 
-use super::callable_function::CallableFunction;
-use super::{get_builtin_binary_op_fn, get_builtin_op_assignment_fn};
+use super::{get_builtin_binary_op_fn, get_builtin_op_assignment_fn, CallableFunction};
 use crate::api::default_limits::MAX_DYNAMIC_PARAMETERS;
-use crate::ast::{Expr, FnCallHashes, Stmt};
+use crate::ast::{Expr, FnCallExpr, FnCallHashes};
 use crate::engine::{
     KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_FN_PTR_CALL, KEYWORD_FN_PTR_CURRY,
     KEYWORD_IS_DEF_VAR, KEYWORD_PRINT, KEYWORD_TYPE_OF,
@@ -108,17 +107,14 @@ impl Drop for ArgBackup<'_> {
     }
 }
 
+// Ensure no data races in function call arguments.
 #[cfg(not(feature = "no_closure"))]
 #[inline]
-pub fn ensure_no_data_race(
-    fn_name: &str,
-    args: &FnCallArgs,
-    is_method_call: bool,
-) -> RhaiResultOf<()> {
+pub fn ensure_no_data_race(fn_name: &str, args: &FnCallArgs, is_ref_mut: bool) -> RhaiResultOf<()> {
     if let Some((n, ..)) = args
         .iter()
         .enumerate()
-        .skip(if is_method_call { 1 } else { 0 })
+        .skip(if is_ref_mut { 1 } else { 0 })
         .find(|(.., a)| a.is_locked())
     {
         return Err(ERR::ErrorDataRace(
@@ -134,7 +130,7 @@ pub fn ensure_no_data_race(
 /// Generate the signature for a function call.
 #[inline]
 #[must_use]
-pub fn gen_fn_call_signature(engine: &Engine, fn_name: &str, args: &[&mut Dynamic]) -> String {
+fn gen_fn_call_signature(engine: &Engine, fn_name: &str, args: &[&mut Dynamic]) -> String {
     format!(
         "{fn_name} ({})",
         args.iter()
@@ -154,7 +150,7 @@ pub fn gen_fn_call_signature(engine: &Engine, fn_name: &str, args: &[&mut Dynami
 #[cfg(not(feature = "no_module"))]
 #[inline]
 #[must_use]
-pub fn gen_qualified_fn_call_signature(
+fn gen_qualified_fn_call_signature(
     engine: &Engine,
     namespace: &crate::ast::Namespace,
     fn_name: &str,
@@ -343,7 +339,7 @@ impl Engine {
     ///
     /// **DO NOT** reuse the argument values unless for the first `&mut` argument -
     /// all others are silently replaced by `()`!
-    pub(crate) fn call_native_fn(
+    pub(crate) fn exec_native_fn_call(
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
@@ -716,39 +712,15 @@ impl Engine {
                 // Restore the original source
                 global.source = orig_source;
 
-                return Ok((result?, false));
+                return result.map(|r| (r, false));
             }
         }
 
         // Native function call
         let hash = hashes.native();
-        self.call_native_fn(
+        self.exec_native_fn_call(
             global, caches, lib, fn_name, hash, args, is_ref_mut, false, pos, level,
         )
-    }
-
-    /// Evaluate a list of statements with no `this` pointer.
-    /// This is commonly used to evaluate a list of statements in an [`AST`][crate::AST] or a script function body.
-    #[inline]
-    pub(crate) fn eval_global_statements(
-        &self,
-        scope: &mut Scope,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        statements: &[Stmt],
-        lib: &[&Module],
-        level: usize,
-    ) -> RhaiResult {
-        self.eval_stmt_block(
-            scope, global, caches, lib, &mut None, statements, false, level,
-        )
-        .or_else(|err| match *err {
-            ERR::Return(out, ..) => Ok(out),
-            ERR::LoopBreak(..) => {
-                unreachable!("no outer loop scope to break out of")
-            }
-            _ => Err(err),
-        })
     }
 
     /// Evaluate an argument.
@@ -763,13 +735,14 @@ impl Engine {
         arg_expr: &Expr,
         level: usize,
     ) -> RhaiResultOf<(Dynamic, Position)> {
-        #[cfg(feature = "debugging")]
-        if self.debugger.is_some() {
-            if let Some(value) = arg_expr.get_literal_value() {
-                #[cfg(feature = "debugging")]
-                self.run_debugger(scope, global, lib, this_ptr, arg_expr, level)?;
-                return Ok((value, arg_expr.start_position()));
-            }
+        // Literal values
+        if let Some(value) = arg_expr.get_literal_value() {
+            self.track_operation(global, arg_expr.start_position())?;
+
+            #[cfg(feature = "debugging")]
+            self.run_debugger(scope, global, lib, this_ptr, arg_expr, level)?;
+
+            return Ok((value, arg_expr.start_position()));
         }
 
         // Do not match function exit for arguments
@@ -784,7 +757,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         global.debugger.reset_status(reset_debugger);
 
-        Ok((result?, arg_expr.start_position()))
+        result.map(|r| (r, arg_expr.start_position()))
     }
 
     /// Call a dot method.
@@ -1022,8 +995,8 @@ impl Engine {
         first_arg: Option<&Expr>,
         args_expr: &[Expr],
         hashes: FnCallHashes,
+        is_operator_call: bool,
         capture_scope: bool,
-        operator_token: Option<&Token>,
         pos: Position,
         level: usize,
     ) -> RhaiResult {
@@ -1036,7 +1009,7 @@ impl Engine {
         let redirected; // Handle call() - Redirect function call
 
         match name {
-            _ if operator_token.is_some() => (),
+            _ if is_operator_call => (),
 
             // Handle call()
             KEYWORD_FN_PTR_CALL if total_args >= 1 => {
@@ -1519,5 +1492,88 @@ impl Engine {
 
         // Evaluate the AST
         self.eval_global_statements(scope, global, caches, statements, lib, level)
+    }
+
+    /// Evaluate a function call expression.
+    pub(crate) fn eval_fn_call_expr(
+        &self,
+        scope: &mut Scope,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        lib: &[&Module],
+        this_ptr: &mut Option<&mut Dynamic>,
+        expr: &FnCallExpr,
+        pos: Position,
+        level: usize,
+    ) -> RhaiResult {
+        let FnCallExpr {
+            name,
+            hashes,
+            args,
+            op_token,
+            ..
+        } = expr;
+
+        // Short-circuit native binary operator call if under Fast Operators mode
+        if op_token.is_some() && self.fast_operators() && args.len() == 2 {
+            let mut lhs = self
+                .get_arg_value(scope, global, caches, lib, this_ptr, &args[0], level)?
+                .0
+                .flatten();
+
+            let mut rhs = self
+                .get_arg_value(scope, global, caches, lib, this_ptr, &args[1], level)?
+                .0
+                .flatten();
+
+            let operands = &mut [&mut lhs, &mut rhs];
+
+            if let Some(func) =
+                get_builtin_binary_op_fn(op_token.as_ref().unwrap(), operands[0], operands[1])
+            {
+                // Built-in found
+                let context = (self, name.as_str(), None, &*global, lib, pos, level + 1).into();
+                return func(context, operands);
+            }
+
+            return self
+                .exec_fn_call(
+                    None, global, caches, lib, name, *hashes, operands, false, false, pos, level,
+                )
+                .map(|(v, ..)| v);
+        }
+
+        #[cfg(not(feature = "no_module"))]
+        if !expr.namespace.is_empty() {
+            // Qualified function call
+            let hash = hashes.native();
+            let namespace = &expr.namespace;
+
+            return self.make_qualified_function_call(
+                scope, global, caches, lib, this_ptr, namespace, name, args, hash, pos, level,
+            );
+        }
+
+        // Normal function call
+        let (first_arg, args) = args.split_first().map_or_else(
+            || (None, args.as_ref()),
+            |(first, rest)| (Some(first), rest),
+        );
+
+        self.make_function_call(
+            scope,
+            global,
+            caches,
+            lib,
+            this_ptr,
+            name,
+            first_arg,
+            args,
+            *hashes,
+            expr.op_token.is_some(),
+            expr.capture_parent_scope,
+            pos,
+            level,
+        )
     }
 }

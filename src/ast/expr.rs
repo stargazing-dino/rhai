@@ -17,7 +17,7 @@ use std::{
     fmt::Write,
     hash::Hash,
     iter::once,
-    num::{NonZeroU8, NonZeroUsize},
+    num::{NonZeroU64, NonZeroU8, NonZeroUsize},
 };
 
 #[cfg(not(feature = "no_float"))]
@@ -86,7 +86,7 @@ impl CustomExpr {
 ///
 /// Two separate hashes are pre-calculated because of the following patterns:
 ///
-/// ```js
+/// ```rhai
 /// func(a, b, c);      // Native: func(a, b, c)        - 3 parameters
 ///                     // Script: func(a, b, c)        - 3 parameters
 ///
@@ -100,22 +100,22 @@ impl CustomExpr {
 ///
 /// Function call hashes are used in the following manner:
 ///
-/// * First, the script hash is tried, which contains only the called function's name plus the
-///   number of parameters.
+/// * First, the script hash (if any) is tried, which contains only the called function's name plus
+///   the number of parameters.
 ///
 /// * Next, the actual types of arguments are hashed and _combined_ with the native hash, which is
-///   then used to search for a native function. In other words, a complete native function call
-///   hash always contains the called function's name plus the types of the arguments.  This is due
-///   to possible function overloading for different parameter types.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Default)]
+///   then used to search for a native function.
+///
+///   In other words, a complete native function call hash always contains the called function's
+///   name plus the types of the arguments.  This is due to possible function overloading for
+///   different parameter types.
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct FnCallHashes {
-    /// Pre-calculated hash for a script-defined function (zero if native functions only).
+    /// Pre-calculated hash for a script-defined function ([`None`] if native functions only).
     #[cfg(not(feature = "no_function"))]
-    script: u64,
+    script: Option<NonZeroU64>,
     /// Pre-calculated hash for a native Rust function with no parameter types.
-    ///
-    /// This hash can never be zero.
-    native: u64,
+    native: NonZeroU64,
 }
 
 impl fmt::Debug for FnCallHashes {
@@ -123,11 +123,11 @@ impl fmt::Debug for FnCallHashes {
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         #[cfg(not(feature = "no_function"))]
-        if self.script != 0 {
-            return if self.script == self.native {
+        if let Some(script) = self.script {
+            return if script == self.native {
                 fmt::Debug::fmt(&self.native, f)
             } else {
-                write!(f, "({}, {})", self.script, self.native)
+                write!(f, "({}, {})", script, self.native)
             };
         }
 
@@ -138,11 +138,11 @@ impl fmt::Debug for FnCallHashes {
 impl From<u64> for FnCallHashes {
     #[inline]
     fn from(hash: u64) -> Self {
-        let hash = if hash == 0 { ALT_ZERO_HASH } else { hash };
+        let hash = NonZeroU64::new(if hash == 0 { ALT_ZERO_HASH } else { hash }).unwrap();
 
         Self {
             #[cfg(not(feature = "no_function"))]
-            script: hash,
+            script: Some(hash),
             native: hash,
         }
     }
@@ -150,23 +150,23 @@ impl From<u64> for FnCallHashes {
 
 impl FnCallHashes {
     /// Create a [`FnCallHashes`] with only the native Rust hash.
-    #[inline(always)]
+    #[inline]
     #[must_use]
-    pub const fn from_native(hash: u64) -> Self {
+    pub fn from_native(hash: u64) -> Self {
         Self {
             #[cfg(not(feature = "no_function"))]
-            script: 0,
-            native: if hash == 0 { ALT_ZERO_HASH } else { hash },
+            script: None,
+            native: NonZeroU64::new(if hash == 0 { ALT_ZERO_HASH } else { hash }).unwrap(),
         }
     }
     /// Create a [`FnCallHashes`] with both native Rust and script function hashes.
-    #[inline(always)]
+    #[inline]
     #[must_use]
-    pub const fn from_all(#[cfg(not(feature = "no_function"))] script: u64, native: u64) -> Self {
+    pub fn from_all(#[cfg(not(feature = "no_function"))] script: u64, native: u64) -> Self {
         Self {
             #[cfg(not(feature = "no_function"))]
-            script: if script == 0 { ALT_ZERO_HASH } else { script },
-            native: if native == 0 { ALT_ZERO_HASH } else { native },
+            script: NonZeroU64::new(if script == 0 { ALT_ZERO_HASH } else { script }),
+            native: NonZeroU64::new(if native == 0 { ALT_ZERO_HASH } else { native }).unwrap(),
         }
     }
     /// Is this [`FnCallHashes`] native-only?
@@ -174,23 +174,31 @@ impl FnCallHashes {
     #[must_use]
     pub const fn is_native_only(&self) -> bool {
         #[cfg(not(feature = "no_function"))]
-        return self.script == 0;
+        return self.script.is_none();
         #[cfg(feature = "no_function")]
         return true;
     }
     /// Get the native hash.
+    ///
+    /// The hash returned is never zero.
     #[inline(always)]
     #[must_use]
-    pub const fn native(&self) -> u64 {
-        self.native
+    pub fn native(&self) -> u64 {
+        self.native.get()
     }
     /// Get the script hash.
+    ///
+    /// The hash returned is never zero.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this [`FnCallHashes`] is native-only.
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub const fn script(&self) -> u64 {
-        assert!(self.script != 0);
-        self.script
+    pub fn script(&self) -> u64 {
+        assert!(self.script.is_some());
+        self.script.as_ref().unwrap().get()
     }
 }
 
@@ -210,9 +218,7 @@ pub struct FnCallExpr {
     /// Does this function call capture the parent scope?
     pub capture_parent_scope: bool,
     /// Is this function call a native operator?
-    pub operator_token: Option<Token>,
-    /// [Position] of the function name.
-    pub pos: Position,
+    pub op_token: Option<Token>,
 }
 
 impl fmt::Debug for FnCallExpr {
@@ -227,13 +233,12 @@ impl fmt::Debug for FnCallExpr {
         ff.field("hash", &self.hashes)
             .field("name", &self.name)
             .field("args", &self.args);
-        if let Some(ref token) = self.operator_token {
-            ff.field("operator_token", token);
+        if let Some(ref token) = self.op_token {
+            ff.field("op_token", token);
         }
         if self.capture_parent_scope {
             ff.field("capture_parent_scope", &self.capture_parent_scope);
         }
-        ff.field("pos", &self.pos);
         ff.finish()
     }
 }
@@ -698,8 +703,7 @@ impl Expr {
                     hashes: calc_fn_hash(None, f.fn_name(), 1).into(),
                     args: once(Self::StringConstant(f.fn_name().into(), pos)).collect(),
                     capture_parent_scope: false,
-                    operator_token: None,
-                    pos,
+                    op_token: None,
                 }
                 .into(),
                 pos,
@@ -754,6 +758,8 @@ impl Expr {
             | Self::And(.., pos)
             | Self::Or(.., pos)
             | Self::Coalesce(.., pos)
+            | Self::FnCall(.., pos)
+            | Self::MethodCall(.., pos)
             | Self::Index(.., pos)
             | Self::Dot(.., pos)
             | Self::InterpolatedString(.., pos)
@@ -761,8 +767,6 @@ impl Expr {
 
             #[cfg(not(feature = "no_custom_syntax"))]
             Self::Custom(.., pos) => *pos,
-
-            Self::FnCall(x, ..) | Self::MethodCall(x, ..) => x.pos,
 
             Self::Stmt(x) => x.position(),
         }

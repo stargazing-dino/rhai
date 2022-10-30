@@ -274,7 +274,7 @@ impl Engine {
 
             // Check for data race.
             #[cfg(not(feature = "no_closure"))]
-            crate::func::call::ensure_no_data_race(name, &args, false).map(|_| Dynamic::UNIT)?;
+            crate::func::ensure_no_data_race(name, &args, false).map(|_| Dynamic::UNIT)?;
 
             if let Some(fn_def) = ast.shared_lib().get_script_fn(name, args.len()) {
                 self.call_script_fn(

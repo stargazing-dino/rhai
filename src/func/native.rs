@@ -382,7 +382,7 @@ impl<'a> NativeCallContext<'a> {
         if native_only {
             return self
                 .engine()
-                .call_native_fn(
+                .exec_native_fn_call(
                     global,
                     caches,
                     self.lib,

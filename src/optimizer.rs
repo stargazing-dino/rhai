@@ -147,7 +147,7 @@ impl<'a> OptimizerState<'a> {
         let lib = &[];
 
         self.engine
-            .call_native_fn(
+            .exec_native_fn_call(
                 &mut self.global,
                 &mut self.caches,
                 lib,
@@ -444,9 +444,9 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                 ) =>
         {
             match x.1.rhs {
-                Expr::FnCall(ref mut x2, ..) => {
+                Expr::FnCall(ref mut x2, pos) => {
                     state.set_dirty();
-                    x.0 = OpAssignment::new_op_assignment_from_base(&x2.name, x2.pos);
+                    x.0 = OpAssignment::new_op_assignment_from_base(&x2.name, pos);
                     x.1.rhs = mem::take(&mut x2.args[1]);
                 }
                 ref expr => unreachable!("Expr::FnCall expected but gets {:?}", expr),
@@ -1142,8 +1142,8 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     return;
                 }
                 // Overloaded operators can override built-in.
-                _ if x.args.len() == 2 && x.operator_token.is_some() && (state.engine.fast_operators() || !has_native_fn_override(state.engine, x.hashes.native(), &arg_types)) => {
-                    if let Some(result) = get_builtin_binary_op_fn(x.operator_token.as_ref().unwrap(), &arg_values[0], &arg_values[1])
+                _ if x.args.len() == 2 && x.op_token.is_some() && (state.engine.fast_operators() || !has_native_fn_override(state.engine, x.hashes.native(), &arg_types)) => {
+                    if let Some(result) = get_builtin_binary_op_fn(x.op_token.as_ref().unwrap(), &arg_values[0], &arg_values[1])
                         .and_then(|f| {
                             #[cfg(not(feature = "no_function"))]
                             let lib = state.lib;

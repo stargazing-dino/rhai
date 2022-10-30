@@ -1,9 +1,8 @@
 //! Module defining functions for evaluating an expression.
 
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
-use crate::ast::{Expr, FnCallExpr, OpAssignment};
+use crate::ast::{Expr, OpAssignment};
 use crate::engine::{KEYWORD_THIS, OP_CONCAT};
-use crate::func::get_builtin_binary_op_fn;
 use crate::types::dynamic::AccessMode;
 use crate::{Dynamic, Engine, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR};
 use std::num::NonZeroUsize;
@@ -206,89 +205,6 @@ impl Engine {
         Ok((val.into(), var_pos))
     }
 
-    /// Evaluate a function call expression.
-    pub(crate) fn eval_fn_call_expr(
-        &self,
-        scope: &mut Scope,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        lib: &[&Module],
-        this_ptr: &mut Option<&mut Dynamic>,
-        expr: &FnCallExpr,
-        pos: Position,
-        level: usize,
-    ) -> RhaiResult {
-        let FnCallExpr {
-            name,
-            hashes,
-            args,
-            operator_token,
-            ..
-        } = expr;
-
-        // Short-circuit native binary operator call if under Fast Operators mode
-        if operator_token.is_some() && self.fast_operators() && args.len() == 2 {
-            let mut lhs = self
-                .get_arg_value(scope, global, caches, lib, this_ptr, &args[0], level)?
-                .0
-                .flatten();
-
-            let mut rhs = self
-                .get_arg_value(scope, global, caches, lib, this_ptr, &args[1], level)?
-                .0
-                .flatten();
-
-            let operands = &mut [&mut lhs, &mut rhs];
-
-            if let Some(func) =
-                get_builtin_binary_op_fn(operator_token.as_ref().unwrap(), operands[0], operands[1])
-            {
-                // Built-in found
-                let context = (self, name.as_str(), None, &*global, lib, pos, level + 1).into();
-                return func(context, operands);
-            }
-
-            return self
-                .exec_fn_call(
-                    None, global, caches, lib, name, *hashes, operands, false, false, pos, level,
-                )
-                .map(|(v, ..)| v);
-        }
-
-        #[cfg(not(feature = "no_module"))]
-        if !expr.namespace.is_empty() {
-            // Qualified function call
-            let hash = hashes.native();
-            let namespace = &expr.namespace;
-
-            return self.make_qualified_function_call(
-                scope, global, caches, lib, this_ptr, namespace, name, args, hash, pos, level,
-            );
-        }
-
-        // Normal function call
-        let (first_arg, args) = args.split_first().map_or_else(
-            || (None, args.as_ref()),
-            |(first, rest)| (Some(first), rest),
-        );
-
-        self.make_function_call(
-            scope,
-            global,
-            caches,
-            lib,
-            this_ptr,
-            name,
-            first_arg,
-            args,
-            *hashes,
-            expr.capture_parent_scope,
-            expr.operator_token.as_ref(),
-            pos,
-            level,
-        )
-    }
-
     /// Evaluate an expression.
     //
     // # Implementation Notes
@@ -312,7 +228,7 @@ impl Engine {
 
         // Function calls should account for a relatively larger portion of expressions because
         // binary operators are also function calls.
-        if let Expr::FnCall(x, ..) = expr {
+        if let Expr::FnCall(x, pos) = expr {
             #[cfg(feature = "debugging")]
             let reset_debugger =
                 self.run_debugger_with_reset(scope, global, lib, this_ptr, expr, level)?;
@@ -320,7 +236,7 @@ impl Engine {
             self.track_operation(global, expr.position())?;
 
             let result =
-                self.eval_fn_call_expr(scope, global, caches, lib, this_ptr, x, x.pos, level);
+                self.eval_fn_call_expr(scope, global, caches, lib, this_ptr, x, *pos, level);
 
             #[cfg(feature = "debugging")]
             global.debugger.reset_status(reset_debugger);

@@ -269,7 +269,7 @@ impl Engine {
                         if op_info.is_op_assignment() {
                             let args = &mut [target.as_mut()];
                             let (mut orig_val, ..) = self
-                                .call_native_fn(
+                                .exec_native_fn_call(
                                     global, caches, lib, getter, *hash_get, args, is_ref_mut,
                                     false, *pos, level,
                                 )
@@ -303,7 +303,7 @@ impl Engine {
                         }
 
                         let args = &mut [target.as_mut(), &mut new_val];
-                        self.call_native_fn(
+                        self.exec_native_fn_call(
                             global, caches, lib, setter, *hash_set, args, is_ref_mut, false, *pos,
                             level,
                         )
@@ -330,7 +330,7 @@ impl Engine {
 
                         let ((getter, hash_get), _, name) = &**x;
                         let args = &mut [target.as_mut()];
-                        self.call_native_fn(
+                        self.exec_native_fn_call(
                             global, caches, lib, getter, *hash_get, args, is_ref_mut, false, *pos,
                             level,
                         )
@@ -429,7 +429,7 @@ impl Engine {
 
                                 // Assume getters are always pure
                                 let (mut val, ..) = self
-                                    .call_native_fn(
+                                    .exec_native_fn_call(
                                         global, caches, lib, getter, *hash_get, args, is_ref_mut,
                                         false, pos, level,
                                     )
@@ -465,7 +465,7 @@ impl Engine {
                                     // Re-use args because the first &mut parameter will not be consumed
                                     let mut arg_values = [target.as_mut(), val.as_mut()];
                                     let args = &mut arg_values;
-                                    self.call_native_fn(
+                                    self.exec_native_fn_call(
                                         global, caches, lib, setter, *hash_set, args, is_ref_mut,
                                         false, pos, level,
                                     )
@@ -764,7 +764,7 @@ impl Engine {
         let pos = Position::NONE;
         let level = level + 1;
 
-        self.call_native_fn(
+        self.exec_native_fn_call(
             global, caches, lib, fn_name, hash, args, true, false, pos, level,
         )
         .map(|(r, ..)| r)
@@ -789,7 +789,7 @@ impl Engine {
         let pos = Position::NONE;
         let level = level + 1;
 
-        self.call_native_fn(
+        self.exec_native_fn_call(
             global, caches, lib, fn_name, hash, args, is_ref_mut, false, pos, level,
         )
     }

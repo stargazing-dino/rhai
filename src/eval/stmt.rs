@@ -153,7 +153,7 @@ impl Engine {
             let op_assign = op_assign.literal_syntax();
             let op = op.literal_syntax();
 
-            match self.call_native_fn(
+            match self.exec_native_fn_call(
                 global, caches, lib, op_assign, hash, args, true, true, *op_pos, level,
             ) {
                 Ok(_) => (),
@@ -161,7 +161,7 @@ impl Engine {
                 {
                     // Expand to `var = var op rhs`
                     *args[0] = self
-                        .call_native_fn(
+                        .exec_native_fn_call(
                             global, caches, lib, op, *hash_op, args, true, false, *op_pos, level,
                         )
                         .map_err(|err| err.fill_position(op_info.pos))?
@@ -207,11 +207,11 @@ impl Engine {
         // Popular branches are lifted out of the `match` statement into their own branches.
 
         // Function calls should account for a relatively larger portion of statements.
-        if let Stmt::FnCall(x, ..) = stmt {
+        if let Stmt::FnCall(x, pos) = stmt {
             self.track_operation(global, stmt.position())?;
 
             let result =
-                self.eval_fn_call_expr(scope, global, caches, lib, this_ptr, x, x.pos, level);
+                self.eval_fn_call_expr(scope, global, caches, lib, this_ptr, x, *pos, level);
 
             #[cfg(feature = "debugging")]
             global.debugger.reset_status(reset_debugger);
@@ -1005,5 +1005,29 @@ impl Engine {
         global.debugger.reset_status(reset_debugger);
 
         result
+    }
+
+    /// Evaluate a list of statements with no `this` pointer.
+    /// This is commonly used to evaluate a list of statements in an [`AST`][crate::AST] or a script function body.
+    #[inline]
+    pub(crate) fn eval_global_statements(
+        &self,
+        scope: &mut Scope,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        statements: &[Stmt],
+        lib: &[&Module],
+        level: usize,
+    ) -> RhaiResult {
+        self.eval_stmt_block(
+            scope, global, caches, lib, &mut None, statements, false, level,
+        )
+        .or_else(|err| match *err {
+            ERR::Return(out, ..) => Ok(out),
+            ERR::LoopBreak(..) => {
+                unreachable!("no outer loop scope to break out of")
+            }
+            _ => Err(err),
+        })
     }
 }
