@@ -25,7 +25,7 @@ static AHASH_SEED: OnceLock<Option<[u64; 4]>> = OnceLock::new();
 /// This is a global variable, and thus will affect every Rhai instance.
 /// This should not be used _unless_ you know you need it.
 ///
-/// **WARNING**:
+/// # Warning:
 /// - You can only call this function **ONCE** for the whole of your program execution.
 /// - You should gracefully handle the `Err(())`.
 /// - You **MUST** call this before **ANY** Rhai operation occurs (e.g. creating an [`Engine`]).
