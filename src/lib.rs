@@ -71,8 +71,6 @@
 #![allow(clippy::negative_feature_names)]
 #![allow(clippy::module_inception)]
 
-#![cfg_attr(feature = "static_hash", feature(once_cell))]
-
 #[cfg(feature = "no_std")]
 extern crate alloc;
 
