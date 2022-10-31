@@ -117,7 +117,7 @@ mod internal {
 
 #[cfg(not(feature = "static_hash"))]
 mod internal {
-    const AHASH_SEED: Option<[u64; 4]> = {{ AHASH_SEED }};
+    const AHASH_SEED: Option<[u64; 4]> = None;
 
     /// Gets the current Rhai Ahash Seed. If the seed is not yet defined, this will automatically set a seed.
     /// The default seed is not stable and may change between versions.

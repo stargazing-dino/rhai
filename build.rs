@@ -18,7 +18,7 @@ fn main() {
 
         let seed = env::var("RHAI_AHASH_SEED").map_or_else(|_| "None".into(), |s| format!("Some({s})"));
 
-        contents = contents.replace("{{AHASH_SEED}}", &seed);
+        contents = contents.replace("{{ AHASH_SEED }}", &seed);
 
         File::create("src/config/hashing.rs")
             .expect("cannot create `config.rs`")
