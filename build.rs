@@ -20,9 +20,9 @@ fn main() {
 
         contents = contents.replace("{{AHASH_SEED}}", &seed);
 
-        File::create("src/config.rs")
+        File::create("src/config/hashing.rs")
             .expect("cannot create `config.rs`")
             .write_all(contents.as_bytes())
-            .expect("cannot write to `config.rs`");
+            .expect("cannot write to `config/hashing.rs`");
     }
 }
