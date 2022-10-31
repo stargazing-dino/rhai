@@ -29,6 +29,9 @@ static AHASH_SEED: OnceLock<Option<[u64; 4]>> = OnceLock::new();
 /// - You can only call this function **ONCE** for the whole of your program execution.
 /// - You should gracefully handle the `Err(())`.
 /// - You **MUST** call this before **ANY** Rhai operation occurs (e.g. creating an [`Engine`]).
+///
+/// # Errors
+/// This will error if the AHashSeed is already set.
 pub fn set_rhai_ahash_seed(new_seed: Option<[u64; 4]>) -> Result<(), Option<[u64; 4]>> {
     AHASH_SEED.set(new_seed)
 }
