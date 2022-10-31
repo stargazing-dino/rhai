@@ -71,6 +71,8 @@
 #![allow(clippy::negative_feature_names)]
 #![allow(clippy::module_inception)]
 
+#![cfg_attr(feature = "stable_hash", feature(once_cell))]
+
 #[cfg(feature = "no_std")]
 extern crate alloc;
 
@@ -83,7 +85,7 @@ use std::prelude::v1::*;
 // Internal modules
 mod api;
 mod ast;
-mod config;
+pub mod config;
 mod engine;
 mod eval;
 mod func;

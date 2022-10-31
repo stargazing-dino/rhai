@@ -63,6 +63,7 @@ unicode-xid-ident = ["unicode-xid"] # allow Unicode Standard Annex #31 for ident
 metadata = ["serde", "serde_json", "rhai_codegen/metadata", "smartstring/serde"] # enable exporting functions metadata
 internals = []                  # expose internal data structures
 debugging = ["internals"]       # enable debugging
+stable_hash = ["std"]
 serde = ["dep:serde", "smartstring/serde", "smallvec/serde"] # implement serde for rhai types
 
 # compiling for no-std
