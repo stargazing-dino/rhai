@@ -44,7 +44,7 @@ jobs:
         flags:
           - ""
           - "--features debugging"
-          - "--features metadata,serde,internals,static_hash"
+          - "--features metadata,serde,internals"
           - "--features unchecked,serde,metadata,internals,debugging"
           - "--features sync,serde,metadata,internals,debugging"
           - "--features no_position,serde,metadata,internals,debugging"
@@ -129,7 +129,6 @@ jobs:
       matrix:
         flags:
           - ""
-          - "--features static_hash"
         include:
           - {os: ubuntu-latest, flags: "--profile unix", experimental: false}
           - {os: windows-latest, flags: "--profile windows", experimental: true}
