@@ -259,17 +259,18 @@ impl Engine {
             ast.resolver().cloned(),
         );
 
-        let mut result = Ok(Dynamic::UNIT);
-
-        if eval_ast && !statements.is_empty() {
-            result = self.eval_global_statements(scope, global, caches, statements, lib, 0);
+        let result = if eval_ast && !statements.is_empty() {
+            let r = self.eval_global_statements(scope, global, caches, statements, lib, 0);
 
             if rewind_scope {
                 scope.rewind(orig_scope_len);
             }
-        }
 
-        result = result.and_then(|_| {
+            r
+        } else {
+            Ok(Dynamic::UNIT)
+        }
+        .and_then(|_| {
             let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
             // Check for data race.

@@ -15,6 +15,8 @@ pub use args::FuncArgs;
 pub use builtin::{get_builtin_binary_op_fn, get_builtin_op_assignment_fn};
 #[cfg(not(feature = "no_closure"))]
 pub use call::ensure_no_data_race;
+#[cfg(not(feature = "no_function"))]
+pub use call::is_anonymous_fn;
 pub use call::FnCallArgs;
 pub use callable_function::CallableFunction;
 #[cfg(not(feature = "no_function"))]

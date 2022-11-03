@@ -3,8 +3,9 @@
 use super::call::FnCallArgs;
 use crate::ast::FnCallHashes;
 use crate::eval::{Caches, GlobalRuntimeState};
+use crate::parser::is_anonymous_fn;
 use crate::plugin::PluginFunction;
-use crate::tokenizer::{Token, TokenizeState};
+use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Module, Position, RhaiResult,
@@ -329,7 +330,10 @@ impl<'a> NativeCallContext<'a> {
         is_method_call: bool,
         args: &mut [&mut Dynamic],
     ) -> RhaiResult {
-        self._call_fn_raw(fn_name, false, is_ref_mut, is_method_call, args)
+        let name = fn_name.as_ref();
+        let native_only = !is_valid_function_name(name) && !is_anonymous_fn(name);
+
+        self._call_fn_raw(fn_name, native_only, is_ref_mut, is_method_call, args)
     }
     /// Call a registered native Rust function inside the call context.
     ///

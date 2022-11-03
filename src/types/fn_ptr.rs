@@ -106,7 +106,7 @@ impl FnPtr {
     #[inline(always)]
     #[must_use]
     pub fn is_anonymous(&self) -> bool {
-        self.name.starts_with(crate::engine::FN_ANONYMOUS)
+        crate::func::is_anonymous_fn(&self.name)
     }
     /// Call the function pointer with curried arguments (if any).
     /// The function may be script-defined (not available under `no_function`) or native Rust.
