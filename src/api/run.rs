@@ -131,7 +131,7 @@ impl Engine {
             } else {
                 &lib
             };
-            self.eval_global_statements(scope, global, caches, statements, lib, 0)?;
+            self.eval_global_statements(global, caches, lib, 0, scope, statements)?;
         }
 
         #[cfg(feature = "debugging")]
@@ -142,7 +142,7 @@ impl Engine {
                 ast.as_ref(),
             ];
             let node = &crate::ast::Stmt::Noop(crate::Position::NONE);
-            self.run_debugger(scope, global, lib, &mut None, node, 0)?;
+            self.run_debugger(global, caches, lib, 0, scope, &mut None, node)?;
         }
 
         Ok(())

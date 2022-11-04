@@ -108,11 +108,15 @@ fn map_std_type_name(name: &str, shorthands: bool) -> &str {
 
 /// Format a Rust type to be display-friendly.
 ///
+/// * `rhai::` prefix is cleared.
 /// * `()` is cleared.
+/// * `&mut` is cleared.
 /// * `INT` and `FLOAT` are expanded.
 /// * [`RhaiResult`][crate::RhaiResult] and [`RhaiResultOf<T>`][crate::RhaiResultOf] are expanded.
 #[cfg(feature = "metadata")]
 pub fn format_type(typ: &str, is_return_type: bool) -> std::borrow::Cow<str> {
+    const RESULT_TYPE: &str = "Result<";
+    const ERROR_TYPE: &str = ",Box<EvalAltResult>>";
     const RHAI_RESULT_TYPE: &str = "RhaiResult";
     const RHAI_RESULT_TYPE_EXPAND: &str = "Result<Dynamic, Box<EvalAltResult>>";
     const RHAI_RESULT_OF_TYPE: &str = "RhaiResultOf<";
@@ -135,6 +139,10 @@ pub fn format_type(typ: &str, is_return_type: bool) -> std::borrow::Cow<str> {
         } else {
             format!("&mut {r}").into()
         };
+    } else if typ.contains(" ") {
+        let typ = typ.replace(" ", "");
+        let r = format_type(&typ, is_return_type);
+        return r.into_owned().into();
     }
 
     match typ {
@@ -163,6 +171,12 @@ pub fn format_type(typ: &str, is_return_type: bool) -> std::borrow::Cow<str> {
         }
         ty if ty.starts_with(RHAI_RESULT_OF_TYPE) && ty.ends_with('>') => {
             let inner = &ty[RHAI_RESULT_OF_TYPE.len()..ty.len() - 1];
+            RHAI_RESULT_OF_TYPE_EXPAND
+                .replace("{}", format_type(inner, false).trim())
+                .into()
+        }
+        ty if ty.starts_with(RESULT_TYPE) && ty.ends_with(ERROR_TYPE) => {
+            let inner = &ty[RESULT_TYPE.len()..ty.len() - ERROR_TYPE.len()];
             RHAI_RESULT_OF_TYPE_EXPAND
                 .replace("{}", format_type(inner, false).trim())
                 .into()

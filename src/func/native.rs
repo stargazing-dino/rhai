@@ -4,7 +4,7 @@ use super::call::FnCallArgs;
 use crate::ast::FnCallHashes;
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::plugin::PluginFunction;
-use crate::tokenizer::{Token, TokenizeState};
+use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Module, Position, RhaiResult,
@@ -329,7 +329,12 @@ impl<'a> NativeCallContext<'a> {
         is_method_call: bool,
         args: &mut [&mut Dynamic],
     ) -> RhaiResult {
-        self._call_fn_raw(fn_name, false, is_ref_mut, is_method_call, args)
+        let name = fn_name.as_ref();
+        let native_only = !is_valid_function_name(name);
+        #[cfg(not(feature = "no_function"))]
+        let native_only = native_only && !crate::parser::is_anonymous_fn(name);
+
+        self._call_fn_raw(fn_name, native_only, is_ref_mut, is_method_call, args)
     }
     /// Call a registered native Rust function inside the call context.
     ///
@@ -377,22 +382,24 @@ impl<'a> NativeCallContext<'a> {
         let caches = &mut Caches::new();
 
         let fn_name = fn_name.as_ref();
+        let op_token = Token::lookup_symbol_from_syntax(fn_name);
+        let op_token = op_token.as_ref();
         let args_len = args.len();
 
         if native_only {
             return self
                 .engine()
-                .call_native_fn(
+                .exec_native_fn_call(
                     global,
                     caches,
                     self.lib,
+                    self.level + 1,
                     fn_name,
+                    op_token,
                     calc_fn_hash(None, fn_name, args_len),
                     args,
                     is_ref_mut,
-                    false,
                     Position::NONE,
-                    self.level + 1,
                 )
                 .map(|(r, ..)| r);
         }
@@ -411,18 +418,18 @@ impl<'a> NativeCallContext<'a> {
 
         self.engine()
             .exec_fn_call(
-                None,
                 global,
                 caches,
                 self.lib,
+                self.level + 1,
+                None,
                 fn_name,
-                false,
+                op_token,
                 hash,
                 args,
                 is_ref_mut,
                 is_method_call,
                 Position::NONE,
-                self.level + 1,
             )
             .map(|(r, ..)| r)
     }

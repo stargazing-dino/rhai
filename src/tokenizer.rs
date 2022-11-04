@@ -799,9 +799,9 @@ impl Token {
         })
     }
 
-    /// Reverse lookup a token from a piece of syntax.
+    /// Reverse lookup a symbol token from a piece of syntax.
     #[must_use]
-    pub fn lookup_from_syntax(syntax: &str) -> Option<Self> {
+    pub fn lookup_symbol_from_syntax(syntax: &str) -> Option<Self> {
         use Token::*;
 
         Some(match syntax {
@@ -879,18 +879,10 @@ impl Token {
             "**" => PowerOf,
             "**=" => PowerOfAssign,
 
-            #[cfg(feature = "no_object")]
-            "?." => Reserved(Box::new(syntax.into())),
-            #[cfg(feature = "no_index")]
-            "?[" => Reserved(Box::new(syntax.into())),
-
             #[cfg(not(feature = "no_function"))]
             "fn" => Fn,
             #[cfg(not(feature = "no_function"))]
             "private" => Private,
-
-            #[cfg(feature = "no_function")]
-            "fn" | "private" => Reserved(Box::new(syntax.into())),
 
             #[cfg(not(feature = "no_module"))]
             "import" => Import,
@@ -899,31 +891,43 @@ impl Token {
             #[cfg(not(feature = "no_module"))]
             "as" => As,
 
+            _ => return None,
+        })
+    }
+
+    /// Is a piece of syntax a reserved keyword?
+    #[must_use]
+    pub fn is_reserved_keyword(syntax: &str) -> bool {
+        match syntax {
+            #[cfg(feature = "no_object")]
+            "?." => true,
+            #[cfg(feature = "no_index")]
+            "?[" => true,
+            #[cfg(feature = "no_function")]
+            "fn" | "private" => true,
             #[cfg(feature = "no_module")]
-            "import" | "export" | "as" => Reserved(Box::new(syntax.into())),
+            "import" | "export" | "as" => true,
 
             // List of reserved operators
             "===" | "!==" | "->" | "<-" | "?" | ":=" | ":;" | "~" | "!." | "::<" | "(*" | "*)"
-            | "#" | "#!" | "@" | "$" | "++" | "--" | "..." | "<|" | "|>" => {
-                Reserved(Box::new(syntax.into()))
-            }
+            | "#" | "#!" | "@" | "$" | "++" | "--" | "..." | "<|" | "|>" => true,
 
             // List of reserved keywords
             "public" | "protected" | "super" | "new" | "use" | "module" | "package" | "var"
             | "static" | "shared" | "with" | "is" | "goto" | "exit" | "match" | "case"
             | "default" | "void" | "null" | "nil" | "spawn" | "thread" | "go" | "sync"
-            | "async" | "await" | "yield" => Reserved(Box::new(syntax.into())),
+            | "async" | "await" | "yield" => true,
 
             KEYWORD_PRINT | KEYWORD_DEBUG | KEYWORD_TYPE_OF | KEYWORD_EVAL | KEYWORD_FN_PTR
             | KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY | KEYWORD_THIS | KEYWORD_IS_DEF_VAR => {
-                Reserved(Box::new(syntax.into()))
+                true
             }
 
             #[cfg(not(feature = "no_function"))]
-            crate::engine::KEYWORD_IS_DEF_FN => Reserved(Box::new(syntax.into())),
+            crate::engine::KEYWORD_IS_DEF_FN => true,
 
-            _ => return None,
-        })
+            _ => false,
+        }
     }
 
     /// Is this token [`EOF`][Token::EOF]?
@@ -1708,11 +1712,11 @@ fn get_next_token_inner(
             // letter or underscore ...
             #[cfg(not(feature = "unicode-xid-ident"))]
             ('a'..='z' | '_' | 'A'..='Z', ..) => {
-                return Some(get_identifier(stream, pos, start_pos, c));
+                return Some(get_token_as_identifier(stream, pos, start_pos, c));
             }
             #[cfg(feature = "unicode-xid-ident")]
             (ch, ..) if unicode_xid::UnicodeXID::is_xid_start(ch) || ch == '_' => {
-                return Some(get_identifier(stream, pos, start_pos, c));
+                return Some(get_token_as_identifier(stream, pos, start_pos, c));
             }
 
             // " - string literal
@@ -2179,8 +2183,8 @@ fn get_next_token_inner(
     Some((Token::EOF, *pos))
 }
 
-/// Get the next identifier.
-fn get_identifier(
+/// Get the next token, parsing it as an identifier.
+fn get_token_as_identifier(
     stream: &mut impl InputStream,
     pos: &mut Position,
     start_pos: Position,
@@ -2199,13 +2203,13 @@ fn get_identifier(
         }
     }
 
-    let is_valid_identifier = is_valid_identifier(identifier.chars());
-
-    if let Some(token) = Token::lookup_from_syntax(&identifier) {
+    if let Some(token) = Token::lookup_symbol_from_syntax(&identifier) {
         return (token, start_pos);
+    } else if Token::is_reserved_keyword(&identifier) {
+        return (Token::Reserved(Box::new(identifier)), start_pos);
     }
 
-    if !is_valid_identifier {
+    if !is_valid_identifier(&identifier) {
         return (
             Token::LexError(LERR::MalformedIdentifier(identifier.to_string()).into()),
             start_pos,
@@ -2233,10 +2237,10 @@ pub fn is_keyword_function(name: &str) -> bool {
 /// _(internals)_ Is a text string a valid identifier?
 /// Exported under the `internals` feature only.
 #[must_use]
-pub fn is_valid_identifier(name: impl Iterator<Item = char>) -> bool {
+pub fn is_valid_identifier(name: &str) -> bool {
     let mut first_alphabetic = false;
 
-    for ch in name {
+    for ch in name.chars() {
         match ch {
             '_' => (),
             _ if is_id_first_alphabetic(ch) => first_alphabetic = true,
@@ -2254,7 +2258,7 @@ pub fn is_valid_identifier(name: impl Iterator<Item = char>) -> bool {
 #[inline(always)]
 #[must_use]
 pub fn is_valid_function_name(name: &str) -> bool {
-    is_valid_identifier(name.chars())
+    is_valid_identifier(name) && !is_keyword_function(name)
 }
 
 /// Is a character valid to start an identifier?
@@ -2433,7 +2437,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 (.., true) => unreachable!("no custom operators"),
                 // Reserved keyword that is not custom and disabled.
                 (token, false) if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token) => {
-                    let msg = format!("reserved {} '{token}' is disabled", if is_valid_identifier(token.chars()) { "keyword"} else {"symbol"});
+                    let msg = format!("reserved {} '{token}' is disabled", if is_valid_identifier(token) { "keyword"} else {"symbol"});
                     Token::LexError(LERR::ImproperSymbol(s.to_string(), msg).into())
                 },
                 // Reserved keyword/operator that is not custom.

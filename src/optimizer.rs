@@ -11,8 +11,8 @@ use crate::func::hashing::get_hasher;
 use crate::tokenizer::Token;
 use crate::types::dynamic::AccessMode;
 use crate::{
-    calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Engine, FnPtr, Identifier,
-    ImmutableString, Position, Scope, StaticVec, AST, INT,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnPtr, Identifier, ImmutableString, Position,
+    Scope, StaticVec, AST, INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -139,6 +139,7 @@ impl<'a> OptimizerState<'a> {
     pub fn call_fn_with_constant_arguments(
         &mut self,
         fn_name: &str,
+        op_token: Option<&Token>,
         arg_values: &mut [Dynamic],
     ) -> Option<Dynamic> {
         #[cfg(not(feature = "no_function"))]
@@ -147,17 +148,17 @@ impl<'a> OptimizerState<'a> {
         let lib = &[];
 
         self.engine
-            .call_native_fn(
+            .exec_native_fn_call(
                 &mut self.global,
                 &mut self.caches,
                 lib,
+                0,
                 fn_name,
+                op_token,
                 calc_fn_hash(None, fn_name, arg_values.len()),
                 &mut arg_values.iter_mut().collect::<StaticVec<_>>(),
                 false,
-                false,
                 Position::NONE,
-                0,
             )
             .ok()
             .map(|(v, ..)| v)
@@ -170,8 +171,7 @@ fn has_native_fn_override(
     hash_script: u64,
     arg_types: impl AsRef<[TypeId]>,
 ) -> bool {
-    let hash_params = calc_fn_params_hash(arg_types.as_ref().iter().copied());
-    let hash = combine_hashes(hash_script, hash_params);
+    let hash = calc_fn_hash_full(hash_script, arg_types.as_ref().iter().copied());
 
     // First check the global namespace and packages, but skip modules that are standard because
     // they should never conflict with system functions.
@@ -438,15 +438,15 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             if !x.0.is_op_assignment()
                 && x.1.lhs.is_variable_access(true)
                 && matches!(&x.1.rhs, Expr::FnCall(x2, ..)
-                        if Token::lookup_from_syntax(&x2.name).map_or(false, |t| t.has_op_assignment())
+                        if Token::lookup_symbol_from_syntax(&x2.name).map_or(false, |t| t.has_op_assignment())
                         && x2.args.len() == 2
                         && x2.args[0].get_variable_name(true) == x.1.lhs.get_variable_name(true)
                 ) =>
         {
             match x.1.rhs {
-                Expr::FnCall(ref mut x2, ..) => {
+                Expr::FnCall(ref mut x2, pos) => {
                     state.set_dirty();
-                    x.0 = OpAssignment::new_op_assignment_from_base(&x2.name, x2.pos);
+                    x.0 = OpAssignment::new_op_assignment_from_base(&x2.name, pos);
                     x.1.rhs = mem::take(&mut x2.args[1]);
                 }
                 ref expr => unreachable!("Expr::FnCall expected but gets {:?}", expr),
@@ -1098,7 +1098,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             && state.optimization_level == OptimizationLevel::Simple // simple optimizations
             && x.args.len() == 1
             && x.name == KEYWORD_FN_PTR
-            && x.args[0].is_constant()
+            && x.constant_args()
         => {
             let fn_name = match x.args[0] {
                 Expr::StringConstant(ref s, ..) => s.clone().into(),
@@ -1122,8 +1122,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         Expr::FnCall(x, pos)
                 if !x.is_qualified() // Non-qualified
                 && state.optimization_level == OptimizationLevel::Simple // simple optimizations
-                && x.args.iter().all(Expr::is_constant) // all arguments are constants
-                //&& !is_valid_identifier(x.chars()) // cannot be scripted
+                && x.constant_args() // all arguments are constants
         => {
             let arg_values = &mut x.args.iter().map(|e| e.get_literal_value().unwrap()).collect::<StaticVec<_>>();
             let arg_types: StaticVec<_> = arg_values.iter().map(Dynamic::type_id).collect();
@@ -1142,8 +1141,8 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     return;
                 }
                 // Overloaded operators can override built-in.
-                _ if x.args.len() == 2 && x.operator_token.is_some() && (state.engine.fast_operators() || !has_native_fn_override(state.engine, x.hashes.native, &arg_types)) => {
-                    if let Some(result) = get_builtin_binary_op_fn(x.operator_token.as_ref().unwrap(), &arg_values[0], &arg_values[1])
+                _ if x.args.len() == 2 && x.op_token.is_some() && (state.engine.fast_operators() || !has_native_fn_override(state.engine, x.hashes.native(), &arg_types)) => {
+                    if let Some(result) = get_builtin_binary_op_fn(x.op_token.as_ref().unwrap(), &arg_values[0], &arg_values[1])
                         .and_then(|f| {
                             #[cfg(not(feature = "no_function"))]
                             let lib = state.lib;
@@ -1186,11 +1185,11 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         Expr::FnCall(x, pos)
                 if !x.is_qualified() // non-qualified
                 && state.optimization_level == OptimizationLevel::Full // full optimizations
-                && x.args.iter().all(Expr::is_constant) // all arguments are constants
+                && x.constant_args() // all arguments are constants
         => {
             // First search for script-defined functions (can override built-in)
             #[cfg(not(feature = "no_function"))]
-            let has_script_fn = state.lib.iter().find_map(|&m| m.get_script_fn(&x.name, x.args.len())).is_some();
+            let has_script_fn = !x.hashes.is_native_only() && state.lib.iter().find_map(|&m| m.get_script_fn(&x.name, x.args.len())).is_some();
             #[cfg(feature = "no_function")]
             let has_script_fn = false;
 
@@ -1201,7 +1200,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     KEYWORD_TYPE_OF if arg_values.len() == 1 => Some(state.engine.map_type_name(arg_values[0].type_name()).into()),
                     #[cfg(not(feature = "no_closure"))]
                     crate::engine::KEYWORD_IS_SHARED if arg_values.len() == 1 => Some(Dynamic::FALSE),
-                    _ => state.call_fn_with_constant_arguments(&x.name, arg_values)
+                    _ => state.call_fn_with_constant_arguments(&x.name, x.op_token.as_ref(), arg_values)
                 };
 
                 if let Some(result) = result {

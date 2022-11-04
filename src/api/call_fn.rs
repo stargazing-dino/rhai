@@ -259,35 +259,36 @@ impl Engine {
             ast.resolver().cloned(),
         );
 
-        let mut result = Ok(Dynamic::UNIT);
-
-        if eval_ast && !statements.is_empty() {
-            result = self.eval_global_statements(scope, global, caches, statements, lib, 0);
+        let result = if eval_ast && !statements.is_empty() {
+            let r = self.eval_global_statements(global, caches, lib, 0, scope, statements);
 
             if rewind_scope {
                 scope.rewind(orig_scope_len);
             }
-        }
 
-        result = result.and_then(|_| {
+            r
+        } else {
+            Ok(Dynamic::UNIT)
+        }
+        .and_then(|_| {
             let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
             // Check for data race.
             #[cfg(not(feature = "no_closure"))]
-            crate::func::call::ensure_no_data_race(name, &args, false).map(|_| Dynamic::UNIT)?;
+            crate::func::ensure_no_data_race(name, &args, false).map(|_| Dynamic::UNIT)?;
 
             if let Some(fn_def) = ast.shared_lib().get_script_fn(name, args.len()) {
                 self.call_script_fn(
-                    scope,
                     global,
                     caches,
                     lib,
+                    0,
+                    scope,
                     &mut this_ptr,
                     fn_def,
                     &mut args,
                     rewind_scope,
                     Position::NONE,
-                    0,
                 )
             } else {
                 Err(ERR::ErrorFunctionNotFound(name.into(), Position::NONE).into())
@@ -305,7 +306,7 @@ impl Engine {
         if self.debugger.is_some() {
             global.debugger.status = crate::eval::DebuggerStatus::Terminate;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
-            self.run_debugger(scope, global, lib, &mut this_ptr, node, 0)?;
+            self.run_debugger(global, caches, lib, 0, scope, &mut this_ptr, node)?;
         }
 
         Ok(result)

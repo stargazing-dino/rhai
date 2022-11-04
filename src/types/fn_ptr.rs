@@ -1,6 +1,6 @@
 //! The `FnPtr` type.
 
-use crate::tokenizer::is_valid_identifier;
+use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
     Dynamic, Engine, FuncArgs, ImmutableString, Module, NativeCallContext, Position, RhaiError,
@@ -106,7 +106,7 @@ impl FnPtr {
     #[inline(always)]
     #[must_use]
     pub fn is_anonymous(&self) -> bool {
-        self.name.starts_with(crate::engine::FN_ANONYMOUS)
+        crate::func::is_anonymous_fn(&self.name)
     }
     /// Call the function pointer with curried arguments (if any).
     /// The function may be script-defined (not available under `no_function`) or native Rust.
@@ -254,7 +254,7 @@ impl TryFrom<ImmutableString> for FnPtr {
 
     #[inline(always)]
     fn try_from(value: ImmutableString) -> RhaiResultOf<Self> {
-        if is_valid_identifier(value.chars()) {
+        if is_valid_function_name(&value) {
             Ok(Self {
                 name: value,
                 curry: StaticVec::new_const(),

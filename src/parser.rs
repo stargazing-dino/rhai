@@ -174,7 +174,7 @@ impl<'e> ParseState<'e> {
     ///
     /// # Return value: `(index, is_func_name)`
     ///
-    /// * `index`: `None` when the variable name is not found in the `stack`,
+    /// * `index`: [`None`] when the variable name is not found in the `stack`,
     ///            otherwise the index value.
     ///
     /// * `is_func_name`: `true` if the variable is actually the name of a function
@@ -223,7 +223,7 @@ impl<'e> ParseState<'e> {
     /// Returns the offset to be deducted from `Stack::len`,
     /// i.e. the top element of the [`ParseState`] is offset 1.
     ///
-    /// Returns `None` when the variable name is not found in the [`ParseState`].
+    /// Returns [`None`] when the variable name is not found in the [`ParseState`].
     ///
     /// # Panics
     ///
@@ -469,7 +469,7 @@ fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position
         // Variable name
         (Token::Identifier(s), pos) => Ok((*s, pos)),
         // Reserved keyword
-        (Token::Reserved(s), pos) if is_valid_identifier(s.chars()) => {
+        (Token::Reserved(s), pos) if is_valid_identifier(s.as_str()) => {
             Err(PERR::Reserved(s.to_string()).into_err(pos))
         }
         // Bad identifier
@@ -486,7 +486,7 @@ fn parse_symbol(input: &mut TokenStream) -> ParseResult<(SmartString, Position)>
         // Symbol
         (token, pos) if token.is_standard_symbol() => Ok((token.literal_syntax().into(), pos)),
         // Reserved symbol
-        (Token::Reserved(s), pos) if !is_valid_identifier(s.chars()) => Ok((*s, pos)),
+        (Token::Reserved(s), pos) if !is_valid_identifier(s.as_str()) => Ok((*s, pos)),
         // Bad symbol
         (Token::LexError(err), pos) => Err(err.into_err(pos)),
         // Not a symbol
@@ -599,9 +599,7 @@ impl Engine {
                 #[cfg(feature = "no_module")]
                 let hash = calc_fn_hash(None, &id, 0);
 
-                let is_valid_function_name = is_valid_function_name(&id);
-
-                let hashes = if is_valid_function_name {
+                let hashes = if is_valid_function_name(&id) {
                     hash.into()
                 } else {
                     FnCallHashes::from_native(hash)
@@ -612,14 +610,11 @@ impl Engine {
                 return Ok(FnCallExpr {
                     name: state.get_interned_string(id),
                     capture_parent_scope,
-                    operator_token: None,
-                    #[cfg(not(feature = "no_function"))]
-                    can_be_script: is_valid_function_name,
+                    op_token: None,
                     #[cfg(not(feature = "no_module"))]
                     namespace,
                     hashes,
                     args,
-                    pos: settings.pos,
                 }
                 .into_fn_call_expr(settings.pos));
             }
@@ -671,9 +666,7 @@ impl Engine {
                     #[cfg(feature = "no_module")]
                     let hash = calc_fn_hash(None, &id, args.len());
 
-                    let is_valid_function_name = is_valid_function_name(&id);
-
-                    let hashes = if is_valid_function_name {
+                    let hashes = if is_valid_function_name(&id) {
                         hash.into()
                     } else {
                         FnCallHashes::from_native(hash)
@@ -684,14 +677,11 @@ impl Engine {
                     return Ok(FnCallExpr {
                         name: state.get_interned_string(id),
                         capture_parent_scope,
-                        operator_token: None,
-                        #[cfg(not(feature = "no_function"))]
-                        can_be_script: is_valid_function_name,
+                        op_token: None,
                         #[cfg(not(feature = "no_module"))]
                         namespace,
                         hashes,
                         args,
-                        pos: settings.pos,
                     }
                     .into_fn_call_expr(settings.pos));
                 }
@@ -1012,7 +1002,7 @@ impl Engine {
                 (Token::InterpolatedString(..), pos) => {
                     return Err(PERR::PropertyExpected.into_err(pos))
                 }
-                (Token::Reserved(s), pos) if is_valid_identifier(s.chars()) => {
+                (Token::Reserved(s), pos) if is_valid_identifier(s.as_str()) => {
                     return Err(PERR::Reserved(s.to_string()).into_err(pos));
                 }
                 (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -1941,11 +1931,8 @@ impl Engine {
                             name: state.get_interned_string("-"),
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "-", 1)),
                             args,
-                            pos,
-                            operator_token: Some(token),
+                            op_token: Some(token),
                             capture_parent_scope: false,
-                            #[cfg(not(feature = "no_function"))]
-                            can_be_script: false,
                         }
                         .into_fn_call_expr(pos))
                     }
@@ -1973,11 +1960,8 @@ impl Engine {
                             name: state.get_interned_string("+"),
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "+", 1)),
                             args,
-                            pos,
-                            operator_token: Some(token),
+                            op_token: Some(token),
                             capture_parent_scope: false,
-                            #[cfg(not(feature = "no_function"))]
-                            can_be_script: false,
                         }
                         .into_fn_call_expr(pos))
                     }
@@ -1998,11 +1982,8 @@ impl Engine {
                     name: state.get_interned_string("!"),
                     hashes: FnCallHashes::from_native(calc_fn_hash(None, "!", 1)),
                     args,
-                    pos,
-                    operator_token: Some(token),
+                    op_token: Some(token),
                     capture_parent_scope: false,
-                    #[cfg(not(feature = "no_function"))]
-                    can_be_script: false,
                 }
                 .into_fn_call_expr(pos))
             }
@@ -2217,11 +2198,15 @@ impl Engine {
             // lhs.func(...)
             (lhs, Expr::FnCall(mut func, func_pos)) => {
                 // Recalculate hash
-                func.hashes = FnCallHashes::from_all(
-                    #[cfg(not(feature = "no_function"))]
-                    calc_fn_hash(None, &func.name, func.args.len()),
-                    calc_fn_hash(None, &func.name, func.args.len() + 1),
-                );
+                func.hashes = if is_valid_function_name(&func.name) {
+                    FnCallHashes::from_all(
+                        #[cfg(not(feature = "no_function"))]
+                        calc_fn_hash(None, &func.name, func.args.len()),
+                        calc_fn_hash(None, &func.name, func.args.len() + 1),
+                    )
+                } else {
+                    FnCallHashes::from_native(calc_fn_hash(None, &func.name, func.args.len() + 1))
+                };
 
                 let rhs = Expr::MethodCall(func, func_pos);
                 Ok(Expr::Dot(BinaryExpr { lhs, rhs }.into(), op_flags, op_pos))
@@ -2263,11 +2248,19 @@ impl Engine {
                     // lhs.func().dot_rhs or lhs.func()[idx_rhs]
                     Expr::FnCall(mut func, func_pos) => {
                         // Recalculate hash
-                        func.hashes = FnCallHashes::from_all(
-                            #[cfg(not(feature = "no_function"))]
-                            calc_fn_hash(None, &func.name, func.args.len()),
-                            calc_fn_hash(None, &func.name, func.args.len() + 1),
-                        );
+                        func.hashes = if is_valid_function_name(&func.name) {
+                            FnCallHashes::from_all(
+                                #[cfg(not(feature = "no_function"))]
+                                calc_fn_hash(None, &func.name, func.args.len()),
+                                calc_fn_hash(None, &func.name, func.args.len() + 1),
+                            )
+                        } else {
+                            FnCallHashes::from_native(calc_fn_hash(
+                                None,
+                                &func.name,
+                                func.args.len() + 1,
+                            ))
+                        };
 
                         let new_lhs = BinaryExpr {
                             lhs: Expr::MethodCall(func, func_pos),
@@ -2322,7 +2315,7 @@ impl Engine {
                     .get(&**c)
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*current_pos))?,
-                Token::Reserved(c) if !is_valid_identifier(c.chars()) => {
+                Token::Reserved(c) if !is_valid_identifier(c) => {
                     return Err(PERR::UnknownOperator(c.to_string()).into_err(*current_pos))
                 }
                 _ => current_op.precedence(),
@@ -2347,7 +2340,7 @@ impl Engine {
                     .get(&**c)
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*next_pos))?,
-                Token::Reserved(c) if !is_valid_identifier(c.chars()) => {
+                Token::Reserved(c) if !is_valid_identifier(c) => {
                     return Err(PERR::UnknownOperator(c.to_string()).into_err(*next_pos))
                 }
                 _ => next_op.precedence(),
@@ -2371,24 +2364,11 @@ impl Engine {
 
             let op = op_token.syntax();
             let hash = calc_fn_hash(None, &op, 2);
-            let is_function = is_valid_function_name(&op);
-            let operator_token = if is_function {
+            let is_valid_script_function = is_valid_function_name(&op);
+            let operator_token = if is_valid_script_function {
                 None
             } else {
                 Some(op_token.clone())
-            };
-
-            let op_base = FnCallExpr {
-                #[cfg(not(feature = "no_module"))]
-                namespace: Default::default(),
-                name: state.get_interned_string(op.as_ref()),
-                hashes: FnCallHashes::from_native(hash),
-                args: StaticVec::new_const(),
-                pos,
-                operator_token,
-                capture_parent_scope: false,
-                #[cfg(not(feature = "no_function"))]
-                can_be_script: is_function,
             };
 
             let mut args = StaticVec::new_const();
@@ -2396,9 +2376,19 @@ impl Engine {
             args.push(rhs);
             args.shrink_to_fit();
 
+            let mut op_base = FnCallExpr {
+                #[cfg(not(feature = "no_module"))]
+                namespace: Default::default(),
+                name: state.get_interned_string(op.as_ref()),
+                hashes: FnCallHashes::from_native(hash),
+                args,
+                op_token: operator_token,
+                capture_parent_scope: false,
+            };
+
             root = match op_token {
                 // '!=' defaults to true when passed invalid operands
-                Token::NotEqualsTo => FnCallExpr { args, ..op_base }.into_fn_call_expr(pos),
+                Token::NotEqualsTo => op_base.into_fn_call_expr(pos),
 
                 // Comparison operators default to false when passed invalid operands
                 Token::EqualsTo
@@ -2406,61 +2396,36 @@ impl Engine {
                 | Token::LessThanEqualsTo
                 | Token::GreaterThan
                 | Token::GreaterThanEqualsTo => {
-                    let pos = args[0].start_position();
-                    FnCallExpr { args, ..op_base }.into_fn_call_expr(pos)
+                    let pos = op_base.args[0].start_position();
+                    op_base.into_fn_call_expr(pos)
                 }
 
                 Token::Or => {
-                    let rhs = args.pop().unwrap();
-                    let current_lhs = args.pop().unwrap();
-                    Expr::Or(
-                        BinaryExpr {
-                            lhs: current_lhs.ensure_bool_expr()?,
-                            rhs: rhs.ensure_bool_expr()?,
-                        }
-                        .into(),
-                        pos,
-                    )
+                    let rhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
+                    let lhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
+                    Expr::Or(BinaryExpr { lhs: lhs, rhs: rhs }.into(), pos)
                 }
                 Token::And => {
-                    let rhs = args.pop().unwrap();
-                    let current_lhs = args.pop().unwrap();
-                    Expr::And(
-                        BinaryExpr {
-                            lhs: current_lhs.ensure_bool_expr()?,
-                            rhs: rhs.ensure_bool_expr()?,
-                        }
-                        .into(),
-                        pos,
-                    )
+                    let rhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
+                    let lhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
+                    Expr::And(BinaryExpr { lhs: lhs, rhs: rhs }.into(), pos)
                 }
                 Token::DoubleQuestion => {
-                    let rhs = args.pop().unwrap();
-                    let current_lhs = args.pop().unwrap();
-                    Expr::Coalesce(
-                        BinaryExpr {
-                            lhs: current_lhs,
-                            rhs,
-                        }
-                        .into(),
-                        pos,
-                    )
+                    let rhs = op_base.args.pop().unwrap();
+                    let lhs = op_base.args.pop().unwrap();
+                    Expr::Coalesce(BinaryExpr { lhs, rhs }.into(), pos)
                 }
                 Token::In => {
                     // Swap the arguments
-                    let current_lhs = args.remove(0);
-                    let pos = current_lhs.start_position();
-                    args.push(current_lhs);
-                    args.shrink_to_fit();
+                    let lhs = op_base.args.remove(0);
+                    let pos = lhs.start_position();
+                    op_base.args.push(lhs);
+                    op_base.args.shrink_to_fit();
 
                     // Convert into a call to `contains`
-                    FnCallExpr {
-                        hashes: calc_fn_hash(None, OP_CONTAINS, 2).into(),
-                        args,
-                        name: state.get_interned_string(OP_CONTAINS),
-                        ..op_base
-                    }
-                    .into_fn_call_expr(pos)
+                    op_base.hashes = calc_fn_hash(None, OP_CONTAINS, 2).into();
+                    op_base.name = state.get_interned_string(OP_CONTAINS);
+                    op_base.into_fn_call_expr(pos)
                 }
 
                 #[cfg(not(feature = "no_custom_syntax"))]
@@ -2470,24 +2435,17 @@ impl Engine {
                         .get(s.as_str())
                         .map_or(false, Option::is_some) =>
                 {
-                    let hash = calc_fn_hash(None, &s, 2);
-                    let pos = args[0].start_position();
-
-                    FnCallExpr {
-                        hashes: if is_function {
-                            hash.into()
-                        } else {
-                            FnCallHashes::from_native(hash)
-                        },
-                        args,
-                        ..op_base
-                    }
-                    .into_fn_call_expr(pos)
+                    op_base.hashes = if is_valid_script_function {
+                        calc_fn_hash(None, &s, 2).into()
+                    } else {
+                        FnCallHashes::from_native(calc_fn_hash(None, &s, 2))
+                    };
+                    op_base.into_fn_call_expr(pos)
                 }
 
                 _ => {
-                    let pos = args[0].start_position();
-                    FnCallExpr { args, ..op_base }.into_fn_call_expr(pos)
+                    let pos = op_base.args[0].start_position();
+                    op_base.into_fn_call_expr(pos)
                 }
             };
         }
@@ -2951,12 +2909,12 @@ impl Engine {
             let mut this_ptr = None;
             let context = EvalContext::new(
                 self,
-                &mut state.stack,
                 &mut state.global,
                 None,
                 &[],
-                &mut this_ptr,
                 level,
+                &mut state.stack,
+                &mut this_ptr,
             );
 
             match filter(false, info, context) {
@@ -3729,11 +3687,8 @@ impl Engine {
                 num_externals + 1,
             )),
             args,
-            pos,
-            operator_token: None,
+            op_token: None,
             capture_parent_scope: false,
-            #[cfg(not(feature = "no_function"))]
-            can_be_script: false,
         }
         .into_fn_call_expr(pos);
 

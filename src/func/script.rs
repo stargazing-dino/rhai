@@ -24,16 +24,16 @@ impl Engine {
     /// **DO NOT** reuse the argument values unless for the first `&mut` argument - all others are silently replaced by `()`!
     pub(crate) fn call_script_fn(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[&Module],
+        level: usize,
+        scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
         fn_def: &ScriptFnDef,
         args: &mut FnCallArgs,
         rewind_scope: bool,
         pos: Position,
-        level: usize,
     ) -> RhaiResult {
         #[cold]
         #[inline(never)]
@@ -140,20 +140,20 @@ impl Engine {
         #[cfg(feature = "debugging")]
         {
             let node = crate::ast::Stmt::Noop(fn_def.body.position());
-            self.run_debugger(scope, global, lib, this_ptr, &node, level)?;
+            self.run_debugger(global, caches, lib, level, scope, this_ptr, &node)?;
         }
 
         // Evaluate the function
         let mut _result = self
             .eval_stmt_block(
-                scope,
                 global,
                 caches,
                 lib,
+                level,
+                scope,
                 this_ptr,
                 &fn_def.body,
                 rewind_scope,
-                level,
             )
             .or_else(|err| match *err {
                 // Convert return statement to return value
@@ -190,7 +190,9 @@ impl Engine {
                     Ok(ref r) => crate::eval::DebuggerEvent::FunctionExitWithValue(r),
                     Err(ref err) => crate::eval::DebuggerEvent::FunctionExitWithError(err),
                 };
-                match self.run_debugger_raw(scope, global, lib, this_ptr, node, event, level) {
+                match self
+                    .run_debugger_raw(global, caches, lib, level, scope, this_ptr, node, event)
+                {
                     Ok(_) => (),
                     Err(err) => _result = Err(err),
                 }

@@ -286,6 +286,7 @@ impl GlobalRuntimeState<'_> {
     /// Get the current source.
     #[inline(always)]
     #[must_use]
+    #[allow(dead_code)]
     pub(crate) const fn source_raw(&self) -> Option<&ImmutableString> {
         self.source.as_ref()
     }

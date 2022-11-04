@@ -25,14 +25,14 @@ impl Engine {
     // Errors that are not recoverable, such as system errors or safety errors, can use `?`.
     pub(crate) fn eval_stmt_block(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[&Module],
+        level: usize,
+        scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
         statements: &[Stmt],
         restore_orig_state: bool,
-        level: usize,
     ) -> RhaiResult {
         if statements.is_empty() {
             return Ok(Dynamic::UNIT);
@@ -53,14 +53,14 @@ impl Engine {
             let imports_len = global.num_imports();
 
             let result = self.eval_stmt(
-                scope,
                 global,
                 caches,
                 lib,
+                level,
+                scope,
                 this_ptr,
                 stmt,
                 restore_orig_state,
-                level,
             )?;
 
             #[cfg(not(feature = "no_module"))]
@@ -113,11 +113,11 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[&Module],
+        level: usize,
         op_info: &OpAssignment,
         target: &mut Target,
         root: (&str, Position),
         new_val: Dynamic,
-        level: usize,
     ) -> RhaiResultOf<()> {
         if target.is_read_only() {
             // Assignment to constant variable
@@ -130,8 +130,8 @@ impl Engine {
             let OpAssignment {
                 hash_op_assign,
                 hash_op,
-                op_assign,
-                op,
+                op_assign: op_assign_token,
+                op: op_token,
                 pos: op_pos,
             } = op_info;
 
@@ -142,27 +142,31 @@ impl Engine {
             let level = level + 1;
 
             if self.fast_operators() {
-                if let Some(func) = get_builtin_op_assignment_fn(op_assign, args[0], args[1]) {
+                if let Some(func) = get_builtin_op_assignment_fn(op_assign_token, args[0], args[1])
+                {
                     // Built-in found
-                    let op = op_assign.literal_syntax();
+                    let op = op_assign_token.literal_syntax();
                     let context = (self, op, None, &*global, lib, *op_pos, level).into();
                     return func(context, args).map(|_| ());
                 }
             }
 
-            let op_assign = op_assign.literal_syntax();
-            let op = op.literal_syntax();
+            let op_assign = op_assign_token.literal_syntax();
+            let op = op_token.literal_syntax();
+            let token = Some(op_assign_token);
 
-            match self.call_native_fn(
-                global, caches, lib, op_assign, hash, args, true, true, *op_pos, level,
+            match self.exec_native_fn_call(
+                global, caches, lib, level, op_assign, token, hash, args, true, *op_pos,
             ) {
                 Ok(_) => (),
                 Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
                 {
                     // Expand to `var = var op rhs`
+                    let token = Some(op_token);
+
                     *args[0] = self
-                        .call_native_fn(
-                            global, caches, lib, op, *hash_op, args, true, false, *op_pos, level,
+                        .exec_native_fn_call(
+                            global, caches, lib, level, op, token, *hash_op, args, true, *op_pos,
                         )
                         .map_err(|err| err.fill_position(op_info.pos))?
                         .0
@@ -190,28 +194,28 @@ impl Engine {
     // Errors that are not recoverable, such as system errors or safety errors, can use `?`.
     pub(crate) fn eval_stmt(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[&Module],
+        level: usize,
+        scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
         stmt: &Stmt,
         rewind_scope: bool,
-        level: usize,
     ) -> RhaiResult {
         #[cfg(feature = "debugging")]
         let reset_debugger =
-            self.run_debugger_with_reset(scope, global, lib, this_ptr, stmt, level)?;
+            self.run_debugger_with_reset(global, caches, lib, level, scope, this_ptr, stmt)?;
 
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
 
         // Function calls should account for a relatively larger portion of statements.
-        if let Stmt::FnCall(x, ..) = stmt {
+        if let Stmt::FnCall(x, pos) = stmt {
             self.track_operation(global, stmt.position())?;
 
             let result =
-                self.eval_fn_call_expr(scope, global, caches, lib, this_ptr, x, x.pos, level);
+                self.eval_fn_call_expr(global, caches, lib, level, scope, this_ptr, x, *pos);
 
             #[cfg(feature = "debugging")]
             global.debugger.reset_status(reset_debugger);
@@ -229,12 +233,12 @@ impl Engine {
 
             let result = if let Expr::Variable(x, ..) = lhs {
                 let rhs_result = self
-                    .eval_expr(scope, global, caches, lib, this_ptr, rhs, level)
+                    .eval_expr(global, caches, lib, level, scope, this_ptr, rhs)
                     .map(Dynamic::flatten);
 
                 if let Ok(rhs_val) = rhs_result {
                     let search_result =
-                        self.search_namespace(scope, global, lib, this_ptr, lhs, level);
+                        self.search_namespace(global, caches, lib, level, scope, this_ptr, lhs);
 
                     if let Ok(search_val) = search_result {
                         let (mut lhs_ptr, pos) = search_val;
@@ -261,7 +265,7 @@ impl Engine {
                         let lhs_ptr = &mut lhs_ptr;
 
                         self.eval_op_assignment(
-                            global, caches, lib, op_info, lhs_ptr, root, rhs_val, level,
+                            global, caches, lib, level, op_info, lhs_ptr, root, rhs_val,
                         )
                         .map(|_| Dynamic::UNIT)
                     } else {
@@ -273,7 +277,7 @@ impl Engine {
             } else {
                 let (op_info, BinaryExpr { lhs, rhs }) = &**x;
 
-                let rhs_result = self.eval_expr(scope, global, caches, lib, this_ptr, rhs, level);
+                let rhs_result = self.eval_expr(global, caches, lib, level, scope, this_ptr, rhs);
 
                 if let Ok(rhs_val) = rhs_result {
                     // Check if the result is a string. If so, intern it.
@@ -303,14 +307,14 @@ impl Engine {
                         #[cfg(not(feature = "no_index"))]
                         Expr::Index(..) => self
                             .eval_dot_index_chain(
-                                scope, global, caches, lib, this_ptr, lhs, level, _new_val,
+                                global, caches, lib, level, scope, this_ptr, lhs, _new_val,
                             )
                             .map(|_| Dynamic::UNIT),
                         // dot_lhs.dot_rhs op= rhs
                         #[cfg(not(feature = "no_object"))]
                         Expr::Dot(..) => self
                             .eval_dot_index_chain(
-                                scope, global, caches, lib, this_ptr, lhs, level, _new_val,
+                                global, caches, lib, level, scope, this_ptr, lhs, _new_val,
                             )
                             .map(|_| Dynamic::UNIT),
                         _ => unreachable!("cannot assign to expression: {:?}", lhs),
@@ -334,13 +338,13 @@ impl Engine {
 
             // Expression as statement
             Stmt::Expr(expr) => self
-                .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                 .map(Dynamic::flatten),
 
             // Block scope
             Stmt::Block(statements, ..) if statements.is_empty() => Ok(Dynamic::UNIT),
             Stmt::Block(statements, ..) => self.eval_stmt_block(
-                scope, global, caches, lib, this_ptr, statements, true, level,
+                global, caches, lib, level, scope, this_ptr, statements, true,
             ),
 
             // If statement
@@ -348,7 +352,7 @@ impl Engine {
                 let (expr, if_block, else_block) = &**x;
 
                 let guard_val = self
-                    .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                    .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                     .and_then(|v| {
                         v.as_bool().map_err(|typ| {
                             self.make_type_mismatch_err::<bool>(typ, expr.position())
@@ -358,11 +362,11 @@ impl Engine {
                 match guard_val {
                     Ok(true) if if_block.is_empty() => Ok(Dynamic::UNIT),
                     Ok(true) => self.eval_stmt_block(
-                        scope, global, caches, lib, this_ptr, if_block, true, level,
+                        global, caches, lib, level, scope, this_ptr, if_block, true,
                     ),
                     Ok(false) if else_block.is_empty() => Ok(Dynamic::UNIT),
                     Ok(false) => self.eval_stmt_block(
-                        scope, global, caches, lib, this_ptr, else_block, true, level,
+                        global, caches, lib, level, scope, this_ptr, else_block, true,
                     ),
                     err => err.map(Into::into),
                 }
@@ -381,7 +385,7 @@ impl Engine {
                 ) = &**x;
 
                 let value_result =
-                    self.eval_expr(scope, global, caches, lib, this_ptr, expr, level);
+                    self.eval_expr(global, caches, lib, level, scope, this_ptr, expr);
 
                 if let Ok(value) = value_result {
                     let expr_result = if value.is_hashable() {
@@ -401,7 +405,7 @@ impl Engine {
                                 let cond_result = match block.condition {
                                     Expr::BoolConstant(b, ..) => Ok(b),
                                     ref c => self
-                                        .eval_expr(scope, global, caches, lib, this_ptr, c, level)
+                                        .eval_expr(global, caches, lib, level, scope, this_ptr, c)
                                         .and_then(|v| {
                                             v.as_bool().map_err(|typ| {
                                                 self.make_type_mismatch_err::<bool>(
@@ -432,7 +436,7 @@ impl Engine {
                                 let cond_result = match block.condition {
                                     Expr::BoolConstant(b, ..) => Ok(b),
                                     ref c => self
-                                        .eval_expr(scope, global, caches, lib, this_ptr, c, level)
+                                        .eval_expr(global, caches, lib, level, scope, this_ptr, c)
                                         .and_then(|v| {
                                             v.as_bool().map_err(|typ| {
                                                 self.make_type_mismatch_err::<bool>(
@@ -462,12 +466,12 @@ impl Engine {
                     };
 
                     if let Ok(Some(expr)) = expr_result {
-                        self.eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                        self.eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                     } else if let Ok(None) = expr_result {
                         // Default match clause
                         def_case.as_ref().map_or(Ok(Dynamic::UNIT), |&index| {
                             let def_expr = &expressions[index].expr;
-                            self.eval_expr(scope, global, caches, lib, this_ptr, def_expr, level)
+                            self.eval_expr(global, caches, lib, level, scope, this_ptr, def_expr)
                         })
                     } else {
                         expr_result.map(|_| Dynamic::UNIT)
@@ -488,7 +492,7 @@ impl Engine {
                 } else {
                     loop {
                         match self.eval_stmt_block(
-                            scope, global, caches, lib, this_ptr, body, true, level,
+                            global, caches, lib, level, scope, this_ptr, body, true,
                         ) {
                             Ok(_) => (),
                             Err(err) => match *err {
@@ -507,7 +511,7 @@ impl Engine {
 
                 loop {
                     let condition = self
-                        .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                        .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                         .and_then(|v| {
                             v.as_bool().map_err(|typ| {
                                 self.make_type_mismatch_err::<bool>(typ, expr.position())
@@ -519,7 +523,7 @@ impl Engine {
                         Ok(true) if body.is_empty() => (),
                         Ok(true) => {
                             match self.eval_stmt_block(
-                                scope, global, caches, lib, this_ptr, body, true, level,
+                                global, caches, lib, level, scope, this_ptr, body, true,
                             ) {
                                 Ok(_) => (),
                                 Err(err) => match *err {
@@ -542,7 +546,7 @@ impl Engine {
                 loop {
                     if !body.is_empty() {
                         match self.eval_stmt_block(
-                            scope, global, caches, lib, this_ptr, body, true, level,
+                            global, caches, lib, level, scope, this_ptr, body, true,
                         ) {
                             Ok(_) => (),
                             Err(err) => match *err {
@@ -554,7 +558,7 @@ impl Engine {
                     }
 
                     let condition = self
-                        .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                        .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                         .and_then(|v| {
                             v.as_bool().map_err(|typ| {
                                 self.make_type_mismatch_err::<bool>(typ, expr.position())
@@ -574,7 +578,7 @@ impl Engine {
                 let (var_name, counter, expr, statements) = &**x;
 
                 let iter_result = self
-                    .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                    .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                     .map(Dynamic::flatten);
 
                 if let Ok(iter_obj) = iter_result {
@@ -648,7 +652,7 @@ impl Engine {
                                 }
 
                                 self.eval_stmt_block(
-                                    scope, global, caches, lib, this_ptr, statements, true, level,
+                                    global, caches, lib, level, scope, this_ptr, statements, true,
                                 )
                                 .map(|_| Dynamic::UNIT)
                                 .or_else(|err| match *err {
@@ -677,7 +681,7 @@ impl Engine {
                 let is_break = options.contains(ASTFlags::BREAK);
 
                 if let Some(ref expr) = expr {
-                    self.eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                    self.eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                         .and_then(|v| ERR::LoopBreak(is_break, v, *pos).into())
                 } else {
                     Err(ERR::LoopBreak(is_break, Dynamic::UNIT, *pos).into())
@@ -696,7 +700,7 @@ impl Engine {
                 } = &**x;
 
                 let result = self
-                    .eval_stmt_block(scope, global, caches, lib, this_ptr, try_block, true, level)
+                    .eval_stmt_block(global, caches, lib, level, scope, this_ptr, try_block, true)
                     .map(|_| Dynamic::UNIT);
 
                 match result {
@@ -746,14 +750,14 @@ impl Engine {
                         }
 
                         let result = self.eval_stmt_block(
-                            scope,
                             global,
                             caches,
                             lib,
+                            level,
+                            scope,
                             this_ptr,
                             catch_block,
                             true,
-                            level,
                         );
 
                         scope.rewind(orig_scope_len);
@@ -775,7 +779,7 @@ impl Engine {
 
             // Throw value
             Stmt::Return(Some(expr), options, pos) if options.contains(ASTFlags::BREAK) => self
-                .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                 .and_then(|v| Err(ERR::ErrorRuntime(v.flatten(), *pos).into())),
 
             // Empty throw
@@ -785,7 +789,7 @@ impl Engine {
 
             // Return value
             Stmt::Return(Some(expr), .., pos) => self
-                .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                 .and_then(|v| Err(ERR::Return(v.flatten(), *pos).into())),
 
             // Empty return
@@ -817,7 +821,7 @@ impl Engine {
                         nesting_level,
                         will_shadow,
                     };
-                    let context = EvalContext::new(self, scope, global, None, lib, this_ptr, level);
+                    let context = EvalContext::new(self, global, None, lib, level, scope, this_ptr);
 
                     match filter(true, info, context) {
                         Ok(true) => None,
@@ -837,7 +841,7 @@ impl Engine {
                 } else {
                     // Evaluate initial value
                     let value_result = self
-                        .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                        .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                         .map(Dynamic::flatten);
 
                     if let Ok(mut value) = value_result {
@@ -900,7 +904,7 @@ impl Engine {
                 }
 
                 let path_result = self
-                    .eval_expr(scope, global, caches, lib, this_ptr, expr, level)
+                    .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                     .and_then(|v| {
                         let typ = v.type_name();
                         v.try_cast::<crate::ImmutableString>().ok_or_else(|| {
@@ -1005,5 +1009,29 @@ impl Engine {
         global.debugger.reset_status(reset_debugger);
 
         result
+    }
+
+    /// Evaluate a list of statements with no `this` pointer.
+    /// This is commonly used to evaluate a list of statements in an [`AST`][crate::AST] or a script function body.
+    #[inline]
+    pub(crate) fn eval_global_statements(
+        &self,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        lib: &[&Module],
+        level: usize,
+        scope: &mut Scope,
+        statements: &[Stmt],
+    ) -> RhaiResult {
+        self.eval_stmt_block(
+            global, caches, lib, level, scope, &mut None, statements, false,
+        )
+        .or_else(|err| match *err {
+            ERR::Return(out, ..) => Ok(out),
+            ERR::LoopBreak(..) => {
+                unreachable!("no outer loop scope to break out of")
+            }
+            _ => Err(err),
+        })
     }
 }

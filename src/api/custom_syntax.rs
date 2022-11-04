@@ -228,7 +228,13 @@ impl Engine {
                 continue;
             }
 
-            let token = Token::lookup_from_syntax(s);
+            let token = Token::lookup_symbol_from_syntax(s).or_else(|| {
+                if Token::is_reserved_keyword(s) {
+                    Some(Token::Reserved(Box::new(s.into())))
+                } else {
+                    None
+                }
+            });
 
             let seg = match s {
                 // Markers not in first position
@@ -273,7 +279,7 @@ impl Engine {
                     .into_err(Position::NONE));
                 }
                 // Identifier in first position
-                _ if segments.is_empty() && is_valid_identifier(s.chars()) => {
+                _ if segments.is_empty() && is_valid_identifier(s) => {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if (!self.disabled_symbols.is_empty() && self.disabled_symbols.contains(s))
                         || token.map_or(false, |v| v.is_reserved())
