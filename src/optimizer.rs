@@ -11,8 +11,8 @@ use crate::func::hashing::get_hasher;
 use crate::tokenizer::Token;
 use crate::types::dynamic::AccessMode;
 use crate::{
-    calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Engine, FnPtr, Identifier,
-    ImmutableString, Position, Scope, StaticVec, AST, INT,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnPtr, Identifier, ImmutableString, Position,
+    Scope, StaticVec, AST, INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -171,8 +171,7 @@ fn has_native_fn_override(
     hash_script: u64,
     arg_types: impl AsRef<[TypeId]>,
 ) -> bool {
-    let hash_params = calc_fn_params_hash(arg_types.as_ref().iter().copied());
-    let hash = combine_hashes(hash_script, hash_params);
+    let hash = calc_fn_hash_full(hash_script, arg_types.as_ref().iter().copied());
 
     // First check the global namespace and packages, but skip modules that are standard because
     // they should never conflict with system functions.

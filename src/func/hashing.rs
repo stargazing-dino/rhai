@@ -156,7 +156,7 @@ pub fn calc_fn_hash<'a>(
     }
 }
 
-/// Calculate a non-zero [`u64`] hash key from a list of parameter types.
+/// Calculate a non-zero [`u64`] hash key from a base [`u64`] hash key and a list of parameter types.
 ///
 /// Parameter types are passed in via [`TypeId`] values from an iterator.
 ///
@@ -165,10 +165,12 @@ pub fn calc_fn_hash<'a>(
 /// If the hash happens to be zero, it is mapped to `DEFAULT_HASH`.
 #[inline]
 #[must_use]
-pub fn calc_fn_params_hash(
+pub fn calc_fn_hash_full(
+    base: u64,
     params: impl IntoIterator<Item = TypeId, IntoIter = impl ExactSizeIterator<Item = TypeId>>,
 ) -> u64 {
     let s = &mut get_hasher();
+    base.hash(s);
     let iter = params.into_iter();
     let len = iter.len();
     iter.for_each(|t| {
@@ -177,20 +179,6 @@ pub fn calc_fn_params_hash(
     len.hash(s);
 
     match s.finish() {
-        0 => ALT_ZERO_HASH,
-        r => r,
-    }
-}
-
-/// Combine two [`u64`] hashes by taking the XOR of them.
-///
-/// # Zeros
-///
-/// If the hash happens to be zero, it is mapped to `DEFAULT_HASH`.
-#[inline(always)]
-#[must_use]
-pub const fn combine_hashes(a: u64, b: u64) -> u64 {
-    match a ^ b {
         0 => ALT_ZERO_HASH,
         r => r,
     }

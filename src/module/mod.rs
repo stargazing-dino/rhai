@@ -10,8 +10,8 @@ use crate::func::{
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypesCollection};
 use crate::{
-    calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Identifier, ImmutableString,
-    NativeCallContext, RhaiResultOf, Shared, SmartString, StaticVec,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Identifier, ImmutableString, NativeCallContext,
+    RhaiResultOf, Shared, SmartString, StaticVec,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -151,9 +151,10 @@ pub fn calc_native_fn_hash<'a>(
     fn_name: &str,
     params: &[TypeId],
 ) -> u64 {
-    let hash_script = calc_fn_hash(modules, fn_name, params.len());
-    let hash_params = calc_fn_params_hash(params.iter().copied());
-    combine_hashes(hash_script, hash_params)
+    calc_fn_hash_full(
+        calc_fn_hash(modules, fn_name, params.len()),
+        params.iter().copied(),
+    )
 }
 
 /// A module which may contain variables, sub-modules, external Rust functions,
@@ -1028,8 +1029,7 @@ impl Module {
 
         let name = name.as_ref();
         let hash_script = calc_fn_hash(None, name, param_types.len());
-        let hash_params = calc_fn_params_hash(param_types.iter().copied());
-        let hash_fn = combine_hashes(hash_script, hash_params);
+        let hash_fn = calc_fn_hash_full(hash_script, param_types.iter().copied());
 
         if is_dynamic {
             self.dynamic_functions_filter.mark(hash_script);

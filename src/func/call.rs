@@ -10,9 +10,8 @@ use crate::engine::{
 use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token};
 use crate::{
-    calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Engine, FnArgsVec, FnPtr,
-    ImmutableString, Module, OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf,
-    Scope, ERR,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString, Module,
+    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, ERR,
 };
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
@@ -178,8 +177,7 @@ impl Engine {
         }
 
         let mut hash = args.as_ref().map_or(hash_base, |args| {
-            let hash_params = calc_fn_params_hash(args.iter().map(|a| a.type_id()));
-            combine_hashes(hash_base, hash_params)
+            calc_fn_hash_full(hash_base, args.iter().map(|a| a.type_id()))
         });
 
         let cache = caches.fn_resolution_cache_mut();
@@ -287,7 +285,8 @@ impl Engine {
                     }
 
                     // Try all permutations with `Dynamic` wildcards
-                    let hash_params = calc_fn_params_hash(
+                    hash = calc_fn_hash_full(
+                        hash_base,
                         args.as_ref()
                             .expect("no permutations")
                             .iter()
@@ -302,7 +301,6 @@ impl Engine {
                                 }
                             }),
                     );
-                    hash = combine_hashes(hash_base, hash_params);
 
                     bitmask += 1;
                 }
@@ -1335,9 +1333,7 @@ impl Engine {
             // Then search native Rust functions
             None => {
                 self.track_operation(global, pos)?;
-                let hash_params = calc_fn_params_hash(args.iter().map(|a| a.type_id()));
-                let hash_qualified_fn = combine_hashes(hash, hash_params);
-
+                let hash_qualified_fn = calc_fn_hash_full(hash, args.iter().map(|a| a.type_id()));
                 module.get_qualified_fn(hash_qualified_fn)
             }
             r => r,
@@ -1355,16 +1351,18 @@ impl Engine {
 
             // Try all permutations with `Dynamic` wildcards
             while bitmask < max_bitmask {
-                let hash_params = calc_fn_params_hash(args.iter().enumerate().map(|(i, a)| {
-                    let mask = 1usize << (num_args - i - 1);
-                    if bitmask & mask == 0 {
-                        a.type_id()
-                    } else {
-                        // Replace with `Dynamic`
-                        TypeId::of::<Dynamic>()
-                    }
-                }));
-                let hash_qualified_fn = combine_hashes(hash, hash_params);
+                let hash_qualified_fn = calc_fn_hash_full(
+                    hash,
+                    args.iter().enumerate().map(|(i, a)| {
+                        let mask = 1usize << (num_args - i - 1);
+                        if bitmask & mask == 0 {
+                            a.type_id()
+                        } else {
+                            // Replace with `Dynamic`
+                            TypeId::of::<Dynamic>()
+                        }
+                    }),
+                );
 
                 self.track_operation(global, pos)?;
 
