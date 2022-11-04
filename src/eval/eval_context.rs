@@ -31,12 +31,12 @@ impl<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'pg, '
     #[must_use]
     pub fn new(
         engine: &'a Engine,
-        scope: &'s mut Scope<'ps>,
         global: &'g mut GlobalRuntimeState<'pg>,
         caches: Option<&'c mut Caches<'pc>>,
         lib: &'a [&'a Module],
-        this_ptr: &'t mut Option<&'pt mut Dynamic>,
         level: usize,
+        scope: &'s mut Scope<'ps>,
+        this_ptr: &'t mut Option<&'pt mut Dynamic>,
     ) -> Self {
         Self {
             engine,
@@ -182,23 +182,23 @@ impl<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'pg, '
 
         match expr {
             crate::ast::Expr::Stmt(statements) => self.engine.eval_stmt_block(
-                self.scope,
                 self.global,
                 caches,
                 self.lib,
+                self.level,
+                self.scope,
                 self.this_ptr,
                 statements,
                 rewind_scope,
-                self.level,
             ),
             _ => self.engine.eval_expr(
-                self.scope,
                 self.global,
                 caches,
                 self.lib,
+                self.level,
+                self.scope,
                 self.this_ptr,
                 expr,
-                self.level,
             ),
         }
     }

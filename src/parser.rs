@@ -2909,12 +2909,12 @@ impl Engine {
             let mut this_ptr = None;
             let context = EvalContext::new(
                 self,
-                &mut state.stack,
                 &mut state.global,
                 None,
                 &[],
-                &mut this_ptr,
                 level,
+                &mut state.stack,
+                &mut this_ptr,
             );
 
             match filter(false, info, context) {

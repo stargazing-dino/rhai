@@ -152,13 +152,13 @@ impl<'a> OptimizerState<'a> {
                 &mut self.global,
                 &mut self.caches,
                 lib,
+                0,
                 fn_name,
                 op_token,
                 calc_fn_hash(None, fn_name, arg_values.len()),
                 &mut arg_values.iter_mut().collect::<StaticVec<_>>(),
                 false,
                 Position::NONE,
-                0,
             )
             .ok()
             .map(|(v, ..)| v)

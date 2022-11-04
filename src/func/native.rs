@@ -393,13 +393,13 @@ impl<'a> NativeCallContext<'a> {
                     global,
                     caches,
                     self.lib,
+                    self.level + 1,
                     fn_name,
                     op_token,
                     calc_fn_hash(None, fn_name, args_len),
                     args,
                     is_ref_mut,
                     Position::NONE,
-                    self.level + 1,
                 )
                 .map(|(r, ..)| r);
         }
@@ -418,10 +418,11 @@ impl<'a> NativeCallContext<'a> {
 
         self.engine()
             .exec_fn_call(
-                None,
                 global,
                 caches,
                 self.lib,
+                self.level + 1,
+                None,
                 fn_name,
                 op_token,
                 hash,
@@ -429,7 +430,6 @@ impl<'a> NativeCallContext<'a> {
                 is_ref_mut,
                 is_method_call,
                 Position::NONE,
-                self.level + 1,
             )
             .map(|(r, ..)| r)
     }

@@ -186,8 +186,9 @@ impl Engine {
         ast: &AST,
     ) -> RhaiResultOf<T> {
         let global = &mut GlobalRuntimeState::new(self);
+        let caches = &mut Caches::new();
 
-        let result = self.eval_ast_with_scope_raw(scope, global, ast, 0)?;
+        let result = self.eval_ast_with_scope_raw(global, caches, 0, scope, ast)?;
 
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {
@@ -197,7 +198,7 @@ impl Engine {
                 ast.as_ref(),
             ];
             let node = &crate::ast::Stmt::Noop(Position::NONE);
-            self.run_debugger(scope, global, lib, &mut None, node, 0)?;
+            self.run_debugger(global, caches, lib, 0, scope, &mut None, node)?;
         }
 
         let typ = self.map_type_name(result.type_name());
@@ -211,12 +212,12 @@ impl Engine {
     #[inline]
     pub(crate) fn eval_ast_with_scope_raw<'a>(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
-        ast: &'a AST,
+        caches: &mut Caches,
         level: usize,
+        scope: &mut Scope,
+        ast: &'a AST,
     ) -> RhaiResult {
-        let mut caches = Caches::new();
         global.source = ast.source_raw().cloned();
 
         #[cfg(not(feature = "no_module"))]
@@ -240,8 +241,7 @@ impl Engine {
             _lib = &[];
         }
 
-        let result =
-            self.eval_global_statements(scope, global, &mut caches, statements, _lib, level);
+        let result = self.eval_global_statements(global, caches, _lib, level, scope, statements);
 
         #[cfg(not(feature = "no_module"))]
         {
@@ -262,14 +262,14 @@ impl Engine {
     #[inline(always)]
     pub fn eval_statements_raw(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        statements: &[crate::ast::Stmt],
         lib: &[&crate::Module],
         level: usize,
+        scope: &mut Scope,
+        statements: &[crate::ast::Stmt],
     ) -> RhaiResult {
-        self.eval_global_statements(scope, global, caches, statements, lib, level)
+        self.eval_global_statements(global, caches, lib, level, scope, statements)
     }
 }
 

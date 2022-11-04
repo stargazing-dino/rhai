@@ -1,7 +1,7 @@
 //! Module defining the debugging interface.
 #![cfg(feature = "debugging")]
 
-use super::{EvalContext, GlobalRuntimeState};
+use super::{Caches, EvalContext, GlobalRuntimeState};
 use crate::ast::{ASTNode, Expr, Stmt};
 use crate::{
     Dynamic, Engine, EvalAltResult, ImmutableString, Module, Position, RhaiResultOf, Scope,
@@ -411,16 +411,17 @@ impl Engine {
     #[inline(always)]
     pub(crate) fn run_debugger<'a>(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
         lib: &[&Module],
+        level: usize,
+        scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
         node: impl Into<ASTNode<'a>>,
-        level: usize,
     ) -> RhaiResultOf<()> {
         if self.debugger.is_some() {
             if let Some(cmd) =
-                self.run_debugger_with_reset_raw(scope, global, lib, this_ptr, node, level)?
+                self.run_debugger_with_reset_raw(global, caches, lib, level, scope, this_ptr, node)?
             {
                 global.debugger.status = cmd;
             }
@@ -437,15 +438,16 @@ impl Engine {
     #[inline(always)]
     pub(crate) fn run_debugger_with_reset<'a>(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
         lib: &[&Module],
+        level: usize,
+        scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
         node: impl Into<ASTNode<'a>>,
-        level: usize,
     ) -> RhaiResultOf<Option<DebuggerStatus>> {
         if self.debugger.is_some() {
-            self.run_debugger_with_reset_raw(scope, global, lib, this_ptr, node, level)
+            self.run_debugger_with_reset_raw(global, caches, lib, level, scope, this_ptr, node)
         } else {
             Ok(None)
         }
@@ -459,12 +461,13 @@ impl Engine {
     #[inline]
     pub(crate) fn run_debugger_with_reset_raw<'a>(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
         lib: &[&Module],
+        level: usize,
+        scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
         node: impl Into<ASTNode<'a>>,
-        level: usize,
     ) -> RhaiResultOf<Option<DebuggerStatus>> {
         let node = node.into();
 
@@ -494,7 +497,7 @@ impl Engine {
             },
         };
 
-        self.run_debugger_raw(scope, global, lib, this_ptr, node, event, level)
+        self.run_debugger_raw(global, caches, lib, level, scope, this_ptr, node, event)
     }
     /// Run the debugger callback unconditionally.
     ///
@@ -505,17 +508,19 @@ impl Engine {
     #[inline]
     pub(crate) fn run_debugger_raw<'a>(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
         lib: &[&Module],
+        level: usize,
+        scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
         node: ASTNode<'a>,
         event: DebuggerEvent,
-        level: usize,
     ) -> Result<Option<DebuggerStatus>, Box<crate::EvalAltResult>> {
         let src = global.source_raw().cloned();
         let src = src.as_ref().map(|s| s.as_str());
-        let context = crate::EvalContext::new(self, scope, global, None, lib, this_ptr, level);
+        let context =
+            crate::EvalContext::new(self, global, Some(caches), lib, level, scope, this_ptr);
 
         if let Some((.., ref on_debugger)) = self.debugger {
             let command = on_debugger(context, event, node, src, node.position())?;
