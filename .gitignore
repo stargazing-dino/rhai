@@ -8,3 +8,6 @@ Rhai.toml
 **/*.bat
 doc/rhai-sync.json
 doc/rhai.json
+.idea/
+.idea
+.idea/*

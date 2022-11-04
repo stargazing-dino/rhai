@@ -83,7 +83,7 @@ use std::prelude::v1::*;
 // Internal modules
 mod api;
 mod ast;
-mod config;
+pub mod config;
 mod engine;
 mod eval;
 mod func;
