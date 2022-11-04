@@ -4,8 +4,8 @@ use super::{get_builtin_binary_op_fn, get_builtin_op_assignment_fn, CallableFunc
 use crate::api::default_limits::MAX_DYNAMIC_PARAMETERS;
 use crate::ast::{Expr, FnCallExpr, FnCallHashes};
 use crate::engine::{
-    FN_ANONYMOUS, KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_FN_PTR_CALL,
-    KEYWORD_FN_PTR_CURRY, KEYWORD_IS_DEF_VAR, KEYWORD_PRINT, KEYWORD_TYPE_OF,
+    KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_FN_PTR_CALL, KEYWORD_FN_PTR_CURRY,
+    KEYWORD_IS_DEF_VAR, KEYWORD_PRINT, KEYWORD_TYPE_OF,
 };
 use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token};
@@ -132,7 +132,7 @@ pub fn ensure_no_data_race(fn_name: &str, args: &FnCallArgs, is_ref_mut: bool) -
 #[inline]
 #[must_use]
 pub fn is_anonymous_fn(name: &str) -> bool {
-    name.starts_with(FN_ANONYMOUS)
+    name.starts_with(crate::engine::FN_ANONYMOUS)
 }
 
 impl Engine {
