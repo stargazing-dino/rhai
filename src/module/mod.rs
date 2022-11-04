@@ -3,7 +3,6 @@
 #[cfg(feature = "metadata")]
 use crate::api::type_names::format_type;
 use crate::ast::FnAccess;
-use crate::eval::Caches;
 use crate::func::{
     shared_take_or_clone, CallableFunction, FnCallArgs, IteratorFn, RegisterNativeFunction,
     SendSync,
@@ -1985,7 +1984,7 @@ impl Module {
         let orig_constants = std::mem::take(&mut global.constants);
 
         // Run the script
-        let caches = &mut Caches::new();
+        let caches = &mut crate::eval::Caches::new();
 
         let result = engine.eval_ast_with_scope_raw(global, caches, 0, &mut scope, ast);
 

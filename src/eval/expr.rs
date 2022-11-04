@@ -68,7 +68,9 @@ impl Engine {
                     self.search_scope_only(global, caches, lib, level, scope, this_ptr, expr)
                 }
                 #[cfg(feature = "no_module")]
-                (_, (), ..) => self.search_scope_only(scope, global, lib, this_ptr, expr),
+                (_, (), ..) => {
+                    self.search_scope_only(global, caches, lib, level, scope, this_ptr, expr)
+                }
 
                 // Qualified variable access
                 #[cfg(not(feature = "no_module"))]
