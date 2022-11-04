@@ -330,7 +330,9 @@ impl<'a> NativeCallContext<'a> {
         args: &mut [&mut Dynamic],
     ) -> RhaiResult {
         let name = fn_name.as_ref();
-        let native_only = !is_valid_function_name(name) && !crate::parser::is_anonymous_fn(name);
+        let native_only = !is_valid_function_name(name);
+        #[cfg(not(feature = "no_function"))]
+        let native_only = native_only && !crate::parser::is_anonymous_fn(name);
 
         self._call_fn_raw(fn_name, native_only, is_ref_mut, is_method_call, args)
     }
