@@ -89,37 +89,6 @@ jobs:
         command: test
         args: ${{matrix.flags}}
 
-#  nightly_features_build:
-#    name: NightlyFeatureBuild
-#    runs-on: ${{matrix.os}}
-#    continue-on-error: ${{matrix.experimental}}
-#    strategy:
-#      matrix:
-#        os: [ubuntu-latest]
-#        flags:
-#          - "--features stable_hash"
-#        toolchain: [ nightly ]
-#        experimental: [ false ]
-#        include:
-#          # smoketests for different toolchains
-#          - { toolchain: nightly, os: windows-latest, experimental: false, flags: "" }
-#          - { toolchain: nightly, os: macos-latest, experimental: false, flags: "" }
-#      fail-fast: false
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v2
-#      - name: Setup Toolchain
-#        uses: actions-rs/toolchain@v1
-#        with:
-#          toolchain: ${{matrix.toolchain}}
-#          override: true
-#      - name: Test
-#        uses: actions-rs/cargo@v1
-#        with:
-#          command: test
-#          args: ${{matrix.flags}}
-
-
   # no-std builds are a bit more extensive to test
   no_std_build:
     name: NoStdBuild
