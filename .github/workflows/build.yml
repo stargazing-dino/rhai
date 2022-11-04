@@ -95,8 +95,6 @@ jobs:
     continue-on-error: ${{matrix.experimental}}
     strategy:
       matrix:
-        flags:
-          - ""
         include:
           - {os: ubuntu-latest, flags: "--profile unix", experimental: false}
           - {os: windows-latest, flags: "--profile windows", experimental: true}
