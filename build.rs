@@ -8,7 +8,6 @@ fn main() {
     // Tell Cargo that if the given environment variable changes, to rerun this build script.
     println!("cargo:rerun-if-changed=build.template");
     println!("cargo:rerun-if-env-changed=RHAI_AHASH_SEED");
-
     let mut contents = String::new();
 
     File::open("build.template")
@@ -20,8 +19,8 @@ fn main() {
 
     contents = contents.replace("{{AHASH_SEED}}", &seed);
 
-    File::create("src/config.rs")
+    File::create("src/config/hashing_env.rs")
         .expect("cannot create `config.rs`")
-        .write(contents.as_bytes())
-        .expect("cannot write to `config.rs`");
+        .write_all(contents.as_bytes())
+        .expect("cannot write to `config/hashing_env.rs`");
 }
