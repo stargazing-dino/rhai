@@ -216,7 +216,7 @@ pub fn set_ahash_seed(new_seed: Option<[u64; 4]>) -> Result<(), Option<[u64; 4]>
 /// See [`set_rhai_ahash_seed`] for more.
 #[inline]
 #[must_use]
-pub fn get_ahash_seed() -> &Option<[u64; 4]> {
+pub fn get_ahash_seed() -> &'static Option<[u64; 4]> {
     match AHASH_SEED.get_or_init(|| hashing_env::AHASH_SEED) {
         Some(ash) => ash,
         None => None,
