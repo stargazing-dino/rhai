@@ -79,7 +79,7 @@ impl BuildHasher for StraightHasherBuilder {
 pub fn get_hasher() -> ahash::AHasher {
     match config::hashing::get_ahash_seed() {
         Some([seed1, seed2, seed3, seed4]) if seed1 | seed2 | seed3 | seed4 != 0 => {
-            ahash::RandomState::with_seeds(seed1, seed2, seed3, seed4).build_hasher()
+            ahash::RandomState::with_seeds(*seed1, *seed2, *seed3, *seed4).build_hasher()
         }
         _ => ahash::AHasher::default(),
     }
