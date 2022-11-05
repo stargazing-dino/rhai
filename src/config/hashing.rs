@@ -20,6 +20,7 @@
 // [236,800,954,213], haha funny yume nikki reference epic uboachan face numberworld nexus moment 100
 
 use crate::config::hashing_env;
+use core::panic::{RefUnwindSafe, UnwindSafe};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -27,7 +28,6 @@ use std::{
     marker::PhantomData,
     mem,
     mem::MaybeUninit,
-    panic::{RefUnwindSafe, UnwindSafe},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
