@@ -71,9 +71,8 @@ jobs:
           # smoketests for different toolchains
           - {toolchain: stable, os: windows-latest, experimental: false, flags: ""}
           - {toolchain: stable, os: macos-latest, experimental: false, flags: ""}
-          # data structure size changes - wait for beta to become stable and uncomment
-          #- {toolchain: beta, os: ubuntu-latest, experimental: false, flags: ""}
-          #- {toolchain: nightly, os: ubuntu-latest, experimental: true, flags: ""}
+          - {toolchain: beta, os: ubuntu-latest, experimental: false, flags: ""}
+          - {toolchain: nightly, os: ubuntu-latest, experimental: true, flags: ""}
       fail-fast: false
     steps:
     - name: Checkout
@@ -96,8 +95,6 @@ jobs:
     continue-on-error: ${{matrix.experimental}}
     strategy:
       matrix:
-        flags:
-          - ""
         include:
           - {os: ubuntu-latest, flags: "--profile unix", experimental: false}
           - {os: windows-latest, flags: "--profile windows", experimental: true}
