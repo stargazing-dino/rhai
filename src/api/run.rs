@@ -122,12 +122,12 @@ impl Engine {
 
         let statements = ast.statements();
         if !statements.is_empty() {
-            let lib = [
+            let lib: &[crate::Shared<crate::Module>] = &[
                 #[cfg(not(feature = "no_function"))]
-                AsRef::<crate::Shared<_>>::as_ref(ast).clone(),
+                AsRef::<crate::Shared<crate::Module>>::as_ref(ast).clone(),
             ];
             let lib = if lib.first().map_or(true, |m| m.is_empty()) {
-                &lib[0..0]
+                &[][..]
             } else {
                 &lib
             };
