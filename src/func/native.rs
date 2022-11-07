@@ -72,13 +72,42 @@ pub struct NativeCallContext<'a> {
     /// Function source, if any.
     source: Option<&'a str>,
     /// The current [`GlobalRuntimeState`], if any.
-    global: Option<&'a GlobalRuntimeState<'a>>,
+    global: Option<&'a GlobalRuntimeState>,
     /// The current stack of loaded [modules][Module].
-    lib: &'a [&'a Module],
+    lib: &'a [Shared<Module>],
     /// [Position] of the function call.
     pos: Position,
     /// The current nesting level of function calls.
     level: usize,
+}
+
+/// _(internals)_ Context of a native Rust function call.
+/// Exported under the `internals` feature only.
+#[cfg(feature = "internals")]
+#[derive(Debug, Clone)]
+pub struct NativeCallContextStore {
+    /// Name of function called.
+    pub fn_name: String,
+    /// Function source, if any.
+    pub source: Option<String>,
+    /// The current [`GlobalRuntimeState`], if any.
+    pub global: GlobalRuntimeState,
+    /// The current stack of loaded [modules][Module].
+    pub lib: StaticVec<Shared<Module>>,
+    /// [Position] of the function call.
+    pub pos: Position,
+    /// The current nesting level of function calls.
+    pub level: usize,
+}
+
+#[cfg(feature = "internals")]
+impl NativeCallContextStore {
+    /// Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    #[inline(always)]
+    #[must_use]
+    pub fn create_context<'a>(&'a self, engine: &'a Engine) -> NativeCallContext<'a> {
+        NativeCallContext::from_stored_data(engine, self)
+    }
 }
 
 impl<'a>
@@ -86,8 +115,8 @@ impl<'a>
         &'a Engine,
         &'a str,
         Option<&'a str>,
-        &'a GlobalRuntimeState<'a>,
-        &'a [&Module],
+        &'a GlobalRuntimeState,
+        &'a [Shared<Module>],
         Position,
         usize,
     )> for NativeCallContext<'a>
@@ -99,7 +128,7 @@ impl<'a>
             &'a str,
             Option<&'a str>,
             &'a GlobalRuntimeState,
-            &'a [&Module],
+            &'a [Shared<Module>],
             Position,
             usize,
         ),
@@ -116,9 +145,9 @@ impl<'a>
     }
 }
 
-impl<'a> From<(&'a Engine, &'a str, &'a [&'a Module])> for NativeCallContext<'a> {
+impl<'a> From<(&'a Engine, &'a str, &'a [Shared<Module>])> for NativeCallContext<'a> {
     #[inline(always)]
-    fn from(value: (&'a Engine, &'a str, &'a [&Module])) -> Self {
+    fn from(value: (&'a Engine, &'a str, &'a [Shared<Module>])) -> Self {
         Self {
             engine: value.0,
             fn_name: value.1,
@@ -140,7 +169,7 @@ impl<'a> NativeCallContext<'a> {
     )]
     #[inline(always)]
     #[must_use]
-    pub fn new(engine: &'a Engine, fn_name: &'a str, lib: &'a [&Module]) -> Self {
+    pub fn new(engine: &'a Engine, fn_name: &'a str, lib: &'a [Shared<Module>]) -> Self {
         Self {
             engine,
             fn_name,
@@ -164,7 +193,7 @@ impl<'a> NativeCallContext<'a> {
         fn_name: &'a str,
         source: Option<&'a str>,
         global: &'a GlobalRuntimeState,
-        lib: &'a [&Module],
+        lib: &'a [Shared<Module>],
         pos: Position,
         level: usize,
     ) -> Self {
@@ -178,6 +207,39 @@ impl<'a> NativeCallContext<'a> {
             level,
         }
     }
+
+    /// _(internals)_ Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    /// Exported under the `internals` feature only.
+    #[cfg(feature = "internals")]
+    #[inline]
+    #[must_use]
+    pub fn from_stored_data(engine: &'a Engine, context: &'a NativeCallContextStore) -> Self {
+        Self {
+            engine,
+            fn_name: &context.fn_name,
+            source: context.source.as_ref().map(String::as_str),
+            global: Some(&context.global),
+            lib: &context.lib,
+            pos: context.pos,
+            level: context.level,
+        }
+    }
+    /// _(internals)_ Store this [`NativeCallContext`] into a [`NativeCallContextClone`].
+    /// Exported under the `internals` feature only.
+    #[cfg(feature = "internals")]
+    #[inline]
+    #[must_use]
+    pub fn store_data(&self) -> NativeCallContextStore {
+        NativeCallContextStore {
+            fn_name: self.fn_name.to_string(),
+            source: self.source.map(|s| s.to_string()),
+            global: self.global.unwrap().clone(),
+            lib: self.lib.iter().cloned().collect(),
+            pos: self.pos,
+            level: self.level,
+        }
+    }
+
     /// The current [`Engine`].
     #[inline(always)]
     #[must_use]
@@ -246,14 +308,14 @@ impl<'a> NativeCallContext<'a> {
     /// in reverse order (i.e. parent namespaces are iterated after child namespaces).
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
-        self.lib.iter().copied()
+        self.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current stack of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn namespaces(&self) -> &[&Module] {
+    pub const fn namespaces(&self) -> &[Shared<Module>] {
         self.lib
     }
     /// Call a function inside the call context with the provided arguments.
