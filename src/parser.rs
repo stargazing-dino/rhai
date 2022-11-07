@@ -55,7 +55,7 @@ pub struct ParseState<'e> {
     /// External [scope][Scope] with constants.
     pub scope: &'e Scope<'e>,
     /// Global runtime state.
-    pub global: GlobalRuntimeState<'e>,
+    pub global: GlobalRuntimeState,
     /// Encapsulates a local stack with variable names to simulate an actual runtime scope.
     pub stack: Scope<'e>,
     /// Size of the local variables stack upon entry of the current block scope.

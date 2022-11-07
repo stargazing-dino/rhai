@@ -4,8 +4,8 @@
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::types::dynamic::Variant;
 use crate::{
-    reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, StaticVec, AST,
-    ERR,
+    reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, Shared, StaticVec,
+    AST, ERR,
 };
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
@@ -248,7 +248,7 @@ impl Engine {
         arg_values: &mut [Dynamic],
     ) -> RhaiResult {
         let statements = ast.statements();
-        let lib = &[ast.as_ref()];
+        let lib = &[AsRef::<Shared<_>>::as_ref(ast).clone()];
         let mut this_ptr = this_ptr;
 
         let orig_scope_len = scope.len();

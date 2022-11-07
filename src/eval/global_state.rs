@@ -1,9 +1,9 @@
 //! Global runtime state.
 
 use crate::{Dynamic, Engine, ImmutableString};
+use std::fmt;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{fmt, marker::PhantomData};
 
 /// Collection of globally-defined constants.
 #[cfg(not(feature = "no_module"))]
@@ -22,7 +22,7 @@ pub type GlobalConstants =
 // Most usage will be looking up a particular key from the list and then getting the module that
 // corresponds to that key.
 #[derive(Clone)]
-pub struct GlobalRuntimeState<'a> {
+pub struct GlobalRuntimeState {
     /// Names of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
     imports: crate::StaticVec<ImmutableString>,
@@ -70,11 +70,9 @@ pub struct GlobalRuntimeState<'a> {
     /// Debugging interface.
     #[cfg(feature = "debugging")]
     pub debugger: super::Debugger,
-    /// Take care of the lifetime parameter.
-    dummy: PhantomData<&'a ()>,
 }
 
-impl GlobalRuntimeState<'_> {
+impl GlobalRuntimeState {
     /// Create a new [`GlobalRuntimeState`] based on an [`Engine`].
     #[inline(always)]
     #[must_use]
@@ -112,8 +110,6 @@ impl GlobalRuntimeState<'_> {
                     None => Dynamic::UNIT,
                 },
             ),
-
-            dummy: PhantomData::default(),
         }
     }
     /// Get the length of the stack of globally-imported [modules][crate::Module].
@@ -319,7 +315,7 @@ impl GlobalRuntimeState<'_> {
 }
 
 #[cfg(not(feature = "no_module"))]
-impl IntoIterator for GlobalRuntimeState<'_> {
+impl IntoIterator for GlobalRuntimeState {
     type Item = (ImmutableString, crate::Shared<crate::Module>);
     type IntoIter = std::iter::Rev<
         std::iter::Zip<
@@ -334,7 +330,7 @@ impl IntoIterator for GlobalRuntimeState<'_> {
 }
 
 #[cfg(not(feature = "no_module"))]
-impl<'a> IntoIterator for &'a GlobalRuntimeState<'_> {
+impl<'a> IntoIterator for &'a GlobalRuntimeState {
     type Item = (&'a ImmutableString, &'a crate::Shared<crate::Module>);
     type IntoIter = std::iter::Rev<
         std::iter::Zip<
@@ -350,7 +346,7 @@ impl<'a> IntoIterator for &'a GlobalRuntimeState<'_> {
 
 #[cfg(not(feature = "no_module"))]
 impl<K: Into<ImmutableString>, M: Into<crate::Shared<crate::Module>>> Extend<(K, M)>
-    for GlobalRuntimeState<'_>
+    for GlobalRuntimeState
 {
     #[inline]
     fn extend<T: IntoIterator<Item = (K, M)>>(&mut self, iter: T) {
@@ -361,7 +357,7 @@ impl<K: Into<ImmutableString>, M: Into<crate::Shared<crate::Module>>> Extend<(K,
     }
 }
 
-impl fmt::Debug for GlobalRuntimeState<'_> {
+impl fmt::Debug for GlobalRuntimeState {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

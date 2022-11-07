@@ -56,12 +56,12 @@ struct OptimizerState<'a> {
     /// An [`Engine`] instance for eager function evaluation.
     engine: &'a Engine,
     /// The global runtime state.
-    global: GlobalRuntimeState<'a>,
+    global: GlobalRuntimeState,
     /// Function resolution caches.
-    caches: Caches<'a>,
+    caches: Caches,
     /// [Module][crate::Module] containing script-defined functions.
     #[cfg(not(feature = "no_function"))]
-    lib: &'a [&'a crate::Module],
+    lib: &'a [crate::Shared<crate::Module>],
     /// Optimization level.
     optimization_level: OptimizationLevel,
 }
@@ -71,7 +71,7 @@ impl<'a> OptimizerState<'a> {
     #[inline(always)]
     pub fn new(
         engine: &'a Engine,
-        #[cfg(not(feature = "no_function"))] lib: &'a [&'a crate::Module],
+        #[cfg(not(feature = "no_function"))] lib: &'a [crate::Shared<crate::Module>],
         optimization_level: OptimizationLevel,
     ) -> Self {
         Self {
@@ -1189,7 +1189,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         => {
             // First search for script-defined functions (can override built-in)
             #[cfg(not(feature = "no_function"))]
-            let has_script_fn = !x.hashes.is_native_only() && state.lib.iter().find_map(|&m| m.get_script_fn(&x.name, x.args.len())).is_some();
+            let has_script_fn = !x.hashes.is_native_only() && state.lib.iter().find_map(|m| m.get_script_fn(&x.name, x.args.len())).is_some();
             #[cfg(feature = "no_function")]
             let has_script_fn = false;
 
@@ -1263,7 +1263,7 @@ fn optimize_top_level(
     statements: StmtBlockContainer,
     engine: &Engine,
     scope: &Scope,
-    #[cfg(not(feature = "no_function"))] lib: &[&crate::Module],
+    #[cfg(not(feature = "no_function"))] lib: &[crate::Shared<crate::Module>],
     optimization_level: OptimizationLevel,
 ) -> StmtBlockContainer {
     let mut statements = statements;
@@ -1317,7 +1317,7 @@ pub fn optimize_into_ast(
     let mut statements = statements;
 
     #[cfg(not(feature = "no_function"))]
-    let lib = {
+    let lib: crate::Shared<_> = {
         let mut module = crate::Module::new();
 
         if optimization_level != OptimizationLevel::None {
@@ -1338,7 +1338,7 @@ pub fn optimize_into_ast(
                 });
             }
 
-            let lib2 = &[&lib2];
+            let lib2 = &[lib2.into()];
 
             for fn_def in functions {
                 let mut fn_def = crate::func::shared_take_or_clone(fn_def);
@@ -1356,7 +1356,7 @@ pub fn optimize_into_ast(
             }
         }
 
-        module
+        module.into()
     };
 
     statements.shrink_to_fit();
@@ -1369,7 +1369,7 @@ pub fn optimize_into_ast(
                 engine,
                 scope,
                 #[cfg(not(feature = "no_function"))]
-                &[&lib],
+                &[lib.clone()],
                 optimization_level,
             ),
         },

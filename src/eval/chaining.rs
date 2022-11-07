@@ -4,7 +4,9 @@
 use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, Expr, OpAssignment};
 use crate::types::dynamic::Union;
-use crate::{Dynamic, Engine, FnArgsVec, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR};
+use crate::{
+    Dynamic, Engine, FnArgsVec, Module, Position, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
+};
 use std::hash::Hash;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -40,7 +42,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         this_ptr: &mut Option<&mut Dynamic>,
         target: &mut Target,
@@ -555,7 +557,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -646,7 +648,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -758,7 +760,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         target: &mut Dynamic,
         idx: &mut Dynamic,
@@ -781,7 +783,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         target: &mut Dynamic,
         idx: &mut Dynamic,
@@ -805,7 +807,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         target: &'t mut Dynamic,
         idx: &mut Dynamic,

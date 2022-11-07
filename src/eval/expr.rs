@@ -4,7 +4,7 @@ use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::ast::{Expr, OpAssignment};
 use crate::engine::{KEYWORD_THIS, OP_CONCAT};
 use crate::types::dynamic::AccessMode;
-use crate::{Dynamic, Engine, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR};
+use crate::{Dynamic, Engine, Module, Position, RhaiResult, RhaiResultOf, Scope, Shared, ERR};
 use std::num::NonZeroUsize;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -18,7 +18,7 @@ impl Engine {
         &self,
         global: &GlobalRuntimeState,
         namespace: &crate::ast::Namespace,
-    ) -> Option<crate::Shared<Module>> {
+    ) -> Option<Shared<Module>> {
         assert!(!namespace.is_empty());
 
         let root = namespace.root();
@@ -51,7 +51,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &'s mut Scope,
         this_ptr: &'s mut Option<&mut Dynamic>,
@@ -137,7 +137,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &'s mut Scope,
         this_ptr: &'s mut Option<&mut Dynamic>,
@@ -160,7 +160,7 @@ impl Engine {
             Expr::Variable(v, None, pos)
                 if lib
                     .iter()
-                    .flat_map(|&m| m.iter_script_fn())
+                    .flat_map(|m| m.iter_script_fn())
                     .any(|(_, _, f, ..)| f == v.3.as_str()) =>
             {
                 let val: Dynamic =
@@ -221,7 +221,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,

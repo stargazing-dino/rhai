@@ -4,7 +4,7 @@
 use super::{Caches, EvalContext, GlobalRuntimeState};
 use crate::ast::{ASTNode, Expr, Stmt};
 use crate::{
-    Dynamic, Engine, EvalAltResult, ImmutableString, Module, Position, RhaiResultOf, Scope,
+    Dynamic, Engine, EvalAltResult, ImmutableString, Module, Position, RhaiResultOf, Scope, Shared,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -413,7 +413,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -440,7 +440,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -463,7 +463,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -510,7 +510,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,

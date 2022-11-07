@@ -11,7 +11,7 @@ use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token};
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString, Module,
-    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, ERR,
+    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
 };
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
@@ -166,7 +166,7 @@ impl Engine {
         _global: &GlobalRuntimeState,
         caches: &'s mut Caches,
         local_entry: &'s mut Option<FnResolutionCacheEntry>,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         op_token: Option<&Token>,
         hash_base: u64,
         args: Option<&mut FnCallArgs>,
@@ -193,8 +193,7 @@ impl Engine {
                 loop {
                     let func = lib
                         .iter()
-                        .copied()
-                        .chain(self.global_modules.iter().map(|m| m.as_ref()))
+                        .chain(self.global_modules.iter())
                         .find_map(|m| m.get_fn(hash).map(|f| (f, m.id_raw())));
 
                     #[cfg(not(feature = "no_module"))]
@@ -323,7 +322,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         name: &str,
         op_token: Option<&Token>,
@@ -538,7 +537,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         _scope: Option<&mut Scope>,
         fn_name: &str,
@@ -705,7 +704,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -742,7 +741,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         fn_name: &str,
         mut hash: FnCallHashes,
@@ -967,7 +966,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -1258,7 +1257,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -1442,7 +1441,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         script: &str,
@@ -1487,7 +1486,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,

@@ -8,7 +8,8 @@ use crate::ast::{
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::types::dynamic::{AccessMode, Union};
 use crate::{
-    Dynamic, Engine, ImmutableString, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR, INT,
+    Dynamic, Engine, ImmutableString, Module, Position, RhaiResult, RhaiResultOf, Scope, Shared,
+    ERR, INT,
 };
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
@@ -27,7 +28,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -112,7 +113,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         op_info: &OpAssignment,
         target: &mut Target,
@@ -196,7 +197,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -1018,7 +1019,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[Shared<Module>],
         level: usize,
         scope: &mut Scope,
         statements: &[Stmt],

@@ -22,6 +22,8 @@ pub use callable_function::CallableFunction;
 #[cfg(not(feature = "no_function"))]
 pub use func::Func;
 pub use hashing::{calc_fn_hash, calc_fn_hash_full, calc_var_hash, get_hasher, StraightHashMap};
+#[cfg(feature = "internals")]
+pub use native::NativeCallContextStore;
 pub use native::{
     locked_read, locked_write, shared_get_mut, shared_make_mut, shared_take, shared_take_or_clone,
     shared_try_take, FnAny, FnPlugin, IteratorFn, Locked, NativeCallContext, SendSync, Shared,

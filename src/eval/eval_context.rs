@@ -1,39 +1,39 @@
 //! Evaluation context.
 
 use super::{Caches, GlobalRuntimeState};
-use crate::{Dynamic, Engine, Module, Scope};
+use crate::{Dynamic, Engine, Module, Scope, Shared};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
 /// Context of a script evaluation process.
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct EvalContext<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> {
+pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
     /// The current [`Engine`].
     engine: &'a Engine,
     /// The current [`Scope`].
     scope: &'s mut Scope<'ps>,
     /// The current [`GlobalRuntimeState`].
-    global: &'g mut GlobalRuntimeState<'pg>,
+    global: &'g mut GlobalRuntimeState,
     /// The current [caches][Caches], if available.
-    caches: Option<&'c mut Caches<'pc>>,
+    caches: Option<&'c mut Caches>,
     /// The current stack of imported [modules][Module].
-    lib: &'a [&'a Module],
+    lib: &'a [Shared<Module>],
     /// The current bound `this` pointer, if any.
     this_ptr: &'t mut Option<&'pt mut Dynamic>,
     /// The current nesting level of function calls.
     level: usize,
 }
 
-impl<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> {
+impl<'a, 's, 'ps, 'g, 'c, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
     /// Create a new [`EvalContext`].
     #[inline(always)]
     #[must_use]
     pub fn new(
         engine: &'a Engine,
-        global: &'g mut GlobalRuntimeState<'pg>,
-        caches: Option<&'c mut Caches<'pc>>,
-        lib: &'a [&'a Module],
+        global: &'g mut GlobalRuntimeState,
+        caches: Option<&'c mut Caches>,
+        lib: &'a [Shared<Module>],
         level: usize,
         scope: &'s mut Scope<'ps>,
         this_ptr: &'t mut Option<&'pt mut Dynamic>,
@@ -104,20 +104,20 @@ impl<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'pg, '
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub fn global_runtime_state_mut(&mut self) -> &mut &'g mut GlobalRuntimeState<'pg> {
+    pub fn global_runtime_state_mut(&mut self) -> &mut &'g mut GlobalRuntimeState {
         &mut self.global
     }
     /// Get an iterator over the namespaces containing definition of all script-defined functions.
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
-        self.lib.iter().copied()
+        self.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current set of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn namespaces(&self) -> &[&Module] {
+    pub const fn namespaces(&self) -> &[Shared<Module>] {
         self.lib
     }
     /// The current bound `this` pointer, if any.

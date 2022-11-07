@@ -195,7 +195,7 @@ impl Engine {
             global.debugger.status = crate::eval::DebuggerStatus::Terminate;
             let lib = &[
                 #[cfg(not(feature = "no_function"))]
-                ast.as_ref(),
+                AsRef::<crate::Shared<_>>::as_ref(ast).clone(),
             ];
             let node = &crate::ast::Stmt::Noop(Position::NONE);
             self.run_debugger(global, caches, lib, 0, scope, &mut None, node)?;
@@ -234,7 +234,7 @@ impl Engine {
 
         let mut _lib = &[
             #[cfg(not(feature = "no_function"))]
-            ast.as_ref(),
+            AsRef::<crate::Shared<_>>::as_ref(ast).clone(),
         ][..];
         #[cfg(not(feature = "no_function"))]
         if !ast.has_functions() {
@@ -264,7 +264,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&crate::Module],
+        lib: &[crate::Shared<crate::Module>],
         level: usize,
         scope: &mut Scope,
         statements: &[crate::ast::Stmt],
