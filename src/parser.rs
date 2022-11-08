@@ -2907,7 +2907,7 @@ impl Engine {
                 will_shadow,
             };
             let caches = &mut Caches::new();
-            let this_ptr = &mut None;
+            let mut this = Dynamic::NULL;
 
             let context = EvalContext::new(
                 self,
@@ -2916,7 +2916,7 @@ impl Engine {
                 &[],
                 level,
                 &mut state.stack,
-                this_ptr,
+                &mut this,
             );
 
             match filter(false, info, context) {

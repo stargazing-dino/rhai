@@ -250,7 +250,9 @@ impl Engine {
     ) -> RhaiResult {
         let statements = ast.statements();
         let lib = &[AsRef::<SharedModule>::as_ref(ast).clone()];
-        let mut this_ptr = this_ptr;
+
+        let mut no_this_ptr = Dynamic::NULL;
+        let mut this_ptr = this_ptr.unwrap_or(&mut no_this_ptr);
 
         let orig_scope_len = scope.len();
 

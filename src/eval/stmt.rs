@@ -29,7 +29,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         statements: &[Stmt],
         restore_orig_state: bool,
     ) -> RhaiResult {
@@ -203,7 +203,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         stmt: &Stmt,
         rewind_scope: bool,
     ) -> RhaiResult {
@@ -912,8 +912,10 @@ impl Engine {
         scope: &mut Scope,
         statements: &[Stmt],
     ) -> RhaiResult {
+        let mut this = Dynamic::NULL;
+
         self.eval_stmt_block(
-            global, caches, lib, level, scope, &mut None, statements, false,
+            global, caches, lib, level, scope, &mut this, statements, false,
         )
         .or_else(|err| match *err {
             ERR::Return(out, ..) => Ok(out),

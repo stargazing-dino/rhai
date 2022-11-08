@@ -29,7 +29,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         fn_def: &ScriptFnDef,
         args: &mut FnCallArgs,
         rewind_scope: bool,

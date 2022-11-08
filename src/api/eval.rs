@@ -198,8 +198,10 @@ impl Engine {
                 #[cfg(not(feature = "no_function"))]
                 AsRef::<crate::SharedModule>::as_ref(ast).clone(),
             ];
+            let mut this = Dynamic::NULL;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
-            self.run_debugger(global, caches, lib, 0, scope, &mut None, node)?;
+
+            self.run_debugger(global, caches, lib, 0, scope, &mut this, node)?;
         }
 
         let typ = self.map_type_name(result.type_name());

@@ -11,8 +11,8 @@ use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token};
 use crate::types::RestoreOnDrop;
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString, SharedModule,
-    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, ERR,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString,
+    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, SharedModule, ERR,
 };
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
@@ -407,6 +407,7 @@ impl Engine {
                 };
                 if trigger {
                     let scope = &mut &mut Scope::new();
+                    let mut this = Dynamic::NULL;
                     let node = crate::ast::Stmt::Noop(pos);
                     let node = (&node).into();
                     let event = match _result {
@@ -415,7 +416,7 @@ impl Engine {
                     };
 
                     if let Err(err) = self
-                        .run_debugger_raw(global, caches, lib, level, scope, &mut None, node, event)
+                        .run_debugger_raw(global, caches, lib, level, scope, &mut this, node, event)
                     {
                         _result = Err(err);
                     }
@@ -646,16 +647,7 @@ impl Engine {
                     let (first_arg, rest_args) = args.split_first_mut().unwrap();
 
                     self.call_script_fn(
-                        global,
-                        caches,
-                        lib,
-                        level,
-                        scope,
-                        &mut Some(*first_arg),
-                        func,
-                        rest_args,
-                        true,
-                        pos,
+                        global, caches, lib, level, scope, first_arg, func, rest_args, true, pos,
                     )
                 } else {
                     // Normal call of script function
@@ -672,8 +664,10 @@ impl Engine {
                         backup.restore_first_arg(a)
                     });
 
+                    let mut this = Dynamic::NULL;
+
                     self.call_script_fn(
-                        global, caches, lib, level, scope, &mut None, func, args, true, pos,
+                        global, caches, lib, level, scope, &mut this, func, args, true, pos,
                     )
                 }
                 .map(|r| (r, false));
@@ -697,7 +691,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         arg_expr: &Expr,
     ) -> RhaiResultOf<(Dynamic, Position)> {
         // Literal values
@@ -956,7 +950,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         fn_name: &str,
         op_token: Option<&Token>,
         first_arg: Option<&Expr>,
@@ -1247,7 +1241,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         namespace: &crate::ast::Namespace,
         fn_name: &str,
         args_expr: &[Expr],
@@ -1376,12 +1370,13 @@ impl Engine {
             Some(f) if f.is_script() => {
                 let fn_def = f.get_script_fn_def().expect("script-defined function");
                 let new_scope = &mut Scope::new();
+                let mut this = Dynamic::NULL;
 
                 let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
                 let global = &mut *RestoreOnDrop::lock(global, move |g| g.source = orig_source);
 
                 self.call_script_fn(
-                    global, caches, lib, level, new_scope, &mut None, fn_def, &mut args, true, pos,
+                    global, caches, lib, level, new_scope, &mut this, fn_def, &mut args, true, pos,
                 )
             }
 
@@ -1474,7 +1469,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         expr: &FnCallExpr,
         pos: Position,
     ) -> RhaiResult {

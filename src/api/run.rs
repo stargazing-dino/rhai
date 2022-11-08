@@ -141,8 +141,9 @@ impl Engine {
                 #[cfg(not(feature = "no_function"))]
                 AsRef::<crate::SharedModule>::as_ref(ast).clone(),
             ];
+            let mut this = crate::Dynamic::NULL;
             let node = &crate::ast::Stmt::Noop(crate::Position::NONE);
-            self.run_debugger(global, caches, lib, 0, scope, &mut None, node)?;
+            self.run_debugger(global, caches, lib, 0, scope, &mut this, node)?;
         }
 
         Ok(())

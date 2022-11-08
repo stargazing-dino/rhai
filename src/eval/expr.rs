@@ -54,7 +54,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &'s mut Scope,
-        this_ptr: &'s mut Option<&mut Dynamic>,
+        this_ptr: &'s mut Dynamic,
         expr: &Expr,
     ) -> RhaiResultOf<(Target<'s>, Position)> {
         match expr {
@@ -140,7 +140,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &'s mut Scope,
-        this_ptr: &'s mut Option<&mut Dynamic>,
+        this_ptr: &'s mut Dynamic,
         expr: &Expr,
     ) -> RhaiResultOf<(Target<'s>, Position)> {
         // Make sure that the pointer indirection is taken only when absolutely necessary.
@@ -148,10 +148,11 @@ impl Engine {
         let (index, var_pos) = match expr {
             // Check if the variable is `this`
             Expr::Variable(v, None, pos) if v.0.is_none() && v.3 == KEYWORD_THIS => {
-                return this_ptr.as_mut().map_or_else(
-                    || Err(ERR::ErrorUnboundThis(*pos).into()),
-                    |val| Ok(((*val).into(), *pos)),
-                )
+                return if this_ptr.is_null() {
+                    Err(ERR::ErrorUnboundThis(*pos).into())
+                } else {
+                    Ok((this_ptr.into(), *pos))
+                };
             }
             _ if global.always_search_scope => (0, expr.start_position()),
             Expr::Variable(.., Some(i), pos) => (i.get() as usize, *pos),
@@ -224,7 +225,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         expr: &Expr,
     ) -> RhaiResult {
         // Coded this way for better branch prediction.
@@ -256,10 +257,11 @@ impl Engine {
             self.track_operation(global, expr.position())?;
 
             return if index.is_none() && x.0.is_none() && x.3 == KEYWORD_THIS {
-                this_ptr
-                    .as_deref()
-                    .cloned()
-                    .ok_or_else(|| ERR::ErrorUnboundThis(*var_pos).into())
+                if this_ptr.is_null() {
+                    ERR::ErrorUnboundThis(*var_pos).into()
+                } else {
+                    Ok(this_ptr.clone())
+                }
             } else {
                 self.search_namespace(global, caches, lib, level, scope, this_ptr, expr)
                     .map(|(val, ..)| val.take_or_clone())

@@ -45,7 +45,7 @@ impl Engine {
         caches: &mut Caches,
         lib: &[SharedModule],
         level: usize,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         target: &mut Target,
         root: (&str, Position),
         _parent: &Expr,
@@ -573,7 +573,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         expr: &Expr,
         new_val: &mut Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResult {
@@ -630,9 +630,10 @@ impl Engine {
 
                 let obj_ptr = &mut target;
                 let root = (x.3.as_str(), *var_pos);
+                let mut this = Dynamic::NULL;
 
                 self.eval_dot_index_chain_helper(
-                    global, caches, lib, level, &mut None, obj_ptr, root, expr, options, rhs,
+                    global, caches, lib, level, &mut this, obj_ptr, root, expr, options, rhs,
                     idx_values, chain_type, new_val,
                 )
             }
@@ -664,7 +665,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         expr: &Expr,
         parent_options: ASTFlags,
         parent_chain_type: ChainType,

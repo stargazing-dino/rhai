@@ -8,7 +8,7 @@ use std::prelude::v1::*;
 /// Context of a script evaluation process.
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
+pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// The current [`Engine`].
     engine: &'a Engine,
     /// The current [`Scope`].
@@ -20,12 +20,12 @@ pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
     /// The current stack of imported [modules][Module].
     lib: &'a [SharedModule],
     /// The current bound `this` pointer, if any.
-    this_ptr: &'t mut Option<&'pt mut Dynamic>,
+    this_ptr: &'t mut Dynamic,
     /// The current nesting level of function calls.
     level: usize,
 }
 
-impl<'a, 's, 'ps, 'g, 'c, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
+impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// Create a new [`EvalContext`].
     #[inline(always)]
     #[must_use]
@@ -36,7 +36,7 @@ impl<'a, 's, 'ps, 'g, 'c, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
         lib: &'a [SharedModule],
         level: usize,
         scope: &'s mut Scope<'ps>,
-        this_ptr: &'t mut Option<&'pt mut Dynamic>,
+        this_ptr: &'t mut Dynamic,
     ) -> Self {
         Self {
             engine,
@@ -104,8 +104,8 @@ impl<'a, 's, 'ps, 'g, 'c, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub fn global_runtime_state_mut(&mut self) -> &mut &'g mut GlobalRuntimeState {
-        &mut self.global
+    pub fn global_runtime_state_mut(&mut self) -> &mut GlobalRuntimeState {
+        self.global
     }
     /// Get an iterator over the namespaces containing definition of all script-defined functions.
     #[inline]
@@ -121,16 +121,24 @@ impl<'a, 's, 'ps, 'g, 'c, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
         self.lib
     }
     /// The current bound `this` pointer, if any.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn this_ptr(&self) -> Option<&Dynamic> {
-        self.this_ptr.as_ref().map(|v| &**v)
+        if self.this_ptr.is_null() {
+            None
+        } else {
+            Some(self.this_ptr)
+        }
     }
     /// Mutable reference to the current bound `this` pointer, if any.
-    #[inline(always)]
+    #[inline]
     #[must_use]
-    pub fn this_ptr_mut(&mut self) -> &mut Option<&'pt mut Dynamic> {
-        self.this_ptr
+    pub fn this_ptr_mut(&mut self) -> Option<&mut Dynamic> {
+        if self.this_ptr.is_null() {
+            None
+        } else {
+            Some(self.this_ptr)
+        }
     }
     /// The current nesting level of function calls.
     #[inline(always)]

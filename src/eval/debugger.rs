@@ -416,7 +416,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<()> {
         if self.debugger.is_some() {
@@ -443,7 +443,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<Option<DebuggerStatus>> {
         if self.debugger.is_some() {
@@ -466,7 +466,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<Option<DebuggerStatus>> {
         let node = node.into();
@@ -513,7 +513,7 @@ impl Engine {
         lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         node: ASTNode<'a>,
         event: DebuggerEvent,
     ) -> Result<Option<DebuggerStatus>, Box<crate::EvalAltResult>> {
