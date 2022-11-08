@@ -382,7 +382,7 @@ pub enum Token {
     ///
     /// Reserved under the `no_float` feature.
     #[cfg(not(feature = "no_float"))]
-    FloatConstant(crate::ast::FloatWrapper<crate::FLOAT>),
+    FloatConstant(crate::types::FloatWrapper<crate::FLOAT>),
     /// A [`Decimal`][rust_decimal::Decimal] constant.
     ///
     /// Requires the `decimal` feature.
@@ -1682,7 +1682,7 @@ fn get_next_token_inner(
                         // If integer parsing is unnecessary, try float instead
                         #[cfg(not(feature = "no_float"))]
                         let num = num.or_else(|_| {
-                            crate::ast::FloatWrapper::from_str(&result).map(Token::FloatConstant)
+                            crate::types::FloatWrapper::from_str(&result).map(Token::FloatConstant)
                         });
 
                         // Then try decimal

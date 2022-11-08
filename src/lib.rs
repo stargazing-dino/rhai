@@ -300,6 +300,10 @@ pub type OptimizationLevel = ();
 pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant};
 
 #[cfg(feature = "internals")]
+#[cfg(not(feature = "no_float"))]
+pub use types::FloatWrapper;
+
+#[cfg(feature = "internals")]
 pub use tokenizer::{get_next_token, parse_string_literal};
 
 #[cfg(feature = "internals")]
@@ -332,10 +336,6 @@ pub use ast::Namespace;
 #[cfg(not(feature = "no_module"))]
 #[cfg(not(feature = "no_function"))]
 pub use ast::EncapsulatedEnviron;
-
-#[cfg(feature = "internals")]
-#[cfg(not(feature = "no_float"))]
-pub use ast::FloatWrapper;
 
 #[cfg(feature = "internals")]
 pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeState};

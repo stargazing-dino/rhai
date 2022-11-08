@@ -70,7 +70,7 @@ pub enum Union {
     Int(INT, Tag, AccessMode),
     /// A floating-point value.
     #[cfg(not(feature = "no_float"))]
-    Float(crate::ast::FloatWrapper<crate::FLOAT>, Tag, AccessMode),
+    Float(super::FloatWrapper<crate::FLOAT>, Tag, AccessMode),
     /// _(decimal)_ A fixed-precision decimal value.
     /// Exported under the `decimal` feature only.
     #[cfg(feature = "decimal")]
@@ -867,7 +867,7 @@ impl Dynamic {
     #[must_use]
     pub const fn from_float(value: crate::FLOAT) -> Self {
         Self(Union::Float(
-            crate::ast::FloatWrapper::new(value),
+            super::FloatWrapper::new(value),
             DEFAULT_TAG_VALUE,
             ReadWrite,
         ))
@@ -1859,9 +1859,9 @@ impl From<crate::FLOAT> for Dynamic {
     }
 }
 #[cfg(not(feature = "no_float"))]
-impl From<crate::ast::FloatWrapper<crate::FLOAT>> for Dynamic {
+impl From<super::FloatWrapper<crate::FLOAT>> for Dynamic {
     #[inline(always)]
-    fn from(value: crate::ast::FloatWrapper<crate::FLOAT>) -> Self {
+    fn from(value: super::FloatWrapper<crate::FLOAT>) -> Self {
         Self(Union::Float(value, DEFAULT_TAG_VALUE, ReadWrite))
     }
 }

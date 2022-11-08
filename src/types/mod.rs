@@ -4,6 +4,7 @@ pub mod bloom_filter;
 pub mod custom_types;
 pub mod dynamic;
 pub mod error;
+pub mod float;
 pub mod fn_ptr;
 pub mod immutable_string;
 pub mod interner;
@@ -18,6 +19,8 @@ pub use dynamic::Dynamic;
 #[cfg(not(feature = "no_time"))]
 pub use dynamic::Instant;
 pub use error::EvalAltResult;
+#[cfg(not(feature = "no_float"))]
+pub use float::FloatWrapper;
 pub use fn_ptr::FnPtr;
 pub use immutable_string::ImmutableString;
 pub use interner::StringsInterner;
