@@ -33,57 +33,47 @@ mod debugging_functions {
     #[cfg(not(feature = "no_function"))]
     #[cfg(not(feature = "no_index"))]
     pub fn back_trace(ctx: NativeCallContext) -> Array {
-        if let Some(global) = ctx.global_runtime_state() {
-            global
-                .debugger
-                .call_stack()
-                .iter()
-                .rev()
-                .filter(|crate::debugger::CallStackFrame { fn_name, args, .. }| {
-                    fn_name.as_str() != "back_trace" || !args.is_empty()
-                })
-                .map(
-                    |frame @ crate::debugger::CallStackFrame {
-                         fn_name: _fn_name,
-                         args: _args,
-                         source: _source,
-                         pos: _pos,
-                     }| {
-                        let display = frame.to_string();
+        ctx.global_runtime_state()
+            .debugger
+            .call_stack()
+            .iter()
+            .rev()
+            .filter(|crate::debugger::CallStackFrame { fn_name, args, .. }| {
+                fn_name.as_str() != "back_trace" || !args.is_empty()
+            })
+            .map(
+                |frame @ crate::debugger::CallStackFrame {
+                     fn_name: _fn_name,
+                     args: _args,
+                     source: _source,
+                     pos: _pos,
+                 }| {
+                    let display = frame.to_string();
 
-                        #[cfg(not(feature = "no_object"))]
-                        {
-                            let mut map = Map::new();
-                            map.insert("display".into(), display.into());
-                            map.insert("fn_name".into(), _fn_name.into());
-                            if !_args.is_empty() {
-                                map.insert(
-                                    "args".into(),
-                                    Dynamic::from_array(_args.clone().to_vec()),
-                                );
-                            }
-                            if let Some(source) = _source {
-                                map.insert("source".into(), source.into());
-                            }
-                            if !_pos.is_none() {
-                                map.insert(
-                                    "line".into(),
-                                    (_pos.line().unwrap() as crate::INT).into(),
-                                );
-                                map.insert(
-                                    "position".into(),
-                                    (_pos.position().unwrap_or(0) as crate::INT).into(),
-                                );
-                            }
-                            Dynamic::from_map(map)
+                    #[cfg(not(feature = "no_object"))]
+                    {
+                        let mut map = Map::new();
+                        map.insert("display".into(), display.into());
+                        map.insert("fn_name".into(), _fn_name.into());
+                        if !_args.is_empty() {
+                            map.insert("args".into(), Dynamic::from_array(_args.clone().to_vec()));
                         }
-                        #[cfg(feature = "no_object")]
-                        display.into()
-                    },
-                )
-                .collect()
-        } else {
-            Array::new()
-        }
+                        if let Some(source) = _source {
+                            map.insert("source".into(), source.into());
+                        }
+                        if !_pos.is_none() {
+                            map.insert("line".into(), (_pos.line().unwrap() as crate::INT).into());
+                            map.insert(
+                                "position".into(),
+                                (_pos.position().unwrap_or(0) as crate::INT).into(),
+                            );
+                        }
+                        Dynamic::from_map(map)
+                    }
+                    #[cfg(feature = "no_object")]
+                    display.into()
+                },
+            )
+            .collect()
     }
 }

@@ -44,7 +44,6 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[SharedModule],
-        level: usize,
         this_ptr: &mut Dynamic,
         target: &mut Target,
         root: (&str, Position),
@@ -76,7 +75,7 @@ impl Engine {
                         if !parent_options.contains(ASTFlags::BREAK) =>
                     {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, lib, level, scope, this_ptr, _parent)?;
+                        self.run_debugger(global, caches, lib, scope, this_ptr, _parent)?;
 
                         let idx_val = &mut idx_values.pop().unwrap();
                         let mut idx_val_for_setter = idx_val.clone();
@@ -85,13 +84,13 @@ impl Engine {
 
                         let (try_setter, result) = {
                             let mut obj = self.get_indexed_mut(
-                                global, caches, lib, level, target, idx_val, idx_pos, false, true,
+                                global, caches, lib, target, idx_val, idx_pos, false, true,
                             )?;
                             let is_obj_temp_val = obj.is_temp_value();
                             let obj_ptr = &mut obj;
 
                             match self.eval_dot_index_chain_helper(
-                                global, caches, lib, level, this_ptr, obj_ptr, root, rhs, *options,
+                                global, caches, lib, this_ptr, obj_ptr, root, rhs, *options,
                                 &x.rhs, idx_values, rhs_chain, new_val,
                             ) {
                                 Ok((result, true)) if is_obj_temp_val => {
@@ -107,7 +106,7 @@ impl Engine {
                             let idx = &mut idx_val_for_setter;
                             let new_val = &mut new_val;
                             self.call_indexer_set(
-                                global, caches, lib, level, target, idx, new_val, is_ref_mut,
+                                global, caches, lib, target, idx, new_val, is_ref_mut,
                             )
                             .or_else(|e| match *e {
                                 ERR::ErrorIndexingType(..) => Ok((Dynamic::UNIT, false)),
@@ -120,19 +119,19 @@ impl Engine {
                     // xxx[rhs] op= new_val
                     _ if new_val.is_some() => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, lib, level, scope, this_ptr, _parent)?;
+                        self.run_debugger(global, caches, lib, scope, this_ptr, _parent)?;
 
                         let (new_val, op_info) = new_val.take().expect("`Some`");
                         let idx_val = &mut idx_values.pop().unwrap();
                         let idx = &mut idx_val.clone();
 
-                        let try_setter = match self.get_indexed_mut(
-                            global, caches, lib, level, target, idx, pos, true, false,
-                        ) {
+                        let try_setter = match self
+                            .get_indexed_mut(global, caches, lib, target, idx, pos, true, false)
+                        {
                             // Indexed value is not a temp value - update directly
                             Ok(ref mut obj_ptr) => {
                                 self.eval_op_assignment(
-                                    global, caches, lib, level, op_info, obj_ptr, root, new_val,
+                                    global, caches, lib, op_info, obj_ptr, root, new_val,
                                 )?;
                                 self.check_data_size(obj_ptr, op_info.pos)?;
                                 None
@@ -151,13 +150,12 @@ impl Engine {
 
                                 // Call the index getter to get the current value
                                 if let Ok(val) =
-                                    self.call_indexer_get(global, caches, lib, level, target, idx)
+                                    self.call_indexer_get(global, caches, lib, target, idx)
                                 {
                                     let mut val = val.into();
                                     // Run the op-assignment
                                     self.eval_op_assignment(
-                                        global, caches, lib, level, op_info, &mut val, root,
-                                        new_val,
+                                        global, caches, lib, op_info, &mut val, root, new_val,
                                     )?;
                                     // Replace new value
                                     new_val = val.take_or_clone();
@@ -169,7 +167,7 @@ impl Engine {
                             let new_val = &mut new_val;
 
                             self.call_indexer_set(
-                                global, caches, lib, level, target, idx_val, new_val, is_ref_mut,
+                                global, caches, lib, target, idx_val, new_val, is_ref_mut,
                             )?;
                         }
 
@@ -178,14 +176,12 @@ impl Engine {
                     // xxx[rhs]
                     _ => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, lib, level, scope, this_ptr, _parent)?;
+                        self.run_debugger(global, caches, lib, scope, this_ptr, _parent)?;
 
                         let idx_val = &mut idx_values.pop().unwrap();
 
-                        self.get_indexed_mut(
-                            global, caches, lib, level, target, idx_val, pos, false, true,
-                        )
-                        .map(|v| (v.take_or_clone(), false))
+                        self.get_indexed_mut(global, caches, lib, target, idx_val, pos, false, true)
+                            .map(|v| (v.take_or_clone(), false))
                     }
                 }
             }
@@ -201,9 +197,8 @@ impl Engine {
                     // xxx.fn_name(arg_expr_list)
                     Expr::MethodCall(x, pos) if !x.is_qualified() && new_val.is_none() => {
                         #[cfg(feature = "debugging")]
-                        let reset = self.run_debugger_with_reset(
-                            global, caches, lib, level, scope, this_ptr, rhs,
-                        )?;
+                        let reset = self
+                            .run_debugger_with_reset(global, caches, lib, scope, this_ptr, rhs)?;
                         #[cfg(feature = "debugging")]
                         let global = &mut *RestoreOnDrop::lock(global, move |g| {
                             g.debugger.reset_status(reset)
@@ -222,8 +217,7 @@ impl Engine {
                         let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
 
                         self.make_method_call(
-                            global, caches, lib, level, name, *hashes, target, call_args, pos1,
-                            *pos,
+                            global, caches, lib, name, *hashes, target, call_args, pos1, *pos,
                         )
                     }
                     // xxx.fn_name(...) = ???
@@ -237,16 +231,16 @@ impl Engine {
                     // {xxx:map}.id op= ???
                     Expr::Property(x, pos) if target.is::<crate::Map>() && new_val.is_some() => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, lib, level, scope, this_ptr, rhs)?;
+                        self.run_debugger(global, caches, lib, scope, this_ptr, rhs)?;
 
                         let index = &mut x.2.clone().into();
                         let (new_val, op_info) = new_val.take().expect("`Some`");
                         {
                             let val_target = &mut self.get_indexed_mut(
-                                global, caches, lib, level, target, index, *pos, true, false,
+                                global, caches, lib, target, index, *pos, true, false,
                             )?;
                             self.eval_op_assignment(
-                                global, caches, lib, level, op_info, val_target, root, new_val,
+                                global, caches, lib, op_info, val_target, root, new_val,
                             )?;
                         }
                         self.check_data_size(target.source(), op_info.pos)?;
@@ -255,18 +249,18 @@ impl Engine {
                     // {xxx:map}.id
                     Expr::Property(x, pos) if target.is::<crate::Map>() => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, lib, level, scope, this_ptr, rhs)?;
+                        self.run_debugger(global, caches, lib, scope, this_ptr, rhs)?;
 
                         let index = &mut x.2.clone().into();
                         let val = self.get_indexed_mut(
-                            global, caches, lib, level, target, index, *pos, false, false,
+                            global, caches, lib, target, index, *pos, false, false,
                         )?;
                         Ok((val.take_or_clone(), false))
                     }
                     // xxx.id op= ???
                     Expr::Property(x, pos) if new_val.is_some() => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, lib, level, scope, this_ptr, rhs)?;
+                        self.run_debugger(global, caches, lib, scope, this_ptr, rhs)?;
 
                         let ((getter, hash_get), (setter, hash_set), name) = &**x;
                         let (mut new_val, op_info) = new_val.take().expect("`Some`");
@@ -275,15 +269,15 @@ impl Engine {
                             let args = &mut [target.as_mut()];
                             let (mut orig_val, ..) = self
                                 .exec_native_fn_call(
-                                    global, caches, lib, level, getter, None, *hash_get, args,
-                                    is_ref_mut, *pos,
+                                    global, caches, lib, getter, None, *hash_get, args, is_ref_mut,
+                                    *pos,
                                 )
                                 .or_else(|err| match *err {
                                     // Try an indexer if property does not exist
                                     ERR::ErrorDotExpr(..) => {
                                         let mut prop = name.into();
                                         self.call_indexer_get(
-                                            global, caches, lib, level, target, &mut prop,
+                                            global, caches, lib, target, &mut prop,
                                         )
                                         .map(|r| (r, false))
                                         .map_err(|e| {
@@ -300,7 +294,7 @@ impl Engine {
                                 let orig_val = &mut (&mut orig_val).into();
 
                                 self.eval_op_assignment(
-                                    global, caches, lib, level, op_info, orig_val, root, new_val,
+                                    global, caches, lib, op_info, orig_val, root, new_val,
                                 )?;
                             }
 
@@ -309,8 +303,7 @@ impl Engine {
 
                         let args = &mut [target.as_mut(), &mut new_val];
                         self.exec_native_fn_call(
-                            global, caches, lib, level, setter, None, *hash_set, args, is_ref_mut,
-                            *pos,
+                            global, caches, lib, setter, None, *hash_set, args, is_ref_mut, *pos,
                         )
                         .or_else(|err| match *err {
                             // Try an indexer if property does not exist
@@ -318,7 +311,7 @@ impl Engine {
                                 let idx = &mut name.into();
                                 let new_val = &mut new_val;
                                 self.call_indexer_set(
-                                    global, caches, lib, level, target, idx, new_val, is_ref_mut,
+                                    global, caches, lib, target, idx, new_val, is_ref_mut,
                                 )
                                 .map_err(|e| match *e {
                                     ERR::ErrorIndexingType(..) => err,
@@ -331,27 +324,24 @@ impl Engine {
                     // xxx.id
                     Expr::Property(x, pos) => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, lib, level, scope, this_ptr, rhs)?;
+                        self.run_debugger(global, caches, lib, scope, this_ptr, rhs)?;
 
                         let ((getter, hash_get), _, name) = &**x;
                         let args = &mut [target.as_mut()];
                         self.exec_native_fn_call(
-                            global, caches, lib, level, getter, None, *hash_get, args, is_ref_mut,
-                            *pos,
+                            global, caches, lib, getter, None, *hash_get, args, is_ref_mut, *pos,
                         )
                         .map_or_else(
                             |err| match *err {
                                 // Try an indexer if property does not exist
                                 ERR::ErrorDotExpr(..) => {
                                     let mut prop = name.into();
-                                    self.call_indexer_get(
-                                        global, caches, lib, level, target, &mut prop,
-                                    )
-                                    .map(|r| (r, false))
-                                    .map_err(|e| match *e {
-                                        ERR::ErrorIndexingType(..) => err,
-                                        _ => e,
-                                    })
+                                    self.call_indexer_get(global, caches, lib, target, &mut prop)
+                                        .map(|r| (r, false))
+                                        .map_err(|e| match *e {
+                                            ERR::ErrorIndexingType(..) => err,
+                                            _ => e,
+                                        })
                                 }
                                 _ => Err(err),
                             },
@@ -368,20 +358,18 @@ impl Engine {
                         let val_target = &mut match x.lhs {
                             Expr::Property(ref p, pos) => {
                                 #[cfg(feature = "debugging")]
-                                self.run_debugger(
-                                    global, caches, lib, level, scope, this_ptr, _node,
-                                )?;
+                                self.run_debugger(global, caches, lib, scope, this_ptr, _node)?;
 
                                 let index = &mut p.2.clone().into();
                                 self.get_indexed_mut(
-                                    global, caches, lib, level, target, index, pos, false, true,
+                                    global, caches, lib, target, index, pos, false, true,
                                 )?
                             }
                             // {xxx:map}.fn_name(arg_expr_list)[expr] | {xxx:map}.fn_name(arg_expr_list).expr
                             Expr::MethodCall(ref x, pos) if !x.is_qualified() => {
                                 #[cfg(feature = "debugging")]
                                 let reset = self.run_debugger_with_reset(
-                                    global, caches, lib, level, scope, this_ptr, _node,
+                                    global, caches, lib, scope, this_ptr, _node,
                                 )?;
                                 #[cfg(feature = "debugging")]
                                 let global = &mut *RestoreOnDrop::lock(global, move |g| {
@@ -402,8 +390,8 @@ impl Engine {
                                 let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
 
                                 self.make_method_call(
-                                    global, caches, lib, level, name, *hashes, target, call_args,
-                                    pos1, pos,
+                                    global, caches, lib, name, *hashes, target, call_args, pos1,
+                                    pos,
                                 )?
                                 .0
                                 .into()
@@ -418,8 +406,8 @@ impl Engine {
                         let rhs_chain = rhs.into();
 
                         self.eval_dot_index_chain_helper(
-                            global, caches, lib, level, this_ptr, val_target, root, rhs, *options,
-                            &x.rhs, idx_values, rhs_chain, new_val,
+                            global, caches, lib, this_ptr, val_target, root, rhs, *options, &x.rhs,
+                            idx_values, rhs_chain, new_val,
                         )
                         .map_err(|err| err.fill_position(*x_pos))
                     }
@@ -431,9 +419,7 @@ impl Engine {
                             // xxx.prop[expr] | xxx.prop.expr
                             Expr::Property(ref p, pos) => {
                                 #[cfg(feature = "debugging")]
-                                self.run_debugger(
-                                    global, caches, lib, level, scope, this_ptr, _node,
-                                )?;
+                                self.run_debugger(global, caches, lib, scope, this_ptr, _node)?;
 
                                 let ((getter, hash_get), (setter, hash_set), name) = &**p;
                                 let rhs_chain = rhs.into();
@@ -443,7 +429,7 @@ impl Engine {
                                 // Assume getters are always pure
                                 let (mut val, ..) = self
                                     .exec_native_fn_call(
-                                        global, caches, lib, level, getter, None, *hash_get, args,
+                                        global, caches, lib, getter, None, *hash_get, args,
                                         is_ref_mut, pos,
                                     )
                                     .or_else(|err| match *err {
@@ -451,7 +437,7 @@ impl Engine {
                                         ERR::ErrorDotExpr(..) => {
                                             let mut prop = name.into();
                                             self.call_indexer_get(
-                                                global, caches, lib, level, target, &mut prop,
+                                                global, caches, lib, target, &mut prop,
                                             )
                                             .map(|r| (r, false))
                                             .map_err(
@@ -468,8 +454,8 @@ impl Engine {
 
                                 let (result, may_be_changed) = self
                                     .eval_dot_index_chain_helper(
-                                        global, caches, lib, level, this_ptr, val, root, rhs,
-                                        *options, &x.rhs, idx_values, rhs_chain, new_val,
+                                        global, caches, lib, this_ptr, val, root, rhs, *options,
+                                        &x.rhs, idx_values, rhs_chain, new_val,
                                     )
                                     .map_err(|err| err.fill_position(*x_pos))?;
 
@@ -479,7 +465,7 @@ impl Engine {
                                     let mut arg_values = [target.as_mut(), val.as_mut()];
                                     let args = &mut arg_values;
                                     self.exec_native_fn_call(
-                                        global, caches, lib, level, setter, None, *hash_set, args,
+                                        global, caches, lib, setter, None, *hash_set, args,
                                         is_ref_mut, pos,
                                     )
                                     .or_else(
@@ -489,8 +475,8 @@ impl Engine {
                                                 let idx = &mut name.into();
                                                 let new_val = val;
                                                 self.call_indexer_set(
-                                                    global, caches, lib, level, target, idx,
-                                                    new_val, is_ref_mut,
+                                                    global, caches, lib, target, idx, new_val,
+                                                    is_ref_mut,
                                                 )
                                                 .or_else(|e| match *e {
                                                     // If there is no setter, no need to feed it
@@ -513,7 +499,7 @@ impl Engine {
                                 let val = {
                                     #[cfg(feature = "debugging")]
                                     let reset = self.run_debugger_with_reset(
-                                        global, caches, lib, level, scope, this_ptr, _node,
+                                        global, caches, lib, scope, this_ptr, _node,
                                     )?;
                                     #[cfg(feature = "debugging")]
                                     let global = &mut *RestoreOnDrop::lock(global, move |g| {
@@ -535,8 +521,8 @@ impl Engine {
                                     let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
 
                                     self.make_method_call(
-                                        global, caches, lib, level, name, *hashes, target,
-                                        call_args, pos1, pos,
+                                        global, caches, lib, name, *hashes, target, call_args,
+                                        pos1, pos,
                                     )?
                                     .0
                                 };
@@ -545,7 +531,7 @@ impl Engine {
                                 let rhs_chain = rhs.into();
 
                                 self.eval_dot_index_chain_helper(
-                                    global, caches, lib, level, this_ptr, val, root, rhs, *options,
+                                    global, caches, lib, this_ptr, val, root, rhs, *options,
                                     &x.rhs, idx_values, rhs_chain, new_val,
                                 )
                                 .map_err(|err| err.fill_position(pos))
@@ -571,7 +557,6 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[SharedModule],
-        level: usize,
         scope: &mut Scope,
         this_ptr: &mut Dynamic,
         expr: &Expr,
@@ -612,8 +597,7 @@ impl Engine {
             // All other patterns - evaluate the arguments chain
             _ => {
                 self.eval_dot_index_chain_arguments(
-                    global, caches, lib, level, scope, this_ptr, rhs, options, chain_type,
-                    idx_values,
+                    global, caches, lib, scope, this_ptr, rhs, options, chain_type, idx_values,
                 )?;
             }
         }
@@ -622,19 +606,19 @@ impl Engine {
             // id.??? or id[???]
             Expr::Variable(x, .., var_pos) => {
                 #[cfg(feature = "debugging")]
-                self.run_debugger(global, caches, lib, level, scope, this_ptr, lhs)?;
+                self.run_debugger(global, caches, lib, scope, this_ptr, lhs)?;
                 self.track_operation(global, *var_pos)?;
 
                 let (mut target, ..) =
-                    self.search_namespace(global, caches, lib, level, scope, this_ptr, lhs)?;
+                    self.search_namespace(global, caches, lib, scope, this_ptr, lhs)?;
 
                 let obj_ptr = &mut target;
                 let root = (x.3.as_str(), *var_pos);
                 let mut this = Dynamic::NULL;
 
                 self.eval_dot_index_chain_helper(
-                    global, caches, lib, level, &mut this, obj_ptr, root, expr, options, rhs,
-                    idx_values, chain_type, new_val,
+                    global, caches, lib, &mut this, obj_ptr, root, expr, options, rhs, idx_values,
+                    chain_type, new_val,
                 )
             }
             // {expr}.??? = ??? or {expr}[???] = ???
@@ -642,14 +626,14 @@ impl Engine {
             // {expr}.??? or {expr}[???]
             expr => {
                 let value = self
-                    .eval_expr(global, caches, lib, level, scope, this_ptr, expr)?
+                    .eval_expr(global, caches, lib, scope, this_ptr, expr)?
                     .flatten();
                 let obj_ptr = &mut value.into();
                 let root = ("", expr.start_position());
 
                 self.eval_dot_index_chain_helper(
-                    global, caches, lib, level, this_ptr, obj_ptr, root, expr, options, rhs,
-                    idx_values, chain_type, new_val,
+                    global, caches, lib, this_ptr, obj_ptr, root, expr, options, rhs, idx_values,
+                    chain_type, new_val,
                 )
             }
         }
@@ -663,7 +647,6 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[SharedModule],
-        level: usize,
         scope: &mut Scope,
         this_ptr: &mut Dynamic,
         expr: &Expr,
@@ -680,7 +663,7 @@ impl Engine {
             {
                 for arg_expr in &x.args {
                     idx_values.push(
-                        self.get_arg_value(global, caches, lib, level, scope, this_ptr, arg_expr)?
+                        self.get_arg_value(global, caches, lib, scope, this_ptr, arg_expr)?
                             .0
                             .flatten(),
                     );
@@ -714,11 +697,9 @@ impl Engine {
                     {
                         for arg_expr in &x.args {
                             _arg_values.push(
-                                self.get_arg_value(
-                                    global, caches, lib, level, scope, this_ptr, arg_expr,
-                                )?
-                                .0
-                                .flatten(),
+                                self.get_arg_value(global, caches, lib, scope, this_ptr, arg_expr)?
+                                    .0
+                                    .flatten(),
                             );
                         }
                     }
@@ -733,7 +714,7 @@ impl Engine {
                     #[cfg(not(feature = "no_index"))]
                     _ if parent_chain_type == ChainType::Indexing => {
                         _arg_values.push(
-                            self.eval_expr(global, caches, lib, level, scope, this_ptr, lhs)?
+                            self.eval_expr(global, caches, lib, scope, this_ptr, lhs)?
                                 .flatten(),
                         );
                     }
@@ -744,8 +725,7 @@ impl Engine {
                 let chain_type = expr.into();
 
                 self.eval_dot_index_chain_arguments(
-                    global, caches, lib, level, scope, this_ptr, rhs, *options, chain_type,
-                    idx_values,
+                    global, caches, lib, scope, this_ptr, rhs, *options, chain_type, idx_values,
                 )?;
 
                 if !_arg_values.is_empty() {
@@ -759,7 +739,7 @@ impl Engine {
             }
             #[cfg(not(feature = "no_index"))]
             _ if parent_chain_type == ChainType::Indexing => idx_values.push(
-                self.eval_expr(global, caches, lib, level, scope, this_ptr, expr)?
+                self.eval_expr(global, caches, lib, scope, this_ptr, expr)?
                     .flatten(),
             ),
             _ => unreachable!("unknown chained expression: {:?}", expr),
@@ -775,7 +755,6 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[SharedModule],
-        level: usize,
         target: &mut Dynamic,
         idx: &mut Dynamic,
     ) -> RhaiResultOf<Dynamic> {
@@ -783,12 +762,12 @@ impl Engine {
         let hash = global.hash_idx_get();
         let fn_name = crate::engine::FN_IDX_GET;
         let pos = Position::NONE;
-        let level = level + 1;
 
-        self.exec_native_fn_call(
-            global, caches, lib, level, fn_name, None, hash, args, true, pos,
-        )
-        .map(|(r, ..)| r)
+        global.level += 1;
+        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level -= 1);
+
+        self.exec_native_fn_call(global, caches, lib, fn_name, None, hash, args, true, pos)
+            .map(|(r, ..)| r)
     }
 
     /// Call a set indexer.
@@ -798,7 +777,6 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[SharedModule],
-        level: usize,
         target: &mut Dynamic,
         idx: &mut Dynamic,
         new_val: &mut Dynamic,
@@ -808,10 +786,12 @@ impl Engine {
         let args = &mut [target, idx, new_val];
         let fn_name = crate::engine::FN_IDX_SET;
         let pos = Position::NONE;
-        let level = level + 1;
+
+        global.level += 1;
+        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level -= 1);
 
         self.exec_native_fn_call(
-            global, caches, lib, level, fn_name, None, hash, args, is_ref_mut, pos,
+            global, caches, lib, fn_name, None, hash, args, is_ref_mut, pos,
         )
     }
 
@@ -822,7 +802,6 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[SharedModule],
-        level: usize,
         target: &'t mut Dynamic,
         idx: &mut Dynamic,
         idx_pos: Position,
@@ -1031,7 +1010,7 @@ impl Engine {
             }
 
             _ if use_indexers => self
-                .call_indexer_get(global, caches, lib, level, target, idx)
+                .call_indexer_get(global, caches, lib, target, idx)
                 .map(Into::into),
 
             _ => Err(ERR::ErrorIndexingType(

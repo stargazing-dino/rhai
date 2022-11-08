@@ -267,7 +267,7 @@ impl Engine {
         });
 
         let result = if eval_ast && !statements.is_empty() {
-            let r = self.eval_global_statements(global, caches, lib, 0, scope, statements);
+            let r = self.eval_global_statements(global, caches, lib, scope, statements);
 
             if rewind_scope {
                 scope.rewind(orig_scope_len);
@@ -289,7 +289,6 @@ impl Engine {
                     global,
                     caches,
                     lib,
-                    0,
                     scope,
                     &mut this_ptr,
                     fn_def,
@@ -306,7 +305,7 @@ impl Engine {
         if self.debugger.is_some() {
             global.debugger.status = crate::eval::DebuggerStatus::Terminate;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
-            self.run_debugger(global, caches, lib, 0, scope, &mut this_ptr, node)?;
+            self.run_debugger(global, caches, lib, scope, &mut this_ptr, node)?;
         }
 
         Ok(result)

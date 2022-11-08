@@ -2898,12 +2898,12 @@ impl Engine {
 
         if let Some(ref filter) = self.def_var_filter {
             let will_shadow = state.stack.iter().any(|(v, ..)| v == name);
-            let level = settings.level;
+            state.global.level = settings.level;
             let is_const = access == AccessMode::ReadOnly;
             let info = VarDefInfo {
                 name: &name,
                 is_const,
-                nesting_level: level,
+                nesting_level: state.global.level,
                 will_shadow,
             };
             let caches = &mut Caches::new();
@@ -2914,7 +2914,6 @@ impl Engine {
                 &mut state.global,
                 caches,
                 &[],
-                level,
                 &mut state.stack,
                 &mut this,
             );

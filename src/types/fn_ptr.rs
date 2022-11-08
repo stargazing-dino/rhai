@@ -1,5 +1,6 @@
 //! The `FnPtr` type.
 
+use crate::eval::GlobalRuntimeState;
 use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
@@ -160,8 +161,16 @@ impl FnPtr {
             &lib
         };
 
-        #[allow(deprecated)]
-        let ctx = NativeCallContext::new(engine, self.fn_name(), lib);
+        let global = &mut GlobalRuntimeState::new(engine);
+
+        let ctx = NativeCallContext::new_with_all_fields(
+            engine,
+            self.fn_name(),
+            None,
+            global,
+            lib,
+            Position::NONE,
+        );
 
         let result = self.call_raw(&ctx, None, arg_values)?;
 

@@ -1986,7 +1986,7 @@ impl Module {
         // Run the script
         let caches = &mut crate::eval::Caches::new();
 
-        let result = engine.eval_ast_with_scope_raw(global, caches, 0, &mut scope, ast);
+        let result = engine.eval_ast_with_scope_raw(global, caches, &mut scope, ast);
 
         // Create new module
         let mut module = Module::new();

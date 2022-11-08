@@ -21,8 +21,6 @@ pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     lib: &'a [SharedModule],
     /// The current bound `this` pointer, if any.
     this_ptr: &'t mut Dynamic,
-    /// The current nesting level of function calls.
-    level: usize,
 }
 
 impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
@@ -34,7 +32,6 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
         global: &'g mut GlobalRuntimeState,
         caches: &'c mut Caches,
         lib: &'a [SharedModule],
-        level: usize,
         scope: &'s mut Scope<'ps>,
         this_ptr: &'t mut Dynamic,
     ) -> Self {
@@ -45,7 +42,6 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
             caches,
             lib,
             this_ptr,
-            level,
         }
     }
     /// The current [`Engine`].
@@ -144,7 +140,7 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     #[inline(always)]
     #[must_use]
     pub const fn call_level(&self) -> usize {
-        self.level
+        self.global.level
     }
 
     /// Evaluate an [expression tree][crate::Expression] within this [evaluation context][`EvalContext`].
@@ -186,7 +182,6 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
                 self.global,
                 self.caches,
                 self.lib,
-                self.level,
                 self.scope,
                 self.this_ptr,
                 statements,
@@ -196,7 +191,6 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
                 self.global,
                 self.caches,
                 self.lib,
-                self.level,
                 self.scope,
                 self.this_ptr,
                 expr,

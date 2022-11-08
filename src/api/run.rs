@@ -131,7 +131,7 @@ impl Engine {
             } else {
                 &lib
             };
-            self.eval_global_statements(global, caches, lib, 0, scope, statements)?;
+            self.eval_global_statements(global, caches, lib, scope, statements)?;
         }
 
         #[cfg(feature = "debugging")]
@@ -143,7 +143,7 @@ impl Engine {
             ];
             let mut this = crate::Dynamic::NULL;
             let node = &crate::ast::Stmt::Noop(crate::Position::NONE);
-            self.run_debugger(global, caches, lib, 0, scope, &mut this, node)?;
+            self.run_debugger(global, caches, lib, scope, &mut this, node)?;
         }
 
         Ok(())
