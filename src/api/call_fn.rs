@@ -3,7 +3,6 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::types::dynamic::Variant;
-use crate::types::RestoreOnDrop;
 use crate::{
     reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, SharedModule,
     StaticVec, AST, ERR,
@@ -252,7 +251,7 @@ impl Engine {
         let lib = &[AsRef::<SharedModule>::as_ref(ast).clone()];
 
         let mut no_this_ptr = Dynamic::NULL;
-        let mut this_ptr = this_ptr.unwrap_or(&mut no_this_ptr);
+        let this_ptr = this_ptr.unwrap_or(&mut no_this_ptr);
 
         let orig_scope_len = scope.len();
 
@@ -262,12 +261,12 @@ impl Engine {
             ast.resolver().cloned(),
         );
         #[cfg(not(feature = "no_module"))]
-        let global = &mut *RestoreOnDrop::lock(global, move |g| {
+        let global = &mut *crate::types::RestoreOnDrop::lock(global, move |g| {
             g.embedded_module_resolver = orig_embedded_module_resolver
         });
 
         let result = if eval_ast && !statements.is_empty() {
-            let r = self.eval_global_statements(global, caches, lib, 0, scope, statements);
+            let r = self.eval_global_statements(global, caches, lib, scope, statements);
 
             if rewind_scope {
                 scope.rewind(orig_scope_len);
@@ -278,22 +277,21 @@ impl Engine {
             Ok(Dynamic::UNIT)
         }
         .and_then(|_| {
-            let mut args: StaticVec<_> = arg_values.iter_mut().collect();
+            let args = &mut arg_values.iter_mut().collect::<StaticVec<_>>();
 
             // Check for data race.
             #[cfg(not(feature = "no_closure"))]
-            crate::func::ensure_no_data_race(name, &args, false).map(|_| Dynamic::UNIT)?;
+            crate::func::ensure_no_data_race(name, args, false).map(|_| Dynamic::UNIT)?;
 
             if let Some(fn_def) = ast.shared_lib().get_script_fn(name, args.len()) {
                 self.call_script_fn(
                     global,
                     caches,
                     lib,
-                    0,
                     scope,
-                    &mut this_ptr,
+                    this_ptr,
                     fn_def,
-                    &mut args,
+                    args,
                     rewind_scope,
                     Position::NONE,
                 )
@@ -306,7 +304,7 @@ impl Engine {
         if self.debugger.is_some() {
             global.debugger.status = crate::eval::DebuggerStatus::Terminate;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
-            self.run_debugger(global, caches, lib, 0, scope, &mut this_ptr, node)?;
+            self.run_debugger(global, caches, lib, scope, this_ptr, node)?;
         }
 
         Ok(result)

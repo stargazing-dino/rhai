@@ -38,6 +38,8 @@ pub struct GlobalRuntimeState {
     /// Number of modules loaded.
     #[cfg(not(feature = "no_module"))]
     pub num_modules_loaded: usize,
+    /// The current nesting level of function calls.
+    pub level: usize,
     /// Level of the current scope.
     ///
     /// The global (root) level is zero, a new block (or function call) is one level higher, and so on.
@@ -87,6 +89,7 @@ impl GlobalRuntimeState {
             #[cfg(not(feature = "no_module"))]
             num_modules_loaded: 0,
             scope_level: 0,
+            level: 0,
             always_search_scope: false,
             #[cfg(not(feature = "no_module"))]
             embedded_module_resolver: None,

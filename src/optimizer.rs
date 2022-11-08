@@ -148,7 +148,6 @@ impl<'a> OptimizerState<'a> {
                 &mut self.global,
                 &mut self.caches,
                 lib,
-                0,
                 fn_name,
                 op_token,
                 calc_fn_hash(None, fn_name, arg_values.len()),
@@ -1144,7 +1143,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                             #[cfg(feature = "no_function")]
                             let lib = &[][..];
 
-                            let context = (state.engine, x.name.as_str(), lib).into();
+                            let context = (state.engine, x.name.as_str(),None, &state.global, lib, *pos).into();
                             let (first, second) = arg_values.split_first_mut().unwrap();
                             (f)(context, &mut [ first, &mut second[0] ]).ok()
                         }) {

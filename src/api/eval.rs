@@ -3,7 +3,6 @@
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
-use crate::types::RestoreOnDrop;
 use crate::{
     Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
 };
@@ -189,7 +188,7 @@ impl Engine {
         let global = &mut GlobalRuntimeState::new(self);
         let caches = &mut Caches::new();
 
-        let result = self.eval_ast_with_scope_raw(global, caches, 0, scope, ast)?;
+        let result = self.eval_ast_with_scope_raw(global, caches, scope, ast)?;
 
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {
@@ -201,7 +200,7 @@ impl Engine {
             let mut this = Dynamic::NULL;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
 
-            self.run_debugger(global, caches, lib, 0, scope, &mut this, node)?;
+            self.run_debugger(global, caches, lib, scope, &mut this, node)?;
         }
 
         let typ = self.map_type_name(result.type_name());
@@ -217,7 +216,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        level: usize,
+
         scope: &mut Scope,
         ast: &'a AST,
     ) -> RhaiResult {
@@ -229,7 +228,7 @@ impl Engine {
             ast.resolver().cloned(),
         );
         #[cfg(not(feature = "no_module"))]
-        let global = &mut *RestoreOnDrop::lock(global, move |g| {
+        let global = &mut *crate::types::RestoreOnDrop::lock(global, move |g| {
             g.embedded_module_resolver = orig_embedded_module_resolver
         });
 
@@ -244,7 +243,7 @@ impl Engine {
             AsRef::<crate::SharedModule>::as_ref(ast).clone(),
         ];
 
-        self.eval_global_statements(global, caches, lib, level, scope, statements)
+        self.eval_global_statements(global, caches, lib, scope, statements)
     }
     /// _(internals)_ Evaluate a list of statements with no `this` pointer.
     /// Exported under the `internals` feature only.
@@ -261,11 +260,11 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[crate::SharedModule],
-        level: usize,
+
         scope: &mut Scope,
         statements: &[crate::ast::Stmt],
     ) -> RhaiResult {
-        self.eval_global_statements(global, caches, lib, level, scope, statements)
+        self.eval_global_statements(global, caches, lib, scope, statements)
     }
 }
 

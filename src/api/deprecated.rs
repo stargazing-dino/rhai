@@ -4,7 +4,7 @@ use crate::func::RegisterNativeFunction;
 use crate::types::dynamic::Variant;
 use crate::{
     Dynamic, Engine, EvalAltResult, FnPtr, Identifier, ImmutableString, NativeCallContext,
-    Position, RhaiResult, RhaiResultOf, Scope, AST,
+    Position, RhaiResult, RhaiResultOf, Scope, SharedModule, AST,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -354,6 +354,26 @@ impl Dynamic {
 }
 
 impl NativeCallContext<'_> {
+    /// Create a new [`NativeCallContext`].
+    ///
+    /// # Unimplemented
+    ///
+    /// This method is deprecated. It is no longer implemented and always panics.
+    ///
+    /// Use [`FnPtr::call`] to call a function pointer directly.
+    ///
+    /// This method will be removed in the next major version.
+    #[deprecated(
+        since = "1.3.0",
+        note = "use `FnPtr::call` to call a function pointer directly."
+    )]
+    #[inline(always)]
+    #[must_use]
+    #[allow(unused_variables)]
+    pub fn new(engine: &Engine, fn_name: &str, lib: &[SharedModule]) -> Self {
+        unimplemented!("`NativeCallContext::new` is deprecated");
+    }
+
     /// Call a function inside the call context.
     ///
     /// # Deprecated
