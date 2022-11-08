@@ -61,7 +61,7 @@ struct OptimizerState<'a> {
     caches: Caches,
     /// [Module][crate::Module] containing script-defined functions.
     #[cfg(not(feature = "no_function"))]
-    lib: &'a [crate::Shared<crate::Module>],
+    lib: &'a [crate::SharedModule],
     /// Optimization level.
     optimization_level: OptimizationLevel,
 }
@@ -71,7 +71,7 @@ impl<'a> OptimizerState<'a> {
     #[inline(always)]
     pub fn new(
         engine: &'a Engine,
-        #[cfg(not(feature = "no_function"))] lib: &'a [crate::Shared<crate::Module>],
+        #[cfg(not(feature = "no_function"))] lib: &'a [crate::SharedModule],
         optimization_level: OptimizationLevel,
     ) -> Self {
         Self {
@@ -1263,7 +1263,7 @@ fn optimize_top_level(
     statements: StmtBlockContainer,
     engine: &Engine,
     scope: &Scope,
-    #[cfg(not(feature = "no_function"))] lib: &[crate::Shared<crate::Module>],
+    #[cfg(not(feature = "no_function"))] lib: &[crate::SharedModule],
     optimization_level: OptimizationLevel,
 ) -> StmtBlockContainer {
     let mut statements = statements;

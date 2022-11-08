@@ -1,5 +1,5 @@
 use crate::{
-    Engine, Module, ModuleResolver, Position, RhaiResultOf, Shared, StaticVec, ERR,
+    Engine, ModuleResolver, Position, RhaiResultOf, SharedModule, StaticVec, ERR,
     STATIC_VEC_INLINE_SIZE,
 };
 #[cfg(feature = "no_std")]
@@ -138,7 +138,7 @@ impl ModuleResolver for ModuleResolversCollection {
         source_path: Option<&str>,
         path: &str,
         pos: Position,
-    ) -> RhaiResultOf<Shared<Module>> {
+    ) -> RhaiResultOf<SharedModule> {
         for resolver in &self.0 {
             match resolver.resolve(engine, source_path, path, pos) {
                 Ok(module) => return Ok(module),

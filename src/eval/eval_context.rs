@@ -1,7 +1,7 @@
 //! Evaluation context.
 
 use super::{Caches, GlobalRuntimeState};
-use crate::{Dynamic, Engine, Module, Scope, Shared};
+use crate::{Dynamic, Engine, Module, Scope, SharedModule};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -16,9 +16,9 @@ pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
     /// The current [`GlobalRuntimeState`].
     global: &'g mut GlobalRuntimeState,
     /// The current [caches][Caches], if available.
-    caches: Option<&'c mut Caches>,
+    caches: &'c mut Caches,
     /// The current stack of imported [modules][Module].
-    lib: &'a [Shared<Module>],
+    lib: &'a [SharedModule],
     /// The current bound `this` pointer, if any.
     this_ptr: &'t mut Option<&'pt mut Dynamic>,
     /// The current nesting level of function calls.
@@ -32,8 +32,8 @@ impl<'a, 's, 'ps, 'g, 'c, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
     pub fn new(
         engine: &'a Engine,
         global: &'g mut GlobalRuntimeState,
-        caches: Option<&'c mut Caches>,
-        lib: &'a [Shared<Module>],
+        caches: &'c mut Caches,
+        lib: &'a [SharedModule],
         level: usize,
         scope: &'s mut Scope<'ps>,
         this_ptr: &'t mut Option<&'pt mut Dynamic>,
@@ -117,7 +117,7 @@ impl<'a, 's, 'ps, 'g, 'c, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn namespaces(&self) -> &[Shared<Module>] {
+    pub const fn namespaces(&self) -> &[SharedModule] {
         self.lib
     }
     /// The current bound `this` pointer, if any.
@@ -173,17 +173,10 @@ impl<'a, 's, 'ps, 'g, 'c, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
     ) -> crate::RhaiResult {
         let expr: &crate::ast::Expr = expr;
 
-        let mut new_caches = Caches::new();
-
-        let caches = match self.caches.as_mut() {
-            Some(c) => c,
-            None => &mut new_caches,
-        };
-
         match expr {
             crate::ast::Expr::Stmt(statements) => self.engine.eval_stmt_block(
                 self.global,
-                caches,
+                self.caches,
                 self.lib,
                 self.level,
                 self.scope,
@@ -193,7 +186,7 @@ impl<'a, 's, 'ps, 'g, 'c, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'c, 't, 'pt> {
             ),
             _ => self.engine.eval_expr(
                 self.global,
-                caches,
+                self.caches,
                 self.lib,
                 self.level,
                 self.scope,

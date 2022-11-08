@@ -1,6 +1,6 @@
 //! Module containing all built-in _packages_ available to Rhai, plus facilities to define custom packages.
 
-use crate::{Engine, Module, Shared};
+use crate::{Engine, Module, SharedModule};
 
 pub(crate) mod arithmetic;
 pub(crate) mod array_basic;
@@ -99,7 +99,7 @@ pub trait Package {
 
     /// Get a reference to a shared module from this package.
     #[must_use]
-    fn as_shared_module(&self) -> Shared<Module>;
+    fn as_shared_module(&self) -> SharedModule;
 }
 
 /// Macro that makes it easy to define a _package_ (which is basically a shared [module][Module])

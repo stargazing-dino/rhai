@@ -8,10 +8,7 @@ use crate::ast::{
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::types::dynamic::{AccessMode, Union};
 use crate::types::RestoreOnDrop;
-use crate::{
-    Dynamic, Engine, ImmutableString, Module, Position, RhaiResult, RhaiResultOf, Scope, Shared,
-    ERR, INT,
-};
+use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, SharedModule, ERR, INT};
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -29,7 +26,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -42,7 +39,7 @@ impl Engine {
 
         // Restore scope at end of block if necessary
         let orig_scope_len = scope.len();
-        let scope = &mut *RestoreOnDrop::new_if(restore_orig_state, scope, move |s| {
+        let scope = &mut *RestoreOnDrop::lock_if(restore_orig_state, scope, move |s| {
             s.rewind(orig_scope_len);
         });
 
@@ -55,7 +52,7 @@ impl Engine {
             global.scope_level += 1;
         }
 
-        let global = &mut *RestoreOnDrop::new_if(restore_orig_state, global, move |g| {
+        let global = &mut *RestoreOnDrop::lock_if(restore_orig_state, global, move |g| {
             g.scope_level -= 1;
             #[cfg(not(feature = "no_module"))]
             g.truncate_imports(orig_imports_len);
@@ -67,7 +64,7 @@ impl Engine {
 
         // Pop new function resolution caches at end of block
         let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
-        let caches = &mut *RestoreOnDrop::new(caches, move |c| {
+        let caches = &mut *RestoreOnDrop::lock(caches, move |c| {
             c.rewind_fn_resolution_caches(orig_fn_resolution_caches_len)
         });
 
@@ -96,10 +93,11 @@ impl Engine {
                     .skip(imports_len)
                     .any(|(.., m)| m.contains_indexed_global_functions())
                 {
+                    // Different scenarios where the cache must be cleared - notice that this is
+                    // expensive as all function resolutions must start again
                     if caches.fn_resolution_caches_len() > orig_fn_resolution_caches_len {
                         // When new module is imported with global functions and there is already
-                        // a new cache, clear it - notice that this is expensive as all function
-                        // resolutions must start again
+                        // a new cache, just clear it
                         caches.fn_resolution_cache_mut().clear();
                     } else if restore_orig_state {
                         // When new module is imported with global functions, push a new cache
@@ -120,19 +118,17 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         op_info: &OpAssignment,
         target: &mut Target,
         root: (&str, Position),
-        new_val: Dynamic,
+        mut new_val: Dynamic,
     ) -> RhaiResultOf<()> {
+        // Assignment to constant variable?
         if target.is_read_only() {
-            // Assignment to constant variable
             return Err(ERR::ErrorAssignmentToConstant(root.0.to_string(), root.1).into());
         }
-
-        let mut new_val = new_val;
 
         if op_info.is_op_assignment() {
             let OpAssignment {
@@ -204,7 +200,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -215,7 +211,7 @@ impl Engine {
         let reset =
             self.run_debugger_with_reset(global, caches, lib, level, scope, this_ptr, stmt)?;
         #[cfg(feature = "debugging")]
-        let global = &mut *RestoreOnDrop::new(global, move |g| g.debugger.reset_status(reset));
+        let global = &mut *RestoreOnDrop::lock(global, move |g| g.debugger.reset_status(reset));
 
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
@@ -240,10 +236,8 @@ impl Engine {
                     .eval_expr(global, caches, lib, level, scope, this_ptr, rhs)?
                     .flatten();
 
-                let search_val =
+                let (mut lhs_ptr, pos) =
                     self.search_namespace(global, caches, lib, level, scope, this_ptr, lhs)?;
-
-                let (mut lhs_ptr, pos) = search_val;
 
                 let var_name = x.3.as_str();
 
@@ -267,16 +261,17 @@ impl Engine {
                 return self
                     .eval_op_assignment(global, caches, lib, level, op_info, lhs_ptr, root, rhs_val)
                     .map(|_| Dynamic::UNIT);
-            } else {
-                let (op_info, BinaryExpr { lhs, rhs }) = &**x;
+            }
 
+            #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+            {
                 let rhs_val = self.eval_expr(global, caches, lib, level, scope, this_ptr, rhs)?;
 
                 // Check if the result is a string. If so, intern it.
                 #[cfg(not(feature = "no_closure"))]
-                let is_string = !rhs_val.is_shared() && rhs_val.is::<ImmutableString>();
+                let is_string = !rhs_val.is_shared() && rhs_val.is::<crate::ImmutableString>();
                 #[cfg(feature = "no_closure")]
-                let is_string = rhs_val.is::<ImmutableString>();
+                let is_string = rhs_val.is::<crate::ImmutableString>();
 
                 let rhs_val = if is_string {
                     self.get_interned_string(
@@ -333,23 +328,20 @@ impl Engine {
                 let (expr, if_block, else_block) = &**x;
 
                 let guard_val = self
-                    .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
-                    .and_then(|v| {
-                        v.as_bool().map_err(|typ| {
-                            self.make_type_mismatch_err::<bool>(typ, expr.position())
-                        })
-                    });
+                    .eval_expr(global, caches, lib, level, scope, this_ptr, expr)?
+                    .as_bool()
+                    .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, expr.position()))?;
 
-                match guard_val {
-                    Ok(true) if if_block.is_empty() => Ok(Dynamic::UNIT),
-                    Ok(true) => self.eval_stmt_block(
+                if guard_val && !if_block.is_empty() {
+                    self.eval_stmt_block(
                         global, caches, lib, level, scope, this_ptr, if_block, true,
-                    ),
-                    Ok(false) if else_block.is_empty() => Ok(Dynamic::UNIT),
-                    Ok(false) => self.eval_stmt_block(
+                    )
+                } else if !guard_val && !else_block.is_empty() {
+                    self.eval_stmt_block(
                         global, caches, lib, level, scope, this_ptr, else_block, true,
-                    ),
-                    err => err.map(Into::into),
+                    )
+                } else {
+                    Ok(Dynamic::UNIT)
                 }
             }
 
@@ -421,14 +413,11 @@ impl Engine {
                     }
                 }
 
-                if let Some(expr) = result {
-                    self.eval_expr(global, caches, lib, level, scope, this_ptr, expr)
-                } else {
-                    def_case.as_ref().map_or(Ok(Dynamic::UNIT), |&index| {
-                        let def_expr = &expressions[index].expr;
-                        self.eval_expr(global, caches, lib, level, scope, this_ptr, def_expr)
+                result
+                    .or_else(|| def_case.as_ref().map(|&index| &expressions[index].expr))
+                    .map_or(Ok(Dynamic::UNIT), |expr| {
+                        self.eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                     })
-                }
             }
 
             // Loop
@@ -439,17 +428,16 @@ impl Engine {
                     loop {
                         self.track_operation(global, body.position())?;
                     }
-                } else {
-                    loop {
-                        match self.eval_stmt_block(
-                            global, caches, lib, level, scope, this_ptr, body, true,
-                        ) {
-                            Ok(_) => (),
-                            Err(err) => match *err {
-                                ERR::LoopBreak(false, ..) => (),
-                                ERR::LoopBreak(true, value, ..) => break Ok(value),
-                                _ => break Err(err),
-                            },
+                }
+
+                loop {
+                    if let Err(err) = self
+                        .eval_stmt_block(global, caches, lib, level, scope, this_ptr, body, true)
+                    {
+                        match *err {
+                            ERR::LoopBreak(false, ..) => (),
+                            ERR::LoopBreak(true, value, ..) => break Ok(value),
+                            _ => break Err(err),
                         }
                     }
                 }
@@ -469,15 +457,17 @@ impl Engine {
                         break Ok(Dynamic::UNIT);
                     }
 
-                    if !body.is_empty() {
-                        if let Err(err) = self.eval_stmt_block(
-                            global, caches, lib, level, scope, this_ptr, body, true,
-                        ) {
-                            match *err {
-                                ERR::LoopBreak(false, ..) => (),
-                                ERR::LoopBreak(true, value, ..) => break Ok(value),
-                                _ => break Err(err),
-                            }
+                    if body.is_empty() {
+                        continue;
+                    }
+
+                    if let Err(err) = self
+                        .eval_stmt_block(global, caches, lib, level, scope, this_ptr, body, true)
+                    {
+                        match *err {
+                            ERR::LoopBreak(false, ..) => (),
+                            ERR::LoopBreak(true, value, ..) => break Ok(value),
+                            _ => break Err(err),
                         }
                     }
                 }
@@ -544,7 +534,7 @@ impl Engine {
                 if let Some(func) = func {
                     // Restore scope at end of statement
                     let orig_scope_len = scope.len();
-                    let scope = &mut *RestoreOnDrop::new(scope, move |s| {
+                    let scope = &mut *RestoreOnDrop::lock(scope, move |s| {
                         s.rewind(orig_scope_len);
                     });
 
@@ -616,12 +606,13 @@ impl Engine {
             Stmt::BreakLoop(expr, options, pos) => {
                 let is_break = options.contains(ASTFlags::BREAK);
 
-                if let Some(ref expr) = expr {
-                    self.eval_expr(global, caches, lib, level, scope, this_ptr, expr)
-                        .and_then(|v| ERR::LoopBreak(is_break, v, *pos).into())
+                let value = if let Some(ref expr) = expr {
+                    self.eval_expr(global, caches, lib, level, scope, this_ptr, expr)?
                 } else {
-                    Err(ERR::LoopBreak(is_break, Dynamic::UNIT, *pos).into())
-                }
+                    Dynamic::UNIT
+                };
+
+                Err(ERR::LoopBreak(is_break, value, *pos).into())
             }
 
             // Try/Catch statement
@@ -638,9 +629,7 @@ impl Engine {
                 match self
                     .eval_stmt_block(global, caches, lib, level, scope, this_ptr, try_block, true)
                 {
-                    Ok(_) => self.eval_stmt_block(
-                        global, caches, lib, level, scope, this_ptr, try_block, true,
-                    ),
+                    r @ Ok(_) => r,
                     Err(err) if err.is_pseudo_error() => Err(err),
                     Err(err) if !err.is_catchable() => Err(err),
                     Err(mut err) => {
@@ -682,7 +671,7 @@ impl Engine {
                         // Restore scope at end of block
                         let orig_scope_len = scope.len();
                         let scope =
-                            &mut *RestoreOnDrop::new_if(!catch_var.is_empty(), scope, move |s| {
+                            &mut *RestoreOnDrop::lock_if(!catch_var.is_empty(), scope, move |s| {
                                 s.rewind(orig_scope_len);
                             });
 
@@ -757,7 +746,8 @@ impl Engine {
                         nesting_level,
                         will_shadow,
                     };
-                    let context = EvalContext::new(self, global, None, lib, level, scope, this_ptr);
+                    let context =
+                        EvalContext::new(self, global, caches, lib, level, scope, this_ptr);
 
                     if !filter(true, info, context)? {
                         return Err(ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into());
@@ -917,7 +907,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         statements: &[Stmt],

@@ -11,8 +11,8 @@ use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token};
 use crate::types::RestoreOnDrop;
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString, Module,
-    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString, SharedModule,
+    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, ERR,
 };
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
@@ -169,7 +169,7 @@ impl Engine {
         _global: &GlobalRuntimeState,
         caches: &'s mut Caches,
         local_entry: &'s mut Option<FnResolutionCacheEntry>,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         op_token: Option<&Token>,
         hash_base: u64,
         args: Option<&mut FnCallArgs>,
@@ -325,7 +325,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         name: &str,
         op_token: Option<&Token>,
@@ -371,7 +371,7 @@ impl Engine {
             }
 
             let args =
-                &mut *RestoreOnDrop::new_if(swap, &mut args, move |a| backup.restore_first_arg(a));
+                &mut *RestoreOnDrop::lock_if(swap, &mut args, move |a| backup.restore_first_arg(a));
 
             #[cfg(feature = "debugging")]
             if self.debugger.is_some() {
@@ -537,7 +537,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         _scope: Option<&mut Scope>,
         fn_name: &str,
@@ -585,7 +585,7 @@ impl Engine {
                         } else {
                             let hash_script =
                                 calc_fn_hash(None, fn_name.as_str(), num_params as usize);
-                            self.has_script_fn(Some(global), caches, lib, hash_script)
+                            self.has_script_fn(global, caches, lib, hash_script)
                         }
                         .into(),
                         false,
@@ -639,7 +639,7 @@ impl Engine {
                 };
 
                 let orig_source = mem::replace(&mut global.source, source.clone());
-                let global = &mut *RestoreOnDrop::new(global, move |g| g.source = orig_source);
+                let global = &mut *RestoreOnDrop::lock(global, move |g| g.source = orig_source);
 
                 return if _is_method_call {
                     // Method call of script function - map first argument to `this`
@@ -668,7 +668,7 @@ impl Engine {
                         backup.change_first_arg_to_copy(args);
                     }
 
-                    let args = &mut *RestoreOnDrop::new_if(swap, &mut args, move |a| {
+                    let args = &mut *RestoreOnDrop::lock_if(swap, &mut args, move |a| {
                         backup.restore_first_arg(a)
                     });
 
@@ -694,7 +694,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -716,7 +716,7 @@ impl Engine {
             matches!(status, crate::eval::DebuggerStatus::FunctionExit(..))
         });
         #[cfg(feature = "debugging")]
-        let global = &mut *RestoreOnDrop::new(global, move |g| g.debugger.reset_status(reset));
+        let global = &mut *RestoreOnDrop::lock(global, move |g| g.debugger.reset_status(reset));
 
         self.eval_expr(global, caches, lib, level, scope, this_ptr, arg_expr)
             .map(|r| (r, arg_expr.start_position()))
@@ -728,7 +728,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         fn_name: &str,
         mut hash: FnCallHashes,
@@ -953,7 +953,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -1087,7 +1087,7 @@ impl Engine {
                     false
                 } else {
                     let hash_script = calc_fn_hash(None, &fn_name, num_params as usize);
-                    self.has_script_fn(Some(global), caches, lib, hash_script)
+                    self.has_script_fn(global, caches, lib, hash_script)
                 }
                 .into());
             }
@@ -1244,7 +1244,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -1378,7 +1378,7 @@ impl Engine {
                 let new_scope = &mut Scope::new();
 
                 let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
-                let global = &mut *RestoreOnDrop::new(global, move |g| g.source = orig_source);
+                let global = &mut *RestoreOnDrop::lock(global, move |g| g.source = orig_source);
 
                 self.call_script_fn(
                     global, caches, lib, level, new_scope, &mut None, fn_def, &mut args, true, pos,
@@ -1426,7 +1426,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         script: &str,
@@ -1471,7 +1471,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,

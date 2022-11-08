@@ -6,7 +6,7 @@ use crate::ast::{ASTFlags, Expr, OpAssignment};
 use crate::types::dynamic::Union;
 use crate::types::RestoreOnDrop;
 use crate::{
-    Dynamic, Engine, FnArgsVec, Module, Position, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
+    Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, SharedModule, ERR,
 };
 use std::hash::Hash;
 #[cfg(feature = "no_std")]
@@ -43,7 +43,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         this_ptr: &mut Option<&mut Dynamic>,
         target: &mut Target,
@@ -205,7 +205,7 @@ impl Engine {
                             global, caches, lib, level, scope, this_ptr, rhs,
                         )?;
                         #[cfg(feature = "debugging")]
-                        let global = &mut *RestoreOnDrop::new(global, move |g| {
+                        let global = &mut *RestoreOnDrop::lock(global, move |g| {
                             g.debugger.reset_status(reset)
                         });
 
@@ -216,7 +216,7 @@ impl Engine {
                         // Truncate the index values upon exit
                         let offset = idx_values.len() - args.len();
                         let idx_values =
-                            &mut *RestoreOnDrop::new(idx_values, move |v| v.truncate(offset));
+                            &mut *RestoreOnDrop::lock(idx_values, move |v| v.truncate(offset));
 
                         let call_args = &mut idx_values[offset..];
                         let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
@@ -384,7 +384,7 @@ impl Engine {
                                     global, caches, lib, level, scope, this_ptr, _node,
                                 )?;
                                 #[cfg(feature = "debugging")]
-                                let global = &mut *RestoreOnDrop::new(global, move |g| {
+                                let global = &mut *RestoreOnDrop::lock(global, move |g| {
                                     g.debugger.reset_status(reset)
                                 });
 
@@ -394,7 +394,7 @@ impl Engine {
 
                                 // Truncate the index values upon exit
                                 let offset = idx_values.len() - args.len();
-                                let idx_values = &mut *RestoreOnDrop::new(idx_values, move |v| {
+                                let idx_values = &mut *RestoreOnDrop::lock(idx_values, move |v| {
                                     v.truncate(offset)
                                 });
 
@@ -516,7 +516,7 @@ impl Engine {
                                         global, caches, lib, level, scope, this_ptr, _node,
                                     )?;
                                     #[cfg(feature = "debugging")]
-                                    let global = &mut *RestoreOnDrop::new(global, move |g| {
+                                    let global = &mut *RestoreOnDrop::lock(global, move |g| {
                                         g.debugger.reset_status(reset)
                                     });
 
@@ -527,7 +527,7 @@ impl Engine {
                                     // Truncate the index values upon exit
                                     let offset = idx_values.len() - args.len();
                                     let idx_values =
-                                        &mut *RestoreOnDrop::new(idx_values, move |v| {
+                                        &mut *RestoreOnDrop::lock(idx_values, move |v| {
                                             v.truncate(offset)
                                         });
 
@@ -570,7 +570,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -661,7 +661,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -773,7 +773,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         target: &mut Dynamic,
         idx: &mut Dynamic,
@@ -796,7 +796,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         target: &mut Dynamic,
         idx: &mut Dynamic,
@@ -820,7 +820,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         target: &'t mut Dynamic,
         idx: &mut Dynamic,

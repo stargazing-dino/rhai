@@ -8,7 +8,7 @@ use crate::ast::{
     SwitchCasesCollection, TryCatchBlock,
 };
 use crate::engine::{Precedence, KEYWORD_THIS, OP_CONTAINS};
-use crate::eval::GlobalRuntimeState;
+use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::tokenizer::{
     is_keyword_function, is_valid_function_name, is_valid_identifier, Token, TokenStream,
@@ -2906,15 +2906,17 @@ impl Engine {
                 nesting_level: level,
                 will_shadow,
             };
-            let mut this_ptr = None;
+            let caches = &mut Caches::new();
+            let this_ptr = &mut None;
+
             let context = EvalContext::new(
                 self,
                 &mut state.global,
-                None,
+                caches,
                 &[],
                 level,
                 &mut state.stack,
-                &mut this_ptr,
+                this_ptr,
             );
 
             match filter(false, info, context) {

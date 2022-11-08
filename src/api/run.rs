@@ -2,7 +2,7 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
-use crate::{Engine, RhaiResultOf, Scope, AST};
+use crate::{Engine, RhaiResultOf, Scope, SharedModule, AST};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -122,9 +122,9 @@ impl Engine {
 
         let statements = ast.statements();
         if !statements.is_empty() {
-            let lib: &[crate::Shared<crate::Module>] = &[
+            let lib: &[SharedModule] = &[
                 #[cfg(not(feature = "no_function"))]
-                AsRef::<crate::Shared<crate::Module>>::as_ref(ast).clone(),
+                AsRef::<SharedModule>::as_ref(ast).clone(),
             ];
             let lib = if lib.first().map_or(true, |m| m.is_empty()) {
                 &[][..]
@@ -139,7 +139,7 @@ impl Engine {
             global.debugger.status = crate::eval::DebuggerStatus::Terminate;
             let lib = &[
                 #[cfg(not(feature = "no_function"))]
-                AsRef::<crate::Shared<_>>::as_ref(ast).clone(),
+                AsRef::<crate::SharedModule>::as_ref(ast).clone(),
             ];
             let node = &crate::ast::Stmt::Noop(crate::Position::NONE);
             self.run_debugger(global, caches, lib, 0, scope, &mut None, node)?;

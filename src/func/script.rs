@@ -4,7 +4,7 @@
 use super::call::FnCallArgs;
 use crate::ast::ScriptFnDef;
 use crate::eval::{Caches, GlobalRuntimeState};
-use crate::{Dynamic, Engine, Module, Position, RhaiError, RhaiResult, Scope, Shared, ERR};
+use crate::{Dynamic, Engine, Position, RhaiError, RhaiResult, Scope, SharedModule, ERR};
 use std::mem;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -26,7 +26,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -228,9 +228,9 @@ impl Engine {
     #[must_use]
     pub(crate) fn has_script_fn(
         &self,
-        _global: Option<&GlobalRuntimeState>,
+        _global: &GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         hash_script: u64,
     ) -> bool {
         let cache = caches.fn_resolution_cache_mut();
@@ -247,7 +247,7 @@ impl Engine {
         #[cfg(not(feature = "no_module"))]
         let result = result ||
             // Then check imported modules
-            _global.map_or(false, |m| m.contains_qualified_fn(hash_script))
+            _global.contains_qualified_fn(hash_script)
             // Then check sub-modules
             || self.global_sub_modules.values().any(|m| m.contains_qualified_fn(hash_script));
 

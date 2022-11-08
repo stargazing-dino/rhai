@@ -4,7 +4,7 @@ use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
     Dynamic, Engine, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError, RhaiResult,
-    RhaiResultOf, StaticVec, AST, ERR,
+    RhaiResultOf, SharedModule, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -150,9 +150,9 @@ impl FnPtr {
         let mut arg_values = crate::StaticVec::new_const();
         args.parse(&mut arg_values);
 
-        let lib: &[crate::Shared<crate::Module>] = &[
+        let lib: &[SharedModule] = &[
             #[cfg(not(feature = "no_function"))]
-            AsRef::<crate::Shared<crate::Module>>::as_ref(ast).clone(),
+            AsRef::<SharedModule>::as_ref(ast).clone(),
         ];
         let lib = if lib.first().map_or(true, |m| m.is_empty()) {
             &[][..]

@@ -12,18 +12,26 @@ pub struct RestoreOnDrop<'a, T, R: FnOnce(&mut T)> {
 }
 
 impl<'a, T, R: FnOnce(&mut T)> RestoreOnDrop<'a, T, R> {
-    /// Create a new [`RestoreOnDrop`] that runs restoration logic at the end of scope only when
-    /// `need_restore` is `true`.
+    /// Create a new [`RestoreOnDrop`] that locks a mutable reference and runs restoration logic at
+    /// the end of scope only when `need_restore` is `true`.
+    ///
+    /// Beware that the end of scope means the end of its lifetime, not necessarily waiting until
+    /// the current block scope is exited.
     #[inline(always)]
-    pub fn new_if(need_restore: bool, value: &'a mut T, restore: R) -> Self {
+    pub fn lock_if(need_restore: bool, value: &'a mut T, restore: R) -> Self {
         Self {
             value,
             restore: if need_restore { Some(restore) } else { None },
         }
     }
-    /// Create a new [`RestoreOnDrop`] that runs restoration logic at the end of scope.
+
+    /// Create a new [`RestoreOnDrop`] that locks a mutable reference and runs restoration logic at
+    /// the end of scope.
+    ///
+    /// Beware that the end of scope means the end of its lifetime, not necessarily waiting until
+    /// the current block scope is exited.
     #[inline(always)]
-    pub fn new(value: &'a mut T, restore: R) -> Self {
+    pub fn lock(value: &'a mut T, restore: R) -> Self {
         Self {
             value,
             restore: Some(restore),

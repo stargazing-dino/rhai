@@ -240,6 +240,9 @@ pub use func::Locked;
 
 use func::{calc_fn_hash, calc_fn_hash_full, calc_var_hash};
 
+/// A shared [`Module`].
+type SharedModule = Shared<Module>;
+
 pub use rhai_codegen::*;
 
 pub use func::{plugin, FuncArgs};

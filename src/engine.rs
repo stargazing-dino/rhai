@@ -9,7 +9,8 @@ use crate::packages::{Package, StandardPackage};
 use crate::tokenizer::Token;
 use crate::types::StringsInterner;
 use crate::{
-    Dynamic, Identifier, ImmutableString, Locked, Module, OptimizationLevel, Shared, StaticVec,
+    Dynamic, Identifier, ImmutableString, Locked, Module, OptimizationLevel, SharedModule,
+    StaticVec,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -91,10 +92,10 @@ pub const OP_INCLUSIVE_RANGE: &str = Token::InclusiveRange.literal_syntax();
 /// ```
 pub struct Engine {
     /// A collection of all modules loaded into the global namespace of the Engine.
-    pub(crate) global_modules: StaticVec<Shared<Module>>,
+    pub(crate) global_modules: StaticVec<SharedModule>,
     /// A collection of all sub-modules directly loaded into the Engine.
     #[cfg(not(feature = "no_module"))]
-    pub(crate) global_sub_modules: std::collections::BTreeMap<Identifier, Shared<Module>>,
+    pub(crate) global_sub_modules: std::collections::BTreeMap<Identifier, SharedModule>,
 
     /// A module resolution service.
     #[cfg(not(feature = "no_module"))]

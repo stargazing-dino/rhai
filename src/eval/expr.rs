@@ -4,8 +4,7 @@ use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::ast::{Expr, OpAssignment};
 use crate::engine::{KEYWORD_THIS, OP_CONCAT};
 use crate::types::dynamic::AccessMode;
-use crate::types::RestoreOnDrop;
-use crate::{Dynamic, Engine, Module, Position, RhaiResult, RhaiResultOf, Scope, Shared, ERR};
+use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, SharedModule, ERR};
 use std::num::NonZeroUsize;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -19,7 +18,7 @@ impl Engine {
         &self,
         global: &GlobalRuntimeState,
         namespace: &crate::ast::Namespace,
-    ) -> Option<Shared<Module>> {
+    ) -> Option<SharedModule> {
         assert!(!namespace.is_empty());
 
         let root = namespace.root();
@@ -52,7 +51,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &'s mut Scope,
         this_ptr: &'s mut Option<&mut Dynamic>,
@@ -138,7 +137,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &'s mut Scope,
         this_ptr: &'s mut Option<&mut Dynamic>,
@@ -174,7 +173,7 @@ impl Engine {
 
         // Check the variable resolver, if any
         if let Some(ref resolve_var) = self.resolve_var {
-            let context = EvalContext::new(self, global, Some(caches), lib, level, scope, this_ptr);
+            let context = EvalContext::new(self, global, caches, lib, level, scope, this_ptr);
             let var_name = expr.get_variable_name(true).expect("`Expr::Variable`");
             match resolve_var(var_name, index, context) {
                 Ok(Some(mut result)) => {
@@ -222,7 +221,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[Shared<Module>],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
         this_ptr: &mut Option<&mut Dynamic>,
@@ -238,7 +237,9 @@ impl Engine {
             let reset =
                 self.run_debugger_with_reset(global, caches, lib, level, scope, this_ptr, expr)?;
             #[cfg(feature = "debugging")]
-            let global = &mut *RestoreOnDrop::new(global, move |g| g.debugger.reset_status(reset));
+            let global = &mut *crate::types::RestoreOnDrop::lock(global, move |g| {
+                g.debugger.reset_status(reset)
+            });
 
             self.track_operation(global, expr.position())?;
 
@@ -269,7 +270,9 @@ impl Engine {
         let reset =
             self.run_debugger_with_reset(global, caches, lib, level, scope, this_ptr, expr)?;
         #[cfg(feature = "debugging")]
-        let global = &mut *RestoreOnDrop::new(global, move |g| g.debugger.reset_status(reset));
+        let global = &mut *crate::types::RestoreOnDrop::lock(global, move |g| {
+            g.debugger.reset_status(reset)
+        });
 
         self.track_operation(global, expr.position())?;
 
@@ -418,7 +421,7 @@ impl Engine {
                     ))
                 })?;
                 let mut context =
-                    EvalContext::new(self, global, Some(caches), lib, level, scope, this_ptr);
+                    EvalContext::new(self, global, caches, lib, level, scope, this_ptr);
 
                 let result = (custom_def.func)(&mut context, &expressions, &custom.state);
 

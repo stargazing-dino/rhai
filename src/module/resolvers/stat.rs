@@ -1,5 +1,6 @@
 use crate::{
-    Engine, Identifier, Module, ModuleResolver, Position, RhaiResultOf, Shared, SmartString, ERR,
+    Engine, Identifier, Module, ModuleResolver, Position, RhaiResultOf, SharedModule, SmartString,
+    ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -27,7 +28,7 @@ use std::{
 /// engine.set_module_resolver(resolver);
 /// ```
 #[derive(Debug, Clone, Default)]
-pub struct StaticModuleResolver(BTreeMap<Identifier, Shared<Module>>);
+pub struct StaticModuleResolver(BTreeMap<Identifier, SharedModule>);
 
 impl StaticModuleResolver {
     /// Create a new [`StaticModuleResolver`].
@@ -65,7 +66,7 @@ impl StaticModuleResolver {
     }
     /// Remove a [module][Module] given its path.
     #[inline(always)]
-    pub fn remove(&mut self, path: &str) -> Option<Shared<Module>> {
+    pub fn remove(&mut self, path: &str) -> Option<SharedModule> {
         self.0.remove(path)
     }
     /// Does the path exist?
@@ -80,12 +81,12 @@ impl StaticModuleResolver {
     }
     /// Get an iterator of all the [modules][Module].
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &Shared<Module>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &SharedModule)> {
         self.0.iter().map(|(k, v)| (k.as_str(), v))
     }
     /// Get a mutable iterator of all the [modules][Module].
     #[inline]
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&str, &mut Shared<Module>)> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&str, &mut SharedModule)> {
         self.0.iter_mut().map(|(k, v)| (k.as_str(), v))
     }
     /// Get an iterator of all the [module][Module] paths.
@@ -95,7 +96,7 @@ impl StaticModuleResolver {
     }
     /// Get an iterator of all the [modules][Module].
     #[inline(always)]
-    pub fn values(&self) -> impl Iterator<Item = &Shared<Module>> {
+    pub fn values(&self) -> impl Iterator<Item = &SharedModule> {
         self.0.values()
     }
     /// Remove all [modules][Module].
@@ -130,8 +131,8 @@ impl StaticModuleResolver {
 }
 
 impl IntoIterator for StaticModuleResolver {
-    type Item = (Identifier, Shared<Module>);
-    type IntoIter = IntoIter<SmartString, Shared<Module>>;
+    type Item = (Identifier, SharedModule);
+    type IntoIter = IntoIter<SmartString, SharedModule>;
 
     #[inline(always)]
     #[must_use]
@@ -141,8 +142,8 @@ impl IntoIterator for StaticModuleResolver {
 }
 
 impl<'a> IntoIterator for &'a StaticModuleResolver {
-    type Item = (&'a Identifier, &'a Shared<Module>);
-    type IntoIter = Iter<'a, SmartString, Shared<Module>>;
+    type Item = (&'a Identifier, &'a SharedModule);
+    type IntoIter = Iter<'a, SmartString, SharedModule>;
 
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
@@ -158,7 +159,7 @@ impl ModuleResolver for StaticModuleResolver {
         _: Option<&str>,
         path: &str,
         pos: Position,
-    ) -> RhaiResultOf<Shared<Module>> {
+    ) -> RhaiResultOf<SharedModule> {
         self.0
             .get(path)
             .cloned()

@@ -196,7 +196,7 @@ impl Engine {
             global.debugger.status = crate::eval::DebuggerStatus::Terminate;
             let lib = &[
                 #[cfg(not(feature = "no_function"))]
-                AsRef::<crate::Shared<_>>::as_ref(ast).clone(),
+                AsRef::<crate::SharedModule>::as_ref(ast).clone(),
             ];
             let node = &crate::ast::Stmt::Noop(Position::NONE);
             self.run_debugger(global, caches, lib, 0, scope, &mut None, node)?;
@@ -227,7 +227,7 @@ impl Engine {
             ast.resolver().cloned(),
         );
         #[cfg(not(feature = "no_module"))]
-        let global = &mut *RestoreOnDrop::new(global, move |g| {
+        let global = &mut *RestoreOnDrop::lock(global, move |g| {
             g.embedded_module_resolver = orig_embedded_module_resolver
         });
 
@@ -239,7 +239,7 @@ impl Engine {
 
         let lib = &[
             #[cfg(not(feature = "no_function"))]
-            AsRef::<crate::Shared<_>>::as_ref(ast).clone(),
+            AsRef::<crate::SharedModule>::as_ref(ast).clone(),
         ];
 
         self.eval_global_statements(global, caches, lib, level, scope, statements)
@@ -258,7 +258,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[crate::Shared<crate::Module>],
+        lib: &[crate::SharedModule],
         level: usize,
         scope: &mut Scope,
         statements: &[crate::ast::Stmt],

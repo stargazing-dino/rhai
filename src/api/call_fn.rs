@@ -5,8 +5,8 @@ use crate::eval::{Caches, GlobalRuntimeState};
 use crate::types::dynamic::Variant;
 use crate::types::RestoreOnDrop;
 use crate::{
-    reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, Shared, StaticVec,
-    AST, ERR,
+    reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, SharedModule,
+    StaticVec, AST, ERR,
 };
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
@@ -249,7 +249,7 @@ impl Engine {
         arg_values: &mut [Dynamic],
     ) -> RhaiResult {
         let statements = ast.statements();
-        let lib = &[AsRef::<Shared<_>>::as_ref(ast).clone()];
+        let lib = &[AsRef::<SharedModule>::as_ref(ast).clone()];
         let mut this_ptr = this_ptr;
 
         let orig_scope_len = scope.len();
@@ -260,7 +260,7 @@ impl Engine {
             ast.resolver().cloned(),
         );
         #[cfg(not(feature = "no_module"))]
-        let global = &mut *RestoreOnDrop::new(global, move |g| {
+        let global = &mut *RestoreOnDrop::lock(global, move |g| {
             g.embedded_module_resolver = orig_embedded_module_resolver
         });
 

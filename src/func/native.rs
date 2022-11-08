@@ -8,7 +8,7 @@ use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Module, Position, RhaiResult,
-    RhaiResultOf, StaticVec, VarDefInfo, ERR,
+    RhaiResultOf, SharedModule, StaticVec, VarDefInfo, ERR,
 };
 use std::any::type_name;
 #[cfg(feature = "no_std")]
@@ -74,7 +74,7 @@ pub struct NativeCallContext<'a> {
     /// The current [`GlobalRuntimeState`], if any.
     global: Option<&'a GlobalRuntimeState>,
     /// The current stack of loaded [modules][Module].
-    lib: &'a [Shared<Module>],
+    lib: &'a [SharedModule],
     /// [Position] of the function call.
     pos: Position,
     /// The current nesting level of function calls.
@@ -93,7 +93,7 @@ pub struct NativeCallContextStore {
     /// The current [`GlobalRuntimeState`], if any.
     pub global: GlobalRuntimeState,
     /// The current stack of loaded [modules][Module].
-    pub lib: StaticVec<Shared<Module>>,
+    pub lib: StaticVec<SharedModule>,
     /// [Position] of the function call.
     pub pos: Position,
     /// The current nesting level of function calls.
@@ -116,7 +116,7 @@ impl<'a>
         &'a str,
         Option<&'a str>,
         &'a GlobalRuntimeState,
-        &'a [Shared<Module>],
+        &'a [SharedModule],
         Position,
         usize,
     )> for NativeCallContext<'a>
@@ -128,7 +128,7 @@ impl<'a>
             &'a str,
             Option<&'a str>,
             &'a GlobalRuntimeState,
-            &'a [Shared<Module>],
+            &'a [SharedModule],
             Position,
             usize,
         ),
@@ -145,9 +145,9 @@ impl<'a>
     }
 }
 
-impl<'a> From<(&'a Engine, &'a str, &'a [Shared<Module>])> for NativeCallContext<'a> {
+impl<'a> From<(&'a Engine, &'a str, &'a [SharedModule])> for NativeCallContext<'a> {
     #[inline(always)]
-    fn from(value: (&'a Engine, &'a str, &'a [Shared<Module>])) -> Self {
+    fn from(value: (&'a Engine, &'a str, &'a [SharedModule])) -> Self {
         Self {
             engine: value.0,
             fn_name: value.1,
@@ -169,7 +169,7 @@ impl<'a> NativeCallContext<'a> {
     )]
     #[inline(always)]
     #[must_use]
-    pub fn new(engine: &'a Engine, fn_name: &'a str, lib: &'a [Shared<Module>]) -> Self {
+    pub fn new(engine: &'a Engine, fn_name: &'a str, lib: &'a [SharedModule]) -> Self {
         Self {
             engine,
             fn_name,
@@ -193,7 +193,7 @@ impl<'a> NativeCallContext<'a> {
         fn_name: &'a str,
         source: Option<&'a str>,
         global: &'a GlobalRuntimeState,
-        lib: &'a [Shared<Module>],
+        lib: &'a [SharedModule],
         pos: Position,
         level: usize,
     ) -> Self {
@@ -291,7 +291,7 @@ impl<'a> NativeCallContext<'a> {
     #[inline]
     pub(crate) fn iter_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&crate::ImmutableString, &Shared<Module>)> {
+    ) -> impl Iterator<Item = (&crate::ImmutableString, &SharedModule)> {
         self.global.iter().flat_map(|&g| g.iter_imports_raw())
     }
     /// _(internals)_ The current [`GlobalRuntimeState`], if any.
@@ -315,7 +315,7 @@ impl<'a> NativeCallContext<'a> {
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn namespaces(&self) -> &[Shared<Module>] {
+    pub const fn namespaces(&self) -> &[SharedModule] {
         self.lib
     }
     /// Call a function inside the call context with the provided arguments.
