@@ -4,6 +4,7 @@ use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::ast::{Expr, OpAssignment};
 use crate::engine::{KEYWORD_THIS, OP_CONCAT};
 use crate::types::dynamic::AccessMode;
+use crate::types::RestoreOnDrop;
 use crate::{Dynamic, Engine, Module, Position, RhaiResult, RhaiResultOf, Scope, Shared, ERR};
 use std::num::NonZeroUsize;
 #[cfg(feature = "no_std")]
@@ -234,18 +235,14 @@ impl Engine {
         // binary operators are also function calls.
         if let Expr::FnCall(x, pos) = expr {
             #[cfg(feature = "debugging")]
-            let reset_debugger =
+            let reset =
                 self.run_debugger_with_reset(global, caches, lib, level, scope, this_ptr, expr)?;
+            #[cfg(feature = "debugging")]
+            let global = &mut *RestoreOnDrop::new(global, move |g| g.debugger.reset_status(reset));
 
             self.track_operation(global, expr.position())?;
 
-            let result =
-                self.eval_fn_call_expr(global, caches, lib, level, scope, this_ptr, x, *pos);
-
-            #[cfg(feature = "debugging")]
-            global.debugger.reset_status(reset_debugger);
-
-            return result;
+            return self.eval_fn_call_expr(global, caches, lib, level, scope, this_ptr, x, *pos);
         }
 
         // Then variable access.
@@ -269,12 +266,14 @@ impl Engine {
         }
 
         #[cfg(feature = "debugging")]
-        let reset_debugger =
+        let reset =
             self.run_debugger_with_reset(global, caches, lib, level, scope, this_ptr, expr)?;
+        #[cfg(feature = "debugging")]
+        let global = &mut *RestoreOnDrop::new(global, move |g| g.debugger.reset_status(reset));
 
         self.track_operation(global, expr.position())?;
 
-        let result = match expr {
+        match expr {
             // Constants
             Expr::DynamicConstant(x, ..) => Ok(x.as_ref().clone()),
             Expr::IntegerConstant(x, ..) => Ok((*x).into()),
@@ -374,60 +373,33 @@ impl Engine {
                     .map(Into::into)
             }
 
-            Expr::And(x, ..) => {
-                let lhs = self
-                    .eval_expr(global, caches, lib, level, scope, this_ptr, &x.lhs)
-                    .and_then(|v| {
-                        v.as_bool().map_err(|typ| {
-                            self.make_type_mismatch_err::<bool>(typ, x.lhs.position())
-                        })
-                    });
+            Expr::And(x, ..) => Ok((self
+                .eval_expr(global, caches, lib, level, scope, this_ptr, &x.lhs)?
+                .as_bool()
+                .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, x.lhs.position()))?
+                && self
+                    .eval_expr(global, caches, lib, level, scope, this_ptr, &x.rhs)?
+                    .as_bool()
+                    .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, x.rhs.position()))?)
+            .into()),
 
-                match lhs {
-                    Ok(true) => self
-                        .eval_expr(global, caches, lib, level, scope, this_ptr, &x.rhs)
-                        .and_then(|v| {
-                            v.as_bool()
-                                .map_err(|typ| {
-                                    self.make_type_mismatch_err::<bool>(typ, x.rhs.position())
-                                })
-                                .map(Into::into)
-                        }),
-                    _ => lhs.map(Into::into),
-                }
-            }
-
-            Expr::Or(x, ..) => {
-                let lhs = self
-                    .eval_expr(global, caches, lib, level, scope, this_ptr, &x.lhs)
-                    .and_then(|v| {
-                        v.as_bool().map_err(|typ| {
-                            self.make_type_mismatch_err::<bool>(typ, x.lhs.position())
-                        })
-                    });
-
-                match lhs {
-                    Ok(false) => self
-                        .eval_expr(global, caches, lib, level, scope, this_ptr, &x.rhs)
-                        .and_then(|v| {
-                            v.as_bool()
-                                .map_err(|typ| {
-                                    self.make_type_mismatch_err::<bool>(typ, x.rhs.position())
-                                })
-                                .map(Into::into)
-                        }),
-                    _ => lhs.map(Into::into),
-                }
-            }
+            Expr::Or(x, ..) => Ok((self
+                .eval_expr(global, caches, lib, level, scope, this_ptr, &x.lhs)?
+                .as_bool()
+                .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, x.lhs.position()))?
+                || self
+                    .eval_expr(global, caches, lib, level, scope, this_ptr, &x.rhs)?
+                    .as_bool()
+                    .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, x.rhs.position()))?)
+            .into()),
 
             Expr::Coalesce(x, ..) => {
-                let lhs = self.eval_expr(global, caches, lib, level, scope, this_ptr, &x.lhs);
+                let value = self.eval_expr(global, caches, lib, level, scope, this_ptr, &x.lhs)?;
 
-                match lhs {
-                    Ok(value) if value.is::<()>() => {
-                        self.eval_expr(global, caches, lib, level, scope, this_ptr, &x.rhs)
-                    }
-                    _ => lhs,
+                if value.is::<()>() {
+                    self.eval_expr(global, caches, lib, level, scope, this_ptr, &x.rhs)
+                } else {
+                    Ok(value)
                 }
             }
 
@@ -467,11 +439,6 @@ impl Engine {
                 .eval_dot_index_chain(global, caches, lib, level, scope, this_ptr, expr, &mut None),
 
             _ => unreachable!("expression cannot be evaluated: {:?}", expr),
-        };
-
-        #[cfg(feature = "debugging")]
-        global.debugger.reset_status(reset_debugger);
-
-        result
+        }
     }
 }

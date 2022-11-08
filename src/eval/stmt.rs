@@ -7,6 +7,7 @@ use crate::ast::{
 };
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::types::dynamic::{AccessMode, Union};
+use crate::types::RestoreOnDrop;
 use crate::{
     Dynamic, Engine, ImmutableString, Module, Position, RhaiResult, RhaiResultOf, Scope, Shared,
     ERR, INT,
@@ -39,17 +40,39 @@ impl Engine {
             return Ok(Dynamic::UNIT);
         }
 
-        let orig_always_search_scope = global.always_search_scope;
+        // Restore scope at end of block if necessary
         let orig_scope_len = scope.len();
+        let scope = &mut *RestoreOnDrop::new_if(restore_orig_state, scope, move |s| {
+            s.rewind(orig_scope_len);
+        });
+
+        // Restore global state at end of block if necessary
+        let orig_always_search_scope = global.always_search_scope;
         #[cfg(not(feature = "no_module"))]
         let orig_imports_len = global.num_imports();
-        let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
 
         if restore_orig_state {
             global.scope_level += 1;
         }
 
-        let result = statements.iter().try_fold(Dynamic::UNIT, |_, stmt| {
+        let global = &mut *RestoreOnDrop::new_if(restore_orig_state, global, move |g| {
+            g.scope_level -= 1;
+            #[cfg(not(feature = "no_module"))]
+            g.truncate_imports(orig_imports_len);
+
+            // The impact of new local variables goes away at the end of a block
+            // because any new variables introduced will go out of scope
+            g.always_search_scope = orig_always_search_scope;
+        });
+
+        // Pop new function resolution caches at end of block
+        let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
+        let caches = &mut *RestoreOnDrop::new(caches, move |c| {
+            c.rewind_fn_resolution_caches(orig_fn_resolution_caches_len)
+        });
+
+        // Run the statements
+        statements.iter().try_fold(Dynamic::UNIT, |_, stmt| {
             #[cfg(not(feature = "no_module"))]
             let imports_len = global.num_imports();
 
@@ -89,23 +112,7 @@ impl Engine {
             }
 
             Ok(result)
-        });
-
-        // If imports list is modified, pop the functions lookup cache
-        caches.rewind_fn_resolution_caches(orig_fn_resolution_caches_len);
-
-        if restore_orig_state {
-            scope.rewind(orig_scope_len);
-            global.scope_level -= 1;
-            #[cfg(not(feature = "no_module"))]
-            global.truncate_imports(orig_imports_len);
-
-            // The impact of new local variables goes away at the end of a block
-            // because any new variables introduced will go out of scope
-            global.always_search_scope = orig_always_search_scope;
-        }
-
-        result
+        })
     }
 
     /// Evaluate an op-assignment statement.
@@ -205,8 +212,10 @@ impl Engine {
         rewind_scope: bool,
     ) -> RhaiResult {
         #[cfg(feature = "debugging")]
-        let reset_debugger =
+        let reset =
             self.run_debugger_with_reset(global, caches, lib, level, scope, this_ptr, stmt)?;
+        #[cfg(feature = "debugging")]
+        let global = &mut *RestoreOnDrop::new(global, move |g| g.debugger.reset_status(reset));
 
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
@@ -215,13 +224,7 @@ impl Engine {
         if let Stmt::FnCall(x, pos) = stmt {
             self.track_operation(global, stmt.position())?;
 
-            let result =
-                self.eval_fn_call_expr(global, caches, lib, level, scope, this_ptr, x, *pos);
-
-            #[cfg(feature = "debugging")]
-            global.debugger.reset_status(reset_debugger);
-
-            return result;
+            return self.eval_fn_call_expr(global, caches, lib, level, scope, this_ptr, x, *pos);
         }
 
         // Then assignments.
@@ -232,108 +235,85 @@ impl Engine {
 
             self.track_operation(global, stmt.position())?;
 
-            let result = if let Expr::Variable(x, ..) = lhs {
-                let rhs_result = self
-                    .eval_expr(global, caches, lib, level, scope, this_ptr, rhs)
-                    .map(Dynamic::flatten);
+            if let Expr::Variable(x, ..) = lhs {
+                let rhs_val = self
+                    .eval_expr(global, caches, lib, level, scope, this_ptr, rhs)?
+                    .flatten();
 
-                if let Ok(rhs_val) = rhs_result {
-                    let search_result =
-                        self.search_namespace(global, caches, lib, level, scope, this_ptr, lhs);
+                let search_val =
+                    self.search_namespace(global, caches, lib, level, scope, this_ptr, lhs)?;
 
-                    if let Ok(search_val) = search_result {
-                        let (mut lhs_ptr, pos) = search_val;
+                let (mut lhs_ptr, pos) = search_val;
 
-                        let var_name = x.3.as_str();
+                let var_name = x.3.as_str();
 
-                        #[cfg(not(feature = "no_closure"))]
-                        // Also handle case where target is a `Dynamic` shared value
-                        // (returned by a variable resolver, for example)
-                        let is_temp_result = !lhs_ptr.is_ref() && !lhs_ptr.is_shared();
-                        #[cfg(feature = "no_closure")]
-                        let is_temp_result = !lhs_ptr.is_ref();
+                #[cfg(not(feature = "no_closure"))]
+                // Also handle case where target is a `Dynamic` shared value
+                // (returned by a variable resolver, for example)
+                let is_temp_result = !lhs_ptr.is_ref() && !lhs_ptr.is_shared();
+                #[cfg(feature = "no_closure")]
+                let is_temp_result = !lhs_ptr.is_ref();
 
-                        // Cannot assign to temp result from expression
-                        if is_temp_result {
-                            return Err(
-                                ERR::ErrorAssignmentToConstant(var_name.to_string(), pos).into()
-                            );
-                        }
-
-                        self.track_operation(global, pos)?;
-
-                        let root = (var_name, pos);
-                        let lhs_ptr = &mut lhs_ptr;
-
-                        self.eval_op_assignment(
-                            global, caches, lib, level, op_info, lhs_ptr, root, rhs_val,
-                        )
-                        .map(|_| Dynamic::UNIT)
-                    } else {
-                        search_result.map(|_| Dynamic::UNIT)
-                    }
-                } else {
-                    rhs_result
+                // Cannot assign to temp result from expression
+                if is_temp_result {
+                    return Err(ERR::ErrorAssignmentToConstant(var_name.to_string(), pos).into());
                 }
+
+                self.track_operation(global, pos)?;
+
+                let root = (var_name, pos);
+                let lhs_ptr = &mut lhs_ptr;
+
+                return self
+                    .eval_op_assignment(global, caches, lib, level, op_info, lhs_ptr, root, rhs_val)
+                    .map(|_| Dynamic::UNIT);
             } else {
                 let (op_info, BinaryExpr { lhs, rhs }) = &**x;
 
-                let rhs_result = self.eval_expr(global, caches, lib, level, scope, this_ptr, rhs);
+                let rhs_val = self.eval_expr(global, caches, lib, level, scope, this_ptr, rhs)?;
 
-                if let Ok(rhs_val) = rhs_result {
-                    // Check if the result is a string. If so, intern it.
-                    #[cfg(not(feature = "no_closure"))]
-                    let is_string = !rhs_val.is_shared() && rhs_val.is::<ImmutableString>();
-                    #[cfg(feature = "no_closure")]
-                    let is_string = rhs_val.is::<ImmutableString>();
+                // Check if the result is a string. If so, intern it.
+                #[cfg(not(feature = "no_closure"))]
+                let is_string = !rhs_val.is_shared() && rhs_val.is::<ImmutableString>();
+                #[cfg(feature = "no_closure")]
+                let is_string = rhs_val.is::<ImmutableString>();
 
-                    let rhs_val = if is_string {
-                        self.get_interned_string(
-                            rhs_val.into_immutable_string().expect("`ImmutableString`"),
-                        )
-                        .into()
-                    } else {
-                        rhs_val.flatten()
-                    };
-
-                    let _new_val = &mut Some((rhs_val, op_info));
-
-                    // Must be either `var[index] op= val` or `var.prop op= val`
-                    match lhs {
-                        // name op= rhs (handled above)
-                        Expr::Variable(..) => {
-                            unreachable!("Expr::Variable case is already handled")
-                        }
-                        // idx_lhs[idx_expr] op= rhs
-                        #[cfg(not(feature = "no_index"))]
-                        Expr::Index(..) => self
-                            .eval_dot_index_chain(
-                                global, caches, lib, level, scope, this_ptr, lhs, _new_val,
-                            )
-                            .map(|_| Dynamic::UNIT),
-                        // dot_lhs.dot_rhs op= rhs
-                        #[cfg(not(feature = "no_object"))]
-                        Expr::Dot(..) => self
-                            .eval_dot_index_chain(
-                                global, caches, lib, level, scope, this_ptr, lhs, _new_val,
-                            )
-                            .map(|_| Dynamic::UNIT),
-                        _ => unreachable!("cannot assign to expression: {:?}", lhs),
-                    }
+                let rhs_val = if is_string {
+                    self.get_interned_string(
+                        rhs_val.into_immutable_string().expect("`ImmutableString`"),
+                    )
+                    .into()
                 } else {
-                    rhs_result
+                    rhs_val.flatten()
+                };
+
+                let _new_val = &mut Some((rhs_val, op_info));
+
+                // Must be either `var[index] op= val` or `var.prop op= val`
+                return match lhs {
+                    // name op= rhs (handled above)
+                    Expr::Variable(..) => {
+                        unreachable!("Expr::Variable case is already handled")
+                    }
+                    // idx_lhs[idx_expr] op= rhs
+                    #[cfg(not(feature = "no_index"))]
+                    Expr::Index(..) => self.eval_dot_index_chain(
+                        global, caches, lib, level, scope, this_ptr, lhs, _new_val,
+                    ),
+                    // dot_lhs.dot_rhs op= rhs
+                    #[cfg(not(feature = "no_object"))]
+                    Expr::Dot(..) => self.eval_dot_index_chain(
+                        global, caches, lib, level, scope, this_ptr, lhs, _new_val,
+                    ),
+                    _ => unreachable!("cannot assign to expression: {:?}", lhs),
                 }
-            };
-
-            #[cfg(feature = "debugging")]
-            global.debugger.reset_status(reset_debugger);
-
-            return result;
+                .map(|_| Dynamic::UNIT);
+            }
         }
 
         self.track_operation(global, stmt.position())?;
 
-        let result = match stmt {
+        match stmt {
             // No-op
             Stmt::Noop(..) => Ok(Dynamic::UNIT),
 
@@ -385,100 +365,69 @@ impl Engine {
                     },
                 ) = &**x;
 
-                let value_result =
-                    self.eval_expr(global, caches, lib, level, scope, this_ptr, expr);
+                let mut result = None;
 
-                if let Ok(value) = value_result {
-                    let expr_result = if value.is_hashable() {
-                        let hasher = &mut get_hasher();
-                        value.hash(hasher);
-                        let hash = hasher.finish();
+                let value = self.eval_expr(global, caches, lib, level, scope, this_ptr, expr)?;
 
-                        // First check hashes
-                        if let Some(case_blocks_list) = cases.get(&hash) {
-                            assert!(!case_blocks_list.is_empty());
+                if value.is_hashable() {
+                    let hasher = &mut get_hasher();
+                    value.hash(hasher);
+                    let hash = hasher.finish();
 
-                            let mut result = Ok(None);
+                    // First check hashes
+                    if let Some(case_blocks_list) = cases.get(&hash) {
+                        assert!(!case_blocks_list.is_empty());
 
-                            for &index in case_blocks_list {
-                                let block = &expressions[index];
+                        for &index in case_blocks_list {
+                            let block = &expressions[index];
 
-                                let cond_result = match block.condition {
-                                    Expr::BoolConstant(b, ..) => Ok(b),
-                                    ref c => self
-                                        .eval_expr(global, caches, lib, level, scope, this_ptr, c)
-                                        .and_then(|v| {
-                                            v.as_bool().map_err(|typ| {
-                                                self.make_type_mismatch_err::<bool>(
-                                                    typ,
-                                                    c.position(),
-                                                )
-                                            })
-                                        }),
-                                };
+                            let cond_result = match block.condition {
+                                Expr::BoolConstant(b, ..) => b,
+                                ref c => self
+                                    .eval_expr(global, caches, lib, level, scope, this_ptr, c)?
+                                    .as_bool()
+                                    .map_err(|typ| {
+                                        self.make_type_mismatch_err::<bool>(typ, c.position())
+                                    })?,
+                            };
 
-                                match cond_result {
-                                    Ok(true) => result = Ok(Some(&block.expr)),
-                                    Ok(false) => continue,
-                                    _ => result = cond_result.map(|_| None),
-                                }
+                            if cond_result {
+                                result = Some(&block.expr);
                                 break;
                             }
-
-                            result
-                        } else if value.is::<INT>() && !ranges.is_empty() {
-                            // Then check integer ranges
-                            let value = value.as_int().expect("`INT`");
-                            let mut result = Ok(None);
-
-                            for r in ranges.iter().filter(|r| r.contains(value)) {
-                                let block = &expressions[r.index()];
-
-                                let cond_result = match block.condition {
-                                    Expr::BoolConstant(b, ..) => Ok(b),
-                                    ref c => self
-                                        .eval_expr(global, caches, lib, level, scope, this_ptr, c)
-                                        .and_then(|v| {
-                                            v.as_bool().map_err(|typ| {
-                                                self.make_type_mismatch_err::<bool>(
-                                                    typ,
-                                                    c.position(),
-                                                )
-                                            })
-                                        }),
-                                };
-
-                                match cond_result {
-                                    Ok(true) => result = Ok(Some(&block.expr)),
-                                    Ok(false) => continue,
-                                    _ => result = cond_result.map(|_| None),
-                                }
-                                break;
-                            }
-
-                            result
-                        } else {
-                            // Nothing matches
-                            Ok(None)
                         }
-                    } else {
-                        // Non-hashable
-                        Ok(None)
-                    };
+                    } else if value.is::<INT>() && !ranges.is_empty() {
+                        // Then check integer ranges
+                        let value = value.as_int().expect("`INT`");
 
-                    if let Ok(Some(expr)) = expr_result {
-                        self.eval_expr(global, caches, lib, level, scope, this_ptr, expr)
-                    } else if let Ok(None) = expr_result {
-                        // Default match clause
-                        def_case.as_ref().map_or(Ok(Dynamic::UNIT), |&index| {
-                            let def_expr = &expressions[index].expr;
-                            self.eval_expr(global, caches, lib, level, scope, this_ptr, def_expr)
-                        })
-                    } else {
-                        expr_result.map(|_| Dynamic::UNIT)
+                        for r in ranges.iter().filter(|r| r.contains(value)) {
+                            let block = &expressions[r.index()];
+
+                            let cond_result = match block.condition {
+                                Expr::BoolConstant(b, ..) => b,
+                                ref c => self
+                                    .eval_expr(global, caches, lib, level, scope, this_ptr, c)?
+                                    .as_bool()
+                                    .map_err(|typ| {
+                                        self.make_type_mismatch_err::<bool>(typ, c.position())
+                                    })?,
+                            };
+
+                            if cond_result {
+                                result = Some(&block.expr);
+                                break;
+                            }
+                        }
                     }
+                }
+
+                if let Some(expr) = result {
+                    self.eval_expr(global, caches, lib, level, scope, this_ptr, expr)
                 } else {
-                    value_result
+                    def_case.as_ref().map_or(Ok(Dynamic::UNIT), |&index| {
+                        let def_expr = &expressions[index].expr;
+                        self.eval_expr(global, caches, lib, level, scope, this_ptr, def_expr)
+                    })
                 }
             }
 
@@ -512,29 +461,24 @@ impl Engine {
 
                 loop {
                     let condition = self
-                        .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
-                        .and_then(|v| {
-                            v.as_bool().map_err(|typ| {
-                                self.make_type_mismatch_err::<bool>(typ, expr.position())
-                            })
-                        });
+                        .eval_expr(global, caches, lib, level, scope, this_ptr, expr)?
+                        .as_bool()
+                        .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, expr.position()))?;
 
-                    match condition {
-                        Ok(false) => break Ok(Dynamic::UNIT),
-                        Ok(true) if body.is_empty() => (),
-                        Ok(true) => {
-                            match self.eval_stmt_block(
-                                global, caches, lib, level, scope, this_ptr, body, true,
-                            ) {
-                                Ok(_) => (),
-                                Err(err) => match *err {
-                                    ERR::LoopBreak(false, ..) => (),
-                                    ERR::LoopBreak(true, value, ..) => break Ok(value),
-                                    _ => break Err(err),
-                                },
+                    if !condition {
+                        break Ok(Dynamic::UNIT);
+                    }
+
+                    if !body.is_empty() {
+                        if let Err(err) = self.eval_stmt_block(
+                            global, caches, lib, level, scope, this_ptr, body, true,
+                        ) {
+                            match *err {
+                                ERR::LoopBreak(false, ..) => (),
+                                ERR::LoopBreak(true, value, ..) => break Ok(value),
+                                _ => break Err(err),
                             }
                         }
-                        err => break err.map(|_| Dynamic::UNIT),
                     }
                 }
             }
@@ -546,30 +490,24 @@ impl Engine {
 
                 loop {
                     if !body.is_empty() {
-                        match self.eval_stmt_block(
+                        if let Err(err) = self.eval_stmt_block(
                             global, caches, lib, level, scope, this_ptr, body, true,
                         ) {
-                            Ok(_) => (),
-                            Err(err) => match *err {
+                            match *err {
                                 ERR::LoopBreak(false, ..) => continue,
                                 ERR::LoopBreak(true, value, ..) => break Ok(value),
                                 _ => break Err(err),
-                            },
+                            }
                         }
                     }
 
                     let condition = self
-                        .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
-                        .and_then(|v| {
-                            v.as_bool().map_err(|typ| {
-                                self.make_type_mismatch_err::<bool>(typ, expr.position())
-                            })
-                        });
+                        .eval_expr(global, caches, lib, level, scope, this_ptr, expr)?
+                        .as_bool()
+                        .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, expr.position()))?;
 
-                    match condition {
-                        Ok(condition) if condition ^ is_while => break Ok(Dynamic::UNIT),
-                        Ok(_) => (),
-                        err => break err.map(|_| Dynamic::UNIT),
+                    if condition ^ is_while {
+                        break Ok(Dynamic::UNIT);
                     }
                 }
             }
@@ -578,102 +516,99 @@ impl Engine {
             Stmt::For(x, ..) => {
                 let (var_name, counter, expr, statements) = &**x;
 
-                let iter_result = self
-                    .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
-                    .map(Dynamic::flatten);
+                let iter_obj = self
+                    .eval_expr(global, caches, lib, level, scope, this_ptr, expr)?
+                    .flatten();
 
-                if let Ok(iter_obj) = iter_result {
-                    let iter_type = iter_obj.type_id();
+                let iter_type = iter_obj.type_id();
 
-                    // lib should only contain scripts, so technically they cannot have iterators
+                // lib should only contain scripts, so technically they cannot have iterators
 
-                    // Search order:
-                    // 1) Global namespace - functions registered via Engine::register_XXX
-                    // 2) Global modules - packages
-                    // 3) Imported modules - functions marked with global namespace
-                    // 4) Global sub-modules - functions marked with global namespace
-                    let func = self
-                        .global_modules
-                        .iter()
-                        .find_map(|m| m.get_iter(iter_type));
+                // Search order:
+                // 1) Global namespace - functions registered via Engine::register_XXX
+                // 2) Global modules - packages
+                // 3) Imported modules - functions marked with global namespace
+                // 4) Global sub-modules - functions marked with global namespace
+                let func = self
+                    .global_modules
+                    .iter()
+                    .find_map(|m| m.get_iter(iter_type));
 
-                    #[cfg(not(feature = "no_module"))]
-                    let func = func.or_else(|| global.get_iter(iter_type)).or_else(|| {
-                        self.global_sub_modules
-                            .values()
-                            .find_map(|m| m.get_qualified_iter(iter_type))
+                #[cfg(not(feature = "no_module"))]
+                let func = func.or_else(|| global.get_iter(iter_type)).or_else(|| {
+                    self.global_sub_modules
+                        .values()
+                        .find_map(|m| m.get_qualified_iter(iter_type))
+                });
+
+                if let Some(func) = func {
+                    // Restore scope at end of statement
+                    let orig_scope_len = scope.len();
+                    let scope = &mut *RestoreOnDrop::new(scope, move |s| {
+                        s.rewind(orig_scope_len);
                     });
 
-                    if let Some(func) = func {
-                        // Add the loop variables
-                        let orig_scope_len = scope.len();
-                        let counter_index = if counter.is_empty() {
-                            usize::MAX
-                        } else {
-                            scope.push(counter.name.clone(), 0 as INT);
-                            scope.len() - 1
-                        };
-
-                        scope.push(var_name.name.clone(), ());
-                        let index = scope.len() - 1;
-
-                        let loop_result = func(iter_obj)
-                            .enumerate()
-                            .try_fold(Dynamic::UNIT, |_, (x, iter_value)| {
-                                // Increment counter
-                                if counter_index < usize::MAX {
-                                    // As the variable increments from 0, this should always work
-                                    // since any overflow will first be caught below.
-                                    let index_value = x as INT;
-
-                                    #[cfg(not(feature = "unchecked"))]
-                                    if index_value > crate::MAX_USIZE_INT {
-                                        return Err(ERR::ErrorArithmetic(
-                                            format!("for-loop counter overflow: {x}"),
-                                            counter.pos,
-                                        )
-                                        .into());
-                                    }
-
-                                    *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
-                                        Dynamic::from_int(index_value);
-                                }
-
-                                let value = match iter_value {
-                                    Ok(v) => v.flatten(),
-                                    Err(err) => return Err(err.fill_position(expr.position())),
-                                };
-
-                                *scope.get_mut_by_index(index).write_lock().unwrap() = value;
-
-                                self.track_operation(global, statements.position())?;
-
-                                if statements.is_empty() {
-                                    return Ok(Dynamic::UNIT);
-                                }
-
-                                self.eval_stmt_block(
-                                    global, caches, lib, level, scope, this_ptr, statements, true,
-                                )
-                                .map(|_| Dynamic::UNIT)
-                                .or_else(|err| match *err {
-                                    ERR::LoopBreak(false, ..) => Ok(Dynamic::UNIT),
-                                    _ => Err(err),
-                                })
-                            })
-                            .or_else(|err| match *err {
-                                ERR::LoopBreak(true, value, ..) => Ok(value),
-                                _ => Err(err),
-                            });
-
-                        scope.rewind(orig_scope_len);
-
-                        loop_result
+                    // Add the loop variables
+                    let counter_index = if counter.is_empty() {
+                        usize::MAX
                     } else {
-                        Err(ERR::ErrorFor(expr.start_position()).into())
-                    }
+                        scope.push(counter.name.clone(), 0 as INT);
+                        scope.len() - 1
+                    };
+
+                    scope.push(var_name.name.clone(), ());
+                    let index = scope.len() - 1;
+
+                    func(iter_obj)
+                        .enumerate()
+                        .try_fold(Dynamic::UNIT, |_, (x, iter_value)| {
+                            // Increment counter
+                            if counter_index < usize::MAX {
+                                // As the variable increments from 0, this should always work
+                                // since any overflow will first be caught below.
+                                let index_value = x as INT;
+
+                                #[cfg(not(feature = "unchecked"))]
+                                if index_value > crate::MAX_USIZE_INT {
+                                    return Err(ERR::ErrorArithmetic(
+                                        format!("for-loop counter overflow: {x}"),
+                                        counter.pos,
+                                    )
+                                    .into());
+                                }
+
+                                *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
+                                    Dynamic::from_int(index_value);
+                            }
+
+                            let value = match iter_value {
+                                Ok(v) => v.flatten(),
+                                Err(err) => return Err(err.fill_position(expr.position())),
+                            };
+
+                            *scope.get_mut_by_index(index).write_lock().unwrap() = value;
+
+                            self.track_operation(global, statements.position())?;
+
+                            if statements.is_empty() {
+                                return Ok(Dynamic::UNIT);
+                            }
+
+                            self.eval_stmt_block(
+                                global, caches, lib, level, scope, this_ptr, statements, true,
+                            )
+                            .map(|_| Dynamic::UNIT)
+                            .or_else(|err| match *err {
+                                ERR::LoopBreak(false, ..) => Ok(Dynamic::UNIT),
+                                _ => Err(err),
+                            })
+                        })
+                        .or_else(|err| match *err {
+                            ERR::LoopBreak(true, value, ..) => Ok(value),
+                            _ => Err(err),
+                        })
                 } else {
-                    iter_result
+                    Err(ERR::ErrorFor(expr.start_position()).into())
                 }
             }
 
@@ -700,12 +635,12 @@ impl Engine {
                     catch_block,
                 } = &**x;
 
-                let result = self
+                match self
                     .eval_stmt_block(global, caches, lib, level, scope, this_ptr, try_block, true)
-                    .map(|_| Dynamic::UNIT);
-
-                match result {
-                    Ok(_) => result,
+                {
+                    Ok(_) => self.eval_stmt_block(
+                        global, caches, lib, level, scope, this_ptr, try_block, true,
+                    ),
                     Err(err) if err.is_pseudo_error() => Err(err),
                     Err(err) if !err.is_catchable() => Err(err),
                     Err(mut err) => {
@@ -744,13 +679,18 @@ impl Engine {
                             }
                         };
 
+                        // Restore scope at end of block
                         let orig_scope_len = scope.len();
+                        let scope =
+                            &mut *RestoreOnDrop::new_if(!catch_var.is_empty(), scope, move |s| {
+                                s.rewind(orig_scope_len);
+                            });
 
                         if !catch_var.is_empty() {
                             scope.push(catch_var.clone(), err_value);
                         }
 
-                        let result = self.eval_stmt_block(
+                        self.eval_stmt_block(
                             global,
                             caches,
                             lib,
@@ -759,21 +699,16 @@ impl Engine {
                             this_ptr,
                             catch_block,
                             true,
-                        );
-
-                        scope.rewind(orig_scope_len);
-
-                        match result {
-                            Ok(_) => Ok(Dynamic::UNIT),
-                            Err(result_err) => match *result_err {
-                                // Re-throw exception
-                                ERR::ErrorRuntime(Dynamic(Union::Unit(..)), pos) => {
-                                    err.set_position(pos);
-                                    Err(err)
-                                }
-                                _ => Err(result_err),
-                            },
-                        }
+                        )
+                        .map(|_| Dynamic::UNIT)
+                        .map_err(|result_err| match *result_err {
+                            // Re-throw exception
+                            ERR::ErrorRuntime(Dynamic(Union::Unit(..)), pos) => {
+                                err.set_position(pos);
+                                err
+                            }
+                            _ => result_err,
+                        })
                     }
                 }
             }
@@ -812,7 +747,7 @@ impl Engine {
                 let export = options.contains(ASTFlags::EXPORTED);
 
                 // Check variable definition filter
-                let result = if let Some(ref filter) = self.def_var_filter {
+                if let Some(ref filter) = self.def_var_filter {
                     let will_shadow = scope.contains(var_name);
                     let nesting_level = global.scope_level;
                     let is_const = access == AccessMode::ReadOnly;
@@ -824,74 +759,56 @@ impl Engine {
                     };
                     let context = EvalContext::new(self, global, None, lib, level, scope, this_ptr);
 
-                    match filter(true, info, context) {
-                        Ok(true) => None,
-                        Ok(false) => {
-                            Some(Err(
-                                ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into()
-                            ))
-                        }
-                        err @ Err(_) => Some(err),
+                    if !filter(true, info, context)? {
+                        return Err(ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into());
                     }
+                }
+
+                // Evaluate initial value
+                let mut value = self
+                    .eval_expr(global, caches, lib, level, scope, this_ptr, expr)?
+                    .flatten();
+
+                let _alias = if !rewind_scope {
+                    // Put global constants into global module
+                    #[cfg(not(feature = "no_function"))]
+                    #[cfg(not(feature = "no_module"))]
+                    if global.scope_level == 0
+                        && access == AccessMode::ReadOnly
+                        && lib.iter().any(|m| !m.is_empty())
+                    {
+                        crate::func::locked_write(global.constants.get_or_insert_with(|| {
+                            crate::Shared::new(
+                                crate::Locked::new(std::collections::BTreeMap::new()),
+                            )
+                        }))
+                        .insert(var_name.name.clone(), value.clone());
+                    }
+
+                    if export {
+                        Some(var_name)
+                    } else {
+                        None
+                    }
+                } else if export {
+                    unreachable!("exported variable not on global level");
                 } else {
                     None
                 };
 
-                if let Some(result) = result {
-                    result.map(|_| Dynamic::UNIT)
+                if let Some(index) = index {
+                    value.set_access_mode(access);
+                    *scope.get_mut_by_index(scope.len() - index.get()) = value;
                 } else {
-                    // Evaluate initial value
-                    let value_result = self
-                        .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
-                        .map(Dynamic::flatten);
-
-                    if let Ok(mut value) = value_result {
-                        let _alias = if !rewind_scope {
-                            // Put global constants into global module
-                            #[cfg(not(feature = "no_function"))]
-                            #[cfg(not(feature = "no_module"))]
-                            if global.scope_level == 0
-                                && access == AccessMode::ReadOnly
-                                && lib.iter().any(|m| !m.is_empty())
-                            {
-                                crate::func::locked_write(global.constants.get_or_insert_with(
-                                    || {
-                                        crate::Shared::new(crate::Locked::new(
-                                            std::collections::BTreeMap::new(),
-                                        ))
-                                    },
-                                ))
-                                .insert(var_name.name.clone(), value.clone());
-                            }
-
-                            if export {
-                                Some(var_name)
-                            } else {
-                                None
-                            }
-                        } else if export {
-                            unreachable!("exported variable not on global level");
-                        } else {
-                            None
-                        };
-
-                        if let Some(index) = index {
-                            value.set_access_mode(access);
-                            *scope.get_mut_by_index(scope.len() - index.get()) = value;
-                        } else {
-                            scope.push_entry(var_name.name.clone(), access, value);
-                        }
-
-                        #[cfg(not(feature = "no_module"))]
-                        if let Some(alias) = _alias {
-                            scope.add_alias_by_index(scope.len() - 1, alias.name.as_str().into());
-                        }
-
-                        Ok(Dynamic::UNIT)
-                    } else {
-                        value_result
-                    }
+                    scope.push_entry(var_name.name.clone(), access, value);
                 }
+
+                #[cfg(not(feature = "no_module"))]
+                if let Some(alias) = _alias {
+                    scope.add_alias_by_index(scope.len() - 1, alias.name.as_str().into());
+                }
+
+                Ok(Dynamic::UNIT)
             }
 
             // Import statement
@@ -904,66 +821,52 @@ impl Engine {
                     return Err(ERR::ErrorTooManyModules(*_pos).into());
                 }
 
-                let path_result = self
-                    .eval_expr(global, caches, lib, level, scope, this_ptr, expr)
-                    .and_then(|v| {
-                        let typ = v.type_name();
-                        v.try_cast::<crate::ImmutableString>().ok_or_else(|| {
-                            self.make_type_mismatch_err::<crate::ImmutableString>(
-                                typ,
-                                expr.position(),
-                            )
-                        })
-                    });
+                let v = self.eval_expr(global, caches, lib, level, scope, this_ptr, expr)?;
+                let typ = v.type_name();
+                let path = v.try_cast::<crate::ImmutableString>().ok_or_else(|| {
+                    self.make_type_mismatch_err::<crate::ImmutableString>(typ, expr.position())
+                })?;
 
-                if let Ok(path) = path_result {
-                    use crate::ModuleResolver;
+                use crate::ModuleResolver;
 
-                    let path_pos = expr.start_position();
+                let path_pos = expr.start_position();
 
-                    let resolver = global.embedded_module_resolver.clone();
+                let resolver = global.embedded_module_resolver.clone();
 
-                    let module_result = resolver
-                        .as_ref()
-                        .and_then(|r| match r.resolve_raw(self, global, &path, path_pos) {
-                            Err(err) if matches!(*err, ERR::ErrorModuleNotFound(..)) => None,
-                            result => Some(result),
-                        })
-                        .or_else(|| {
-                            Some(
-                                self.module_resolver
-                                    .resolve_raw(self, global, &path, path_pos),
-                            )
-                        })
-                        .unwrap_or_else(|| {
-                            Err(ERR::ErrorModuleNotFound(path.to_string(), path_pos).into())
-                        });
+                let module = resolver
+                    .as_ref()
+                    .and_then(|r| match r.resolve_raw(self, global, &path, path_pos) {
+                        Err(err) if matches!(*err, ERR::ErrorModuleNotFound(..)) => None,
+                        result => Some(result),
+                    })
+                    .or_else(|| {
+                        Some(
+                            self.module_resolver
+                                .resolve_raw(self, global, &path, path_pos),
+                        )
+                    })
+                    .unwrap_or_else(|| {
+                        Err(ERR::ErrorModuleNotFound(path.to_string(), path_pos).into())
+                    })?;
 
-                    if let Ok(module) = module_result {
-                        let (export, must_be_indexed) = if !export.is_empty() {
-                            (export.name.clone(), true)
-                        } else {
-                            (self.get_interned_string(""), false)
-                        };
-
-                        if !must_be_indexed || module.is_indexed() {
-                            global.push_import(export, module);
-                        } else {
-                            // Index the module (making a clone copy if necessary) if it is not indexed
-                            let mut m = crate::func::shared_take_or_clone(module);
-                            m.build_index();
-                            global.push_import(export, m);
-                        }
-
-                        global.num_modules_loaded += 1;
-
-                        Ok(Dynamic::UNIT)
-                    } else {
-                        module_result.map(|_| Dynamic::UNIT)
-                    }
+                let (export, must_be_indexed) = if !export.is_empty() {
+                    (export.name.clone(), true)
                 } else {
-                    path_result.map(|_| Dynamic::UNIT)
+                    (self.get_interned_string(""), false)
+                };
+
+                if !must_be_indexed || module.is_indexed() {
+                    global.push_import(export, module);
+                } else {
+                    // Index the module (making a clone copy if necessary) if it is not indexed
+                    let mut m = crate::func::shared_take_or_clone(module);
+                    m.build_index();
+                    global.push_import(export, m);
                 }
+
+                global.num_modules_loaded += 1;
+
+                Ok(Dynamic::UNIT)
             }
 
             // Export statement
@@ -1004,12 +907,7 @@ impl Engine {
             }
 
             _ => unreachable!("statement cannot be evaluated: {:?}", stmt),
-        };
-
-        #[cfg(feature = "debugging")]
-        global.debugger.reset_status(reset_debugger);
-
-        result
+        }
     }
 
     /// Evaluate a list of statements with no `this` pointer.

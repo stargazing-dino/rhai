@@ -3,6 +3,7 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::types::dynamic::Variant;
+use crate::types::RestoreOnDrop;
 use crate::{
     reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, Shared, StaticVec,
     AST, ERR,
@@ -258,6 +259,10 @@ impl Engine {
             &mut global.embedded_module_resolver,
             ast.resolver().cloned(),
         );
+        #[cfg(not(feature = "no_module"))]
+        let global = &mut *RestoreOnDrop::new(global, move |g| {
+            g.embedded_module_resolver = orig_embedded_module_resolver
+        });
 
         let result = if eval_ast && !statements.is_empty() {
             let r = self.eval_global_statements(global, caches, lib, 0, scope, statements);
@@ -293,14 +298,7 @@ impl Engine {
             } else {
                 Err(ERR::ErrorFunctionNotFound(name.into(), Position::NONE).into())
             }
-        });
-
-        #[cfg(not(feature = "no_module"))]
-        {
-            global.embedded_module_resolver = orig_embedded_module_resolver;
-        }
-
-        let result = result?;
+        })?;
 
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {

@@ -3,6 +3,7 @@
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
+use crate::types::RestoreOnDrop;
 use crate::{
     Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
 };
@@ -225,6 +226,10 @@ impl Engine {
             &mut global.embedded_module_resolver,
             ast.resolver().cloned(),
         );
+        #[cfg(not(feature = "no_module"))]
+        let global = &mut *RestoreOnDrop::new(global, move |g| {
+            g.embedded_module_resolver = orig_embedded_module_resolver
+        });
 
         let statements = ast.statements();
 
@@ -232,23 +237,12 @@ impl Engine {
             return Ok(Dynamic::UNIT);
         }
 
-        let mut _lib = &[
+        let lib = &[
             #[cfg(not(feature = "no_function"))]
             AsRef::<crate::Shared<_>>::as_ref(ast).clone(),
-        ][..];
-        #[cfg(not(feature = "no_function"))]
-        if !ast.has_functions() {
-            _lib = &[];
-        }
+        ];
 
-        let result = self.eval_global_statements(global, caches, _lib, level, scope, statements);
-
-        #[cfg(not(feature = "no_module"))]
-        {
-            global.embedded_module_resolver = orig_embedded_module_resolver;
-        }
-
-        result
+        self.eval_global_statements(global, caches, lib, level, scope, statements)
     }
     /// _(internals)_ Evaluate a list of statements with no `this` pointer.
     /// Exported under the `internals` feature only.
