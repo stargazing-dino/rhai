@@ -4,7 +4,10 @@
 use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, Expr, OpAssignment};
 use crate::types::dynamic::Union;
-use crate::{Dynamic, Engine, FnArgsVec, Module, Position, RhaiResult, RhaiResultOf, Scope, ERR};
+use crate::types::RestoreOnDrop;
+use crate::{
+    Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, SharedModule, ERR,
+};
 use std::hash::Hash;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -40,9 +43,9 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[SharedModule],
         level: usize,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         target: &mut Target,
         root: (&str, Position),
         _parent: &Expr,
@@ -198,29 +201,30 @@ impl Engine {
                     // xxx.fn_name(arg_expr_list)
                     Expr::MethodCall(x, pos) if !x.is_qualified() && new_val.is_none() => {
                         #[cfg(feature = "debugging")]
-                        let reset_debugger = self.run_debugger_with_reset(
+                        let reset = self.run_debugger_with_reset(
                             global, caches, lib, level, scope, this_ptr, rhs,
                         )?;
+                        #[cfg(feature = "debugging")]
+                        let global = &mut *RestoreOnDrop::lock(global, move |g| {
+                            g.debugger.reset_status(reset)
+                        });
 
                         let crate::ast::FnCallExpr {
                             name, hashes, args, ..
                         } = &**x;
 
+                        // Truncate the index values upon exit
                         let offset = idx_values.len() - args.len();
+                        let idx_values =
+                            &mut *RestoreOnDrop::lock(idx_values, move |v| v.truncate(offset));
+
                         let call_args = &mut idx_values[offset..];
                         let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
 
-                        let result = self.make_method_call(
+                        self.make_method_call(
                             global, caches, lib, level, name, *hashes, target, call_args, pos1,
                             *pos,
-                        );
-
-                        idx_values.truncate(offset);
-
-                        #[cfg(feature = "debugging")]
-                        global.debugger.reset_status(reset_debugger);
-
-                        result
+                        )
                     }
                     // xxx.fn_name(...) = ???
                     Expr::MethodCall(..) if new_val.is_some() => {
@@ -376,29 +380,33 @@ impl Engine {
                             // {xxx:map}.fn_name(arg_expr_list)[expr] | {xxx:map}.fn_name(arg_expr_list).expr
                             Expr::MethodCall(ref x, pos) if !x.is_qualified() => {
                                 #[cfg(feature = "debugging")]
-                                let reset_debugger = self.run_debugger_with_reset(
+                                let reset = self.run_debugger_with_reset(
                                     global, caches, lib, level, scope, this_ptr, _node,
                                 )?;
+                                #[cfg(feature = "debugging")]
+                                let global = &mut *RestoreOnDrop::lock(global, move |g| {
+                                    g.debugger.reset_status(reset)
+                                });
 
                                 let crate::ast::FnCallExpr {
                                     name, hashes, args, ..
                                 } = &**x;
 
+                                // Truncate the index values upon exit
                                 let offset = idx_values.len() - args.len();
+                                let idx_values = &mut *RestoreOnDrop::lock(idx_values, move |v| {
+                                    v.truncate(offset)
+                                });
+
                                 let call_args = &mut idx_values[offset..];
                                 let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
 
-                                let result = self.make_method_call(
+                                self.make_method_call(
                                     global, caches, lib, level, name, *hashes, target, call_args,
                                     pos1, pos,
-                                );
-
-                                idx_values.truncate(offset);
-
-                                #[cfg(feature = "debugging")]
-                                global.debugger.reset_status(reset_debugger);
-
-                                result?.0.into()
+                                )?
+                                .0
+                                .into()
                             }
                             // {xxx:map}.module::fn_name(...) - syntax error
                             Expr::MethodCall(..) => unreachable!(
@@ -502,32 +510,39 @@ impl Engine {
                             }
                             // xxx.fn_name(arg_expr_list)[expr] | xxx.fn_name(arg_expr_list).expr
                             Expr::MethodCall(ref f, pos) if !f.is_qualified() => {
-                                #[cfg(feature = "debugging")]
-                                let reset_debugger = self.run_debugger_with_reset(
-                                    global, caches, lib, level, scope, this_ptr, _node,
-                                )?;
+                                let val = {
+                                    #[cfg(feature = "debugging")]
+                                    let reset = self.run_debugger_with_reset(
+                                        global, caches, lib, level, scope, this_ptr, _node,
+                                    )?;
+                                    #[cfg(feature = "debugging")]
+                                    let global = &mut *RestoreOnDrop::lock(global, move |g| {
+                                        g.debugger.reset_status(reset)
+                                    });
 
-                                let crate::ast::FnCallExpr {
-                                    name, hashes, args, ..
-                                } = &**f;
-                                let rhs_chain = rhs.into();
+                                    let crate::ast::FnCallExpr {
+                                        name, hashes, args, ..
+                                    } = &**f;
 
-                                let offset = idx_values.len() - args.len();
-                                let call_args = &mut idx_values[offset..];
-                                let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
+                                    // Truncate the index values upon exit
+                                    let offset = idx_values.len() - args.len();
+                                    let idx_values =
+                                        &mut *RestoreOnDrop::lock(idx_values, move |v| {
+                                            v.truncate(offset)
+                                        });
 
-                                let result = self.make_method_call(
-                                    global, caches, lib, level, name, *hashes, target, call_args,
-                                    pos1, pos,
-                                );
+                                    let call_args = &mut idx_values[offset..];
+                                    let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
 
-                                idx_values.truncate(offset);
+                                    self.make_method_call(
+                                        global, caches, lib, level, name, *hashes, target,
+                                        call_args, pos1, pos,
+                                    )?
+                                    .0
+                                };
 
-                                #[cfg(feature = "debugging")]
-                                global.debugger.reset_status(reset_debugger);
-
-                                let (val, _) = &mut result?;
                                 let val = &mut val.into();
+                                let rhs_chain = rhs.into();
 
                                 self.eval_dot_index_chain_helper(
                                     global, caches, lib, level, this_ptr, val, root, rhs, *options,
@@ -555,10 +570,10 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         expr: &Expr,
         new_val: &mut Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResult {
@@ -615,9 +630,10 @@ impl Engine {
 
                 let obj_ptr = &mut target;
                 let root = (x.3.as_str(), *var_pos);
+                let mut this = Dynamic::NULL;
 
                 self.eval_dot_index_chain_helper(
-                    global, caches, lib, level, &mut None, obj_ptr, root, expr, options, rhs,
+                    global, caches, lib, level, &mut this, obj_ptr, root, expr, options, rhs,
                     idx_values, chain_type, new_val,
                 )
             }
@@ -646,10 +662,10 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[SharedModule],
         level: usize,
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         expr: &Expr,
         parent_options: ASTFlags,
         parent_chain_type: ChainType,
@@ -758,7 +774,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[SharedModule],
         level: usize,
         target: &mut Dynamic,
         idx: &mut Dynamic,
@@ -781,7 +797,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[SharedModule],
         level: usize,
         target: &mut Dynamic,
         idx: &mut Dynamic,
@@ -805,7 +821,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[SharedModule],
         level: usize,
         target: &'t mut Dynamic,
         idx: &mut Dynamic,

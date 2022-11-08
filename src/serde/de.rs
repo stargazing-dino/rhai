@@ -125,6 +125,8 @@ impl<'de> Deserializer<'de> for DynamicDeserializer<'de> {
 
     fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
         match self.0 .0 {
+            Union::Null => unreachable!(),
+
             Union::Unit(..) => self.deserialize_unit(visitor),
             Union::Bool(..) => self.deserialize_bool(visitor),
             Union::Str(..) => self.deserialize_str(visitor),

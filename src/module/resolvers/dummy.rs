@@ -1,4 +1,4 @@
-use crate::{Engine, Module, ModuleResolver, Position, RhaiResultOf, Shared, ERR};
+use crate::{Engine, ModuleResolver, Position, RhaiResultOf, SharedModule, ERR};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -45,7 +45,7 @@ impl ModuleResolver for DummyModuleResolver {
         _: Option<&str>,
         path: &str,
         pos: Position,
-    ) -> RhaiResultOf<Shared<Module>> {
+    ) -> RhaiResultOf<SharedModule> {
         Err(ERR::ErrorModuleNotFound(path.into(), pos).into())
     }
 }

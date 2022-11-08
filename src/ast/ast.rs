@@ -28,7 +28,7 @@ pub struct AST {
     body: StmtBlock,
     /// Script-defined functions.
     #[cfg(not(feature = "no_function"))]
-    lib: crate::Shared<crate::Module>,
+    lib: crate::SharedModule,
     /// Embedded module resolver, if any.
     #[cfg(not(feature = "no_module"))]
     resolver: Option<crate::Shared<crate::module::resolvers::StaticModuleResolver>>,
@@ -74,7 +74,7 @@ impl AST {
     #[must_use]
     pub(crate) fn new(
         statements: impl IntoIterator<Item = Stmt>,
-        #[cfg(not(feature = "no_function"))] functions: impl Into<crate::Shared<crate::Module>>,
+        #[cfg(not(feature = "no_function"))] functions: impl Into<crate::SharedModule>,
     ) -> Self {
         Self {
             source: None,
@@ -94,7 +94,7 @@ impl AST {
     #[must_use]
     pub fn new(
         statements: impl IntoIterator<Item = Stmt>,
-        #[cfg(not(feature = "no_function"))] functions: impl Into<crate::Shared<crate::Module>>,
+        #[cfg(not(feature = "no_function"))] functions: impl Into<crate::SharedModule>,
     ) -> Self {
         Self {
             source: None,
@@ -113,7 +113,7 @@ impl AST {
     #[must_use]
     pub(crate) fn new_with_source(
         statements: impl IntoIterator<Item = Stmt>,
-        #[cfg(not(feature = "no_function"))] functions: impl Into<crate::Shared<crate::Module>>,
+        #[cfg(not(feature = "no_function"))] functions: impl Into<crate::SharedModule>,
         source: impl Into<ImmutableString>,
     ) -> Self {
         let mut ast = Self::new(
@@ -131,7 +131,7 @@ impl AST {
     #[must_use]
     pub fn new_with_source(
         statements: impl IntoIterator<Item = Stmt>,
-        #[cfg(not(feature = "no_function"))] functions: impl Into<crate::Shared<crate::Module>>,
+        #[cfg(not(feature = "no_function"))] functions: impl Into<crate::SharedModule>,
         source: impl Into<ImmutableString>,
     ) -> Self {
         let mut ast = Self::new(
@@ -267,7 +267,7 @@ impl AST {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) const fn shared_lib(&self) -> &crate::Shared<crate::Module> {
+    pub(crate) const fn shared_lib(&self) -> &crate::SharedModule {
         &self.lib
     }
     /// _(internals)_ Get the internal shared [`Module`][crate::Module] containing all script-defined functions.
@@ -278,7 +278,7 @@ impl AST {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub const fn shared_lib(&self) -> &crate::Shared<crate::Module> {
+    pub const fn shared_lib(&self) -> &crate::SharedModule {
         &self.lib
     }
     /// Get the embedded [module resolver][crate::ModuleResolver].
@@ -957,19 +957,19 @@ impl AsRef<crate::Module> for AST {
 }
 
 #[cfg(not(feature = "no_function"))]
-impl Borrow<crate::Shared<crate::Module>> for AST {
+impl Borrow<crate::SharedModule> for AST {
     #[inline(always)]
     #[must_use]
-    fn borrow(&self) -> &crate::Shared<crate::Module> {
+    fn borrow(&self) -> &crate::SharedModule {
         self.shared_lib()
     }
 }
 
 #[cfg(not(feature = "no_function"))]
-impl AsRef<crate::Shared<crate::Module>> for AST {
+impl AsRef<crate::SharedModule> for AST {
     #[inline(always)]
     #[must_use]
-    fn as_ref(&self) -> &crate::Shared<crate::Module> {
+    fn as_ref(&self) -> &crate::SharedModule {
         self.shared_lib()
     }
 }

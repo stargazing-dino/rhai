@@ -4,6 +4,7 @@ use crate::func::{FnCallArgs, RegisterNativeFunction, SendSync};
 use crate::types::dynamic::Variant;
 use crate::{
     Engine, FnAccess, FnNamespace, Identifier, Module, NativeCallContext, RhaiResultOf, Shared,
+    SharedModule,
 };
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
@@ -636,7 +637,7 @@ impl Engine {
     /// When searching for functions, modules loaded later are preferred. In other words, loaded
     /// modules are searched in reverse order.
     #[inline(always)]
-    pub fn register_global_module(&mut self, module: Shared<Module>) -> &mut Self {
+    pub fn register_global_module(&mut self, module: SharedModule) -> &mut Self {
         // Insert the module into the front.
         // The first module is always the global namespace.
         self.global_modules.insert(1, module);
@@ -680,12 +681,12 @@ impl Engine {
     pub fn register_static_module(
         &mut self,
         name: impl AsRef<str>,
-        module: Shared<Module>,
+        module: SharedModule,
     ) -> &mut Self {
         fn register_static_module_raw(
-            root: &mut std::collections::BTreeMap<Identifier, Shared<Module>>,
+            root: &mut std::collections::BTreeMap<Identifier, SharedModule>,
             name: &str,
-            module: Shared<Module>,
+            module: SharedModule,
         ) {
             let separator = crate::tokenizer::Token::DoubleColon.syntax();
             let separator = separator.as_ref();

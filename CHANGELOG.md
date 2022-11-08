@@ -41,6 +41,11 @@ New features
 
 * `Scope` is now serializable and deserializable via `serde`.
 
+### Store and recreate `NativeCallContext`
+
+* A convenient API is added to store a `NativeCallContext` into a new `NativeCallContextStore` type.
+* This allows a `NativeCallContext` to be stored and recreated later on.
+
 ### Call native Rust functions in `NativeCallContext`
 
 * `NativeCallContext::call_native_fn` is added to call registered native Rust functions only.

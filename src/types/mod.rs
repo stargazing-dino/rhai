@@ -8,6 +8,7 @@ pub mod fn_ptr;
 pub mod immutable_string;
 pub mod interner;
 pub mod parse_error;
+pub mod restore;
 pub mod scope;
 pub mod variant;
 
@@ -21,5 +22,6 @@ pub use fn_ptr::FnPtr;
 pub use immutable_string::ImmutableString;
 pub use interner::StringsInterner;
 pub use parse_error::{LexError, ParseError, ParseErrorType};
+pub use restore::RestoreOnDrop;
 pub use scope::Scope;
 pub use variant::Variant;

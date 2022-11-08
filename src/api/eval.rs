@@ -3,6 +3,7 @@
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
+use crate::types::RestoreOnDrop;
 use crate::{
     Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
 };
@@ -195,10 +196,12 @@ impl Engine {
             global.debugger.status = crate::eval::DebuggerStatus::Terminate;
             let lib = &[
                 #[cfg(not(feature = "no_function"))]
-                ast.as_ref(),
+                AsRef::<crate::SharedModule>::as_ref(ast).clone(),
             ];
+            let mut this = Dynamic::NULL;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
-            self.run_debugger(global, caches, lib, 0, scope, &mut None, node)?;
+
+            self.run_debugger(global, caches, lib, 0, scope, &mut this, node)?;
         }
 
         let typ = self.map_type_name(result.type_name());
@@ -225,6 +228,10 @@ impl Engine {
             &mut global.embedded_module_resolver,
             ast.resolver().cloned(),
         );
+        #[cfg(not(feature = "no_module"))]
+        let global = &mut *RestoreOnDrop::lock(global, move |g| {
+            g.embedded_module_resolver = orig_embedded_module_resolver
+        });
 
         let statements = ast.statements();
 
@@ -232,23 +239,12 @@ impl Engine {
             return Ok(Dynamic::UNIT);
         }
 
-        let mut _lib = &[
+        let lib = &[
             #[cfg(not(feature = "no_function"))]
-            ast.as_ref(),
-        ][..];
-        #[cfg(not(feature = "no_function"))]
-        if !ast.has_functions() {
-            _lib = &[];
-        }
+            AsRef::<crate::SharedModule>::as_ref(ast).clone(),
+        ];
 
-        let result = self.eval_global_statements(global, caches, _lib, level, scope, statements);
-
-        #[cfg(not(feature = "no_module"))]
-        {
-            global.embedded_module_resolver = orig_embedded_module_resolver;
-        }
-
-        result
+        self.eval_global_statements(global, caches, lib, level, scope, statements)
     }
     /// _(internals)_ Evaluate a list of statements with no `this` pointer.
     /// Exported under the `internals` feature only.
@@ -264,7 +260,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&crate::Module],
+        lib: &[crate::SharedModule],
         level: usize,
         scope: &mut Scope,
         statements: &[crate::ast::Stmt],

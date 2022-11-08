@@ -3,9 +3,10 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::types::dynamic::Variant;
+use crate::types::RestoreOnDrop;
 use crate::{
-    reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, StaticVec, AST,
-    ERR,
+    reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, SharedModule,
+    StaticVec, AST, ERR,
 };
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
@@ -248,8 +249,10 @@ impl Engine {
         arg_values: &mut [Dynamic],
     ) -> RhaiResult {
         let statements = ast.statements();
-        let lib = &[ast.as_ref()];
-        let mut this_ptr = this_ptr;
+        let lib = &[AsRef::<SharedModule>::as_ref(ast).clone()];
+
+        let mut no_this_ptr = Dynamic::NULL;
+        let mut this_ptr = this_ptr.unwrap_or(&mut no_this_ptr);
 
         let orig_scope_len = scope.len();
 
@@ -258,6 +261,10 @@ impl Engine {
             &mut global.embedded_module_resolver,
             ast.resolver().cloned(),
         );
+        #[cfg(not(feature = "no_module"))]
+        let global = &mut *RestoreOnDrop::lock(global, move |g| {
+            g.embedded_module_resolver = orig_embedded_module_resolver
+        });
 
         let result = if eval_ast && !statements.is_empty() {
             let r = self.eval_global_statements(global, caches, lib, 0, scope, statements);
@@ -293,14 +300,7 @@ impl Engine {
             } else {
                 Err(ERR::ErrorFunctionNotFound(name.into(), Position::NONE).into())
             }
-        });
-
-        #[cfg(not(feature = "no_module"))]
-        {
-            global.embedded_module_resolver = orig_embedded_module_resolver;
-        }
-
-        let result = result?;
+        })?;
 
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {

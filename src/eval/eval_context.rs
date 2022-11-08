@@ -1,42 +1,42 @@
 //! Evaluation context.
 
 use super::{Caches, GlobalRuntimeState};
-use crate::{Dynamic, Engine, Module, Scope};
+use crate::{Dynamic, Engine, Module, Scope, SharedModule};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
 /// Context of a script evaluation process.
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct EvalContext<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> {
+pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// The current [`Engine`].
     engine: &'a Engine,
     /// The current [`Scope`].
     scope: &'s mut Scope<'ps>,
     /// The current [`GlobalRuntimeState`].
-    global: &'g mut GlobalRuntimeState<'pg>,
+    global: &'g mut GlobalRuntimeState,
     /// The current [caches][Caches], if available.
-    caches: Option<&'c mut Caches<'pc>>,
+    caches: &'c mut Caches,
     /// The current stack of imported [modules][Module].
-    lib: &'a [&'a Module],
+    lib: &'a [SharedModule],
     /// The current bound `this` pointer, if any.
-    this_ptr: &'t mut Option<&'pt mut Dynamic>,
+    this_ptr: &'t mut Dynamic,
     /// The current nesting level of function calls.
     level: usize,
 }
 
-impl<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> {
+impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// Create a new [`EvalContext`].
     #[inline(always)]
     #[must_use]
     pub fn new(
         engine: &'a Engine,
-        global: &'g mut GlobalRuntimeState<'pg>,
-        caches: Option<&'c mut Caches<'pc>>,
-        lib: &'a [&'a Module],
+        global: &'g mut GlobalRuntimeState,
+        caches: &'c mut Caches,
+        lib: &'a [SharedModule],
         level: usize,
         scope: &'s mut Scope<'ps>,
-        this_ptr: &'t mut Option<&'pt mut Dynamic>,
+        this_ptr: &'t mut Dynamic,
     ) -> Self {
         Self {
             engine,
@@ -104,33 +104,41 @@ impl<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'pg, '
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub fn global_runtime_state_mut(&mut self) -> &mut &'g mut GlobalRuntimeState<'pg> {
-        &mut self.global
+    pub fn global_runtime_state_mut(&mut self) -> &mut GlobalRuntimeState {
+        self.global
     }
     /// Get an iterator over the namespaces containing definition of all script-defined functions.
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
-        self.lib.iter().copied()
+        self.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current set of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn namespaces(&self) -> &[&Module] {
+    pub const fn namespaces(&self) -> &[SharedModule] {
         self.lib
     }
     /// The current bound `this` pointer, if any.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn this_ptr(&self) -> Option<&Dynamic> {
-        self.this_ptr.as_ref().map(|v| &**v)
+        if self.this_ptr.is_null() {
+            None
+        } else {
+            Some(self.this_ptr)
+        }
     }
     /// Mutable reference to the current bound `this` pointer, if any.
-    #[inline(always)]
+    #[inline]
     #[must_use]
-    pub fn this_ptr_mut(&mut self) -> &mut Option<&'pt mut Dynamic> {
-        self.this_ptr
+    pub fn this_ptr_mut(&mut self) -> Option<&mut Dynamic> {
+        if self.this_ptr.is_null() {
+            None
+        } else {
+            Some(self.this_ptr)
+        }
     }
     /// The current nesting level of function calls.
     #[inline(always)]
@@ -173,17 +181,10 @@ impl<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'pg, '
     ) -> crate::RhaiResult {
         let expr: &crate::ast::Expr = expr;
 
-        let mut new_caches = Caches::new();
-
-        let caches = match self.caches.as_mut() {
-            Some(c) => c,
-            None => &mut new_caches,
-        };
-
         match expr {
             crate::ast::Expr::Stmt(statements) => self.engine.eval_stmt_block(
                 self.global,
-                caches,
+                self.caches,
                 self.lib,
                 self.level,
                 self.scope,
@@ -193,7 +194,7 @@ impl<'a, 's, 'ps, 'g, 'pg, 'c, 'pc, 't, 'pt> EvalContext<'a, 's, 'ps, 'g, 'pg, '
             ),
             _ => self.engine.eval_expr(
                 self.global,
-                caches,
+                self.caches,
                 self.lib,
                 self.level,
                 self.scope,
