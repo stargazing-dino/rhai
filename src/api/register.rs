@@ -662,7 +662,7 @@ impl Engine {
     /// let mut module = Module::new();
     /// module.set_native_fn("calc", |x: i64| Ok(x + 1));
     ///
-    /// let module: SharedModule = module.into();
+    /// let module: Shared<Module> = module.into();
     ///
     /// engine
     ///     // Register the module as a fixed sub-module

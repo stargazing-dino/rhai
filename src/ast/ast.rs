@@ -267,7 +267,7 @@ impl AST {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) const fn shared_lib(&self) -> &SharedModule {
+    pub(crate) const fn shared_lib(&self) -> &crate::SharedModule {
         &self.lib
     }
     /// _(internals)_ Get the internal shared [`Module`][crate::Module] containing all script-defined functions.
