@@ -3,7 +3,6 @@
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
-use crate::types::RestoreOnDrop;
 use crate::{
     Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
 };
@@ -229,7 +228,7 @@ impl Engine {
             ast.resolver().cloned(),
         );
         #[cfg(not(feature = "no_module"))]
-        let global = &mut *RestoreOnDrop::lock(global, move |g| {
+        let global = &mut *crate::types::RestoreOnDrop::lock(global, move |g| {
             g.embedded_module_resolver = orig_embedded_module_resolver
         });
 

@@ -161,16 +161,9 @@ impl FnPtr {
             &lib
         };
 
-        let global = &mut GlobalRuntimeState::new(engine);
+        let global = &GlobalRuntimeState::new(engine);
 
-        let ctx = NativeCallContext::new_with_all_fields(
-            engine,
-            self.fn_name(),
-            None,
-            global,
-            lib,
-            Position::NONE,
-        );
+        let ctx = (engine, self.fn_name(), None, global, lib, Position::NONE).into();
 
         let result = self.call_raw(&ctx, None, arg_values)?;
 

@@ -730,12 +730,11 @@ impl Engine {
                 // Check variable definition filter
                 if let Some(ref filter) = self.def_var_filter {
                     let will_shadow = scope.contains(var_name);
-                    let nesting_level = global.scope_level;
                     let is_const = access == AccessMode::ReadOnly;
                     let info = VarDefInfo {
                         name: var_name,
                         is_const,
-                        nesting_level,
+                        nesting_level: global.scope_level,
                         will_shadow,
                     };
                     let context = EvalContext::new(self, global, caches, lib, scope, this_ptr);
