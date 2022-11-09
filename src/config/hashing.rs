@@ -160,13 +160,13 @@ where
     }
 }
 
-unsafe impl<T: Sync + Send> Sync for SusLock<T> where T: 'static + Copy {}
-unsafe impl<T: Send> Send for SusLock<T> where T: 'static + Copy {}
-impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for SusLock<T> where T: 'static + Copy {}
+unsafe impl<T: Sync + Send> Sync for SusLock<T> where T: 'static {}
+unsafe impl<T: Send> Send for SusLock<T> where T: 'static {}
+impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for SusLock<T> where T: 'static {}
 
 impl<T> Drop for SusLock<T>
 where
-    T: 'static + Copy,
+    T: 'static,
 {
     #[inline]
     fn drop(&mut self) {
@@ -217,8 +217,10 @@ pub fn set_ahash_seed(new_seed: Option<[u64; 4]>) -> Result<(), Option<[u64; 4]>
 #[inline]
 #[must_use]
 pub fn get_ahash_seed() -> &'static Option<[u64; 4]> {
+    const NONE: &'static Option<[u64; 4]> = &None;
+
     match AHASH_SEED.get_or_init(|| hashing_env::AHASH_SEED) {
         Some(ash) => ash,
-        None => None,
+        None => NONE,
     }
 }

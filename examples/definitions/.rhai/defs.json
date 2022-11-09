@@ -3,8 +3,8 @@
     "general_kenobi": {
       "functions": [
         {
-          "baseHash": 727795846011184342,
-          "fullHash": 5101524478338862216,
+          "baseHash": 3873007749982070651,
+          "fullHash": 5865213555928423624,
           "namespace": "internal",
           "access": "public",
           "name": "hello_there",
@@ -27,8 +27,8 @@
   },
   "functions": [
     {
-      "baseHash": 17133166385977770750,
-      "fullHash": 11299449021188202345,
+      "baseHash": 12461724250411739075,
+      "fullHash": 14530626537296006176,
       "namespace": "global",
       "access": "public",
       "name": "minus",
