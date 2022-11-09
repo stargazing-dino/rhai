@@ -39,7 +39,7 @@ New features
 
 ### Static hashing
 
-* It is now possible to specify a fixed _seed_ for use with the `ahash` hasher, via a static function `rhai::config::hashing::set_ahash_seed` or an environment variable, in order to force static (i.e. deterministic) hashes for function signatures.
+* It is now possible to specify a fixed _seed_ for use with the `ahash` hasher, via a static function `rhai::config::hashing::set_ahash_seed` or an environment variable (`RHAI_AHASH_SEED`), in order to force static (i.e. deterministic) hashes for function signatures.
 * This is necessary when using Rhai across shared-library boundaries.
 * A build script is used to extract the environment variable (`RHAI_AHASH_SEED`, if any) and splice it into the source code before compilation.
 
