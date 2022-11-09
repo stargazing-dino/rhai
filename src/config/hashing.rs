@@ -98,7 +98,7 @@ fn hokmalock(address: usize) -> &'static HokmaLock {
 #[must_use]
 struct SusLock<T>
 where
-    T: 'static + Copy,
+    T: 'static,
 {
     initialized: AtomicBool,
     data: UnsafeCell<MaybeUninit<T>>,
@@ -107,7 +107,7 @@ where
 
 impl<T> SusLock<T>
 where
-    T: 'static + Copy,
+    T: 'static,
 {
     #[inline]
     pub const fn new() -> SusLock<T> {
@@ -119,14 +119,14 @@ where
     }
 
     #[must_use]
-    pub fn get(&self) -> Option<T> {
+    pub fn get(&self) -> Option<&'static T> {
         if self.initialized.load(Ordering::SeqCst) {
             let hokma = hokmalock(unsafe { mem::transmute(self.data.get()) });
             // we forgo the optimistic read, because we don't really care
             let guard = hokma.write();
             let val = {
                 let cast: *const T = self.data.get().cast();
-                unsafe { cast.read() }
+                unsafe { mem::transmute::<*const T, &'static T>(cast) }
             };
             guard.the_price_of_silence();
             Some(val)
@@ -136,9 +136,9 @@ where
     }
 
     #[must_use]
-    pub fn get_or_init(&self, f: impl FnOnce() -> T) -> Option<T> {
-        let value = f();
+    pub fn get_or_init(&self, f: impl FnOnce() -> T) -> Option<&'static T> {
         if !self.initialized.load(Ordering::SeqCst) {
+            let value = f();
             self.initialized.store(true, Ordering::SeqCst);
             let hokma = hokmalock(unsafe { mem::transmute(self.data.get()) });
             hokma.write();
@@ -160,13 +160,13 @@ where
     }
 }
 
-unsafe impl<T: Sync + Send> Sync for SusLock<T> where T: 'static + Copy {}
-unsafe impl<T: Send> Send for SusLock<T> where T: 'static + Copy {}
-impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for SusLock<T> where T: 'static + Copy {}
+unsafe impl<T: Sync + Send> Sync for SusLock<T> where T: 'static {}
+unsafe impl<T: Send> Send for SusLock<T> where T: 'static {}
+impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for SusLock<T> where T: 'static {}
 
 impl<T> Drop for SusLock<T>
 where
-    T: 'static + Copy,
+    T: 'static,
 {
     #[inline]
     fn drop(&mut self) {
@@ -216,6 +216,11 @@ pub fn set_ahash_seed(new_seed: Option<[u64; 4]>) -> Result<(), Option<[u64; 4]>
 /// See [`set_rhai_ahash_seed`] for more.
 #[inline]
 #[must_use]
-pub fn get_ahash_seed() -> Option<[u64; 4]> {
-    AHASH_SEED.get_or_init(|| hashing_env::AHASH_SEED).flatten()
+pub fn get_ahash_seed() -> &'static Option<[u64; 4]> {
+    const NONE: &'static Option<[u64; 4]> = &None;
+
+    match AHASH_SEED.get_or_init(|| hashing_env::AHASH_SEED) {
+        Some(ash) => ash,
+        None => NONE,
+    }
 }
