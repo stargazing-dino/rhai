@@ -12,7 +12,7 @@ use crate::tokenizer::Token;
 use crate::types::dynamic::AccessMode;
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnPtr, Identifier, ImmutableString, Position,
-    Scope, StaticVec, AST, INT,
+    Scope, StaticVec, AST,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -592,7 +592,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             }
 
             // Then check ranges
-            if value.is::<INT>() && !ranges.is_empty() {
+            if value.is_int() && !ranges.is_empty() {
                 let value = value.as_int().unwrap();
 
                 // Only one range or all ranges without conditions

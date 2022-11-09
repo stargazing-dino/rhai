@@ -111,10 +111,10 @@ impl Engine {
         #[cfg(not(feature = "no_module"))]
         let (lib, constants) = if let Some(ref environ) = fn_def.environ {
             let crate::ast::EncapsulatedEnviron {
-                lib: fn_lib,
-                imports,
-                constants,
-            } = environ.as_ref();
+                lib: ref fn_lib,
+                ref imports,
+                ref constants,
+            } = **environ;
 
             imports
                 .iter()

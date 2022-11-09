@@ -63,7 +63,7 @@ impl Engine {
             #[cfg(not(feature = "no_index"))]
             ChainType::Indexing => {
                 // Check for existence with the null conditional operator
-                if parent_options.contains(ASTFlags::NEGATED) && target.is::<()>() {
+                if parent_options.contains(ASTFlags::NEGATED) && target.is_unit() {
                     return Ok((Dynamic::UNIT, false));
                 }
 
@@ -189,7 +189,7 @@ impl Engine {
             #[cfg(not(feature = "no_object"))]
             ChainType::Dotting => {
                 // Check for existence with the Elvis operator
-                if parent_options.contains(ASTFlags::NEGATED) && target.is::<()>() {
+                if parent_options.contains(ASTFlags::NEGATED) && target.is_unit() {
                     return Ok((Dynamic::UNIT, false));
                 }
 
@@ -229,7 +229,7 @@ impl Engine {
                         unreachable!("function call in dot chain should not be namespace-qualified")
                     }
                     // {xxx:map}.id op= ???
-                    Expr::Property(x, pos) if target.is::<crate::Map>() && new_val.is_some() => {
+                    Expr::Property(x, pos) if target.is_map() && new_val.is_some() => {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, lib, scope, this_ptr, rhs)?;
 
@@ -247,7 +247,7 @@ impl Engine {
                         Ok((Dynamic::UNIT, true))
                     }
                     // {xxx:map}.id
-                    Expr::Property(x, pos) if target.is::<crate::Map>() => {
+                    Expr::Property(x, pos) if target.is_map() => {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, lib, scope, this_ptr, rhs)?;
 
@@ -351,7 +351,7 @@ impl Engine {
                     }
                     // {xxx:map}.sub_lhs[expr] | {xxx:map}.sub_lhs.expr
                     Expr::Index(x, options, x_pos) | Expr::Dot(x, options, x_pos)
-                        if target.is::<crate::Map>() =>
+                        if target.is_map() =>
                     {
                         let _node = &x.lhs;
 

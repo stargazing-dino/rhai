@@ -559,7 +559,7 @@ fn main() {
                 // Evaluate
                 engine.eval_ast_with_scope::<Dynamic>(&mut scope, &main_ast)
             }) {
-            Ok(result) if !result.is::<()>() => {
+            Ok(result) if !result.is_unit() => {
                 println!("=> {result:?}");
                 println!();
             }

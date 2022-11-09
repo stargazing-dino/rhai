@@ -8,7 +8,10 @@ use crate::ast::{
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::types::dynamic::{AccessMode, Union};
 use crate::types::RestoreOnDrop;
-use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, SharedModule, ERR, INT};
+use crate::{
+    Dynamic, Engine, ImmutableString, Position, RhaiResult, RhaiResultOf, Scope, SharedModule, ERR,
+    INT,
+};
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -174,8 +177,7 @@ impl Engine {
                             global, caches, lib, op, token, *hash_op, args, true, *op_pos,
                         )
                         .map_err(|err| err.fill_position(op_info.pos))?
-                        .0
-                        .flatten();
+                        .0;
                 }
                 Err(err) => return Err(err),
             }
@@ -183,6 +185,13 @@ impl Engine {
             self.check_data_size(args[0], root.1)?;
         } else {
             // Normal assignment
+
+            // If value is a string, intern it
+            if new_val.is_string() {
+                let value = new_val.into_immutable_string().expect("`ImmutableString`");
+                new_val = self.get_interned_string(value).into();
+            }
+
             *target.write_lock::<Dynamic>().unwrap() = new_val;
         }
 
@@ -257,34 +266,27 @@ impl Engine {
                 let root = (var_name, pos);
                 let lhs_ptr = &mut lhs_ptr;
 
-                return self
-                    .eval_op_assignment(global, caches, lib, op_info, lhs_ptr, root, rhs_val)
-                    .map(|_| Dynamic::UNIT);
+                self.eval_op_assignment(global, caches, lib, op_info, lhs_ptr, root, rhs_val)?;
+
+                return Ok(Dynamic::UNIT);
             }
 
             #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
             {
-                let rhs_val = self.eval_expr(global, caches, lib, scope, this_ptr, rhs)?;
+                let mut rhs_val = self
+                    .eval_expr(global, caches, lib, scope, this_ptr, rhs)?
+                    .flatten();
 
-                // Check if the result is a string. If so, intern it.
-                #[cfg(not(feature = "no_closure"))]
-                let is_string = !rhs_val.is_shared() && rhs_val.is::<crate::ImmutableString>();
-                #[cfg(feature = "no_closure")]
-                let is_string = rhs_val.is::<crate::ImmutableString>();
-
-                let rhs_val = if is_string {
-                    self.get_interned_string(
-                        rhs_val.into_immutable_string().expect("`ImmutableString`"),
-                    )
-                    .into()
-                } else {
-                    rhs_val.flatten()
-                };
+                // If value is a string, intern it
+                if rhs_val.is_string() {
+                    let value = rhs_val.into_immutable_string().expect("`ImmutableString`");
+                    rhs_val = self.get_interned_string(value).into();
+                }
 
                 let _new_val = &mut Some((rhs_val, op_info));
 
                 // Must be either `var[index] op= val` or `var.prop op= val`
-                return match lhs {
+                match lhs {
                     // name op= rhs (handled above)
                     Expr::Variable(..) => {
                         unreachable!("Expr::Variable case is already handled")
@@ -298,8 +300,9 @@ impl Engine {
                     Expr::Dot(..) => self
                         .eval_dot_index_chain(global, caches, lib, scope, this_ptr, lhs, _new_val),
                     _ => unreachable!("cannot assign to expression: {:?}", lhs),
-                }
-                .map(|_| Dynamic::UNIT);
+                }?;
+
+                return Ok(Dynamic::UNIT);
             }
         }
 
@@ -381,7 +384,7 @@ impl Engine {
                                 break;
                             }
                         }
-                    } else if value.is::<INT>() && !ranges.is_empty() {
+                    } else if value.is_int() && !ranges.is_empty() {
                         // Then check integer ranges
                         let value = value.as_int().expect("`INT`");
 
@@ -803,8 +806,8 @@ impl Engine {
 
                 let v = self.eval_expr(global, caches, lib, scope, this_ptr, expr)?;
                 let typ = v.type_name();
-                let path = v.try_cast::<crate::ImmutableString>().ok_or_else(|| {
-                    self.make_type_mismatch_err::<crate::ImmutableString>(typ, expr.position())
+                let path = v.try_cast::<ImmutableString>().ok_or_else(|| {
+                    self.make_type_mismatch_err::<ImmutableString>(typ, expr.position())
                 })?;
 
                 use crate::ModuleResolver;
@@ -832,7 +835,7 @@ impl Engine {
                 let (export, must_be_indexed) = if !export.is_empty() {
                     (export.name.clone(), true)
                 } else {
-                    (self.get_interned_string(""), false)
+                    (self.const_empty_string(), false)
                 };
 
                 if !must_be_indexed || module.is_indexed() {

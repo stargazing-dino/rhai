@@ -287,7 +287,7 @@ impl Engine {
 
             // `... ${...} ...`
             Expr::InterpolatedString(x, _) => {
-                let mut concat = self.get_interned_string("").into();
+                let mut concat = self.const_empty_string().into();
                 let target = &mut concat;
 
                 let mut op_info = OpAssignment::new_op_assignment(OP_CONCAT, Position::NONE);
@@ -296,7 +296,9 @@ impl Engine {
                 let result = x
                     .iter()
                     .try_for_each(|expr| {
-                        let item = self.eval_expr(global, caches, lib, scope, this_ptr, expr)?;
+                        let item = self
+                            .eval_expr(global, caches, lib, scope, this_ptr, expr)?
+                            .flatten();
 
                         op_info.pos = expr.start_position();
 
@@ -394,7 +396,7 @@ impl Engine {
             Expr::Coalesce(x, ..) => {
                 let value = self.eval_expr(global, caches, lib, scope, this_ptr, &x.lhs)?;
 
-                if value.is::<()>() {
+                if value.is_unit() {
                     self.eval_expr(global, caches, lib, scope, this_ptr, &x.rhs)
                 } else {
                     Ok(value)

@@ -81,6 +81,11 @@ pub struct NativeCallContext<'a> {
 
 /// _(internals)_ Context of a native Rust function call.
 /// Exported under the `internals` feature only.
+///
+/// # WARNING - Volatile Type
+///
+/// This type is volatile and may change in the future.
+#[deprecated = "This type is NOT deprecated, but it is considered volatile and may change in the future."]
 #[cfg(feature = "internals")]
 #[derive(Debug, Clone)]
 pub struct NativeCallContextStore {
@@ -97,8 +102,14 @@ pub struct NativeCallContextStore {
 }
 
 #[cfg(feature = "internals")]
+#[allow(deprecated)]
 impl NativeCallContextStore {
     /// Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    ///
+    /// # WARNING - Unstable API
+    ///
+    /// This API is volatile and may change in the future.
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     #[inline(always)]
     #[must_use]
     pub fn create_context<'a>(&'a self, engine: &'a Engine) -> NativeCallContext<'a> {
@@ -167,9 +178,15 @@ impl<'a> NativeCallContext<'a> {
 
     /// _(internals)_ Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
     /// Exported under the `internals` feature only.
+    ///
+    /// # WARNING - Unstable API
+    ///
+    /// This API is volatile and may change in the future.
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     #[cfg(feature = "internals")]
     #[inline]
     #[must_use]
+    #[allow(deprecated)]
     pub fn from_stored_data(engine: &'a Engine, context: &'a NativeCallContextStore) -> Self {
         Self {
             engine,
@@ -182,9 +199,15 @@ impl<'a> NativeCallContext<'a> {
     }
     /// _(internals)_ Store this [`NativeCallContext`] into a [`NativeCallContextClone`].
     /// Exported under the `internals` feature only.
+    ///
+    /// # WARNING - Unstable API
+    ///
+    /// This API is volatile and may change in the future.
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     #[cfg(feature = "internals")]
     #[inline]
     #[must_use]
+    #[allow(deprecated)]
     pub fn store_data(&self) -> NativeCallContextStore {
         NativeCallContextStore {
             fn_name: self.fn_name.to_string(),

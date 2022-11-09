@@ -145,7 +145,7 @@ impl Engine {
         format!(
             "{fn_name} ({})",
             args.iter()
-                .map(|a| if a.is::<ImmutableString>() {
+                .map(|a| if a.is_string() {
                     "&str | ImmutableString | String"
                 } else {
                     self.map_type_name(a.type_name())
@@ -574,7 +574,7 @@ impl Engine {
                 // Handle is_def_fn()
                 #[cfg(not(feature = "no_function"))]
                 crate::engine::KEYWORD_IS_DEF_FN
-                    if args.len() == 2 && args[0].is::<FnPtr>() && args[1].is::<crate::INT>() =>
+                    if args.len() == 2 && args[0].is_fnptr() && args[1].is_int() =>
                 {
                     let fn_name = args[0].read_lock::<ImmutableString>().expect("`FnPtr`");
                     let num_params = args[1].as_int().expect("`INT`");
@@ -731,7 +731,7 @@ impl Engine {
         let is_ref_mut = target.is_ref();
 
         let (result, updated) = match fn_name {
-            KEYWORD_FN_PTR_CALL if target.is::<FnPtr>() => {
+            KEYWORD_FN_PTR_CALL if target.is_fnptr() => {
                 // FnPtr call
                 let fn_ptr = target.read_lock::<FnPtr>().expect("`FnPtr`");
 
@@ -775,7 +775,7 @@ impl Engine {
                 if call_args.is_empty() {
                     let typ = self.map_type_name(target.type_name());
                     return Err(self.make_type_mismatch_err::<FnPtr>(typ, fn_call_pos));
-                } else if !call_args[0].is::<FnPtr>() {
+                } else if !call_args[0].is_fnptr() {
                     let typ = self.map_type_name(call_args[0].type_name());
                     return Err(self.make_type_mismatch_err::<FnPtr>(typ, first_arg_pos));
                 }
@@ -827,7 +827,7 @@ impl Engine {
                 )
             }
             KEYWORD_FN_PTR_CURRY => {
-                if !target.is::<FnPtr>() {
+                if !target.is_fnptr() {
                     let typ = self.map_type_name(target.type_name());
                     return Err(self.make_type_mismatch_err::<FnPtr>(typ, fn_call_pos));
                 }
@@ -969,7 +969,7 @@ impl Engine {
                 let (arg_value, arg_pos) =
                     self.get_arg_value(global, caches, lib, scope, this_ptr, arg)?;
 
-                if !arg_value.is::<FnPtr>() {
+                if !arg_value.is_fnptr() {
                     let typ = self.map_type_name(arg_value.type_name());
                     return Err(self.make_type_mismatch_err::<FnPtr>(typ, arg_pos));
                 }
@@ -1025,7 +1025,7 @@ impl Engine {
                 let (arg_value, arg_pos) =
                     self.get_arg_value(global, caches, lib, scope, this_ptr, first)?;
 
-                if !arg_value.is::<FnPtr>() {
+                if !arg_value.is_fnptr() {
                     let typ = self.map_type_name(arg_value.type_name());
                     return Err(self.make_type_mismatch_err::<FnPtr>(typ, arg_pos));
                 }
