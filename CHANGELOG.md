@@ -16,6 +16,7 @@ Bug fixes
 * `import` statements inside `eval` no longer cause errors in subsequent code.
 * Functions marked `global` in `import`ed modules with no alias names now work properly.
 * Incorrect loop optimizations that are too aggressive (e.g. unrolling a `do { ... } until true` with a `break` statement inside) and cause crashes are removed.
+* `Dynamic::is` now works properly for shared values.
 
 Breaking changes
 ----------------

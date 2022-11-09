@@ -52,7 +52,6 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[SharedModule],
-
         scope: &'s mut Scope,
         this_ptr: &'s mut Dynamic,
         expr: &Expr,
@@ -136,7 +135,6 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[SharedModule],
-
         scope: &'s mut Scope,
         this_ptr: &'s mut Dynamic,
         expr: &Expr,
@@ -221,7 +219,6 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         lib: &[SharedModule],
-
         scope: &mut Scope,
         this_ptr: &mut Dynamic,
         expr: &Expr,

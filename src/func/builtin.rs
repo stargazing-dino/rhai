@@ -690,7 +690,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                 PlusAssign => Some(|_ctx, args| {
                     let (first, second) = args.split_first_mut().expect(BUILTIN);
                     let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
-                    let y = std::mem::take(second[0]).cast::<ImmutableString>();
+                    let y = &*second[0].read_lock::<ImmutableString>().expect(BUILTIN);
 
                     #[cfg(not(feature = "unchecked"))]
                     if !x.is_empty() && !y.is_empty() {
@@ -704,7 +704,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                 MinusAssign => Some(|_, args| {
                     let (first, second) = args.split_first_mut().expect(BUILTIN);
                     let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
-                    let y = std::mem::take(second[0]).cast::<ImmutableString>();
+                    let y = &*second[0].read_lock::<ImmutableString>().expect(BUILTIN);
                     Ok((*x -= y).into())
                 }),
                 _ => None,
@@ -718,7 +718,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
 
             return match op {
                 PlusAssign => Some(|_ctx, args| {
-                    let x = std::mem::take(args[1]).cast::<Array>();
+                    let x = std::mem::take(args[1]).into_array().expect(BUILTIN);
 
                     if x.is_empty() {
                         return Ok(Dynamic::UNIT);
@@ -749,7 +749,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
 
             return match op {
                 PlusAssign => Some(|_ctx, args| {
-                    let blob2 = std::mem::take(args[1]).cast::<Blob>();
+                    let blob2 = std::mem::take(args[1]).into_blob().expect(BUILTIN);
                     let blob1 = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
 
                     #[cfg(not(feature = "unchecked"))]
@@ -951,13 +951,13 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
 
             return match op {
                 PlusAssign => Some(|_ctx, args| {
-                    let s = std::mem::take(args[1]).cast::<ImmutableString>();
+                    let (first, second) = args.split_first_mut().expect(BUILTIN);
+                    let blob = &mut *first.write_lock::<Blob>().expect(BUILTIN);
+                    let s = &*second[0].read_lock::<ImmutableString>().expect(BUILTIN);
 
                     if s.is_empty() {
                         return Ok(Dynamic::UNIT);
                     }
-
-                    let blob = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
 
                     #[cfg(not(feature = "unchecked"))]
                     _ctx.engine().raise_err_if_over_data_size_limit((
@@ -966,7 +966,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                         0,
                     ))?;
 
-                    Ok(append_str(blob, &s).into())
+                    Ok(append_str(blob, s).into())
                 }),
                 _ => None,
             };

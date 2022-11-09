@@ -6,7 +6,7 @@ use crate::ast::{
     ASTFlags, BinaryExpr, Expr, Ident, OpAssignment, Stmt, SwitchCasesCollection, TryCatchBlock,
 };
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
-use crate::types::dynamic::{AccessMode, Union};
+use crate::types::dynamic::AccessMode;
 use crate::types::RestoreOnDrop;
 use crate::{
     Dynamic, Engine, ImmutableString, Position, RhaiResult, RhaiResultOf, Scope, SharedModule, ERR,
@@ -687,7 +687,7 @@ impl Engine {
                         .map(|_| Dynamic::UNIT)
                         .map_err(|result_err| match *result_err {
                             // Re-throw exception
-                            ERR::ErrorRuntime(Dynamic(Union::Unit(..)), pos) => {
+                            ERR::ErrorRuntime(v, pos) if v.is_unit() => {
                                 err.set_position(pos);
                                 err
                             }

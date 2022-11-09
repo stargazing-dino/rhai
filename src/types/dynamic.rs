@@ -260,10 +260,18 @@ impl Dynamic {
     }
     /// Is the value held by this [`Dynamic`] a particular type?
     ///
-    /// If the [`Dynamic`] is a shared variant checking is performed on top of its internal value.
+    /// # Panics or Deadlocks When Value is Shared
+    ///
+    /// Under the `sync` feature, this call may deadlock, or [panic](https://doc.rust-lang.org/std/sync/struct.RwLock.html#panics-1).
+    /// Otherwise, this call panics if the data is currently borrowed for write.
     #[inline]
     #[must_use]
     pub fn is<T: Any + Clone>(&self) -> bool {
+        #[cfg(not(feature = "no_closure"))]
+        if self.is_shared() {
+            return TypeId::of::<T>() == self.type_id();
+        }
+
         if TypeId::of::<T>() == TypeId::of::<()>() {
             return matches!(self.0, Union::Unit(..));
         }
@@ -1819,9 +1827,12 @@ impl Dynamic {
     #[inline]
     pub fn as_unit(&self) -> Result<(), &'static str> {
         match self.0 {
-            Union::Unit(v, ..) => Ok(v),
+            Union::Unit(..) => Ok(()),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Unit(..) => Ok(()),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1832,7 +1843,10 @@ impl Dynamic {
         match self.0 {
             Union::Int(n, ..) => Ok(n),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Int(n, ..) => Ok(n),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1846,7 +1860,10 @@ impl Dynamic {
         match self.0 {
             Union::Float(n, ..) => Ok(*n),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Float(n, ..) => Ok(*n),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1860,7 +1877,10 @@ impl Dynamic {
         match self.0 {
             Union::Decimal(ref n, ..) => Ok(**n),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Decimal(ref n, ..) => Ok(**n),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1871,7 +1891,10 @@ impl Dynamic {
         match self.0 {
             Union::Bool(b, ..) => Ok(b),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Bool(b, ..) => Ok(b),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1880,9 +1903,12 @@ impl Dynamic {
     #[inline]
     pub fn as_char(&self) -> Result<char, &'static str> {
         match self.0 {
-            Union::Char(n, ..) => Ok(n),
+            Union::Char(c, ..) => Ok(c),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Char(c, ..) => Ok(c),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1917,14 +1943,10 @@ impl Dynamic {
         match self.0 {
             Union::Str(s, ..) => Ok(s),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                let value = crate::func::locked_read(cell);
-
-                match value.0 {
-                    Union::Str(ref s, ..) => Ok(s.clone()),
-                    _ => Err((*value).type_name()),
-                }
-            }
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Str(ref s, ..) => Ok(s.clone()),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1938,14 +1960,10 @@ impl Dynamic {
         match self.0 {
             Union::Array(a, ..) => Ok(*a),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                let value = crate::func::locked_read(cell);
-
-                match value.0 {
-                    Union::Array(ref a, ..) => Ok(a.as_ref().clone()),
-                    _ => Err((*value).type_name()),
-                }
-            }
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Array(ref a, ..) => Ok(a.as_ref().clone()),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1973,12 +1991,12 @@ impl Dynamic {
                     v.try_cast::<T>().ok_or(typ)
                 })
                 .collect(),
-            Union::Blob(..) if TypeId::of::<T>() == TypeId::of::<u8>() => Ok(self.cast::<Vec<T>>()),
+            Union::Blob(b, ..) if TypeId::of::<T>() == TypeId::of::<u8>() => {
+                Ok(reify!(*b => Vec<T>))
+            }
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) => {
-                let value = crate::func::locked_read(cell);
-
-                match value.0 {
+                match crate::func::locked_read(cell).0 {
                     Union::Array(ref a, ..) => {
                         a.iter()
                             .map(|v| {
@@ -1996,10 +2014,10 @@ impl Dynamic {
                             })
                             .collect()
                     }
-                    Union::Blob(..) if TypeId::of::<T>() == TypeId::of::<u8>() => {
-                        Ok((*value).clone().cast::<Vec<T>>())
+                    Union::Blob(ref b, ..) if TypeId::of::<T>() == TypeId::of::<u8>() => {
+                        Ok(reify!(b.clone() => Vec<T>))
                     }
-                    _ => Err((*value).type_name()),
+                    _ => Err(cell.type_name()),
                 }
             }
             _ => Err(self.type_name()),
@@ -2013,16 +2031,12 @@ impl Dynamic {
     #[inline(always)]
     pub fn into_blob(self) -> Result<crate::Blob, &'static str> {
         match self.0 {
-            Union::Blob(a, ..) => Ok(*a),
+            Union::Blob(b, ..) => Ok(*b),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                let value = crate::func::locked_read(cell);
-
-                match value.0 {
-                    Union::Blob(ref a, ..) => Ok(a.as_ref().clone()),
-                    _ => Err((*value).type_name()),
-                }
-            }
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Blob(ref b, ..) => Ok(b.as_ref().clone()),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
