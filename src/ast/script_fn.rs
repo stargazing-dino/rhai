@@ -20,9 +20,9 @@ use std::{fmt, hash::Hash};
 #[derive(Debug, Clone)]
 pub struct EncapsulatedEnviron {
     /// Functions defined within the same [`AST`][crate::AST].
-    pub lib: crate::Shared<crate::Module>,
+    pub lib: crate::SharedModule,
     /// Imported [modules][crate::Module].
-    pub imports: Box<[(ImmutableString, crate::Shared<crate::Module>)]>,
+    pub imports: Box<[(ImmutableString, crate::SharedModule)]>,
     /// Globally-defined constants.
     pub constants: Option<crate::eval::GlobalConstants>,
 }

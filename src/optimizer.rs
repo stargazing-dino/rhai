@@ -50,18 +50,18 @@ struct OptimizerState<'a> {
     /// Has the [`AST`] been changed during this pass?
     changed: bool,
     /// Collection of constants to use for eager function evaluations.
-    variables: StaticVec<(Identifier, AccessMode, Option<Dynamic>)>,
+    variables: StaticVec<(Identifier, AccessMode, Dynamic)>,
     /// Activate constants propagation?
     propagate_constants: bool,
     /// An [`Engine`] instance for eager function evaluation.
     engine: &'a Engine,
     /// The global runtime state.
-    global: GlobalRuntimeState<'a>,
+    global: GlobalRuntimeState,
     /// Function resolution caches.
-    caches: Caches<'a>,
+    caches: Caches,
     /// [Module][crate::Module] containing script-defined functions.
     #[cfg(not(feature = "no_function"))]
-    lib: &'a [&'a crate::Module],
+    lib: &'a [crate::SharedModule],
     /// Optimization level.
     optimization_level: OptimizationLevel,
 }
@@ -71,7 +71,7 @@ impl<'a> OptimizerState<'a> {
     #[inline(always)]
     pub fn new(
         engine: &'a Engine,
-        #[cfg(not(feature = "no_function"))] lib: &'a [&'a crate::Module],
+        #[cfg(not(feature = "no_function"))] lib: &'a [crate::SharedModule],
         optimization_level: OptimizationLevel,
     ) -> Self {
         Self {
@@ -108,12 +108,7 @@ impl<'a> OptimizerState<'a> {
     }
     /// Add a new variable to the list.
     #[inline(always)]
-    pub fn push_var(
-        &mut self,
-        name: impl Into<Identifier>,
-        access: AccessMode,
-        value: Option<Dynamic>,
-    ) {
+    pub fn push_var(&mut self, name: impl Into<Identifier>, access: AccessMode, value: Dynamic) {
         self.variables.push((name.into(), access, value));
     }
     /// Look up a constant from the list.
@@ -127,7 +122,8 @@ impl<'a> OptimizerState<'a> {
             if n == name {
                 return match access {
                     AccessMode::ReadWrite => None,
-                    AccessMode::ReadOnly => value.as_ref(),
+                    AccessMode::ReadOnly if value.is_null() => None,
+                    AccessMode::ReadOnly => Some(value),
                 };
             }
         }
@@ -141,7 +137,7 @@ impl<'a> OptimizerState<'a> {
         fn_name: &str,
         op_token: Option<&Token>,
         arg_values: &mut [Dynamic],
-    ) -> Option<Dynamic> {
+    ) -> Dynamic {
         #[cfg(not(feature = "no_function"))]
         let lib = self.lib;
         #[cfg(feature = "no_function")]
@@ -152,7 +148,6 @@ impl<'a> OptimizerState<'a> {
                 &mut self.global,
                 &mut self.caches,
                 lib,
-                0,
                 fn_name,
                 op_token,
                 calc_fn_hash(None, fn_name, arg_values.len()),
@@ -160,8 +155,7 @@ impl<'a> OptimizerState<'a> {
                 false,
                 Position::NONE,
             )
-            .ok()
-            .map(|(v, ..)| v)
+            .map_or(Dynamic::NULL, |(v, ..)| v)
     }
 }
 
@@ -271,13 +265,13 @@ fn optimize_stmt_block(
                             state.push_var(
                                 x.0.as_str(),
                                 AccessMode::ReadOnly,
-                                x.1.get_literal_value(),
+                                x.1.get_literal_value().unwrap_or(Dynamic::NULL),
                             );
                         }
                     } else {
                         // Add variables into the state
                         optimize_expr(&mut x.1, state, false);
-                        state.push_var(x.0.as_str(), AccessMode::ReadWrite, None);
+                        state.push_var(x.0.as_str(), AccessMode::ReadWrite, Dynamic::NULL);
                     }
                 }
                 // Optimize the statement
@@ -1149,7 +1143,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                             #[cfg(feature = "no_function")]
                             let lib = &[][..];
 
-                            let context = (state.engine, x.name.as_str(), lib).into();
+                            let context = (state.engine, x.name.as_str(),None, &state.global, lib, *pos).into();
                             let (first, second) = arg_values.split_first_mut().unwrap();
                             (f)(context, &mut [ first, &mut second[0] ]).ok()
                         }) {
@@ -1189,7 +1183,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         => {
             // First search for script-defined functions (can override built-in)
             #[cfg(not(feature = "no_function"))]
-            let has_script_fn = !x.hashes.is_native_only() && state.lib.iter().find_map(|&m| m.get_script_fn(&x.name, x.args.len())).is_some();
+            let has_script_fn = !x.hashes.is_native_only() && state.lib.iter().find_map(|m| m.get_script_fn(&x.name, x.args.len())).is_some();
             #[cfg(feature = "no_function")]
             let has_script_fn = false;
 
@@ -1197,13 +1191,13 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 let arg_values = &mut x.args.iter().map(Expr::get_literal_value).collect::<Option<StaticVec<_>>>().unwrap();
 
                 let result = match x.name.as_str() {
-                    KEYWORD_TYPE_OF if arg_values.len() == 1 => Some(state.engine.map_type_name(arg_values[0].type_name()).into()),
+                    KEYWORD_TYPE_OF if arg_values.len() == 1 => state.engine.map_type_name(arg_values[0].type_name()).into(),
                     #[cfg(not(feature = "no_closure"))]
-                    crate::engine::KEYWORD_IS_SHARED if arg_values.len() == 1 => Some(Dynamic::FALSE),
+                    crate::engine::KEYWORD_IS_SHARED if arg_values.len() == 1 => Dynamic::FALSE,
                     _ => state.call_fn_with_constant_arguments(&x.name, x.op_token.as_ref(), arg_values)
                 };
 
-                if let Some(result) = result {
+                if !result.is_null() {
                     state.set_dirty();
                     *expr = Expr::from_dynamic(result, *pos);
                     return;
@@ -1263,7 +1257,7 @@ fn optimize_top_level(
     statements: StmtBlockContainer,
     engine: &Engine,
     scope: &Scope,
-    #[cfg(not(feature = "no_function"))] lib: &[&crate::Module],
+    #[cfg(not(feature = "no_function"))] lib: &[crate::SharedModule],
     optimization_level: OptimizationLevel,
 ) -> StmtBlockContainer {
     let mut statements = statements;
@@ -1289,15 +1283,15 @@ fn optimize_top_level(
         .rev()
         .flat_map(|m| m.iter_var())
     {
-        state.push_var(name, AccessMode::ReadOnly, Some(value.clone()));
+        state.push_var(name, AccessMode::ReadOnly, value.clone());
     }
 
     // Add constants and variables from the scope
     for (name, constant, value) in scope.iter() {
         if constant {
-            state.push_var(name, AccessMode::ReadOnly, Some(value));
+            state.push_var(name, AccessMode::ReadOnly, value);
         } else {
-            state.push_var(name, AccessMode::ReadWrite, None);
+            state.push_var(name, AccessMode::ReadWrite, Dynamic::NULL);
         }
     }
 
@@ -1317,7 +1311,7 @@ pub fn optimize_into_ast(
     let mut statements = statements;
 
     #[cfg(not(feature = "no_function"))]
-    let lib = {
+    let lib: crate::Shared<_> = {
         let mut module = crate::Module::new();
 
         if optimization_level != OptimizationLevel::None {
@@ -1338,7 +1332,7 @@ pub fn optimize_into_ast(
                 });
             }
 
-            let lib2 = &[&lib2];
+            let lib2 = &[lib2.into()];
 
             for fn_def in functions {
                 let mut fn_def = crate::func::shared_take_or_clone(fn_def);
@@ -1356,7 +1350,7 @@ pub fn optimize_into_ast(
             }
         }
 
-        module
+        module.into()
     };
 
     statements.shrink_to_fit();
@@ -1369,7 +1363,7 @@ pub fn optimize_into_ast(
                 engine,
                 scope,
                 #[cfg(not(feature = "no_function"))]
-                &[&lib],
+                &[lib.clone()],
                 optimization_level,
             ),
         },

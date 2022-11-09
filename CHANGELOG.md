@@ -4,6 +4,11 @@ Rhai Release Notes
 Version 1.11.0
 ==============
 
+Speed Improvements
+------------------
+
+* Due to a code refactor, built-in operators for standard types now run even faster, in certain cases by 20-30%.
+
 Bug fixes
 ---------
 
@@ -12,10 +17,10 @@ Bug fixes
 * Functions marked `global` in `import`ed modules with no alias names now work properly.
 * Incorrect loop optimizations that are too aggressive (e.g. unrolling a `do { ... } until true` with a `break` statement inside) and cause crashes are removed.
 
-Speed Improvements
-------------------
+Breaking changes
+----------------
 
-* Due to a code refactor, built-in operators for standard types now run even faster, in certain cases by 20-30%.
+* `NativeCallContext::new` is completely deprecated and unimplemented (always panics) in favor of new API's.
 
 New features
 ------------
@@ -40,6 +45,11 @@ New features
 ### Serializable `Scope`
 
 * `Scope` is now serializable and deserializable via `serde`.
+
+### Store and recreate `NativeCallContext`
+
+* A convenient API is added to store a `NativeCallContext` into a new `NativeCallContextStore` type.
+* This allows a `NativeCallContext` to be stored and recreated later on.
 
 ### Call native Rust functions in `NativeCallContext`
 

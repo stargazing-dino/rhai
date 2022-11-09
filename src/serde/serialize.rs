@@ -15,6 +15,8 @@ use crate::types::dynamic::Variant;
 impl Serialize for Dynamic {
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         match self.0 {
+            Union::Null => unreachable!(),
+
             Union::Unit(..) => ser.serialize_unit(),
             Union::Bool(x, ..) => ser.serialize_bool(x),
             Union::Str(ref s, ..) => ser.serialize_str(s.as_str()),

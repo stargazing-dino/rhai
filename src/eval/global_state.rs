@@ -1,9 +1,9 @@
 //! Global runtime state.
 
 use crate::{Dynamic, Engine, ImmutableString};
+use std::fmt;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{fmt, marker::PhantomData};
 
 /// Collection of globally-defined constants.
 #[cfg(not(feature = "no_module"))]
@@ -22,13 +22,13 @@ pub type GlobalConstants =
 // Most usage will be looking up a particular key from the list and then getting the module that
 // corresponds to that key.
 #[derive(Clone)]
-pub struct GlobalRuntimeState<'a> {
+pub struct GlobalRuntimeState {
     /// Names of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
     imports: crate::StaticVec<ImmutableString>,
     /// Stack of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    modules: crate::StaticVec<crate::Shared<crate::Module>>,
+    modules: crate::StaticVec<crate::SharedModule>,
     /// Source of the current context.
     ///
     /// No source if the string is empty.
@@ -38,6 +38,8 @@ pub struct GlobalRuntimeState<'a> {
     /// Number of modules loaded.
     #[cfg(not(feature = "no_module"))]
     pub num_modules_loaded: usize,
+    /// The current nesting level of function calls.
+    pub level: usize,
     /// Level of the current scope.
     ///
     /// The global (root) level is zero, a new block (or function call) is one level higher, and so on.
@@ -70,11 +72,9 @@ pub struct GlobalRuntimeState<'a> {
     /// Debugging interface.
     #[cfg(feature = "debugging")]
     pub debugger: super::Debugger,
-    /// Take care of the lifetime parameter.
-    dummy: PhantomData<&'a ()>,
 }
 
-impl GlobalRuntimeState<'_> {
+impl GlobalRuntimeState {
     /// Create a new [`GlobalRuntimeState`] based on an [`Engine`].
     #[inline(always)]
     #[must_use]
@@ -89,6 +89,7 @@ impl GlobalRuntimeState<'_> {
             #[cfg(not(feature = "no_module"))]
             num_modules_loaded: 0,
             scope_level: 0,
+            level: 0,
             always_search_scope: false,
             #[cfg(not(feature = "no_module"))]
             embedded_module_resolver: None,
@@ -112,8 +113,6 @@ impl GlobalRuntimeState<'_> {
                     None => Dynamic::UNIT,
                 },
             ),
-
-            dummy: PhantomData::default(),
         }
     }
     /// Get the length of the stack of globally-imported [modules][crate::Module].
@@ -131,7 +130,7 @@ impl GlobalRuntimeState<'_> {
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     #[must_use]
-    pub fn get_shared_import(&self, index: usize) -> Option<crate::Shared<crate::Module>> {
+    pub fn get_shared_import(&self, index: usize) -> Option<crate::SharedModule> {
         self.modules.get(index).cloned()
     }
     /// Get a mutable reference to the globally-imported [module][crate::Module] at a
@@ -145,7 +144,7 @@ impl GlobalRuntimeState<'_> {
     pub(crate) fn get_shared_import_mut(
         &mut self,
         index: usize,
-    ) -> Option<&mut crate::Shared<crate::Module>> {
+    ) -> Option<&mut crate::SharedModule> {
         self.modules.get_mut(index)
     }
     /// Get the index of a globally-imported [module][crate::Module] by name.
@@ -169,7 +168,7 @@ impl GlobalRuntimeState<'_> {
     pub fn push_import(
         &mut self,
         name: impl Into<ImmutableString>,
-        module: impl Into<crate::Shared<crate::Module>>,
+        module: impl Into<crate::SharedModule>,
     ) {
         self.imports.push(name.into());
         self.modules.push(module.into());
@@ -202,7 +201,7 @@ impl GlobalRuntimeState<'_> {
     #[inline]
     pub(crate) fn iter_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&ImmutableString, &crate::Shared<crate::Module>)> {
+    ) -> impl Iterator<Item = (&ImmutableString, &crate::SharedModule)> {
         self.imports.iter().zip(self.modules.iter()).rev()
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in forward order.
@@ -212,7 +211,7 @@ impl GlobalRuntimeState<'_> {
     #[inline]
     pub fn scan_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&ImmutableString, &crate::Shared<crate::Module>)> {
+    ) -> impl Iterator<Item = (&ImmutableString, &crate::SharedModule)> {
         self.imports.iter().zip(self.modules.iter())
     }
     /// Can the particular function with [`Dynamic`] parameter(s) exist in the stack of
@@ -319,12 +318,12 @@ impl GlobalRuntimeState<'_> {
 }
 
 #[cfg(not(feature = "no_module"))]
-impl IntoIterator for GlobalRuntimeState<'_> {
-    type Item = (ImmutableString, crate::Shared<crate::Module>);
+impl IntoIterator for GlobalRuntimeState {
+    type Item = (ImmutableString, crate::SharedModule);
     type IntoIter = std::iter::Rev<
         std::iter::Zip<
             smallvec::IntoIter<[ImmutableString; crate::STATIC_VEC_INLINE_SIZE]>,
-            smallvec::IntoIter<[crate::Shared<crate::Module>; crate::STATIC_VEC_INLINE_SIZE]>,
+            smallvec::IntoIter<[crate::SharedModule; crate::STATIC_VEC_INLINE_SIZE]>,
         >,
     >;
 
@@ -334,12 +333,12 @@ impl IntoIterator for GlobalRuntimeState<'_> {
 }
 
 #[cfg(not(feature = "no_module"))]
-impl<'a> IntoIterator for &'a GlobalRuntimeState<'_> {
-    type Item = (&'a ImmutableString, &'a crate::Shared<crate::Module>);
+impl<'a> IntoIterator for &'a GlobalRuntimeState {
+    type Item = (&'a ImmutableString, &'a crate::SharedModule);
     type IntoIter = std::iter::Rev<
         std::iter::Zip<
             std::slice::Iter<'a, ImmutableString>,
-            std::slice::Iter<'a, crate::Shared<crate::Module>>,
+            std::slice::Iter<'a, crate::SharedModule>,
         >,
     >;
 
@@ -349,9 +348,7 @@ impl<'a> IntoIterator for &'a GlobalRuntimeState<'_> {
 }
 
 #[cfg(not(feature = "no_module"))]
-impl<K: Into<ImmutableString>, M: Into<crate::Shared<crate::Module>>> Extend<(K, M)>
-    for GlobalRuntimeState<'_>
-{
+impl<K: Into<ImmutableString>, M: Into<crate::SharedModule>> Extend<(K, M)> for GlobalRuntimeState {
     #[inline]
     fn extend<T: IntoIterator<Item = (K, M)>>(&mut self, iter: T) {
         for (k, m) in iter {
@@ -361,7 +358,7 @@ impl<K: Into<ImmutableString>, M: Into<crate::Shared<crate::Module>>> Extend<(K,
     }
 }
 
-impl fmt::Debug for GlobalRuntimeState<'_> {
+impl fmt::Debug for GlobalRuntimeState {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -10,7 +10,7 @@ use crate::func::{
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypesCollection};
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Identifier, ImmutableString, NativeCallContext,
-    RhaiResultOf, Shared, SmartString, StaticVec,
+    RhaiResultOf, Shared, SharedModule, SmartString, StaticVec,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -172,7 +172,7 @@ pub struct Module {
     /// Custom types.
     custom_types: Option<CustomTypesCollection>,
     /// Sub-modules.
-    modules: Option<BTreeMap<Identifier, Shared<Module>>>,
+    modules: Option<BTreeMap<Identifier, SharedModule>>,
     /// [`Module`] variables.
     variables: Option<BTreeMap<Identifier, Dynamic>>,
     /// Flattened collection of all [`Module`] variables, including those in sub-modules.
@@ -754,7 +754,7 @@ impl Module {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     #[must_use]
-    pub(crate) fn get_sub_modules_mut(&mut self) -> &mut BTreeMap<Identifier, Shared<Module>> {
+    pub(crate) fn get_sub_modules_mut(&mut self) -> &mut BTreeMap<Identifier, SharedModule> {
         // We must assume that the user has changed the sub-modules
         // (otherwise why take a mutable reference?)
         self.all_functions = None;
@@ -822,7 +822,7 @@ impl Module {
     pub fn set_sub_module(
         &mut self,
         name: impl Into<Identifier>,
-        sub_module: impl Into<Shared<Module>>,
+        sub_module: impl Into<SharedModule>,
     ) -> &mut Self {
         self.modules
             .get_or_insert_with(|| Default::default())
@@ -1830,7 +1830,7 @@ impl Module {
 
     /// Get an iterator to the sub-modules in the [`Module`].
     #[inline]
-    pub fn iter_sub_modules(&self) -> impl Iterator<Item = (&str, &Shared<Module>)> {
+    pub fn iter_sub_modules(&self) -> impl Iterator<Item = (&str, &SharedModule)> {
         self.modules
             .iter()
             .flat_map(|m| m.iter().map(|(k, m)| (k.as_str(), m)))
@@ -1986,7 +1986,7 @@ impl Module {
         // Run the script
         let caches = &mut crate::eval::Caches::new();
 
-        let result = engine.eval_ast_with_scope_raw(global, caches, 0, &mut scope, ast);
+        let result = engine.eval_ast_with_scope_raw(global, caches, &mut scope, ast);
 
         // Create new module
         let mut module = Module::new();

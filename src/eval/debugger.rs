@@ -4,7 +4,7 @@
 use super::{Caches, EvalContext, GlobalRuntimeState};
 use crate::ast::{ASTNode, Expr, Stmt};
 use crate::{
-    Dynamic, Engine, EvalAltResult, ImmutableString, Module, Position, RhaiResultOf, Scope,
+    Dynamic, Engine, EvalAltResult, ImmutableString, Position, RhaiResultOf, Scope, SharedModule,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -413,15 +413,14 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
-        level: usize,
+        lib: &[SharedModule],
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<()> {
         if self.debugger.is_some() {
             if let Some(cmd) =
-                self.run_debugger_with_reset_raw(global, caches, lib, level, scope, this_ptr, node)?
+                self.run_debugger_with_reset_raw(global, caches, lib, scope, this_ptr, node)?
             {
                 global.debugger.status = cmd;
             }
@@ -440,14 +439,13 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
-        level: usize,
+        lib: &[SharedModule],
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<Option<DebuggerStatus>> {
         if self.debugger.is_some() {
-            self.run_debugger_with_reset_raw(global, caches, lib, level, scope, this_ptr, node)
+            self.run_debugger_with_reset_raw(global, caches, lib, scope, this_ptr, node)
         } else {
             Ok(None)
         }
@@ -463,10 +461,9 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
-        level: usize,
+        lib: &[SharedModule],
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<Option<DebuggerStatus>> {
         let node = node.into();
@@ -497,7 +494,7 @@ impl Engine {
             },
         };
 
-        self.run_debugger_raw(global, caches, lib, level, scope, this_ptr, node, event)
+        self.run_debugger_raw(global, caches, lib, scope, this_ptr, node, event)
     }
     /// Run the debugger callback unconditionally.
     ///
@@ -510,17 +507,15 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
-        level: usize,
+        lib: &[SharedModule],
         scope: &mut Scope,
-        this_ptr: &mut Option<&mut Dynamic>,
+        this_ptr: &mut Dynamic,
         node: ASTNode<'a>,
         event: DebuggerEvent,
     ) -> Result<Option<DebuggerStatus>, Box<crate::EvalAltResult>> {
         let src = global.source_raw().cloned();
         let src = src.as_ref().map(|s| s.as_str());
-        let context =
-            crate::EvalContext::new(self, global, Some(caches), lib, level, scope, this_ptr);
+        let context = crate::EvalContext::new(self, global, caches, lib, scope, this_ptr);
 
         if let Some((.., ref on_debugger)) = self.debugger {
             let command = on_debugger(context, event, node, src, node.position())?;
@@ -546,12 +541,12 @@ impl Engine {
                     // Bump a level if it is a function call
                     let level = match node {
                         ASTNode::Expr(Expr::FnCall(..)) | ASTNode::Stmt(Stmt::FnCall(..)) => {
-                            level + 1
+                            global.level + 1
                         }
                         ASTNode::Stmt(Stmt::Expr(e)) if matches!(**e, Expr::FnCall(..)) => {
-                            level + 1
+                            global.level + 1
                         }
-                        _ => level,
+                        _ => global.level,
                     };
                     global.debugger.status = DebuggerStatus::FunctionExit(level);
                     Ok(None)

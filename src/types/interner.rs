@@ -1,3 +1,5 @@
+//! A strings interner type.
+
 use super::BloomFilterU64;
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::ImmutableString;
@@ -20,10 +22,8 @@ pub const MAX_INTERNED_STRINGS: usize = 1024;
 /// Maximum length of strings interned.
 pub const MAX_STRING_LEN: usize = 24;
 
-/// _(internals)_ A factory of identifiers from text strings.
+/// _(internals)_ A cache for interned strings.
 /// Exported under the `internals` feature only.
-///
-/// Normal identifiers, property getters and setters are interned separately.
 pub struct StringsInterner<'a> {
     /// Maximum number of strings interned.
     pub capacity: usize,
@@ -103,41 +103,46 @@ impl StringsInterner<'_> {
                 if value.strong_count() > 1 {
                     return value;
                 }
-
                 e.insert(value).clone()
             }
         };
 
-        // If the interner is over capacity, remove the longest entry that has the lowest count
-        if self.cache.len() > self.capacity {
-            // Throttle: leave some buffer to grow when shrinking the cache.
-            // We leave at least two entries, one for the empty string, and one for the string
-            // that has just been inserted.
-            let max = if self.capacity < 5 {
-                2
-            } else {
-                self.capacity - 3
-            };
-
-            while self.cache.len() > max {
-                let (_, _, n) = self
-                    .cache
-                    .iter()
-                    .fold((0, usize::MAX, 0), |(x, c, n), (&k, v)| {
-                        if k != hash
-                            && (v.strong_count() < c || (v.strong_count() == c && v.len() > x))
-                        {
-                            (v.len(), v.strong_count(), k)
-                        } else {
-                            (x, c, n)
-                        }
-                    });
-
-                self.cache.remove(&n);
-            }
-        }
+        // Throttle the cache upon exit
+        self.throttle_cache(hash);
 
         result
+    }
+
+    /// If the interner is over capacity, remove the longest entry that has the lowest count
+    fn throttle_cache(&mut self, hash: u64) {
+        if self.cache.len() <= self.capacity {
+            return;
+        }
+
+        // Leave some buffer to grow when shrinking the cache.
+        // We leave at least two entries, one for the empty string, and one for the string
+        // that has just been inserted.
+        let max = if self.capacity < 5 {
+            2
+        } else {
+            self.capacity - 3
+        };
+
+        while self.cache.len() > max {
+            let (_, _, n) = self
+                .cache
+                .iter()
+                .fold((0, usize::MAX, 0), |(x, c, n), (&k, v)| {
+                    if k != hash && (v.strong_count() < c || (v.strong_count() == c && v.len() > x))
+                    {
+                        (v.len(), v.strong_count(), k)
+                    } else {
+                        (x, c, n)
+                    }
+                });
+
+            self.cache.remove(&n);
+        }
     }
 
     /// Number of strings interned.

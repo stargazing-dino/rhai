@@ -8,7 +8,7 @@ use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Module, Position, RhaiResult,
-    RhaiResultOf, StaticVec, VarDefInfo, ERR,
+    RhaiResultOf, SharedModule, StaticVec, VarDefInfo, ERR,
 };
 use std::any::type_name;
 #[cfg(feature = "no_std")]
@@ -72,13 +72,38 @@ pub struct NativeCallContext<'a> {
     /// Function source, if any.
     source: Option<&'a str>,
     /// The current [`GlobalRuntimeState`], if any.
-    global: Option<&'a GlobalRuntimeState<'a>>,
+    global: &'a GlobalRuntimeState,
     /// The current stack of loaded [modules][Module].
-    lib: &'a [&'a Module],
+    lib: &'a [SharedModule],
     /// [Position] of the function call.
     pos: Position,
-    /// The current nesting level of function calls.
-    level: usize,
+}
+
+/// _(internals)_ Context of a native Rust function call.
+/// Exported under the `internals` feature only.
+#[cfg(feature = "internals")]
+#[derive(Debug, Clone)]
+pub struct NativeCallContextStore {
+    /// Name of function called.
+    pub fn_name: String,
+    /// Function source, if any.
+    pub source: Option<String>,
+    /// The current [`GlobalRuntimeState`], if any.
+    pub global: GlobalRuntimeState,
+    /// The current stack of loaded [modules][Module].
+    pub lib: StaticVec<SharedModule>,
+    /// [Position] of the function call.
+    pub pos: Position,
+}
+
+#[cfg(feature = "internals")]
+impl NativeCallContextStore {
+    /// Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    #[inline(always)]
+    #[must_use]
+    pub fn create_context<'a>(&'a self, engine: &'a Engine) -> NativeCallContext<'a> {
+        NativeCallContext::from_stored_data(engine, self)
+    }
 }
 
 impl<'a>
@@ -86,10 +111,9 @@ impl<'a>
         &'a Engine,
         &'a str,
         Option<&'a str>,
-        &'a GlobalRuntimeState<'a>,
-        &'a [&Module],
+        &'a GlobalRuntimeState,
+        &'a [SharedModule],
         Position,
-        usize,
     )> for NativeCallContext<'a>
 {
     #[inline(always)]
@@ -99,58 +123,22 @@ impl<'a>
             &'a str,
             Option<&'a str>,
             &'a GlobalRuntimeState,
-            &'a [&Module],
+            &'a [SharedModule],
             Position,
-            usize,
         ),
     ) -> Self {
         Self {
             engine: value.0,
             fn_name: value.1,
             source: value.2,
-            global: Some(value.3),
+            global: value.3,
             lib: value.4,
             pos: value.5,
-            level: value.6,
-        }
-    }
-}
-
-impl<'a> From<(&'a Engine, &'a str, &'a [&'a Module])> for NativeCallContext<'a> {
-    #[inline(always)]
-    fn from(value: (&'a Engine, &'a str, &'a [&Module])) -> Self {
-        Self {
-            engine: value.0,
-            fn_name: value.1,
-            source: None,
-            global: None,
-            lib: value.2,
-            pos: Position::NONE,
-            level: 0,
         }
     }
 }
 
 impl<'a> NativeCallContext<'a> {
-    /// _(internals)_ Create a new [`NativeCallContext`].
-    /// Exported under the `internals` feature only.
-    #[deprecated(
-        since = "1.3.0",
-        note = "`NativeCallContext::new` will be moved under `internals`. Use `FnPtr::call` to call a function pointer directly."
-    )]
-    #[inline(always)]
-    #[must_use]
-    pub fn new(engine: &'a Engine, fn_name: &'a str, lib: &'a [&Module]) -> Self {
-        Self {
-            engine,
-            fn_name,
-            source: None,
-            global: None,
-            lib,
-            pos: Position::NONE,
-            level: 0,
-        }
-    }
     /// _(internals)_ Create a new [`NativeCallContext`].
     /// Exported under the `internals` feature only.
     ///
@@ -164,20 +152,49 @@ impl<'a> NativeCallContext<'a> {
         fn_name: &'a str,
         source: Option<&'a str>,
         global: &'a GlobalRuntimeState,
-        lib: &'a [&Module],
+        lib: &'a [SharedModule],
         pos: Position,
-        level: usize,
     ) -> Self {
         Self {
             engine,
             fn_name,
             source,
-            global: Some(global),
+            global,
             lib,
             pos,
-            level,
         }
     }
+
+    /// _(internals)_ Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    /// Exported under the `internals` feature only.
+    #[cfg(feature = "internals")]
+    #[inline]
+    #[must_use]
+    pub fn from_stored_data(engine: &'a Engine, context: &'a NativeCallContextStore) -> Self {
+        Self {
+            engine,
+            fn_name: &context.fn_name,
+            source: context.source.as_ref().map(String::as_str),
+            global: &context.global,
+            lib: &context.lib,
+            pos: context.pos,
+        }
+    }
+    /// _(internals)_ Store this [`NativeCallContext`] into a [`NativeCallContextClone`].
+    /// Exported under the `internals` feature only.
+    #[cfg(feature = "internals")]
+    #[inline]
+    #[must_use]
+    pub fn store_data(&self) -> NativeCallContextStore {
+        NativeCallContextStore {
+            fn_name: self.fn_name.to_string(),
+            source: self.source.map(|s| s.to_string()),
+            global: self.global.clone(),
+            lib: self.lib.iter().cloned().collect(),
+            pos: self.pos,
+        }
+    }
+
     /// The current [`Engine`].
     #[inline(always)]
     #[must_use]
@@ -200,7 +217,7 @@ impl<'a> NativeCallContext<'a> {
     #[inline(always)]
     #[must_use]
     pub const fn call_level(&self) -> usize {
-        self.level
+        self.global.level
     }
     /// The current source.
     #[inline(always)]
@@ -212,7 +229,7 @@ impl<'a> NativeCallContext<'a> {
     #[inline(always)]
     #[must_use]
     pub fn tag(&self) -> Option<&Dynamic> {
-        self.global.as_ref().map(|g| &g.tag)
+        Some(&self.global.tag)
     }
     /// Get an iterator over the current set of modules imported via `import` statements
     /// in reverse order.
@@ -221,7 +238,7 @@ impl<'a> NativeCallContext<'a> {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &Module)> {
-        self.global.iter().flat_map(|&g| g.iter_imports())
+        self.global.iter_imports()
     }
     /// Get an iterator over the current set of modules imported via `import` statements in reverse order.
     #[cfg(not(feature = "no_module"))]
@@ -229,8 +246,8 @@ impl<'a> NativeCallContext<'a> {
     #[inline]
     pub(crate) fn iter_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&crate::ImmutableString, &Shared<Module>)> {
-        self.global.iter().flat_map(|&g| g.iter_imports_raw())
+    ) -> impl Iterator<Item = (&crate::ImmutableString, &SharedModule)> {
+        self.global.iter_imports_raw()
     }
     /// _(internals)_ The current [`GlobalRuntimeState`], if any.
     /// Exported under the `internals` feature only.
@@ -239,21 +256,21 @@ impl<'a> NativeCallContext<'a> {
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn global_runtime_state(&self) -> Option<&GlobalRuntimeState> {
+    pub const fn global_runtime_state(&self) -> &GlobalRuntimeState {
         self.global
     }
     /// Get an iterator over the namespaces containing definitions of all script-defined functions
     /// in reverse order (i.e. parent namespaces are iterated after child namespaces).
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
-        self.lib.iter().copied()
+        self.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current stack of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn namespaces(&self) -> &[&Module] {
+    pub const fn namespaces(&self) -> &[SharedModule] {
         self.lib
     }
     /// Call a function inside the call context with the provided arguments.
@@ -375,16 +392,15 @@ impl<'a> NativeCallContext<'a> {
         is_method_call: bool,
         args: &mut [&mut Dynamic],
     ) -> RhaiResult {
-        let global = &mut self
-            .global
-            .cloned()
-            .unwrap_or_else(|| GlobalRuntimeState::new(self.engine()));
+        let mut global = &mut self.global.clone();
         let caches = &mut Caches::new();
 
         let fn_name = fn_name.as_ref();
         let op_token = Token::lookup_symbol_from_syntax(fn_name);
         let op_token = op_token.as_ref();
         let args_len = args.len();
+
+        global.level += 1;
 
         if native_only {
             return self
@@ -393,7 +409,6 @@ impl<'a> NativeCallContext<'a> {
                     global,
                     caches,
                     self.lib,
-                    self.level + 1,
                     fn_name,
                     op_token,
                     calc_fn_hash(None, fn_name, args_len),
@@ -421,7 +436,6 @@ impl<'a> NativeCallContext<'a> {
                 global,
                 caches,
                 self.lib,
-                self.level + 1,
                 None,
                 fn_name,
                 op_token,

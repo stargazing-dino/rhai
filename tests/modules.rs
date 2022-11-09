@@ -2,7 +2,7 @@
 use rhai::{
     module_resolvers::{DummyModuleResolver, StaticModuleResolver},
     Dynamic, Engine, EvalAltResult, FnNamespace, FnPtr, ImmutableString, Module, NativeCallContext,
-    ParseError, ParseErrorType, Scope, Shared, INT,
+    ParseError, ParseErrorType, Scope, INT,
 };
 
 #[test]
@@ -546,44 +546,13 @@ fn test_module_context() -> Result<(), Box<EvalAltResult>> {
     engine.register_fn(
         "calc",
         |context: NativeCallContext, fp: FnPtr| -> Result<INT, Box<EvalAltResult>> {
-            // Store fields for later use
             let engine = context.engine();
-            let fn_name = context.fn_name().to_string();
-            let source = context.source().map(|s| s.to_string());
-            let global = context.global_runtime_state().unwrap().clone();
-            let pos = context.position();
-            let call_level = context.call_level();
 
-            // Store the paths of the stack of call modules up to this point
-            let modules_list: Vec<String> = context
-                .iter_namespaces()
-                .map(|m| m.id().unwrap_or("testing"))
-                .filter(|id| !id.is_empty())
-                .map(|id| id.to_string())
-                .collect();
+            // Store context for later use - requires the 'internals' feature
+            let context_data = context.store_data();
 
-            // Recreate the 'NativeCallContext' - requires the 'internals' feature
-            let mut libraries = Vec::<Shared<Module>>::new();
-
-            for path in modules_list {
-                // Recreate the stack of call modules by resolving each path with
-                // the module resolver.
-                let module = engine.module_resolver().resolve(engine, None, &path, pos)?;
-
-                libraries.push(module);
-            }
-
-            let lib: Vec<&Module> = libraries.iter().map(|m| m.as_ref()).collect();
-
-            let new_context = NativeCallContext::new_with_all_fields(
-                engine,
-                &fn_name,
-                source.as_ref().map(String::as_str),
-                &global,
-                &lib,
-                pos,
-                call_level,
-            );
+            // Recreate the 'NativeCallContext'
+            let new_context = context_data.create_context(engine);
 
             fp.call_within_context(&new_context, (41 as INT,))
         },

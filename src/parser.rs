@@ -8,7 +8,7 @@ use crate::ast::{
     SwitchCasesCollection, TryCatchBlock,
 };
 use crate::engine::{Precedence, KEYWORD_THIS, OP_CONTAINS};
-use crate::eval::GlobalRuntimeState;
+use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::tokenizer::{
     is_keyword_function, is_valid_function_name, is_valid_identifier, Token, TokenStream,
@@ -55,7 +55,7 @@ pub struct ParseState<'e> {
     /// External [scope][Scope] with constants.
     pub scope: &'e Scope<'e>,
     /// Global runtime state.
-    pub global: GlobalRuntimeState<'e>,
+    pub global: GlobalRuntimeState,
     /// Encapsulates a local stack with variable names to simulate an actual runtime scope.
     pub stack: Scope<'e>,
     /// Size of the local variables stack upon entry of the current block scope.
@@ -2898,23 +2898,24 @@ impl Engine {
 
         if let Some(ref filter) = self.def_var_filter {
             let will_shadow = state.stack.iter().any(|(v, ..)| v == name);
-            let level = settings.level;
+            state.global.level = settings.level;
             let is_const = access == AccessMode::ReadOnly;
             let info = VarDefInfo {
                 name: &name,
                 is_const,
-                nesting_level: level,
+                nesting_level: state.global.level,
                 will_shadow,
             };
-            let mut this_ptr = None;
+            let caches = &mut Caches::new();
+            let mut this = Dynamic::NULL;
+
             let context = EvalContext::new(
                 self,
                 &mut state.global,
-                None,
+                caches,
                 &[],
-                level,
                 &mut state.stack,
-                &mut this_ptr,
+                &mut this,
             );
 
             match filter(false, info, context) {
