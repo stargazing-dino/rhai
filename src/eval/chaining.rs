@@ -742,8 +742,9 @@ impl Engine {
         let fn_name = crate::engine::FN_IDX_GET;
         let pos = Position::NONE;
 
+        let orig_level = global.level;
         global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level -= 1);
+        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
         self.exec_native_fn_call(global, caches, fn_name, None, hash, args, true, pos)
             .map(|(r, ..)| r)
@@ -765,8 +766,9 @@ impl Engine {
         let fn_name = crate::engine::FN_IDX_SET;
         let pos = Position::NONE;
 
+        let orig_level = global.level;
         global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level -= 1);
+        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
         self.exec_native_fn_call(global, caches, fn_name, None, hash, args, is_ref_mut, pos)
     }

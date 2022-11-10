@@ -29,7 +29,8 @@ pub struct GlobalRuntimeState {
     /// Stack of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
     modules: StaticVec<SharedModule>,
-    /// The current stack of loaded [modules][Module].
+    /// The current stack of loaded [modules][crate::Module] containing script-defined functions.
+    #[cfg(not(feature = "no_function"))]
     pub lib: StaticVec<SharedModule>,
     /// Source of the current context.
     ///
@@ -86,6 +87,7 @@ impl GlobalRuntimeState {
             imports: StaticVec::new_const(),
             #[cfg(not(feature = "no_module"))]
             modules: StaticVec::new_const(),
+            #[cfg(not(feature = "no_function"))]
             lib: StaticVec::new_const(),
             source: None,
             num_operations: 0,
@@ -333,21 +335,30 @@ impl fmt::Debug for GlobalRuntimeState {
         let mut f = f.debug_struct("GlobalRuntimeState");
 
         #[cfg(not(feature = "no_module"))]
-        f.field("imports", &self.scan_imports_raw().collect::<Vec<_>>());
+        f.field("imports", &self.scan_imports_raw().collect::<Vec<_>>())
+            .field("num_modules_loaded", &self.num_modules_loaded)
+            .field("embedded_module_resolver", &self.embedded_module_resolver);
+
+        #[cfg(not(feature = "no_function"))]
+        f.field("lib", &self.lib);
 
         f.field("source", &self.source)
-            .field("num_operations", &self.num_operations);
+            .field("num_operations", &self.num_operations)
+            .field("level", &self.level)
+            .field("scope_level", &self.scope_level)
+            .field("always_search_scope", &self.always_search_scope);
 
         #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
         f.field("fn_hash_indexing", &self.fn_hash_indexing);
 
         #[cfg(not(feature = "no_module"))]
-        f.field("num_modules_loaded", &self.num_modules_loaded)
-            .field("embedded_module_resolver", &self.embedded_module_resolver);
-
-        #[cfg(not(feature = "no_module"))]
         #[cfg(not(feature = "no_function"))]
         f.field("constants", &self.constants);
+
+        f.field("tag", &self.tag);
+
+        #[cfg(feature = "debugging")]
+        f.field("debugger", &self.debugger);
 
         f.finish()
     }

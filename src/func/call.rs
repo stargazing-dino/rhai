@@ -193,12 +193,21 @@ impl Engine {
                 let mut bitmask = 1usize; // Bitmask of which parameter to replace with `Dynamic`
 
                 loop {
+                    #[cfg(not(feature = "no_function"))]
                     let func = global
                         .lib
                         .iter()
                         .rev()
                         .chain(self.global_modules.iter())
                         .find_map(|m| m.get_fn(hash).map(|f| (f, m.id_raw())));
+                    #[cfg(feature = "no_function")]
+                    let func = None;
+
+                    let func = func.or_else(|| {
+                        self.global_modules
+                            .iter()
+                            .find_map(|m| m.get_fn(hash).map(|f| (f, m.id_raw())))
+                    });
 
                     #[cfg(not(feature = "no_module"))]
                     let func = if args.is_none() {
@@ -230,12 +239,15 @@ impl Engine {
 
                     // Check `Dynamic` parameters for functions with parameters
                     if allow_dynamic && max_bitmask == 0 && num_args > 0 {
-                        let is_dynamic = global
-                            .lib
+                        let is_dynamic = self
+                            .global_modules
                             .iter()
-                            .any(|m| m.may_contain_dynamic_fn(hash_base))
-                            || self
-                                .global_modules
+                            .any(|m| m.may_contain_dynamic_fn(hash_base));
+
+                        #[cfg(not(feature = "no_function"))]
+                        let is_dynamic = is_dynamic
+                            || global
+                                .lib
                                 .iter()
                                 .any(|m| m.may_contain_dynamic_fn(hash_base));
 
@@ -560,8 +572,9 @@ impl Engine {
         #[cfg(not(feature = "no_closure"))]
         ensure_no_data_race(fn_name, _args, is_ref_mut)?;
 
+        let orig_level = global.level;
         global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level -= 1);
+        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
         // These may be redirected from method style calls.
         if hashes.is_native_only() {
@@ -1093,8 +1106,8 @@ impl Engine {
                     .into_immutable_string()
                     .map_err(|typ| self.make_type_mismatch_err::<ImmutableString>(typ, pos))?;
 
+                let orig_level = global.level;
                 global.level += 1;
-                let global = &mut *RestoreOnDrop::lock(global, move |g| g.level -= 1);
 
                 let result = self.eval_script_expr_in_place(global, caches, scope, s, pos);
 
@@ -1108,6 +1121,7 @@ impl Engine {
                 if scope_changed {
                     global.always_search_scope = true;
                 }
+                global.level = orig_level;
 
                 return result.map_err(|err| {
                     ERR::ErrorInFunctionCall(
@@ -1346,8 +1360,9 @@ impl Engine {
             }
         }
 
+        let orig_level = global.level;
         global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level -= 1);
+        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
         match func {
             #[cfg(not(feature = "no_function"))]
@@ -1484,8 +1499,9 @@ impl Engine {
                 get_builtin_binary_op_fn(op_token.as_ref().unwrap(), operands[0], operands[1])
             {
                 // Built-in found
+                let orig_level = global.level;
                 global.level += 1;
-                let global = &*RestoreOnDrop::lock(global, move |g| g.level -= 1);
+                let global = &*RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
                 let context = (self, name.as_str(), None, global, pos).into();
                 return func(context, operands);

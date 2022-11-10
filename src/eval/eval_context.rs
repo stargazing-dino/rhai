@@ -11,12 +11,12 @@ use std::prelude::v1::*;
 pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// The current [`Engine`].
     engine: &'a Engine,
-    /// The current [`Scope`].
-    scope: &'s mut Scope<'ps>,
     /// The current [`GlobalRuntimeState`].
     global: &'g mut GlobalRuntimeState,
     /// The current [caches][Caches], if available.
     caches: &'c mut Caches,
+    /// The current [`Scope`].
+    scope: &'s mut Scope<'ps>,
     /// The current bound `this` pointer, if any.
     this_ptr: &'t mut Dynamic,
 }
@@ -34,9 +34,9 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     ) -> Self {
         Self {
             engine,
-            scope,
             global,
             caches,
+            scope,
             this_ptr,
         }
     }
@@ -100,12 +100,18 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
         self.global
     }
     /// Get an iterator over the namespaces containing definition of all script-defined functions.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
         self.global.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current set of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]

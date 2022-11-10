@@ -273,12 +273,18 @@ impl<'a> NativeCallContext<'a> {
     }
     /// Get an iterator over the namespaces containing definitions of all script-defined functions
     /// in reverse order (i.e. parent namespaces are iterated after child namespaces).
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
         self.global.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current stack of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]

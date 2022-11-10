@@ -141,8 +141,9 @@ impl Engine {
                     // Built-in found
                     let op = op_assign_token.literal_syntax();
 
+                    let orig_level = global.level;
                     global.level += 1;
-                    let global = &*RestoreOnDrop::lock(global, move |g| g.level -= 1);
+                    let global = &*RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
                     let context = (self, op, None, global, *op_pos).into();
                     return func(context, args).map(|_| ());

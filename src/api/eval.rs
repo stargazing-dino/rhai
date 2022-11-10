@@ -207,6 +207,8 @@ impl Engine {
         ast: &'a AST,
     ) -> RhaiResult {
         let orig_source = mem::replace(&mut global.source, ast.source_raw().cloned());
+
+        #[cfg(not(feature = "no_function"))]
         let orig_lib_len = global.lib.len();
 
         #[cfg(not(feature = "no_function"))]
@@ -242,7 +244,9 @@ impl Engine {
             global.embedded_module_resolver = orig_embedded_module_resolver;
         }
 
+        #[cfg(not(feature = "no_function"))]
         global.lib.truncate(orig_lib_len);
+
         global.source = orig_source;
 
         result
