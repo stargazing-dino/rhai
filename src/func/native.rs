@@ -73,8 +73,6 @@ pub struct NativeCallContext<'a> {
     source: Option<&'a str>,
     /// The current [`GlobalRuntimeState`], if any.
     global: &'a GlobalRuntimeState,
-    /// The current stack of loaded [modules][Module].
-    lib: &'a [SharedModule],
     /// [Position] of the function call.
     pos: Position,
 }
@@ -95,8 +93,6 @@ pub struct NativeCallContextStore {
     pub source: Option<String>,
     /// The current [`GlobalRuntimeState`], if any.
     pub global: GlobalRuntimeState,
-    /// The current stack of loaded [modules][Module].
-    pub lib: StaticVec<SharedModule>,
     /// [Position] of the function call.
     pub pos: Position,
 }
@@ -123,7 +119,6 @@ impl<'a>
         &'a str,
         Option<&'a str>,
         &'a GlobalRuntimeState,
-        &'a [SharedModule],
         Position,
     )> for NativeCallContext<'a>
 {
@@ -134,7 +129,6 @@ impl<'a>
             &'a str,
             Option<&'a str>,
             &'a GlobalRuntimeState,
-            &'a [SharedModule],
             Position,
         ),
     ) -> Self {
@@ -143,8 +137,7 @@ impl<'a>
             fn_name: value.1,
             source: value.2,
             global: value.3,
-            lib: value.4,
-            pos: value.5,
+            pos: value.4,
         }
     }
 }
@@ -163,7 +156,6 @@ impl<'a> NativeCallContext<'a> {
         fn_name: &'a str,
         source: Option<&'a str>,
         global: &'a GlobalRuntimeState,
-        lib: &'a [SharedModule],
         pos: Position,
     ) -> Self {
         Self {
@@ -171,7 +163,6 @@ impl<'a> NativeCallContext<'a> {
             fn_name,
             source,
             global,
-            lib,
             pos,
         }
     }
@@ -193,7 +184,6 @@ impl<'a> NativeCallContext<'a> {
             fn_name: &context.fn_name,
             source: context.source.as_ref().map(String::as_str),
             global: &context.global,
-            lib: &context.lib,
             pos: context.pos,
         }
     }
@@ -213,7 +203,6 @@ impl<'a> NativeCallContext<'a> {
             fn_name: self.fn_name.to_string(),
             source: self.source.map(|s| s.to_string()),
             global: self.global.clone(),
-            lib: self.lib.iter().cloned().collect(),
             pos: self.pos,
         }
     }
@@ -286,15 +275,15 @@ impl<'a> NativeCallContext<'a> {
     /// in reverse order (i.e. parent namespaces are iterated after child namespaces).
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
-        self.lib.iter().map(|m| m.as_ref())
+        self.global.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current stack of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn namespaces(&self) -> &[SharedModule] {
-        self.lib
+    pub fn namespaces(&self) -> &[SharedModule] {
+        &self.global.lib
     }
     /// Call a function inside the call context with the provided arguments.
     #[inline]
@@ -431,7 +420,6 @@ impl<'a> NativeCallContext<'a> {
                 .exec_native_fn_call(
                     global,
                     caches,
-                    self.lib,
                     fn_name,
                     op_token,
                     calc_fn_hash(None, fn_name, args_len),
@@ -458,7 +446,6 @@ impl<'a> NativeCallContext<'a> {
             .exec_fn_call(
                 global,
                 caches,
-                self.lib,
                 None,
                 fn_name,
                 op_token,

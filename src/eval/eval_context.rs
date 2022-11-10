@@ -17,8 +17,6 @@ pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     global: &'g mut GlobalRuntimeState,
     /// The current [caches][Caches], if available.
     caches: &'c mut Caches,
-    /// The current stack of imported [modules][Module].
-    lib: &'a [SharedModule],
     /// The current bound `this` pointer, if any.
     this_ptr: &'t mut Dynamic,
 }
@@ -31,7 +29,6 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
         engine: &'a Engine,
         global: &'g mut GlobalRuntimeState,
         caches: &'c mut Caches,
-        lib: &'a [SharedModule],
         scope: &'s mut Scope<'ps>,
         this_ptr: &'t mut Dynamic,
     ) -> Self {
@@ -40,7 +37,6 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
             scope,
             global,
             caches,
-            lib,
             this_ptr,
         }
     }
@@ -106,15 +102,15 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// Get an iterator over the namespaces containing definition of all script-defined functions.
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
-        self.lib.iter().map(|m| m.as_ref())
+        self.global.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current set of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn namespaces(&self) -> &[SharedModule] {
-        self.lib
+    pub fn namespaces(&self) -> &[SharedModule] {
+        &self.global.lib
     }
     /// The current bound `this` pointer, if any.
     #[inline]
@@ -181,20 +177,14 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
             crate::ast::Expr::Stmt(statements) => self.engine.eval_stmt_block(
                 self.global,
                 self.caches,
-                self.lib,
                 self.scope,
                 self.this_ptr,
                 statements,
                 rewind_scope,
             ),
-            _ => self.engine.eval_expr(
-                self.global,
-                self.caches,
-                self.lib,
-                self.scope,
-                self.this_ptr,
-                expr,
-            ),
+            _ => self
+                .engine
+                .eval_expr(self.global, self.caches, self.scope, self.this_ptr, expr),
         }
     }
 }

@@ -3,9 +3,10 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::types::dynamic::Variant;
+use crate::types::RestoreOnDrop;
 use crate::{
-    reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, SharedModule,
-    StaticVec, AST, ERR,
+    reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, StaticVec, AST,
+    ERR,
 };
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
@@ -248,31 +249,30 @@ impl Engine {
         arg_values: &mut [Dynamic],
     ) -> RhaiResult {
         let statements = ast.statements();
-        let lib = &[AsRef::<SharedModule>::as_ref(ast).clone()];
+
+        let orig_lib_len = global.lib.len();
+
+        #[cfg(not(feature = "no_function"))]
+        if !ast.functions().is_empty() {
+            global.lib.push(ast.functions().clone());
+        }
 
         let mut no_this_ptr = Dynamic::NULL;
         let this_ptr = this_ptr.unwrap_or(&mut no_this_ptr);
-
-        let orig_scope_len = scope.len();
 
         #[cfg(not(feature = "no_module"))]
         let orig_embedded_module_resolver = std::mem::replace(
             &mut global.embedded_module_resolver,
             ast.resolver().cloned(),
         );
-        #[cfg(not(feature = "no_module"))]
-        let global = &mut *crate::types::RestoreOnDrop::lock(global, move |g| {
-            g.embedded_module_resolver = orig_embedded_module_resolver
-        });
 
         let result = if eval_ast && !statements.is_empty() {
-            let r = self.eval_global_statements(global, caches, lib, scope, statements);
+            let orig_scope_len = scope.len();
+            let scope = &mut *RestoreOnDrop::lock_if(rewind_scope, scope, move |s| {
+                s.rewind(orig_scope_len);
+            });
 
-            if rewind_scope {
-                scope.rewind(orig_scope_len);
-            }
-
-            r
+            self.eval_global_statements(global, caches, scope, statements)
         } else {
             Ok(Dynamic::UNIT)
         }
@@ -287,7 +287,6 @@ impl Engine {
                 self.call_script_fn(
                     global,
                     caches,
-                    lib,
                     scope,
                     this_ptr,
                     fn_def,
@@ -298,15 +297,21 @@ impl Engine {
             } else {
                 Err(ERR::ErrorFunctionNotFound(name.into(), Position::NONE).into())
             }
-        })?;
+        });
 
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {
             global.debugger.status = crate::eval::DebuggerStatus::Terminate;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
-            self.run_debugger(global, caches, lib, scope, this_ptr, node)?;
+            self.run_debugger(global, caches, scope, this_ptr, node)?;
         }
 
-        Ok(result)
+        #[cfg(not(feature = "no_module"))]
+        {
+            global.embedded_module_resolver = orig_embedded_module_resolver;
+        }
+        global.lib.truncate(orig_lib_len);
+
+        result
     }
 }

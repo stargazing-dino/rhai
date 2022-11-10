@@ -2909,14 +2909,8 @@ impl Engine {
             let caches = &mut Caches::new();
             let mut this = Dynamic::NULL;
 
-            let context = EvalContext::new(
-                self,
-                &mut state.global,
-                caches,
-                &[],
-                &mut state.stack,
-                &mut this,
-            );
+            let context =
+                EvalContext::new(self, &mut state.global, caches, &mut state.stack, &mut this);
 
             match filter(false, info, context) {
                 Ok(true) => (),

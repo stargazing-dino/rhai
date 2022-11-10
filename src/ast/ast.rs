@@ -231,6 +231,23 @@ impl AST {
     pub(crate) fn set_doc(&mut self, doc: impl Into<crate::SmartString>) {
         self.doc = doc.into();
     }
+    /// Get the shared [module][crate::Module] containing script-defined functions.
+    #[cfg(not(feature = "no_function"))]
+    #[cfg(not(feature = "internals"))]
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn functions(&self) -> &crate::SharedModule {
+        &self.lib
+    }
+    /// _(internals)_ Get the shared [module][crate::Module] containing script-defined functions.
+    /// Exported under the `internals` feature only.
+    #[cfg(not(feature = "no_function"))]
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    #[must_use]
+    pub fn functions(&self) -> &crate::SharedModule {
+        &self.lib
+    }
     /// Get the statements.
     #[cfg(not(feature = "internals"))]
     #[inline(always)]

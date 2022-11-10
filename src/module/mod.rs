@@ -1980,6 +1980,7 @@ impl Module {
         // Save global state
         let orig_imports_len = global.num_imports();
         let orig_source = global.source.clone();
+        let orig_lib_len = global.lib.len();
         #[cfg(not(feature = "no_function"))]
         let orig_constants = std::mem::take(&mut global.constants);
 
@@ -2008,6 +2009,7 @@ impl Module {
         #[cfg(not(feature = "no_function"))]
         let constants = std::mem::replace(&mut global.constants, orig_constants);
         global.truncate_imports(orig_imports_len);
+        global.lib.truncate(orig_lib_len);
         global.source = orig_source;
 
         result?;

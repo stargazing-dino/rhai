@@ -4,7 +4,7 @@
 use super::call::FnCallArgs;
 use crate::ast::ScriptFnDef;
 use crate::eval::{Caches, GlobalRuntimeState};
-use crate::{Dynamic, Engine, Position, RhaiError, RhaiResult, Scope, SharedModule, ERR};
+use crate::{Dynamic, Engine, Position, RhaiError, RhaiResult, Scope, ERR};
 use std::mem;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -26,7 +26,6 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[SharedModule],
         scope: &mut Scope,
         this_ptr: &mut Dynamic,
         fn_def: &ScriptFnDef,
@@ -79,6 +78,7 @@ impl Engine {
         }
 
         let orig_scope_len = scope.len();
+        let orig_lib_len = global.lib.len();
         #[cfg(not(feature = "no_module"))]
         let orig_imports_len = global.num_imports();
 
@@ -106,12 +106,9 @@ impl Engine {
         let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
 
         #[cfg(not(feature = "no_module"))]
-        let mut lib_merged = crate::StaticVec::with_capacity(lib.len() + 1);
-
-        #[cfg(not(feature = "no_module"))]
-        let (lib, constants) = if let Some(ref environ) = fn_def.environ {
+        let orig_constants = if let Some(ref environ) = fn_def.environ {
             let crate::ast::EncapsulatedEnviron {
-                lib: ref fn_lib,
+                ref lib,
                 ref imports,
                 ref constants,
             } = **environ;
@@ -121,38 +118,24 @@ impl Engine {
                 .cloned()
                 .for_each(|(n, m)| global.push_import(n, m));
 
-            (
-                if fn_lib.is_empty() {
-                    lib
-                } else {
-                    caches.push_fn_resolution_cache();
-                    lib_merged.push(fn_lib.clone());
-                    lib_merged.extend(lib.iter().cloned());
-                    &lib_merged
-                },
-                Some(mem::replace(&mut global.constants, constants.clone())),
-            )
+            if !lib.is_empty() {
+                global.lib.push(lib.clone());
+            }
+
+            Some(mem::replace(&mut global.constants, constants.clone()))
         } else {
-            (lib, None)
+            None
         };
 
         #[cfg(feature = "debugging")]
         {
             let node = crate::ast::Stmt::Noop(fn_def.body.position());
-            self.run_debugger(global, caches, lib, scope, this_ptr, &node)?;
+            self.run_debugger(global, caches, scope, this_ptr, &node)?;
         }
 
         // Evaluate the function
         let mut _result = self
-            .eval_stmt_block(
-                global,
-                caches,
-                lib,
-                scope,
-                this_ptr,
-                &fn_def.body,
-                rewind_scope,
-            )
+            .eval_stmt_block(global, caches, scope, this_ptr, &fn_def.body, rewind_scope)
             .or_else(|err| match *err {
                 // Convert return statement to return value
                 ERR::Return(x, ..) => Ok(x),
@@ -188,7 +171,7 @@ impl Engine {
                     Ok(ref r) => crate::eval::DebuggerEvent::FunctionExitWithValue(r),
                     Err(ref err) => crate::eval::DebuggerEvent::FunctionExitWithError(err),
                 };
-                match self.run_debugger_raw(global, caches, lib, scope, this_ptr, node, event) {
+                match self.run_debugger_raw(global, caches, scope, this_ptr, node, event) {
                     Ok(_) => (),
                     Err(err) => _result = Err(err),
                 }
@@ -205,12 +188,13 @@ impl Engine {
             // Remove arguments only, leaving new variables in the scope
             scope.remove_range(orig_scope_len, args.len());
         }
+        global.lib.truncate(orig_lib_len);
         #[cfg(not(feature = "no_module"))]
         global.truncate_imports(orig_imports_len);
 
         // Restore constants
         #[cfg(not(feature = "no_module"))]
-        if let Some(constants) = constants {
+        if let Some(constants) = orig_constants {
             global.constants = constants;
         }
 
@@ -224,9 +208,8 @@ impl Engine {
     #[must_use]
     pub(crate) fn has_script_fn(
         &self,
-        _global: &GlobalRuntimeState,
+        global: &GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[SharedModule],
         hash_script: u64,
     ) -> bool {
         let cache = caches.fn_resolution_cache_mut();
@@ -236,14 +219,14 @@ impl Engine {
         }
 
         // First check script-defined functions
-        let result = lib.iter().any(|m| m.contains_fn(hash_script))
+        let result = global.lib.iter().any(|m| m.contains_fn(hash_script))
             // Then check the global namespace and packages
             || self.global_modules.iter().any(|m| m.contains_fn(hash_script));
 
         #[cfg(not(feature = "no_module"))]
         let result = result ||
             // Then check imported modules
-            _global.contains_qualified_fn(hash_script)
+            global.contains_qualified_fn(hash_script)
             // Then check sub-modules
             || self.global_sub_modules.values().any(|m| m.contains_qualified_fn(hash_script));
 
