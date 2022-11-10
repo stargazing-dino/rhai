@@ -8,11 +8,11 @@ use crate::engine::{KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_PRINT, 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::builtin::get_builtin_binary_op_fn;
 use crate::func::hashing::get_hasher;
-use crate::tokenizer::{Span, Token};
+use crate::tokenizer::Token;
 use crate::types::dynamic::AccessMode;
 use crate::{
-    calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Engine, FnPtr, Identifier,
-    ImmutableString, Position, Scope, StaticVec, AST, INT,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnPtr, Identifier, ImmutableString, Position,
+    Scope, StaticVec, AST, INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -38,6 +38,7 @@ pub enum OptimizationLevel {
 
 impl Default for OptimizationLevel {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::Simple
     }
@@ -49,18 +50,18 @@ struct OptimizerState<'a> {
     /// Has the [`AST`] been changed during this pass?
     changed: bool,
     /// Collection of constants to use for eager function evaluations.
-    variables: StaticVec<(Identifier, AccessMode, Option<Dynamic>)>,
+    variables: StaticVec<(Identifier, AccessMode, Dynamic)>,
     /// Activate constants propagation?
     propagate_constants: bool,
     /// An [`Engine`] instance for eager function evaluation.
     engine: &'a Engine,
     /// The global runtime state.
-    global: GlobalRuntimeState<'a>,
+    global: GlobalRuntimeState,
     /// Function resolution caches.
-    caches: Caches<'a>,
+    caches: Caches,
     /// [Module][crate::Module] containing script-defined functions.
     #[cfg(not(feature = "no_function"))]
-    lib: &'a [&'a crate::Module],
+    lib: &'a [crate::SharedModule],
     /// Optimization level.
     optimization_level: OptimizationLevel,
 }
@@ -70,7 +71,7 @@ impl<'a> OptimizerState<'a> {
     #[inline(always)]
     pub fn new(
         engine: &'a Engine,
-        #[cfg(not(feature = "no_function"))] lib: &'a [&'a crate::Module],
+        #[cfg(not(feature = "no_function"))] lib: &'a [crate::SharedModule],
         optimization_level: OptimizationLevel,
     ) -> Self {
         Self {
@@ -107,12 +108,7 @@ impl<'a> OptimizerState<'a> {
     }
     /// Add a new variable to the list.
     #[inline(always)]
-    pub fn push_var(
-        &mut self,
-        name: impl Into<Identifier>,
-        access: AccessMode,
-        value: Option<Dynamic>,
-    ) {
+    pub fn push_var(&mut self, name: impl Into<Identifier>, access: AccessMode, value: Dynamic) {
         self.variables.push((name.into(), access, value));
     }
     /// Look up a constant from the list.
@@ -126,7 +122,8 @@ impl<'a> OptimizerState<'a> {
             if n == name {
                 return match access {
                     AccessMode::ReadWrite => None,
-                    AccessMode::ReadOnly => value.as_ref(),
+                    AccessMode::ReadOnly if value.is_null() => None,
+                    AccessMode::ReadOnly => Some(value),
                 };
             }
         }
@@ -138,28 +135,27 @@ impl<'a> OptimizerState<'a> {
     pub fn call_fn_with_constant_arguments(
         &mut self,
         fn_name: &str,
+        op_token: Option<&Token>,
         arg_values: &mut [Dynamic],
-    ) -> Option<Dynamic> {
+    ) -> Dynamic {
         #[cfg(not(feature = "no_function"))]
         let lib = self.lib;
         #[cfg(feature = "no_function")]
         let lib = &[];
 
         self.engine
-            .call_native_fn(
+            .exec_native_fn_call(
                 &mut self.global,
                 &mut self.caches,
                 lib,
                 fn_name,
+                op_token,
                 calc_fn_hash(None, fn_name, arg_values.len()),
                 &mut arg_values.iter_mut().collect::<StaticVec<_>>(),
                 false,
-                false,
                 Position::NONE,
-                0,
             )
-            .ok()
-            .map(|(v, ..)| v)
+            .map_or(Dynamic::NULL, |(v, ..)| v)
     }
 }
 
@@ -169,26 +165,30 @@ fn has_native_fn_override(
     hash_script: u64,
     arg_types: impl AsRef<[TypeId]>,
 ) -> bool {
-    let hash_params = calc_fn_params_hash(arg_types.as_ref().iter().copied());
-    let hash = combine_hashes(hash_script, hash_params);
+    let hash = calc_fn_hash_full(hash_script, arg_types.as_ref().iter().copied());
 
     // First check the global namespace and packages, but skip modules that are standard because
     // they should never conflict with system functions.
-    let result = engine
+    if engine
         .global_modules
         .iter()
         .filter(|m| !m.standard)
-        .any(|m| m.contains_fn(hash));
+        .any(|m| m.contains_fn(hash))
+    {
+        return true;
+    }
 
-    #[cfg(not(feature = "no_module"))]
     // Then check sub-modules
-    let result = result
-        || engine
-            .global_sub_modules
-            .values()
-            .any(|m| m.contains_qualified_fn(hash));
+    #[cfg(not(feature = "no_module"))]
+    if engine
+        .global_sub_modules
+        .values()
+        .any(|m| m.contains_qualified_fn(hash))
+    {
+        return true;
+    }
 
-    result
+    false
 }
 
 /// Optimize a block of [statements][Stmt].
@@ -254,7 +254,7 @@ fn optimize_stmt_block(
         });
 
         // Optimize each statement in the block
-        for stmt in statements.iter_mut() {
+        for stmt in &mut statements {
             match stmt {
                 Stmt::Var(x, options, ..) => {
                     if options.contains(ASTFlags::CONSTANT) {
@@ -265,13 +265,13 @@ fn optimize_stmt_block(
                             state.push_var(
                                 x.0.as_str(),
                                 AccessMode::ReadOnly,
-                                x.1.get_literal_value(),
+                                x.1.get_literal_value().unwrap_or(Dynamic::NULL),
                             );
                         }
                     } else {
                         // Add variables into the state
                         optimize_expr(&mut x.1, state, false);
-                        state.push_var(x.0.as_str(), AccessMode::ReadWrite, None);
+                        state.push_var(x.0.as_str(), AccessMode::ReadWrite, Dynamic::NULL);
                     }
                 }
                 // Optimize the statement
@@ -432,15 +432,15 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             if !x.0.is_op_assignment()
                 && x.1.lhs.is_variable_access(true)
                 && matches!(&x.1.rhs, Expr::FnCall(x2, ..)
-                        if Token::lookup_from_syntax(&x2.name).map_or(false, |t| t.has_op_assignment())
+                        if Token::lookup_symbol_from_syntax(&x2.name).map_or(false, |t| t.has_op_assignment())
                         && x2.args.len() == 2
                         && x2.args[0].get_variable_name(true) == x.1.lhs.get_variable_name(true)
                 ) =>
         {
             match x.1.rhs {
-                Expr::FnCall(ref mut x2, ..) => {
+                Expr::FnCall(ref mut x2, pos) => {
                     state.set_dirty();
-                    x.0 = OpAssignment::new_op_assignment_from_base(&x2.name, x2.pos);
+                    x.0 = OpAssignment::new_op_assignment_from_base(&x2.name, pos);
                     x.1.rhs = mem::take(&mut x2.args[1]);
                 }
                 ref expr => unreachable!("Expr::FnCall expected but gets {:?}", expr),
@@ -550,13 +550,14 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                             // switch const { case if condition => stmt, _ => def } => if condition { stmt } else { def }
                             optimize_expr(&mut b.condition, state, false);
 
-                            let else_stmt = if let Some(index) = def_case {
-                                let mut def_stmt =
-                                    Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
-                                optimize_stmt(&mut def_stmt, state, true);
-                                def_stmt.into()
-                            } else {
-                                StmtBlock::NONE
+                            let else_stmt = match def_case {
+                                Some(index) => {
+                                    let mut def_stmt =
+                                        Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
+                                    optimize_stmt(&mut def_stmt, state, true);
+                                    def_stmt.into()
+                                }
+                                _ => StmtBlock::NONE,
                             };
 
                             *stmt = Stmt::If(
@@ -615,13 +616,14 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                             // switch const { range if condition => stmt, _ => def } => if condition { stmt } else { def }
                             optimize_expr(&mut condition, state, false);
 
-                            let else_stmt = if let Some(index) = def_case {
-                                let mut def_stmt =
-                                    Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
-                                optimize_stmt(&mut def_stmt, state, true);
-                                def_stmt.into()
-                            } else {
-                                StmtBlock::NONE
+                            let else_stmt = match def_case {
+                                Some(index) => {
+                                    let mut def_stmt =
+                                        Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
+                                    optimize_stmt(&mut def_stmt, state, true);
+                                    def_stmt.into()
+                                }
+                                _ => StmtBlock::NONE,
                             };
 
                             let if_stmt =
@@ -664,12 +666,13 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             // Promote the default case
             state.set_dirty();
 
-            if let Some(index) = def_case {
-                let mut def_stmt = Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
-                optimize_stmt(&mut def_stmt, state, true);
-                *stmt = def_stmt;
-            } else {
-                *stmt = StmtBlock::empty(*pos).into();
+            match def_case {
+                Some(index) => {
+                    let mut def_stmt = Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
+                    optimize_stmt(&mut def_stmt, state, true);
+                    *stmt = def_stmt;
+                }
+                _ => *stmt = StmtBlock::empty(*pos).into(),
             }
         }
         // switch
@@ -688,7 +691,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             optimize_expr(match_expr, state, false);
 
             // Optimize blocks
-            for b in expressions.iter_mut() {
+            for b in expressions.as_mut() {
                 optimize_expr(&mut b.condition, state, false);
                 optimize_expr(&mut b.expr, state, false);
 
@@ -776,50 +779,6 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                 *condition = Expr::Unit(*pos);
             }
             **body = optimize_stmt_block(mem::take(&mut **body), state, false, true, false);
-
-            if body.len() == 1 {
-                match body[0] {
-                    // while expr { break; } -> { expr; }
-                    Stmt::BreakLoop(options, pos) if options.contains(ASTFlags::BREAK) => {
-                        // Only a single break statement - turn into running the guard expression once
-                        state.set_dirty();
-                        if condition.is_unit() {
-                            *stmt = Stmt::Noop(pos);
-                        } else {
-                            let mut statements = vec![Stmt::Expr(mem::take(condition).into())];
-                            if preserve_result {
-                                statements.push(Stmt::Noop(pos));
-                            }
-                            *stmt = (statements, Span::new(pos, Position::NONE)).into();
-                        };
-                    }
-                    _ => (),
-                }
-            }
-        }
-        // do { block } until true -> { block }
-        Stmt::Do(x, options, ..)
-            if matches!(x.0, Expr::BoolConstant(true, ..))
-                && options.contains(ASTFlags::NEGATED) =>
-        {
-            state.set_dirty();
-            *stmt = (
-                optimize_stmt_block(mem::take(&mut *x.1), state, false, true, false),
-                x.1.span(),
-            )
-                .into();
-        }
-        // do { block } while false -> { block }
-        Stmt::Do(x, options, ..)
-            if matches!(x.0, Expr::BoolConstant(false, ..))
-                && !options.contains(ASTFlags::NEGATED) =>
-        {
-            state.set_dirty();
-            *stmt = (
-                optimize_stmt_block(mem::take(&mut *x.1), state, false, true, false),
-                x.1.span(),
-            )
-                .into();
         }
         // do { block } while|until expr
         Stmt::Do(x, ..) => {
@@ -893,26 +852,22 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         Stmt::Expr(expr) => {
             optimize_expr(expr, state, false);
 
-            match &mut **expr {
-                // func(...)
-                Expr::FnCall(x, pos) => {
-                    state.set_dirty();
-                    *stmt = Stmt::FnCall(mem::take(x), *pos);
-                }
-                // {...};
-                Expr::Stmt(x) => {
-                    if x.is_empty() {
-                        state.set_dirty();
-                        *stmt = Stmt::Noop(x.position());
-                    } else {
-                        state.set_dirty();
-                        *stmt = mem::take(&mut **x).into();
-                    }
-                }
-                // expr;
-                _ => (),
+            if matches!(**expr, Expr::FnCall(..) | Expr::Stmt(..)) {
+                state.set_dirty();
+                *stmt = match *mem::take(expr) {
+                    // func(...);
+                    Expr::FnCall(x, pos) => Stmt::FnCall(x, pos),
+                    // {};
+                    Expr::Stmt(x) if x.is_empty() => Stmt::Noop(x.position()),
+                    // {...};
+                    Expr::Stmt(x) => (*x).into(),
+                    _ => unreachable!(),
+                };
             }
         }
+
+        // break expr;
+        Stmt::BreakLoop(Some(ref mut expr), ..) => optimize_expr(expr, state, false),
 
         // return expr;
         Stmt::Return(Some(ref mut expr), ..) => optimize_expr(expr, state, false),
@@ -1137,7 +1092,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             && state.optimization_level == OptimizationLevel::Simple // simple optimizations
             && x.args.len() == 1
             && x.name == KEYWORD_FN_PTR
-            && x.args[0].is_constant()
+            && x.constant_args()
         => {
             let fn_name = match x.args[0] {
                 Expr::StringConstant(ref s, ..) => s.clone().into(),
@@ -1161,8 +1116,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         Expr::FnCall(x, pos)
                 if !x.is_qualified() // Non-qualified
                 && state.optimization_level == OptimizationLevel::Simple // simple optimizations
-                && x.args.iter().all(Expr::is_constant) // all arguments are constants
-                //&& !is_valid_identifier(x.chars()) // cannot be scripted
+                && x.constant_args() // all arguments are constants
         => {
             let arg_values = &mut x.args.iter().map(|e| e.get_literal_value().unwrap()).collect::<StaticVec<_>>();
             let arg_types: StaticVec<_> = arg_values.iter().map(Dynamic::type_id).collect();
@@ -1181,15 +1135,15 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     return;
                 }
                 // Overloaded operators can override built-in.
-                _ if x.args.len() == 2 && (state.engine.fast_operators() || !has_native_fn_override(state.engine, x.hashes.native, &arg_types)) => {
-                    if let Some(result) = get_builtin_binary_op_fn(&x.name, &arg_values[0], &arg_values[1])
+                _ if x.args.len() == 2 && x.op_token.is_some() && (state.engine.fast_operators() || !has_native_fn_override(state.engine, x.hashes.native(), &arg_types)) => {
+                    if let Some(result) = get_builtin_binary_op_fn(x.op_token.as_ref().unwrap(), &arg_values[0], &arg_values[1])
                         .and_then(|f| {
                             #[cfg(not(feature = "no_function"))]
                             let lib = state.lib;
                             #[cfg(feature = "no_function")]
-                            let lib = &[];
+                            let lib = &[][..];
 
-                            let context = (state.engine, &x.name, lib).into();
+                            let context = (state.engine, x.name.as_str(),None, &state.global, lib, *pos).into();
                             let (first, second) = arg_values.split_first_mut().unwrap();
                             (f)(context, &mut [ first, &mut second[0] ]).ok()
                         }) {
@@ -1204,7 +1158,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             x.args.iter_mut().for_each(|a| optimize_expr(a, state, false));
 
             // Move constant arguments
-            for arg in x.args.iter_mut() {
+            for arg in &mut x.args {
                 match arg {
                     Expr::DynamicConstant(..) | Expr::Unit(..)
                     | Expr::StringConstant(..) | Expr::CharConstant(..)
@@ -1225,25 +1179,25 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         Expr::FnCall(x, pos)
                 if !x.is_qualified() // non-qualified
                 && state.optimization_level == OptimizationLevel::Full // full optimizations
-                && x.args.iter().all(Expr::is_constant) // all arguments are constants
+                && x.constant_args() // all arguments are constants
         => {
             // First search for script-defined functions (can override built-in)
             #[cfg(not(feature = "no_function"))]
-            let has_script_fn = state.lib.iter().copied().any(|m| m.get_script_fn(&x.name, x.args.len()).is_some());
+            let has_script_fn = !x.hashes.is_native_only() && state.lib.iter().find_map(|m| m.get_script_fn(&x.name, x.args.len())).is_some();
             #[cfg(feature = "no_function")]
             let has_script_fn = false;
 
             if !has_script_fn {
-                let arg_values = &mut x.args.iter().map(|e| e.get_literal_value().unwrap()).collect::<StaticVec<_>>();
+                let arg_values = &mut x.args.iter().map(Expr::get_literal_value).collect::<Option<StaticVec<_>>>().unwrap();
 
                 let result = match x.name.as_str() {
-                    KEYWORD_TYPE_OF if arg_values.len() == 1 => Some(state.engine.map_type_name(arg_values[0].type_name()).into()),
+                    KEYWORD_TYPE_OF if arg_values.len() == 1 => state.engine.map_type_name(arg_values[0].type_name()).into(),
                     #[cfg(not(feature = "no_closure"))]
-                    crate::engine::KEYWORD_IS_SHARED if arg_values.len() == 1 => Some(Dynamic::FALSE),
-                    _ => state.call_fn_with_constant_arguments(&x.name, arg_values)
+                    crate::engine::KEYWORD_IS_SHARED if arg_values.len() == 1 => Dynamic::FALSE,
+                    _ => state.call_fn_with_constant_arguments(&x.name, x.op_token.as_ref(), arg_values)
                 };
 
-                if let Some(result) = result {
+                if !result.is_null() {
                     state.set_dirty();
                     *expr = Expr::from_dynamic(result, *pos);
                     return;
@@ -1254,7 +1208,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         }
 
         // id(args ..) or xxx.id(args ..) -> optimize function call arguments
-        Expr::FnCall(x, ..) | Expr::MethodCall(x, ..) => for arg in x.args.iter_mut() {
+        Expr::FnCall(x, ..) | Expr::MethodCall(x, ..) => for arg in &mut x.args {
             optimize_expr(arg, state, false);
 
             // Move constant arguments
@@ -1303,7 +1257,7 @@ fn optimize_top_level(
     statements: StmtBlockContainer,
     engine: &Engine,
     scope: &Scope,
-    #[cfg(not(feature = "no_function"))] lib: &[&crate::Module],
+    #[cfg(not(feature = "no_function"))] lib: &[crate::SharedModule],
     optimization_level: OptimizationLevel,
 ) -> StmtBlockContainer {
     let mut statements = statements;
@@ -1329,15 +1283,15 @@ fn optimize_top_level(
         .rev()
         .flat_map(|m| m.iter_var())
     {
-        state.push_var(name, AccessMode::ReadOnly, Some(value.clone()));
+        state.push_var(name, AccessMode::ReadOnly, value.clone());
     }
 
     // Add constants and variables from the scope
     for (name, constant, value) in scope.iter() {
         if constant {
-            state.push_var(name, AccessMode::ReadOnly, Some(value));
+            state.push_var(name, AccessMode::ReadOnly, value);
         } else {
-            state.push_var(name, AccessMode::ReadWrite, None);
+            state.push_var(name, AccessMode::ReadWrite, Dynamic::NULL);
         }
     }
 
@@ -1357,7 +1311,7 @@ pub fn optimize_into_ast(
     let mut statements = statements;
 
     #[cfg(not(feature = "no_function"))]
-    let lib = {
+    let lib: crate::Shared<_> = {
         let mut module = crate::Module::new();
 
         if optimization_level != OptimizationLevel::None {
@@ -1378,7 +1332,7 @@ pub fn optimize_into_ast(
                 });
             }
 
-            let lib2 = &[&lib2];
+            let lib2 = &[lib2.into()];
 
             for fn_def in functions {
                 let mut fn_def = crate::func::shared_take_or_clone(fn_def);
@@ -1396,7 +1350,7 @@ pub fn optimize_into_ast(
             }
         }
 
-        module
+        module.into()
     };
 
     statements.shrink_to_fit();
@@ -1409,7 +1363,7 @@ pub fn optimize_into_ast(
                 engine,
                 scope,
                 #[cfg(not(feature = "no_function"))]
-                &[&lib],
+                &[lib.clone()],
                 optimization_level,
             ),
         },

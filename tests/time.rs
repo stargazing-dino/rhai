@@ -1,5 +1,4 @@
-#![cfg(not(feature = "no_std"))]
-#![cfg(not(target_family = "wasm"))]
+#![cfg(not(feature = "no_time"))]
 
 use rhai::{Engine, EvalAltResult};
 

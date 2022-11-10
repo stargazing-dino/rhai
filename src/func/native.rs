@@ -4,11 +4,11 @@ use super::call::FnCallArgs;
 use crate::ast::FnCallHashes;
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::plugin::PluginFunction;
-use crate::tokenizer::{Token, TokenizeState};
+use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Module, Position, RhaiResult,
-    RhaiResultOf, StaticVec, VarDefInfo, ERR,
+    RhaiResultOf, SharedModule, StaticVec, VarDefInfo, ERR,
 };
 use std::any::type_name;
 #[cfg(feature = "no_std")]
@@ -72,91 +72,73 @@ pub struct NativeCallContext<'a> {
     /// Function source, if any.
     source: Option<&'a str>,
     /// The current [`GlobalRuntimeState`], if any.
-    global: Option<&'a GlobalRuntimeState<'a>>,
+    global: &'a GlobalRuntimeState,
     /// The current stack of loaded [modules][Module].
-    lib: &'a [&'a Module],
+    lib: &'a [SharedModule],
     /// [Position] of the function call.
     pos: Position,
-    /// The current nesting level of function calls.
-    level: usize,
 }
 
-impl<'a, M: AsRef<[&'a Module]> + ?Sized, S: AsRef<str> + 'a + ?Sized>
+/// _(internals)_ Context of a native Rust function call.
+/// Exported under the `internals` feature only.
+#[cfg(feature = "internals")]
+#[derive(Debug, Clone)]
+pub struct NativeCallContextStore {
+    /// Name of function called.
+    pub fn_name: String,
+    /// Function source, if any.
+    pub source: Option<String>,
+    /// The current [`GlobalRuntimeState`], if any.
+    pub global: GlobalRuntimeState,
+    /// The current stack of loaded [modules][Module].
+    pub lib: StaticVec<SharedModule>,
+    /// [Position] of the function call.
+    pub pos: Position,
+}
+
+#[cfg(feature = "internals")]
+impl NativeCallContextStore {
+    /// Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    #[inline(always)]
+    #[must_use]
+    pub fn create_context<'a>(&'a self, engine: &'a Engine) -> NativeCallContext<'a> {
+        NativeCallContext::from_stored_data(engine, self)
+    }
+}
+
+impl<'a>
     From<(
         &'a Engine,
-        &'a S,
-        Option<&'a S>,
-        &'a GlobalRuntimeState<'a>,
-        &'a M,
+        &'a str,
+        Option<&'a str>,
+        &'a GlobalRuntimeState,
+        &'a [SharedModule],
         Position,
-        usize,
     )> for NativeCallContext<'a>
 {
     #[inline(always)]
     fn from(
         value: (
             &'a Engine,
-            &'a S,
-            Option<&'a S>,
+            &'a str,
+            Option<&'a str>,
             &'a GlobalRuntimeState,
-            &'a M,
+            &'a [SharedModule],
             Position,
-            usize,
         ),
     ) -> Self {
         Self {
             engine: value.0,
-            fn_name: value.1.as_ref(),
-            source: value.2.map(<_>::as_ref),
-            global: Some(value.3),
-            lib: value.4.as_ref(),
+            fn_name: value.1,
+            source: value.2,
+            global: value.3,
+            lib: value.4,
             pos: value.5,
-            level: value.6,
-        }
-    }
-}
-
-impl<'a, M: AsRef<[&'a Module]> + ?Sized, S: AsRef<str> + 'a + ?Sized>
-    From<(&'a Engine, &'a S, &'a M)> for NativeCallContext<'a>
-{
-    #[inline(always)]
-    fn from(value: (&'a Engine, &'a S, &'a M)) -> Self {
-        Self {
-            engine: value.0,
-            fn_name: value.1.as_ref(),
-            source: None,
-            global: None,
-            lib: value.2.as_ref(),
-            pos: Position::NONE,
-            level: 0,
         }
     }
 }
 
 impl<'a> NativeCallContext<'a> {
-    /// _(internals)_ Create a new [`NativeCallContext`].
-    /// Exported under the `metadata` feature only.
-    #[deprecated(
-        since = "1.3.0",
-        note = "`NativeCallContext::new` will be moved under `internals`. Use `FnPtr::call` to call a function pointer directly."
-    )]
-    #[inline(always)]
-    #[must_use]
-    pub fn new(
-        engine: &'a Engine,
-        fn_name: &'a (impl AsRef<str> + 'a + ?Sized),
-        lib: &'a [&Module],
-    ) -> Self {
-        Self {
-            engine,
-            fn_name: fn_name.as_ref(),
-            source: None,
-            global: None,
-            lib,
-            pos: Position::NONE,
-            level: 0,
-        }
-    }
     /// _(internals)_ Create a new [`NativeCallContext`].
     /// Exported under the `internals` feature only.
     ///
@@ -167,23 +149,52 @@ impl<'a> NativeCallContext<'a> {
     #[must_use]
     pub fn new_with_all_fields(
         engine: &'a Engine,
-        fn_name: &'a (impl AsRef<str> + 'a + ?Sized),
-        source: Option<&'a (impl AsRef<str> + 'a + ?Sized)>,
+        fn_name: &'a str,
+        source: Option<&'a str>,
         global: &'a GlobalRuntimeState,
-        lib: &'a [&Module],
+        lib: &'a [SharedModule],
         pos: Position,
-        level: usize,
     ) -> Self {
         Self {
             engine,
-            fn_name: fn_name.as_ref(),
-            source: source.map(<_>::as_ref),
-            global: Some(global),
+            fn_name,
+            source,
+            global,
             lib,
             pos,
-            level,
         }
     }
+
+    /// _(internals)_ Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    /// Exported under the `internals` feature only.
+    #[cfg(feature = "internals")]
+    #[inline]
+    #[must_use]
+    pub fn from_stored_data(engine: &'a Engine, context: &'a NativeCallContextStore) -> Self {
+        Self {
+            engine,
+            fn_name: &context.fn_name,
+            source: context.source.as_ref().map(String::as_str),
+            global: &context.global,
+            lib: &context.lib,
+            pos: context.pos,
+        }
+    }
+    /// _(internals)_ Store this [`NativeCallContext`] into a [`NativeCallContextClone`].
+    /// Exported under the `internals` feature only.
+    #[cfg(feature = "internals")]
+    #[inline]
+    #[must_use]
+    pub fn store_data(&self) -> NativeCallContextStore {
+        NativeCallContextStore {
+            fn_name: self.fn_name.to_string(),
+            source: self.source.map(|s| s.to_string()),
+            global: self.global.clone(),
+            lib: self.lib.iter().cloned().collect(),
+            pos: self.pos,
+        }
+    }
+
     /// The current [`Engine`].
     #[inline(always)]
     #[must_use]
@@ -206,7 +217,7 @@ impl<'a> NativeCallContext<'a> {
     #[inline(always)]
     #[must_use]
     pub const fn call_level(&self) -> usize {
-        self.level
+        self.global.level
     }
     /// The current source.
     #[inline(always)]
@@ -218,7 +229,7 @@ impl<'a> NativeCallContext<'a> {
     #[inline(always)]
     #[must_use]
     pub fn tag(&self) -> Option<&Dynamic> {
-        self.global.as_ref().map(|g| &g.tag)
+        Some(&self.global.tag)
     }
     /// Get an iterator over the current set of modules imported via `import` statements
     /// in reverse order.
@@ -227,7 +238,7 @@ impl<'a> NativeCallContext<'a> {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &Module)> {
-        self.global.iter().flat_map(|&g| g.iter_imports())
+        self.global.iter_imports()
     }
     /// Get an iterator over the current set of modules imported via `import` statements in reverse order.
     #[cfg(not(feature = "no_module"))]
@@ -235,8 +246,8 @@ impl<'a> NativeCallContext<'a> {
     #[inline]
     pub(crate) fn iter_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&crate::ImmutableString, &Shared<Module>)> {
-        self.global.iter().flat_map(|&g| g.iter_imports_raw())
+    ) -> impl Iterator<Item = (&crate::ImmutableString, &SharedModule)> {
+        self.global.iter_imports_raw()
     }
     /// _(internals)_ The current [`GlobalRuntimeState`], if any.
     /// Exported under the `internals` feature only.
@@ -245,21 +256,21 @@ impl<'a> NativeCallContext<'a> {
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn global_runtime_state(&self) -> Option<&GlobalRuntimeState> {
+    pub const fn global_runtime_state(&self) -> &GlobalRuntimeState {
         self.global
     }
     /// Get an iterator over the namespaces containing definitions of all script-defined functions
     /// in reverse order (i.e. parent namespaces are iterated after child namespaces).
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
-        self.lib.iter().copied()
+        self.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current stack of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn namespaces(&self) -> &[&Module] {
+    pub const fn namespaces(&self) -> &[SharedModule] {
         self.lib
     }
     /// Call a function inside the call context with the provided arguments.
@@ -274,7 +285,7 @@ impl<'a> NativeCallContext<'a> {
 
         let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
-        let result = self.call_fn_raw(fn_name, false, false, &mut args)?;
+        let result = self._call_fn_raw(fn_name, false, false, false, &mut args)?;
 
         let typ = self.engine().map_type_name(result.type_name());
 
@@ -283,7 +294,32 @@ impl<'a> NativeCallContext<'a> {
             ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
         })
     }
-    /// Call a function inside the call context.
+    /// Call a registered native Rust function inside the call context with the provided arguments.
+    ///
+    /// This is often useful because Rust functions typically only want to cross-call other
+    /// registered Rust functions and not have to worry about scripted functions hijacking the
+    /// process unknowingly (or deliberately).
+    #[inline]
+    pub fn call_native_fn<T: Variant + Clone>(
+        &self,
+        fn_name: impl AsRef<str>,
+        args: impl FuncArgs,
+    ) -> RhaiResultOf<T> {
+        let mut arg_values = StaticVec::new_const();
+        args.parse(&mut arg_values);
+
+        let mut args: StaticVec<_> = arg_values.iter_mut().collect();
+
+        let result = self._call_fn_raw(fn_name, true, false, false, &mut args)?;
+
+        let typ = self.engine().map_type_name(result.type_name());
+
+        result.try_cast().ok_or_else(|| {
+            let t = self.engine().map_type_name(type_name::<T>()).into();
+            ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+        })
+    }
+    /// Call a function (native Rust or scripted) inside the call context.
     ///
     /// If `is_method_call` is [`true`], the first argument is assumed to be the `this` pointer for
     /// a script-defined function (or the object of a method call).
@@ -302,6 +338,7 @@ impl<'a> NativeCallContext<'a> {
     ///
     /// If `is_ref_mut` is [`true`], the first argument is assumed to be passed by reference and is
     /// not consumed.
+    #[inline(always)]
     pub fn call_fn_raw(
         &self,
         fn_name: impl AsRef<str>,
@@ -309,14 +346,80 @@ impl<'a> NativeCallContext<'a> {
         is_method_call: bool,
         args: &mut [&mut Dynamic],
     ) -> RhaiResult {
-        let mut global = self
-            .global
-            .cloned()
-            .unwrap_or_else(|| GlobalRuntimeState::new(self.engine()));
-        let mut caches = Caches::new();
+        let name = fn_name.as_ref();
+        let native_only = !is_valid_function_name(name);
+        #[cfg(not(feature = "no_function"))]
+        let native_only = native_only && !crate::parser::is_anonymous_fn(name);
+
+        self._call_fn_raw(fn_name, native_only, is_ref_mut, is_method_call, args)
+    }
+    /// Call a registered native Rust function inside the call context.
+    ///
+    /// This is often useful because Rust functions typically only want to cross-call other
+    /// registered Rust functions and not have to worry about scripted functions hijacking the
+    /// process unknowingly (or deliberately).
+    ///
+    /// # WARNING - Low Level API
+    ///
+    /// This function is very low level.
+    ///
+    /// # Arguments
+    ///
+    /// All arguments may be _consumed_, meaning that they may be replaced by `()`. This is to avoid
+    /// unnecessarily cloning the arguments.
+    ///
+    /// **DO NOT** reuse the arguments after this call. If they are needed afterwards, clone them
+    /// _before_ calling this function.
+    ///
+    /// If `is_ref_mut` is [`true`], the first argument is assumed to be passed by reference and is
+    /// not consumed.
+    #[inline(always)]
+    pub fn call_native_fn_raw(
+        &self,
+        fn_name: impl AsRef<str>,
+        is_ref_mut: bool,
+        args: &mut [&mut Dynamic],
+    ) -> RhaiResult {
+        self._call_fn_raw(fn_name, true, is_ref_mut, false, args)
+    }
+
+    /// Call a function (native Rust or scripted) inside the call context.
+    fn _call_fn_raw(
+        &self,
+        fn_name: impl AsRef<str>,
+        native_only: bool,
+        is_ref_mut: bool,
+        is_method_call: bool,
+        args: &mut [&mut Dynamic],
+    ) -> RhaiResult {
+        let mut global = &mut self.global.clone();
+        let caches = &mut Caches::new();
 
         let fn_name = fn_name.as_ref();
+        let op_token = Token::lookup_symbol_from_syntax(fn_name);
+        let op_token = op_token.as_ref();
         let args_len = args.len();
+
+        global.level += 1;
+
+        if native_only {
+            return self
+                .engine()
+                .exec_native_fn_call(
+                    global,
+                    caches,
+                    self.lib,
+                    fn_name,
+                    op_token,
+                    calc_fn_hash(None, fn_name, args_len),
+                    args,
+                    is_ref_mut,
+                    Position::NONE,
+                )
+                .map(|(r, ..)| r);
+        }
+
+        // Native or script
 
         let hash = if is_method_call {
             FnCallHashes::from_all(
@@ -330,17 +433,17 @@ impl<'a> NativeCallContext<'a> {
 
         self.engine()
             .exec_fn_call(
-                None,
-                &mut global,
-                &mut caches,
+                global,
+                caches,
                 self.lib,
+                None,
                 fn_name,
+                op_token,
                 hash,
                 args,
                 is_ref_mut,
                 is_method_call,
                 Position::NONE,
-                self.level + 1,
             )
             .map(|(r, ..)| r)
     }

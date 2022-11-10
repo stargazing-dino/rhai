@@ -83,6 +83,7 @@ use std::prelude::v1::*;
 // Internal modules
 mod api;
 mod ast;
+pub mod config;
 mod engine;
 mod eval;
 mod func;
@@ -206,7 +207,7 @@ pub use eval::EvalContext;
 pub use func::{NativeCallContext, RegisterNativeFunction};
 pub use module::{FnNamespace, Module};
 pub use tokenizer::Position;
-#[cfg(not(feature = "no_std"))]
+#[cfg(not(feature = "no_time"))]
 pub use types::Instant;
 pub use types::{
     Dynamic, EvalAltResult, FnPtr, ImmutableString, LexError, ParseError, ParseErrorType, Scope,
@@ -227,7 +228,7 @@ pub mod debugger {
 /// An identifier in Rhai. [`SmartString`](https://crates.io/crates/smartstring) is used because most
 /// identifiers are ASCII and short, fewer than 23 characters, so they can be stored inline.
 #[cfg(not(feature = "internals"))]
-pub(crate) type Identifier = SmartString;
+type Identifier = SmartString;
 
 /// An identifier in Rhai. [`SmartString`](https://crates.io/crates/smartstring) is used because most
 /// identifiers are ASCII and short, fewer than 23 characters, so they can be stored inline.
@@ -240,7 +241,10 @@ pub use func::Shared;
 /// Alias to [`RefCell`][std::cell::RefCell] or [`RwLock`][std::sync::RwLock] depending on the `sync` feature flag.
 pub use func::Locked;
 
-pub(crate) use func::{calc_fn_hash, calc_fn_params_hash, calc_var_hash, combine_hashes};
+use func::{calc_fn_hash, calc_fn_hash_full, calc_var_hash};
+
+/// A shared [`Module`].
+type SharedModule = Shared<Module>;
 
 pub use rhai_codegen::*;
 
@@ -343,6 +347,9 @@ pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeS
 #[cfg(feature = "metadata")]
 pub use api::definitions::Definitions;
 
+/// Number of items to keep inline for [`StaticVec`].
+const STATIC_VEC_INLINE_SIZE: usize = 3;
+
 /// Alias to [`smallvec::SmallVec<[T; 3]>`](https://crates.io/crates/smallvec), which is a
 /// specialized [`Vec`] backed by a small, inline, fixed-size array when there are ≤ 3 items stored.
 ///
@@ -375,7 +382,7 @@ pub use api::definitions::Definitions;
 /// most scripts load fewer than 4 external modules; most module paths contain fewer than 4 levels
 /// (e.g. `std::collections::map::HashMap` is 4 levels and it is just about as long as they get).
 #[cfg(not(feature = "internals"))]
-type StaticVec<T> = smallvec::SmallVec<[T; 3]>;
+type StaticVec<T> = smallvec::SmallVec<[T; STATIC_VEC_INLINE_SIZE]>;
 
 /// _(internals)_ Alias to [`smallvec::SmallVec<[T; 3]>`](https://crates.io/crates/smallvec),
 /// which is a [`Vec`] backed by a small, inline, fixed-size array when there are ≤ 3 items stored.
@@ -410,7 +417,11 @@ type StaticVec<T> = smallvec::SmallVec<[T; 3]>;
 /// most scripts load fewer than 4 external modules; most module paths contain fewer than 4 levels
 /// (e.g. `std::collections::map::HashMap` is 4 levels and it is just about as long as they get).
 #[cfg(feature = "internals")]
-pub type StaticVec<T> = smallvec::SmallVec<[T; 3]>;
+pub type StaticVec<T> = smallvec::SmallVec<[T; STATIC_VEC_INLINE_SIZE]>;
+
+/// Number of items to keep inline for [`FnArgsVec`].
+#[cfg(not(feature = "no_closure"))]
+const FN_ARGS_VEC_INLINE_SIZE: usize = 5;
 
 /// Inline arguments storage for function calls.
 ///
@@ -425,14 +436,14 @@ pub type StaticVec<T> = smallvec::SmallVec<[T; 3]>;
 ///
 /// Under `no_closure`, this type aliases to [`StaticVec`][crate::StaticVec] instead.
 #[cfg(not(feature = "no_closure"))]
-type FnArgsVec<T> = smallvec::SmallVec<[T; 5]>;
+type FnArgsVec<T> = smallvec::SmallVec<[T; FN_ARGS_VEC_INLINE_SIZE]>;
 
 /// Inline arguments storage for function calls.
 /// This type aliases to [`StaticVec`][crate::StaticVec].
 #[cfg(feature = "no_closure")]
 type FnArgsVec<T> = crate::StaticVec<T>;
 
-pub(crate) type SmartString = smartstring::SmartString<smartstring::LazyCompact>;
+type SmartString = smartstring::SmartString<smartstring::LazyCompact>;
 
 // Compiler guards against mutually-exclusive feature flags
 

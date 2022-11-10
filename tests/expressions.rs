@@ -55,10 +55,13 @@ fn test_expressions() -> Result<(), Box<EvalAltResult>> {
         )
         .is_err());
 
-    assert!(engine.eval_expression::<()>("40 + 2;").is_err());
-    assert!(engine.eval_expression::<()>("40 + { 2 }").is_err());
-    assert!(engine.eval_expression::<()>("x = 42").is_err());
+    assert!(engine.compile_expression("40 + 2;").is_err());
+    assert!(engine.compile_expression("40 + { 2 }").is_err());
+    assert!(engine.compile_expression("x = 42").is_err());
     assert!(engine.compile_expression("let x = 42").is_err());
+    assert!(engine
+        .compile_expression("do { break 42; } while true")
+        .is_err());
 
     engine.compile("40 + { let x = 2; x }")?;
 

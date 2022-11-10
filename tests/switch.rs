@@ -52,7 +52,7 @@ fn test_switch() -> Result<(), Box<EvalAltResult>> {
         123
     );
     assert_eq!(
-        engine.eval::<INT>("let x = timestamp(); switch x { 1 => 123, _ => 42 }")?,
+        engine.eval_with_scope::<INT>(&mut scope, "switch x { 424242 => 123, _ => 42 }")?,
         42
     );
     assert_eq!(

@@ -32,6 +32,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
+
   # typical build with various feature combinations
   build:
     name: Build
@@ -59,19 +60,19 @@ jobs:
           - "--features no_object,serde,metadata,internals,debugging"
           - "--features no_function,serde,metadata,internals,debugging"
           - "--features no_module,serde,metadata,internals,debugging"
+          - "--features no_time,serde,metadata,internals,debugging"
           - "--features no_closure,serde,metadata,internals,debugging"
           - "--features unicode-xid-ident,serde,metadata,internals,debugging"
-          - "--features sync,no_function,no_float,no_position,no_optimize,no_module,no_closure,no_custom_syntax,metadata,serde,unchecked,debugging"
-          - "--features no_function,no_float,no_position,no_index,no_object,no_optimize,no_module,no_closure,no_custom_syntax,unchecked"
+          - "--features sync,no_time,no_function,no_float,no_position,no_optimize,no_module,no_closure,no_custom_syntax,metadata,serde,unchecked,debugging"
+          - "--features no_time,no_function,no_float,no_position,no_index,no_object,no_optimize,no_module,no_closure,no_custom_syntax,unchecked"
         toolchain: [stable]
         experimental: [false]
         include:
           # smoketests for different toolchains
           - {toolchain: stable, os: windows-latest, experimental: false, flags: ""}
           - {toolchain: stable, os: macos-latest, experimental: false, flags: ""}
-          # data structure size changes - wait for beta to become stable and uncomment
-          #- {toolchain: beta, os: ubuntu-latest, experimental: false, flags: ""}
-          #- {toolchain: nightly, os: ubuntu-latest, experimental: true, flags: ""}
+          - {toolchain: beta, os: ubuntu-latest, experimental: false, flags: ""}
+          - {toolchain: nightly, os: ubuntu-latest, experimental: true, flags: ""}
       fail-fast: false
     steps:
     - name: Checkout
@@ -86,6 +87,7 @@ jobs:
       with:
         command: test
         args: ${{matrix.flags}}
+
   # no-std builds are a bit more extensive to test
   no_std_build:
     name: NoStdBuild
@@ -110,6 +112,41 @@ jobs:
       with:
         command: build
         args: --manifest-path=no_std/no_std_test/Cargo.toml ${{matrix.flags}}
+
+  wasm:
+    name: Check Wasm build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        flags:
+          - "--target wasm32-wasi"
+# These fail currently, future PR should fix them
+#          - "--target wasm32-unknown-unknown"
+#          - "--target wasm32-unknown-unknown --features wasm-bindgen"
+          - "--target wasm32-unknown-unknown --no-default-features"
+          - "--target wasm32-unknown-unknown --no-default-features --features wasm-bindgen"
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Generic Wasm Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          target: wasm32-unknown-unknown
+      - name: Setup Wasi Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          target: wasm32-wasi
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: ${{matrix.flags}}
+
   rustfmt:
     name: Check Formatting
     runs-on: windows-latest
@@ -133,6 +170,7 @@ jobs:
       with:
         command: clippy
         args: --all -- -Aclippy::all -Dclippy::perf
+
   codegen_build:
     name: Codegen Build
     runs-on: ${{matrix.os}}

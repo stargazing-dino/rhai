@@ -2,7 +2,7 @@
 
 use crate::engine::OP_EQUALS;
 use crate::plugin::*;
-use crate::{def_package, format_map_as_json, Dynamic, ImmutableString, Map, RhaiResultOf, INT};
+use crate::{def_package, Dynamic, ImmutableString, Map, NativeCallContext, RhaiResultOf, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -29,6 +29,20 @@ mod map_functions {
     #[rhai_fn(pure)]
     pub fn is_empty(map: &mut Map) -> bool {
         map.len() == 0
+    }
+    /// Returns `true` if the object map contains a specified property.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let m = #{a: 1, b: 2, c: 3};
+    ///
+    /// print(m.contains("b"));     // prints true
+    ///
+    /// print(m.contains("x"));     // prints false
+    /// ```
+    pub fn contains(map: &mut Map, property: &str) -> bool {
+        map.contains_key(property)
     }
     /// Get the value of the `property` in the object map and return a copy.
     ///
@@ -68,10 +82,11 @@ mod map_functions {
     /// print(m);           // prints "#{a: 1, b: 42, c: 3, x: 0}"
     /// ```
     pub fn set(map: &mut Map, property: &str, value: Dynamic) {
-        if let Some(value_ref) = map.get_mut(property) {
-            *value_ref = value;
-        } else {
-            map.insert(property.into(), value);
+        match map.get_mut(property) {
+            Some(value_ref) => *value_ref = value,
+            _ => {
+                map.insert(property.into(), value);
+            }
         }
     }
     /// Clear the object map.
@@ -198,7 +213,7 @@ mod map_functions {
             for (m1, v1) in map1 {
                 if let Some(v2) = map2.get_mut(m1) {
                     let equals = ctx
-                        .call_fn_raw(OP_EQUALS, true, false, &mut [v1, v2])?
+                        .call_native_fn_raw(OP_EQUALS, true, &mut [v1, v2])?
                         .as_bool()
                         .unwrap_or(false);
 
@@ -290,6 +305,9 @@ mod map_functions {
     /// print(m.to_json());     // prints {"a":1, "b":2, "c":3}
     /// ```
     pub fn to_json(map: &mut Map) -> String {
-        format_map_as_json(map)
+        #[cfg(feature = "metadata")]
+        return serde_json::to_string(map).unwrap_or_else(|_| "ERROR".into());
+        #[cfg(not(feature = "metadata"))]
+        return crate::format_map_as_json(map);
     }
 }

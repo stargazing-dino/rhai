@@ -29,13 +29,15 @@ pub struct Namespace {
 }
 
 impl fmt::Debug for Namespace {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_empty() {
             return f.write_str("NONE");
         }
 
         if let Some(index) = self.index {
-            write!(f, "{} -> ", index)?;
+            write!(f, "{index} -> ")?;
         }
 
         f.write_str(
@@ -83,7 +85,7 @@ impl DerefMut for Namespace {
 }
 
 impl From<Vec<Ident>> for Namespace {
-    #[inline(always)]
+    #[inline]
     fn from(mut path: Vec<Ident>) -> Self {
         path.shrink_to_fit();
         Self {
@@ -94,7 +96,7 @@ impl From<Vec<Ident>> for Namespace {
 }
 
 impl From<StaticVec<Ident>> for Namespace {
-    #[inline(always)]
+    #[inline]
     fn from(mut path: StaticVec<Ident>) -> Self {
         path.shrink_to_fit();
         Self { index: None, path }

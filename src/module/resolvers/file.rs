@@ -4,7 +4,8 @@
 use crate::eval::GlobalRuntimeState;
 use crate::func::{locked_read, locked_write};
 use crate::{
-    Engine, Identifier, Locked, Module, ModuleResolver, Position, RhaiResultOf, Scope, Shared, ERR,
+    Engine, Identifier, Locked, Module, ModuleResolver, Position, RhaiResultOf, Scope, Shared,
+    SharedModule, ERR,
 };
 
 use std::{
@@ -51,11 +52,12 @@ pub struct FileModuleResolver {
     extension: Identifier,
     cache_enabled: bool,
     scope: Scope<'static>,
-    cache: Locked<BTreeMap<PathBuf, Shared<Module>>>,
+    cache: Locked<BTreeMap<PathBuf, SharedModule>>,
 }
 
 impl Default for FileModuleResolver {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }
@@ -194,8 +196,8 @@ impl FileModuleResolver {
     /// Get a reference to the file module resolver's [scope][Scope].
     ///
     /// The [scope][Scope] is used for compiling module scripts.
-    #[must_use]
     #[inline(always)]
+    #[must_use]
     pub const fn scope(&self) -> &Scope {
         &self.scope
     }
@@ -211,8 +213,8 @@ impl FileModuleResolver {
     /// Get a mutable reference to the file module resolver's [scope][Scope].
     ///
     /// The [scope][Scope] is used for compiling module scripts.
-    #[must_use]
     #[inline(always)]
+    #[must_use]
     pub fn scope_mut(&mut self) -> &mut Scope<'static> {
         &mut self.scope
     }
@@ -257,7 +259,7 @@ impl FileModuleResolver {
     /// The next time this path is resolved, the script file will be loaded once again.
     #[inline]
     #[must_use]
-    pub fn clear_cache_for_path(&mut self, path: impl AsRef<Path>) -> Option<Shared<Module>> {
+    pub fn clear_cache_for_path(&mut self, path: impl AsRef<Path>) -> Option<SharedModule> {
         locked_write(&self.cache)
             .remove_entry(path.as_ref())
             .map(|(.., v)| v)
@@ -292,7 +294,7 @@ impl FileModuleResolver {
         source: Option<&str>,
         path: &str,
         pos: Position,
-    ) -> Result<Shared<Module>, Box<crate::EvalAltResult>> {
+    ) -> Result<SharedModule, Box<crate::EvalAltResult>> {
         // Load relative paths from source if there is no base path specified
         let source_path = global
             .as_ref()
@@ -321,10 +323,9 @@ impl FileModuleResolver {
 
         let scope = Scope::new();
 
-        let m: Shared<_> = if let Some(global) = global {
-            Module::eval_ast_as_new_raw(engine, scope, global, &ast)
-        } else {
-            Module::eval_ast_as_new(scope, &ast, engine)
+        let m: Shared<_> = match global {
+            Some(global) => Module::eval_ast_as_new_raw(engine, scope, global, &ast),
+            None => Module::eval_ast_as_new(scope, &ast, engine),
         }
         .map_err(|err| Box::new(ERR::ErrorInModule(path.to_string(), err, pos)))?
         .into();
@@ -344,7 +345,7 @@ impl ModuleResolver for FileModuleResolver {
         global: &mut GlobalRuntimeState,
         path: &str,
         pos: Position,
-    ) -> RhaiResultOf<Shared<Module>> {
+    ) -> RhaiResultOf<SharedModule> {
         self.impl_resolve(engine, Some(global), None, path, pos)
     }
 
@@ -355,7 +356,7 @@ impl ModuleResolver for FileModuleResolver {
         source: Option<&str>,
         path: &str,
         pos: Position,
-    ) -> RhaiResultOf<Shared<Module>> {
+    ) -> RhaiResultOf<SharedModule> {
         self.impl_resolve(engine, None, source, path, pos)
     }
 

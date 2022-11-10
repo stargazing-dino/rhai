@@ -4,7 +4,7 @@
 use super::call::FnCallArgs;
 use crate::ast::ScriptFnDef;
 use crate::eval::{Caches, GlobalRuntimeState};
-use crate::{Dynamic, Engine, Module, Position, RhaiError, RhaiResult, Scope, ERR};
+use crate::{Dynamic, Engine, Position, RhaiError, RhaiResult, Scope, SharedModule, ERR};
 use std::mem;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -24,16 +24,15 @@ impl Engine {
     /// **DO NOT** reuse the argument values unless for the first `&mut` argument - all others are silently replaced by `()`!
     pub(crate) fn call_script_fn(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
-        this_ptr: &mut Option<&mut Dynamic>,
+        lib: &[SharedModule],
+        scope: &mut Scope,
+        this_ptr: &mut Dynamic,
         fn_def: &ScriptFnDef,
         args: &mut FnCallArgs,
         rewind_scope: bool,
         pos: Position,
-        level: usize,
     ) -> RhaiResult {
         #[cold]
         #[inline(never)]
@@ -54,7 +53,7 @@ impl Engine {
 
             Err(ERR::ErrorInFunctionCall(
                 name,
-                source.unwrap_or_else(|| global.source.to_string()),
+                source.unwrap_or_else(|| global.source().unwrap_or("").to_string()),
                 err,
                 pos,
             )
@@ -63,12 +62,10 @@ impl Engine {
 
         assert!(fn_def.params.len() == args.len());
 
-        #[cfg(not(feature = "unchecked"))]
-        self.inc_operations(&mut global.num_operations, pos)?;
+        self.track_operation(global, pos)?;
 
         // Check for stack overflow
-        #[cfg(not(feature = "unchecked"))]
-        if level > self.max_call_levels() {
+        if global.level > self.max_call_levels() {
             return Err(ERR::ErrorStackOverflow(pos).into());
         }
 
@@ -129,8 +126,8 @@ impl Engine {
                     lib
                 } else {
                     caches.push_fn_resolution_cache();
-                    lib_merged.push(&**fn_lib);
-                    lib_merged.extend(lib.iter().copied());
+                    lib_merged.push(fn_lib.clone());
+                    lib_merged.extend(lib.iter().cloned());
                     &lib_merged
                 },
                 Some(mem::replace(&mut global.constants, constants.clone())),
@@ -142,20 +139,19 @@ impl Engine {
         #[cfg(feature = "debugging")]
         {
             let node = crate::ast::Stmt::Noop(fn_def.body.position());
-            self.run_debugger(scope, global, lib, this_ptr, &node, level)?;
+            self.run_debugger(global, caches, lib, scope, this_ptr, &node)?;
         }
 
         // Evaluate the function
         let mut _result = self
             .eval_stmt_block(
-                scope,
                 global,
                 caches,
                 lib,
+                scope,
                 this_ptr,
                 &fn_def.body,
                 rewind_scope,
-                level,
             )
             .or_else(|err| match *err {
                 // Convert return statement to return value
@@ -181,7 +177,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         {
             let trigger = match global.debugger.status {
-                crate::eval::DebuggerStatus::FunctionExit(n) => n >= level,
+                crate::eval::DebuggerStatus::FunctionExit(n) => n >= global.level,
                 crate::eval::DebuggerStatus::Next(.., true) => true,
                 _ => false,
             };
@@ -192,7 +188,7 @@ impl Engine {
                     Ok(ref r) => crate::eval::DebuggerEvent::FunctionExitWithValue(r),
                     Err(ref err) => crate::eval::DebuggerEvent::FunctionExitWithError(err),
                 };
-                match self.run_debugger_raw(scope, global, lib, this_ptr, node, event, level) {
+                match self.run_debugger_raw(global, caches, lib, scope, this_ptr, node, event) {
                     Ok(_) => (),
                     Err(err) => _result = Err(err),
                 }
@@ -228,9 +224,9 @@ impl Engine {
     #[must_use]
     pub(crate) fn has_script_fn(
         &self,
-        _global: Option<&GlobalRuntimeState>,
+        _global: &GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[&Module],
+        lib: &[SharedModule],
         hash_script: u64,
     ) -> bool {
         let cache = caches.fn_resolution_cache_mut();
@@ -247,16 +243,13 @@ impl Engine {
         #[cfg(not(feature = "no_module"))]
         let result = result ||
             // Then check imported modules
-            _global.map_or(false, |m| m.contains_qualified_fn(hash_script))
+            _global.contains_qualified_fn(hash_script)
             // Then check sub-modules
             || self.global_sub_modules.values().any(|m| m.contains_qualified_fn(hash_script));
 
-        if !result {
-            if cache.filter.is_absent(hash_script) {
-                cache.filter.mark(hash_script);
-            } else {
-                cache.map.insert(hash_script, None);
-            }
+        if !result && !cache.filter.is_absent_and_set(hash_script) {
+            // Do not cache "one-hit wonders"
+            cache.map.insert(hash_script, None);
         }
 
         result

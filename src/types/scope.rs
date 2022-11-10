@@ -1,7 +1,7 @@
 //! Module that defines the [`Scope`] type representing a function call-stack scope.
 
 use super::dynamic::{AccessMode, Variant};
-use crate::{Dynamic, Identifier};
+use crate::{Dynamic, Identifier, ImmutableString};
 use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -21,6 +21,14 @@ const SCOPE_ENTRIES_INLINED: usize = 8;
 ///
 /// Currently the lifetime parameter is not used, but it is not guaranteed to remain unused for
 /// future versions. Until then, `'static` can be used.
+///
+/// # Constant Generic Parameter
+///
+/// There is a constant generic parameter that indicates how many entries to keep inline.
+/// As long as the number of entries does not exceed this limit, no allocations occur.
+/// The default is 8.
+///
+/// A larger value makes [`Scope`] larger, but reduces the chance of allocations.
 ///
 /// # Thread Safety
 ///
@@ -61,19 +69,18 @@ const SCOPE_ENTRIES_INLINED: usize = 8;
 //
 // [`Dynamic`] is reasonably small so packing it tightly improves cache performance.
 #[derive(Debug, Hash, Default)]
-pub struct Scope<'a> {
+pub struct Scope<'a, const N: usize = SCOPE_ENTRIES_INLINED> {
     /// Current value of the entry.
     values: SmallVec<[Dynamic; SCOPE_ENTRIES_INLINED]>,
     /// Name of the entry.
     names: SmallVec<[Identifier; SCOPE_ENTRIES_INLINED]>,
     /// Aliases of the entry.
-    aliases: SmallVec<[Vec<Identifier>; SCOPE_ENTRIES_INLINED]>,
+    aliases: SmallVec<[Vec<ImmutableString>; SCOPE_ENTRIES_INLINED]>,
     /// Phantom to keep the lifetime parameter in order not to break existing code.
     dummy: PhantomData<&'a ()>,
 }
 
 impl fmt::Display for Scope<'_> {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, (name, constant, value)) in self.iter_raw().enumerate() {
             #[cfg(not(feature = "no_closure"))]
@@ -118,10 +125,10 @@ impl Clone for Scope<'_> {
 }
 
 impl IntoIterator for Scope<'_> {
-    type Item = (String, Dynamic, Vec<Identifier>);
+    type Item = (String, Dynamic, Vec<ImmutableString>);
     type IntoIter = Box<dyn Iterator<Item = Self::Item>>;
 
-    #[inline]
+    #[must_use]
     fn into_iter(self) -> Self::IntoIter {
         Box::new(
             self.values
@@ -133,10 +140,10 @@ impl IntoIterator for Scope<'_> {
 }
 
 impl<'a> IntoIterator for &'a Scope<'_> {
-    type Item = (&'a Identifier, &'a Dynamic, &'a Vec<Identifier>);
+    type Item = (&'a Identifier, &'a Dynamic, &'a Vec<ImmutableString>);
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
-    #[inline]
+    #[must_use]
     fn into_iter(self) -> Self::IntoIter {
         Box::new(
             self.values
@@ -167,6 +174,28 @@ impl Scope<'_> {
             values: SmallVec::new_const(),
             names: SmallVec::new_const(),
             aliases: SmallVec::new_const(),
+            dummy: PhantomData,
+        }
+    }
+    /// Create a new [`Scope`] with a particular capacity.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rhai::Scope;
+    ///
+    /// let mut my_scope = Scope::with_capacity(10);
+    ///
+    /// my_scope.push("x", 42_i64);
+    /// assert_eq!(my_scope.get_value::<i64>("x").expect("x should exist"), 42);
+    /// ```
+    #[inline(always)]
+    #[must_use]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            values: SmallVec::with_capacity(capacity),
+            names: SmallVec::with_capacity(capacity),
+            aliases: SmallVec::with_capacity(capacity),
             dummy: PhantomData,
         }
     }
@@ -378,7 +407,7 @@ impl Scope<'_> {
     /// Find an entry in the [`Scope`], starting from the last.
     #[inline]
     #[must_use]
-    pub(crate) fn get_index(&self, name: &str) -> Option<(usize, AccessMode)> {
+    pub(crate) fn search(&self, name: &str) -> Option<usize> {
         let len = self.len();
 
         self.names
@@ -388,7 +417,7 @@ impl Scope<'_> {
             .find_map(|(i, key)| {
                 if name == key {
                     let index = len - 1 - i;
-                    Some((index, self.values[index].access_mode()))
+                    Some(index)
                 } else {
                     None
                 }
@@ -438,10 +467,11 @@ impl Scope<'_> {
     #[inline]
     #[must_use]
     pub fn is_constant(&self, name: &str) -> Option<bool> {
-        self.get_index(name).map(|(.., access)| match access {
-            AccessMode::ReadWrite => false,
-            AccessMode::ReadOnly => true,
-        })
+        self.search(name)
+            .map(|n| match self.values[n].access_mode() {
+                AccessMode::ReadWrite => false,
+                AccessMode::ReadOnly => true,
+            })
     }
     /// Update the value of the named entry in the [`Scope`] if it already exists and is not constant.
     /// Push a new entry with the value into the [`Scope`] if the name doesn't exist or if the
@@ -474,7 +504,10 @@ impl Scope<'_> {
         name: impl AsRef<str> + Into<Identifier>,
         value: impl Variant + Clone,
     ) -> &mut Self {
-        match self.get_index(name.as_ref()) {
+        match self
+            .search(name.as_ref())
+            .map(|n| (n, self.values[n].access_mode()))
+        {
             None | Some((.., AccessMode::ReadOnly)) => {
                 self.push(name, value);
             }
@@ -513,7 +546,10 @@ impl Scope<'_> {
         name: impl AsRef<str> + Into<Identifier>,
         value: impl Variant + Clone,
     ) -> &mut Self {
-        match self.get_index(name.as_ref()) {
+        match self
+            .search(name.as_ref())
+            .map(|n| (n, self.values[n].access_mode()))
+        {
             None => {
                 self.push(name, value);
             }
@@ -547,7 +583,7 @@ impl Scope<'_> {
     #[inline(always)]
     #[must_use]
     pub fn get(&self, name: &str) -> Option<&Dynamic> {
-        self.get_index(name).map(|(index, _)| &self.values[index])
+        self.search(name).map(|index| &self.values[index])
     }
     /// Remove the last entry in the [`Scope`] by the specified name and return its value.
     ///
@@ -578,7 +614,7 @@ impl Scope<'_> {
     #[inline(always)]
     #[must_use]
     pub fn remove<T: Variant + Clone>(&mut self, name: &str) -> Option<T> {
-        self.get_index(name).and_then(|(index, _)| {
+        self.search(name).and_then(|index| {
             self.names.remove(index);
             self.aliases.remove(index);
             self.values.remove(index).try_cast()
@@ -610,9 +646,9 @@ impl Scope<'_> {
     #[inline]
     #[must_use]
     pub fn get_mut(&mut self, name: &str) -> Option<&mut Dynamic> {
-        self.get_index(name)
-            .and_then(move |(index, access)| match access {
-                AccessMode::ReadWrite => Some(self.get_mut_by_index(index)),
+        self.search(name)
+            .and_then(move |n| match self.values[n].access_mode() {
+                AccessMode::ReadWrite => Some(self.get_mut_by_index(n)),
                 AccessMode::ReadOnly => None,
             })
     }
@@ -633,7 +669,7 @@ impl Scope<'_> {
     /// Panics if the index is out of bounds.
     #[cfg(not(feature = "no_module"))]
     #[inline]
-    pub(crate) fn add_alias_by_index(&mut self, index: usize, alias: Identifier) -> &mut Self {
+    pub(crate) fn add_alias_by_index(&mut self, index: usize, alias: ImmutableString) -> &mut Self {
         let aliases = self.aliases.get_mut(index).unwrap();
         if aliases.is_empty() || !aliases.contains(&alias) {
             aliases.push(alias);
@@ -654,11 +690,11 @@ impl Scope<'_> {
     pub fn set_alias(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
-        alias: impl Into<Identifier>,
+        alias: impl Into<ImmutableString>,
     ) {
-        if let Some((index, ..)) = self.get_index(name.as_ref()) {
+        if let Some(index) = self.search(name.as_ref()) {
             let alias = match alias.into() {
-                x if x.is_empty() => name.into(),
+                x if x.is_empty() => name.into().into(),
                 x => x,
             };
             self.add_alias_by_index(index, alias);
@@ -690,9 +726,10 @@ impl Scope<'_> {
         scope
     }
     /// Get an iterator to entries in the [`Scope`].
-    #[inline]
     #[allow(dead_code)]
-    pub(crate) fn into_iter(self) -> impl Iterator<Item = (Identifier, Dynamic, Vec<Identifier>)> {
+    pub(crate) fn into_iter(
+        self,
+    ) -> impl Iterator<Item = (Identifier, Dynamic, Vec<ImmutableString>)> {
         self.names
             .into_iter()
             .zip(self.values.into_iter().zip(self.aliases.into_iter()))

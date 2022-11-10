@@ -1,8 +1,8 @@
-#![cfg(not(feature = "no_std"))]
+#![cfg(not(feature = "no_time"))]
 
 use super::arithmetic::make_err as make_arithmetic_err;
 use crate::plugin::*;
-use crate::{def_package, Dynamic, EvalAltResult, RhaiResult, RhaiResultOf, INT};
+use crate::{def_package, Dynamic, RhaiResult, RhaiResultOf, INT};
 
 #[cfg(not(feature = "no_float"))]
 use crate::FLOAT;

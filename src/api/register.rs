@@ -4,6 +4,7 @@ use crate::func::{FnCallArgs, RegisterNativeFunction, SendSync};
 use crate::types::dynamic::Variant;
 use crate::{
     Engine, FnAccess, FnNamespace, Identifier, Module, NativeCallContext, RhaiResultOf, Shared,
+    SharedModule,
 };
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
@@ -16,12 +17,14 @@ impl Engine {
     /// Get the global namespace module (which is the fist module in `global_modules`).
     #[inline(always)]
     #[allow(dead_code)]
+    #[must_use]
     pub(crate) fn global_namespace(&self) -> &Module {
         self.global_modules.first().unwrap()
     }
     /// Get a mutable reference to the global namespace module
     /// (which is the first module in `global_modules`).
     #[inline(always)]
+    #[must_use]
     pub(crate) fn global_namespace_mut(&mut self) -> &mut Module {
         let module = self.global_modules.first_mut().unwrap();
         Shared::get_mut(module).expect("not shared")
@@ -224,12 +227,12 @@ impl Engine {
     #[inline(always)]
     pub fn register_type_with_name_raw(
         &mut self,
-        fully_qualified_type_path: impl Into<Identifier>,
+        type_path: impl Into<Identifier>,
         name: impl Into<Identifier>,
     ) -> &mut Self {
         // Add the pretty-print type name into the map
         self.global_namespace_mut()
-            .set_custom_type_raw(fully_qualified_type_path, name);
+            .set_custom_type_raw(type_path, name);
         self
     }
     /// Register a type iterator for an iterable type with the [`Engine`].
@@ -634,7 +637,7 @@ impl Engine {
     /// When searching for functions, modules loaded later are preferred. In other words, loaded
     /// modules are searched in reverse order.
     #[inline(always)]
-    pub fn register_global_module(&mut self, module: Shared<Module>) -> &mut Self {
+    pub fn register_global_module(&mut self, module: SharedModule) -> &mut Self {
         // Insert the module into the front.
         // The first module is always the global namespace.
         self.global_modules.insert(1, module);
@@ -678,12 +681,12 @@ impl Engine {
     pub fn register_static_module(
         &mut self,
         name: impl AsRef<str>,
-        module: Shared<Module>,
+        module: SharedModule,
     ) -> &mut Self {
         fn register_static_module_raw(
-            root: &mut std::collections::BTreeMap<Identifier, Shared<Module>>,
+            root: &mut std::collections::BTreeMap<Identifier, SharedModule>,
             name: &str,
-            module: Shared<Module>,
+            module: SharedModule,
         ) {
             let separator = crate::tokenizer::Token::DoubleColon.syntax();
             let separator = separator.as_ref();

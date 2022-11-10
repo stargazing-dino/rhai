@@ -122,6 +122,7 @@ impl Engine {
         let ast = self.parse_global_expr(
             &mut stream.peekable(),
             &mut state,
+            |_| {},
             #[cfg(not(feature = "no_optimize"))]
             OptimizationLevel::None,
             #[cfg(feature = "no_optimize")]
@@ -185,18 +186,21 @@ impl Engine {
         ast: &AST,
     ) -> RhaiResultOf<T> {
         let global = &mut GlobalRuntimeState::new(self);
+        let caches = &mut Caches::new();
 
-        let result = self.eval_ast_with_scope_raw(scope, global, ast, 0)?;
+        let result = self.eval_ast_with_scope_raw(global, caches, scope, ast)?;
 
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {
             global.debugger.status = crate::eval::DebuggerStatus::Terminate;
             let lib = &[
                 #[cfg(not(feature = "no_function"))]
-                ast.as_ref(),
+                AsRef::<crate::SharedModule>::as_ref(ast).clone(),
             ];
+            let mut this = Dynamic::NULL;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
-            self.run_debugger(scope, global, lib, &mut None, node, 0)?;
+
+            self.run_debugger(global, caches, lib, scope, &mut this, node)?;
         }
 
         let typ = self.map_type_name(result.type_name());
@@ -210,19 +214,23 @@ impl Engine {
     #[inline]
     pub(crate) fn eval_ast_with_scope_raw<'a>(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+
+        scope: &mut Scope,
         ast: &'a AST,
-        level: usize,
     ) -> RhaiResult {
-        let mut caches = Caches::new();
-        global.source = ast.source_raw().clone();
+        global.source = ast.source_raw().cloned();
 
         #[cfg(not(feature = "no_module"))]
         let orig_embedded_module_resolver = std::mem::replace(
             &mut global.embedded_module_resolver,
             ast.resolver().cloned(),
         );
+        #[cfg(not(feature = "no_module"))]
+        let global = &mut *crate::types::RestoreOnDrop::lock(global, move |g| {
+            g.embedded_module_resolver = orig_embedded_module_resolver
+        });
 
         let statements = ast.statements();
 
@@ -230,24 +238,12 @@ impl Engine {
             return Ok(Dynamic::UNIT);
         }
 
-        let mut _lib = &[
+        let lib = &[
             #[cfg(not(feature = "no_function"))]
-            ast.as_ref(),
-        ][..];
-        #[cfg(not(feature = "no_function"))]
-        if !ast.has_functions() {
-            _lib = &[];
-        }
+            AsRef::<crate::SharedModule>::as_ref(ast).clone(),
+        ];
 
-        let result =
-            self.eval_global_statements(scope, global, &mut caches, statements, _lib, level);
-
-        #[cfg(not(feature = "no_module"))]
-        {
-            global.embedded_module_resolver = orig_embedded_module_resolver;
-        }
-
-        result
+        self.eval_global_statements(global, caches, lib, scope, statements)
     }
     /// _(internals)_ Evaluate a list of statements with no `this` pointer.
     /// Exported under the `internals` feature only.
@@ -261,14 +257,14 @@ impl Engine {
     #[inline(always)]
     pub fn eval_statements_raw(
         &self,
-        scope: &mut Scope,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
+        lib: &[crate::SharedModule],
+
+        scope: &mut Scope,
         statements: &[crate::ast::Stmt],
-        lib: &[&crate::Module],
-        level: usize,
     ) -> RhaiResult {
-        self.eval_global_statements(scope, global, caches, statements, lib, level)
+        self.eval_global_statements(global, caches, lib, scope, statements)
     }
 }
 

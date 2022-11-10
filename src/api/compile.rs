@@ -295,6 +295,6 @@ impl Engine {
 
         let mut peekable = stream.peekable();
         let mut state = ParseState::new(self, scope, Default::default(), tokenizer_control);
-        self.parse_global_expr(&mut peekable, &mut state, self.optimization_level)
+        self.parse_global_expr(&mut peekable, &mut state, |_| {}, self.optimization_level)
     }
 }

@@ -3,7 +3,7 @@ members = [".", "codegen"]
 
 [package]
 name = "rhai"
-version = "1.10.1"
+version = "1.11.0"
 rust-version = "1.61.0"
 edition = "2018"
 resolver = "2"
@@ -19,7 +19,8 @@ categories = ["no-std", "embedded", "wasm", "parser-implementations"]
 
 [dependencies]
 smallvec = { version = "1.7", default-features = false, features = ["union", "const_new", "const_generics"] }
-ahash = { version = "0.8", default-features = false }
+# 0.8.1 pulls in `getrandom/js` which breaks no-std
+ahash = { version = "=0.8.0", default-features = false, features = ["compile-time-rng"] }
 num-traits = { version = "0.2", default-features = false }
 bitflags = { version = "1", default-features = false }
 smartstring = { version = "1", default-features = false }
@@ -33,6 +34,7 @@ serde = { version = "1.0", default-features = false, features = ["derive", "allo
 serde_json = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
 unicode-xid = { version = "0.2", default-features = false, optional = true }
 rust_decimal = { version = "1.16", default-features = false, features = ["maths"], optional = true }
+getrandom = { version = "0.2", optional = true }
 rustyline = { version = "10", optional = true }
 
 [dev-dependencies]
@@ -40,9 +42,8 @@ serde_bytes = "0.11"
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 
 [features]
-default = ["std"]
-std = ["ahash/std", "ahash/runtime-rng", "num-traits/std", "smartstring/std"]
-base_std = ["ahash/std", "num-traits/std", "smartstring/std"] # Prevent ahash random seed, enabling dynamic libraries to be used.
+default = ["std", "ahash/runtime-rng"]  # ahash/runtime-rng trumps ahash/compile-time-rng
+std = ["ahash/std", "num-traits/std", "smartstring/std"]
 unchecked = []                  # unchecked arithmetic
 sync = []                       # restrict to only types that implement Send + Sync
 no_position = []                # do not track position in the parser
@@ -54,6 +55,7 @@ only_i64 = []                   # set INT=i64 (default) and disable support for 
 decimal = ["rust_decimal"]      # add the Decimal number type
 no_index = []                   # no arrays and indexing
 no_object = []                  # no custom objects
+no_time = []                    # no timestamps
 no_function = ["no_closure"]    # no script-defined functions (meaning no closures)
 no_closure = []                 # no automatic sharing and capture of anonymous functions to external variables
 no_module = []                  # no modules
@@ -65,11 +67,11 @@ debugging = ["internals"]       # enable debugging
 serde = ["dep:serde", "smartstring/serde", "smallvec/serde"] # implement serde for rhai types
 
 # compiling for no-std
-no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm", "ahash/compile-time-rng", "hashbrown/ahash-compile-time-rng"]
+no_std = ["no-std-compat", "num-traits/libm", "core-error", "libm", "hashbrown", "no_time"]
 
 # compiling for WASM
-wasm-bindgen = ["instant/wasm-bindgen"]
-stdweb = ["instant/stdweb"]
+wasm-bindgen = ["getrandom/js", "instant/wasm-bindgen"]
+stdweb = ["getrandom/js", "instant/stdweb"]
 
 # compiling bin tools
 bin-features = ["decimal", "metadata", "serde", "debugging", "rustyline"]

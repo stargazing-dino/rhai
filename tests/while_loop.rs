@@ -22,6 +22,22 @@ fn test_while() -> Result<(), Box<EvalAltResult>> {
         6
     );
 
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let x = 0;
+
+                while x < 10 {
+                    x += 1;
+                    if x > 5 { break x * 2; }
+                    if x > 3 { continue; }
+                    x += 3;
+                }
+            ",
+        )?,
+        12
+    );
+
     Ok(())
 }
 
@@ -46,6 +62,25 @@ fn test_do() -> Result<(), Box<EvalAltResult>> {
         )?,
         6
     );
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let x = 0;
+
+                do {
+                    x += 1;
+                    if x > 5 { break x * 2; }
+                    if x > 3 { continue; }
+                    x += 3;
+                } while x < 10;
+            ",
+        )?,
+        12
+    );
+
+    engine.run("do {} while false")?;
+
+    assert_eq!(engine.eval::<INT>("do { break 42; } while false")?, 42);
 
     Ok(())
 }

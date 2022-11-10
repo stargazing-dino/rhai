@@ -13,6 +13,7 @@ use std::prelude::v1::*;
 /// Error encountered when tokenizing the script text.
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 #[non_exhaustive]
+#[must_use]
 pub enum LexError {
     /// An unexpected symbol is encountered when tokenizing the script text.
     UnexpectedInput(String),
@@ -37,11 +38,11 @@ impl Error for LexError {}
 impl fmt::Display for LexError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnexpectedInput(s) => write!(f, "Unexpected '{}'", s),
-            Self::MalformedEscapeSequence(s) => write!(f, "Invalid escape sequence: '{}'", s),
-            Self::MalformedNumber(s) => write!(f, "Invalid number: '{}'", s),
-            Self::MalformedChar(s) => write!(f, "Invalid character: '{}'", s),
-            Self::MalformedIdentifier(s) => write!(f, "Variable name is not proper: '{}'", s),
+            Self::UnexpectedInput(s) => write!(f, "Unexpected '{s}'"),
+            Self::MalformedEscapeSequence(s) => write!(f, "Invalid escape sequence: '{s}'"),
+            Self::MalformedNumber(s) => write!(f, "Invalid number: '{s}'"),
+            Self::MalformedChar(s) => write!(f, "Invalid character: '{s}'"),
+            Self::MalformedIdentifier(s) => write!(f, "Variable name is not proper: '{s}'"),
             Self::UnterminatedString => f.write_str("Open string is not terminated"),
             Self::StringTooLong(max) => write!(
                 f,
@@ -49,7 +50,7 @@ impl fmt::Display for LexError {
                 max
             ),
             Self::ImproperSymbol(s, d) if d.is_empty() => {
-                write!(f, "Invalid symbol encountered: '{}'", s)
+                write!(f, "Invalid symbol encountered: '{s}'")
             }
             Self::ImproperSymbol(.., d) => f.write_str(d),
         }
@@ -58,8 +59,8 @@ impl fmt::Display for LexError {
 
 impl LexError {
     /// Convert a [`LexError`] into a [`ParseError`].
-    #[inline(always)]
-    #[must_use]
+    #[cold]
+    #[inline(never)]
     pub fn into_err(self, pos: Position) -> ParseError {
         ParseError(Box::new(self.into()), pos)
     }
@@ -72,6 +73,7 @@ impl LexError {
 /// massive code changes to remove/add back enum variants in match statements.
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 #[non_exhaustive]
+#[must_use]
 pub enum ParseErrorType {
     /// The script ends prematurely.
     UnexpectedEOF,
@@ -171,7 +173,8 @@ pub enum ParseErrorType {
 
 impl ParseErrorType {
     /// Make a [`ParseError`] using the current type and position.
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     #[must_use]
     pub(crate) fn into_err(self, pos: Position) -> ParseError {
         ParseError(self.into(), pos)
@@ -181,77 +184,69 @@ impl ParseErrorType {
 impl fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::BadInput(err) => write!(f, "{}", err),
+            Self::BadInput(err) => write!(f, "{err}"),
 
-            Self::UnknownOperator(s) => write!(f, "Unknown operator: '{}'", s),
+            Self::UnknownOperator(s) => write!(f, "Unknown operator: '{s}'"),
 
-            Self::MalformedCallExpr(s) => match s.as_str() {
-                "" => f.write_str("Invalid expression in function call arguments"),
-                s => f.write_str(s)
-            },
-            Self::MalformedIndexExpr(s) => match s.as_str() {
-                "" => f.write_str("Invalid index in indexing expression"),
-                s => f.write_str(s)
-            },
-            Self::MalformedInExpr(s) => match s.as_str() {
-                "" => f.write_str("Invalid 'in' expression"),
-                s => f.write_str(s)
-            },
-            Self::MalformedCapture(s) => match s.as_str() {
-                "" => f.write_str("Invalid capturing"),
-                s => f.write_str(s)
-            },
+            Self::MalformedCallExpr(s)  if s.is_empty() => f.write_str(s),
+            Self::MalformedCallExpr(..) => f.write_str("Invalid expression in function call arguments"),
+
+            Self::MalformedIndexExpr(s) if s.is_empty() => f.write_str("Invalid index in indexing expression"),
+            Self::MalformedIndexExpr(s) =>  f.write_str(s),
+
+            Self::MalformedInExpr(s) if s.is_empty() => f.write_str("Invalid 'in' expression"),
+            Self::MalformedInExpr(s) =>  f.write_str(s),
+
+            Self::MalformedCapture(s) if s.is_empty()  => f.write_str("Invalid capturing"),
+            Self::MalformedCapture(s) => f.write_str(s),
 
             Self::FnDuplicatedDefinition(s, n) => {
-                write!(f, "Function {} with ", s)?;
+                write!(f, "Function {s} with ")?;
                 match n {
                     0 => f.write_str("no parameters already exists"),
                     1 => f.write_str("1 parameter already exists"),
-                    _ => write!(f, "{} parameters already exists", n),
+                    _ => write!(f, "{n} parameters already exists"),
                 }
             }
-            Self::FnMissingBody(s) => match s.as_str() {
-                "" => f.write_str("Expecting body statement block for anonymous function"),
-                s => write!(f, "Expecting body statement block for function {}", s)
-            },
-            Self::FnMissingParams(s) => write!(f, "Expecting parameters for function {}", s),
-            Self::FnDuplicatedParam(s, arg) => write!(f, "Duplicated parameter {} for function {}", arg, s),
 
-            Self::DuplicatedProperty(s) => write!(f, "Duplicated property for object map literal: {}", s),
+            Self::FnMissingBody(s) if s.is_empty()  => f.write_str("Expecting body statement block for anonymous function"),
+            Self::FnMissingBody(s) =>  write!(f, "Expecting body statement block for function {s}"),
+
+            Self::FnMissingParams(s) => write!(f, "Expecting parameters for function {s}"),
+            Self::FnDuplicatedParam(s, arg) => write!(f, "Duplicated parameter {arg} for function {s}"),
+
+            Self::DuplicatedProperty(s) => write!(f, "Duplicated property for object map literal: {s}"),
             #[allow(deprecated)]
             Self::DuplicatedSwitchCase => f.write_str("Duplicated switch case"),
-            Self::DuplicatedVariable(s) => write!(f, "Duplicated variable name: {}", s),
+            Self::DuplicatedVariable(s) => write!(f, "Duplicated variable name: {s}"),
 
-            Self::VariableExists(s) => write!(f, "Variable already defined: {}", s),
-            Self::VariableUndefined(s) => write!(f, "Undefined variable: {}", s),
-            Self::ModuleUndefined(s) => write!(f, "Undefined module: {}", s),
+            Self::VariableExists(s) => write!(f, "Variable already defined: {s}"),
+            Self::VariableUndefined(s) => write!(f, "Undefined variable: {s}"),
+            Self::ModuleUndefined(s) => write!(f, "Undefined module: {s}"),
 
-            Self::MismatchedType(r, a) => write!(f, "Expecting {}, not {}", r, a),
+            Self::MismatchedType(r, a) => write!(f, "Expecting {r}, not {a}"),
             Self::ExprExpected(s) => write!(f, "Expecting {} expression", s),
-            Self::MissingToken(token, s) => write!(f, "Expecting '{}' {}", token, s),
+            Self::MissingToken(token, s) => write!(f, "Expecting '{token}' {s}"),
 
             Self::MissingSymbol(s) if s.is_empty() => f.write_str("Expecting a symbol"),
             Self::MissingSymbol(s) => f.write_str(s),
 
-            Self::AssignmentToConstant(s) => match s.as_str() {
-                "" => f.write_str("Cannot assign to a constant value"),
-                s => write!(f, "Cannot assign to constant {}", s)
-            },
-            Self::AssignmentToInvalidLHS(s) => match s.as_str() {
-                "" => f.write_str("Expression cannot be assigned to"),
-                s => f.write_str(s)
-            },
+            Self::AssignmentToConstant(s) if s.is_empty() => f.write_str("Cannot assign to a constant value"),
+            Self::AssignmentToConstant(s) =>  write!(f, "Cannot assign to constant {s}"),
 
-            Self::LiteralTooLarge(typ, max) => write!(f, "{} exceeds the maximum limit ({})", typ, max),
-            Self::Reserved(s) if is_valid_identifier(s.chars()) => write!(f, "'{}' is a reserved keyword", s),
-            Self::Reserved(s) => write!(f, "'{}' is a reserved symbol", s),
+            Self::AssignmentToInvalidLHS(s) if s.is_empty() => f.write_str("Expression cannot be assigned to"),
+            Self::AssignmentToInvalidLHS(s) => f.write_str(s),
+
+            Self::LiteralTooLarge(typ, max) => write!(f, "{typ} exceeds the maximum limit ({max})"),
+            Self::Reserved(s) if is_valid_identifier(s.as_str()) => write!(f, "'{s}' is a reserved keyword"),
+            Self::Reserved(s) => write!(f, "'{s}' is a reserved symbol"),
             Self::UnexpectedEOF => f.write_str("Script is incomplete"),
             Self::WrongSwitchIntegerCase => f.write_str("Integer switch case cannot follow a range case"),
             Self::WrongSwitchDefaultCase => f.write_str("Default switch case must be the last"),
             Self::WrongSwitchCaseCondition => f.write_str("This switch case cannot have a condition"),
             Self::PropertyExpected => f.write_str("Expecting name of a property"),
             Self::VariableExpected => f.write_str("Expecting name of a variable"),
-            Self::ForbiddenVariable(s) => write!(f, "Forbidden variable name: {}", s),
+            Self::ForbiddenVariable(s) => write!(f, "Forbidden variable name: {s}"),
             Self::WrongFnDefinition => f.write_str("Function definitions must be at global level and cannot be inside a block or another function"),
             Self::FnMissingName => f.write_str("Expecting function name in function declaration"),
             Self::WrongDocComment => f.write_str("Doc-comment must be followed immediately by a function definition"),
@@ -277,6 +272,7 @@ impl From<LexError> for ParseErrorType {
 
 /// Error when parsing a script.
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
+#[must_use]
 pub struct ParseError(
     /// Parse error type.
     pub Box<ParseErrorType>,

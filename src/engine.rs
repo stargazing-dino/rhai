@@ -9,8 +9,8 @@ use crate::packages::{Package, StandardPackage};
 use crate::tokenizer::Token;
 use crate::types::StringsInterner;
 use crate::{
-    Dynamic, Identifier, ImmutableString, Locked, Module, OptimizationLevel, Position, RhaiResult,
-    Shared, StaticVec,
+    Dynamic, Identifier, ImmutableString, Locked, Module, OptimizationLevel, SharedModule,
+    StaticVec,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -86,16 +86,16 @@ pub const OP_INCLUSIVE_RANGE: &str = Token::InclusiveRange.literal_syntax();
 ///
 /// let result = engine.eval::<i64>("40 + 2")?;
 ///
-/// println!("Answer: {}", result);  // prints 42
+/// println!("Answer: {result}");   // prints 42
 /// # Ok(())
 /// # }
 /// ```
 pub struct Engine {
     /// A collection of all modules loaded into the global namespace of the Engine.
-    pub(crate) global_modules: StaticVec<Shared<Module>>,
+    pub(crate) global_modules: StaticVec<SharedModule>,
     /// A collection of all sub-modules directly loaded into the Engine.
     #[cfg(not(feature = "no_module"))]
-    pub(crate) global_sub_modules: std::collections::BTreeMap<Identifier, Shared<Module>>,
+    pub(crate) global_sub_modules: std::collections::BTreeMap<Identifier, SharedModule>,
 
     /// A module resolution service.
     #[cfg(not(feature = "no_module"))]
@@ -150,7 +150,8 @@ pub struct Engine {
 }
 
 impl fmt::Debug for Engine {
-    #[inline]
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut f = f.debug_struct("Engine");
 
@@ -189,6 +190,7 @@ impl fmt::Debug for Engine {
 
 impl Default for Engine {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }
@@ -235,18 +237,14 @@ impl Engine {
         #[cfg(not(feature = "no_std"))]
         #[cfg(not(target_family = "wasm"))]
         {
-            engine.print = Box::new(|s| println!("{}", s));
-            engine.debug = Box::new(|s, source, pos| {
-                source.map_or_else(
-                    || {
-                        if pos.is_none() {
-                            println!("{}", s);
-                        } else {
-                            println!("{:?} | {}", pos, s);
-                        }
-                    },
-                    |source| println!("{} @ {:?} | {}", source, pos, s),
-                )
+            engine.print = Box::new(|s| println!("{s}"));
+            engine.debug = Box::new(|s, source, pos| match (source, pos) {
+                (Some(source), crate::Position::NONE) => println!("{source} | {s}"),
+                #[cfg(not(feature = "no_position"))]
+                (Some(source), pos) => println!("{source} @ {pos:?} | {s}"),
+                (None, crate::Position::NONE) => println!("{s}"),
+                #[cfg(not(feature = "no_position"))]
+                (None, pos) => println!("{pos:?} | {s}"),
             });
         }
 
@@ -342,16 +340,5 @@ impl Engine {
     #[must_use]
     pub fn const_empty_string(&self) -> ImmutableString {
         self.get_interned_string("")
-    }
-
-    /// Check a result to ensure that it is valid.
-    #[inline]
-    pub(crate) fn check_return_value(&self, result: RhaiResult, _pos: Position) -> RhaiResult {
-        #[cfg(not(feature = "unchecked"))]
-        if let Ok(ref r) = result {
-            self.check_data_size(r, _pos)?;
-        }
-
-        result
     }
 }

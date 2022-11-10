@@ -4,6 +4,7 @@ use crate::{ImmutableString, Position};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
+    borrow::Borrow,
     fmt,
     hash::Hash,
     ops::{Deref, DerefMut},
@@ -20,14 +21,25 @@ pub struct Ident {
 }
 
 impl fmt::Debug for Ident {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.name)?;
         self.pos.debug_print(f)
     }
 }
 
+impl Borrow<str> for Ident {
+    #[inline(always)]
+    #[must_use]
+    fn borrow(&self) -> &str {
+        self.name.as_ref()
+    }
+}
+
 impl AsRef<str> for Ident {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &str {
         self.name.as_ref()
     }

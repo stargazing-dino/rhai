@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         engine
             .gen_fn_signatures(false)
             .into_iter()
-            .for_each(|func| println!("{}", func));
+            .for_each(|func| println!("{func}"));
 
         println!();
     }
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         ",
     )?;
 
-    println!("{:?}", result);
+    println!("{result:?}");
 
     let result = engine.eval::<TestStruct>(
         "
@@ -61,7 +61,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         ",
     )?;
 
-    println!("{:?}", result);
+    println!("{result:?}");
 
     Ok(())
 }

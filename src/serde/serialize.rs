@@ -1,20 +1,22 @@
 //! Implementations of [`serde::Serialize`].
 
 use crate::types::dynamic::Union;
-use crate::{Dynamic, ImmutableString};
-use serde::ser::{Serialize, Serializer};
+use crate::{Dynamic, ImmutableString, Scope};
+use serde::{ser::SerializeSeq, Serialize, Serializer};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
 #[cfg(not(feature = "no_object"))]
 use serde::ser::SerializeMap;
 
-#[cfg(not(feature = "no_std"))]
+#[cfg(not(feature = "no_time"))]
 use crate::types::dynamic::Variant;
 
 impl Serialize for Dynamic {
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         match self.0 {
+            Union::Null => unreachable!(),
+
             Union::Unit(..) => ser.serialize_unit(),
             Union::Bool(x, ..) => ser.serialize_bool(x),
             Union::Str(ref s, ..) => ser.serialize_str(s.as_str()),
@@ -37,10 +39,9 @@ impl Serialize for Dynamic {
             Union::Decimal(ref x, ..) => {
                 use rust_decimal::prelude::ToPrimitive;
 
-                if let Some(v) = x.to_f64() {
-                    ser.serialize_f64(v)
-                } else {
-                    ser.serialize_str(&x.to_string())
+                match x.to_f64() {
+                    Some(v) => ser.serialize_f64(v),
+                    None => ser.serialize_str(&x.to_string()),
                 }
             }
             #[cfg(feature = "decimal")]
@@ -48,10 +49,9 @@ impl Serialize for Dynamic {
             Union::Decimal(ref x, ..) => {
                 use rust_decimal::prelude::ToPrimitive;
 
-                if let Some(v) = x.to_f32() {
-                    ser.serialize_f32(v)
-                } else {
-                    ser.serialize_str(&x.to_string())
+                match x.to_f32() {
+                    Some(v) => ser.serialize_f32(v),
+                    _ => ser.serialize_str(&x.to_string()),
                 }
             }
 
@@ -67,7 +67,7 @@ impl Serialize for Dynamic {
                 map.end()
             }
             Union::FnPtr(ref f, ..) => ser.serialize_str(f.fn_name()),
-            #[cfg(not(feature = "no_std"))]
+            #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(ref x, ..) => ser.serialize_str(x.as_ref().type_name()),
 
             Union::Variant(ref v, ..) => ser.serialize_str((***v).type_name()),
@@ -83,7 +83,38 @@ impl Serialize for Dynamic {
 }
 
 impl Serialize for ImmutableString {
+    #[inline(always)]
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         ser.serialize_str(self.as_str())
+    }
+}
+
+impl Serialize for Scope<'_> {
+    #[inline(always)]
+    fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+        #[derive(Debug, Clone, Hash, Serialize)]
+        struct ScopeEntry<'a> {
+            pub name: &'a str,
+            pub value: &'a Dynamic,
+            #[serde(default, skip_serializing_if = "is_false")]
+            pub is_constant: bool,
+        }
+
+        fn is_false(value: &bool) -> bool {
+            !value
+        }
+
+        let mut ser = ser.serialize_seq(Some(self.len()))?;
+
+        for (name, is_constant, value) in self.iter_raw() {
+            let entry = ScopeEntry {
+                name,
+                value,
+                is_constant,
+            };
+            ser.serialize_element(&entry)?;
+        }
+
+        ser.end()
     }
 }

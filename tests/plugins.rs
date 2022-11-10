@@ -2,10 +2,10 @@
 #![cfg(not(feature = "no_module"))]
 
 use rhai::plugin::*;
-use rhai::{Engine, EvalAltResult, INT};
+use rhai::{Engine, EvalAltResult, Scope, INT};
 
 mod test {
-    use rhai::plugin::*;
+    use super::*;
 
     #[export_module]
     pub mod special_array_package {
@@ -42,7 +42,7 @@ mod test {
         #[rhai_fn(name = "no_effect", set = "no_effect", pure)]
         pub fn no_effect(array: &mut Array, value: INT) {
             // array is not modified
-            println!("Array = {:?}, Value = {}", array, value);
+            println!("Array = {array:?}, Value = {value}");
         }
     }
 }
@@ -119,7 +119,7 @@ fn test_plugins_package() -> Result<(), Box<EvalAltResult>> {
 
         assert!(
             matches!(*engine.run("const A = [1, 2, 3]; A.test(42);").expect_err("should error"),
-            EvalAltResult::ErrorAssignmentToConstant(x, ..) if x == "array")
+            EvalAltResult::ErrorNonPureMethodCallOnConstant(x, ..) if x == "test")
         )
     }
 
@@ -169,4 +169,58 @@ fn test_plugins_parameters() -> Result<(), Box<EvalAltResult>> {
     );
 
     Ok(())
+}
+
+#[cfg(target_pointer_width = "64")]
+mod handle {
+    use super::*;
+
+    #[derive(Debug, Eq, PartialEq, Clone, Copy, Hash)]
+    pub struct WorldHandle(usize);
+    pub type World = Vec<i64>;
+
+    impl From<&mut World> for WorldHandle {
+        fn from(world: &mut World) -> Self {
+            Self::new(world)
+        }
+    }
+
+    impl AsMut<World> for WorldHandle {
+        fn as_mut(&mut self) -> &mut World {
+            unsafe { std::mem::transmute(self.0) }
+        }
+    }
+
+    impl WorldHandle {
+        pub fn new(world: &mut World) -> Self {
+            Self(unsafe { std::mem::transmute(world) })
+        }
+    }
+
+    #[export_module]
+    pub mod handle_module {
+        pub type Handle = WorldHandle;
+
+        #[rhai_fn(get = "len")]
+        pub fn len(world: &mut Handle) -> INT {
+            world.as_mut().len() as INT
+        }
+    }
+
+    #[test]
+    fn test_module_handle() -> Result<(), Box<EvalAltResult>> {
+        let mut engine = Engine::new();
+
+        engine.register_global_module(exported_module!(handle_module).into());
+
+        let mut scope = Scope::new();
+
+        let world: &mut World = &mut vec![42];
+        scope.push("world", WorldHandle::from(world));
+
+        #[cfg(not(feature = "no_object"))]
+        assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "world.len")?, 1);
+
+        Ok(())
+    }
 }

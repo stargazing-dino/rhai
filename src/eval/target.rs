@@ -2,9 +2,12 @@
 
 use crate::types::dynamic::Variant;
 use crate::{Dynamic, Position, RhaiResultOf};
-use std::ops::{Deref, DerefMut};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+use std::{
+    borrow::Borrow,
+    ops::{Deref, DerefMut},
+};
 
 // Calculate an offset+len pair given an actual length of the underlying array.
 //
@@ -416,7 +419,16 @@ impl Deref for Target<'_> {
 
 impl AsRef<Dynamic> for Target<'_> {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &Dynamic {
+        self
+    }
+}
+
+impl Borrow<Dynamic> for Target<'_> {
+    #[inline(always)]
+    #[must_use]
+    fn borrow(&self) -> &Dynamic {
         self
     }
 }
@@ -440,6 +452,7 @@ impl DerefMut for Target<'_> {
 
 impl AsMut<Dynamic> for Target<'_> {
     #[inline(always)]
+    #[must_use]
     fn as_mut(&mut self) -> &mut Dynamic {
         self
     }

@@ -45,7 +45,6 @@ fn print_source(lines: &[String], pos: Position, offset: usize, window: (usize, 
             if n == line {
                 if let Some(pos) = pos.position() {
                     let shift = offset + line_no_len + marker.len() + 2;
-
                     println!("{0:>1$}{2:>3$}", "│ ", shift, "\x1b[36m^\x1b[39m", pos + 10);
                 }
             }
@@ -76,7 +75,7 @@ fn print_current_source(
     }
     if !src.is_empty() {
         // Print just a line number for imported modules
-        println!("{} @ {:?}", src, pos);
+        println!("{src} @ {pos:?}");
     } else {
         // Print the current source line
         print_source(lines, pos, 0, window);
@@ -101,17 +100,16 @@ fn print_error(input: &str, mut err: EvalAltResult) {
     // Print error position
     if pos.is_none() {
         // No position
-        println!("{}", err);
+        println!("{err}");
     } else {
         // Specific position - print line text
-        println!("{}{}", line_no, lines[pos.line().unwrap() - 1]);
+        println!("{line_no}{}", lines[pos.line().unwrap() - 1]);
 
         // Display position marker
         println!(
-            "{0:>1$} {2}",
+            "{0:>1$} {err}",
             "^",
             line_no.len() + pos.position().unwrap(),
-            err
         );
     }
 }
@@ -248,11 +246,11 @@ fn debug_callback(
                 BreakPoint::AtPosition { .. } => (),
                 BreakPoint::AtFunctionName { ref name, .. }
                 | BreakPoint::AtFunctionCall { ref name, .. } => {
-                    println!("! Call to function {}.", name)
+                    println!("! Call to function {name}.")
                 }
                 #[cfg(not(feature = "no_object"))]
                 BreakPoint::AtProperty { ref name, .. } => {
-                    println!("! Property {} accessed.", name)
+                    println!("! Property {name} accessed.")
                 }
                 _ => unreachable!(),
             }
@@ -310,10 +308,11 @@ fn debug_callback(
                 ["node"] => {
                     if pos.is_none() {
                         println!("{:?}", node);
-                    } else if let Some(source) = source {
-                        println!("{:?} {} @ {:?}", node, source, pos);
                     } else {
-                        println!("{:?} @ {:?}", node, pos);
+                        match source {
+                            Some(source) => println!("{node:?} {source} @ {pos:?}"),
+                            None => println!("{node:?} @ {pos:?}"),
+                        }
                     }
                     println!();
                 }
@@ -327,7 +326,7 @@ fn debug_callback(
                 ["list" | "l", n] if n.parse::<usize>().is_ok() => {
                     let num = n.parse::<usize>().unwrap();
                     if num == 0 || num > lines.len() {
-                        eprintln!("\x1b[31mInvalid line: {}\x1b[39m", num);
+                        eprintln!("\x1b[31mInvalid line: {num}\x1b[39m");
                     } else {
                         let pos = Position::new(num as u16, 0);
                         print_current_source(&mut context, source, pos, lines, (3, 6));
@@ -339,24 +338,18 @@ fn debug_callback(
                 ["over" | "o"] => break Ok(DebuggerCommand::StepOver),
                 ["next" | "n"] => break Ok(DebuggerCommand::Next),
                 ["scope"] => println!("{}", context.scope()),
-                ["print" | "p", "this"] => {
-                    if let Some(value) = context.this_ptr() {
-                        println!("=> {:?}", value);
-                    } else {
-                        println!("`this` pointer is unbound.");
-                    }
-                }
-                ["print" | "p", var_name] => {
-                    if let Some(value) = context.scope().get_value::<Dynamic>(var_name) {
-                        println!("=> {:?}", value);
-                    } else {
-                        eprintln!("Variable not found: {}", var_name);
-                    }
-                }
+                ["print" | "p", "this"] => match context.this_ptr() {
+                    Some(value) => println!("=> {value:?}"),
+                    None => println!("`this` pointer is unbound."),
+                },
+                ["print" | "p", var_name] => match context.scope().get_value::<Dynamic>(var_name) {
+                    Some(value) => println!("=> {value:?}"),
+                    None => eprintln!("Variable not found: {var_name}"),
+                },
                 ["print" | "p"] => {
                     println!("{}", context.scope().clone_visible());
                     if let Some(value) = context.this_ptr() {
-                        println!("this = {:?}", value);
+                        println!("this = {value:?}");
                     }
                 }
                 #[cfg(not(feature = "no_module"))]
@@ -385,7 +378,7 @@ fn debug_callback(
                         .iter()
                         .rev()
                     {
-                        println!("{}", frame)
+                        println!("{frame}")
                     }
                 }
                 ["info" | "i", "break" | "b"] => Iterator::for_each(
@@ -402,7 +395,7 @@ fn debug_callback(
                             print!("{}", line_num);
                             print_source(lines, *pos, line_num.len(), (0, 0));
                         }
-                        _ => println!("[{}] {}", i + 1, bp),
+                        _ => println!("[{}] {bp}", i + 1),
                     },
                 ),
                 ["enable" | "en", n] => {
@@ -420,12 +413,12 @@ fn debug_callback(
                                 .get_mut(n - 1)
                                 .unwrap()
                                 .enable(true);
-                            println!("Break-point #{} enabled.", n)
+                            println!("Break-point #{n} enabled.")
                         } else {
-                            eprintln!("\x1b[31mInvalid break-point: {}\x1b[39m", n);
+                            eprintln!("\x1b[31mInvalid break-point: {n}\x1b[39m");
                         }
                     } else {
-                        eprintln!("\x1b[31mInvalid break-point: '{}'\x1b[39m", n);
+                        eprintln!("\x1b[31mInvalid break-point: '{n}'\x1b[39m");
                     }
                 }
                 ["disable" | "dis", n] => {
@@ -443,12 +436,12 @@ fn debug_callback(
                                 .get_mut(n - 1)
                                 .unwrap()
                                 .enable(false);
-                            println!("Break-point #{} disabled.", n)
+                            println!("Break-point #{n} disabled.")
                         } else {
-                            eprintln!("\x1b[31mInvalid break-point: {}\x1b[39m", n);
+                            eprintln!("\x1b[31mInvalid break-point: {n}\x1b[39m");
                         }
                     } else {
-                        eprintln!("\x1b[31mInvalid break-point: '{}'\x1b[39m", n);
+                        eprintln!("\x1b[31mInvalid break-point: '{n}'\x1b[39m");
                     }
                 }
                 ["delete" | "d", n] => {
@@ -464,12 +457,12 @@ fn debug_callback(
                                 .debugger
                                 .break_points_mut()
                                 .remove(n - 1);
-                            println!("Break-point #{} deleted.", n)
+                            println!("Break-point #{n} deleted.")
                         } else {
-                            eprintln!("\x1b[31mInvalid break-point: {}\x1b[39m", n);
+                            eprintln!("\x1b[31mInvalid break-point: {n}\x1b[39m");
                         }
                     } else {
-                        eprintln!("\x1b[31mInvalid break-point: '{}'\x1b[39m", n);
+                        eprintln!("\x1b[31mInvalid break-point: '{n}'\x1b[39m");
                     }
                 }
                 ["delete" | "d"] => {
@@ -487,14 +480,14 @@ fn debug_callback(
                             args,
                             enabled: true,
                         };
-                        println!("Break-point added for {}", bp);
+                        println!("Break-point added for {bp}");
                         context
                             .global_runtime_state_mut()
                             .debugger
                             .break_points_mut()
                             .push(bp);
                     } else {
-                        eprintln!("\x1b[31mInvalid number of arguments: '{}'\x1b[39m", args);
+                        eprintln!("\x1b[31mInvalid number of arguments: '{args}'\x1b[39m");
                     }
                 }
                 // Property name
@@ -504,7 +497,7 @@ fn debug_callback(
                         name: param[1..].into(),
                         enabled: true,
                     };
-                    println!("Break-point added for {}", bp);
+                    println!("Break-point added for {bp}");
                     context
                         .global_runtime_state_mut()
                         .debugger
@@ -523,18 +516,18 @@ fn debug_callback(
 
                     if range.contains(&n) {
                         let bp = rhai::debugger::BreakPoint::AtPosition {
-                            source: source.unwrap_or("").into(),
+                            source: source.map(|s| s.into()),
                             pos: Position::new(n as u16, 0),
                             enabled: true,
                         };
-                        println!("Break-point added {}", bp);
+                        println!("Break-point added {bp}");
                         context
                             .global_runtime_state_mut()
                             .debugger
                             .break_points_mut()
                             .push(bp);
                     } else {
-                        eprintln!("\x1b[31mInvalid line number: '{}'\x1b[39m", n);
+                        eprintln!("\x1b[31mInvalid line number: '{n}'\x1b[39m");
                     }
                 }
                 // Function name parameter
@@ -543,7 +536,7 @@ fn debug_callback(
                         name: param.trim().into(),
                         enabled: true,
                     };
-                    println!("Break-point added for {}", bp);
+                    println!("Break-point added for {bp}");
                     context
                         .global_runtime_state_mut()
                         .debugger
@@ -553,11 +546,11 @@ fn debug_callback(
                 #[cfg(not(feature = "no_position"))]
                 ["break" | "b"] => {
                     let bp = rhai::debugger::BreakPoint::AtPosition {
-                        source: source.unwrap_or("").into(),
+                        source: source.map(|s| s.into()),
                         pos,
                         enabled: true,
                     };
-                    println!("Break-point added {}", bp);
+                    println!("Break-point added {bp}");
                     context
                         .global_runtime_state_mut()
                         .debugger
@@ -594,7 +587,7 @@ fn debug_callback(
 
 fn main() {
     let title = format!("Rhai Debugger (version {})", env!("CARGO_PKG_VERSION"));
-    println!("{}", title);
+    println!("{title}");
     println!("{0:=<1$}", "", title.len());
 
     // Initialize scripting engine

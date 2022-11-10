@@ -488,39 +488,29 @@ mod f64_functions {
 #[cfg(feature = "decimal")]
 #[export_module]
 pub mod decimal_functions {
-    use num_traits::Pow;
-    use rust_decimal::{prelude::Zero, Decimal, MathematicalOps};
+    use rust_decimal::{prelude::Zero, Decimal};
 
-    #[rhai_fn(skip, return_raw)]
-    pub fn add(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
-        if cfg!(not(feature = "unchecked")) {
+    #[cfg(not(feature = "unchecked"))]
+    pub mod builtin {
+        use rust_decimal::MathematicalOps;
+
+        #[rhai_fn(return_raw)]
+        pub fn add(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
             x.checked_add(y)
                 .ok_or_else(|| make_err(format!("Addition overflow: {x} + {y}")))
-        } else {
-            Ok(x + y)
         }
-    }
-    #[rhai_fn(skip, return_raw)]
-    pub fn subtract(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
-        if cfg!(not(feature = "unchecked")) {
+        #[rhai_fn(return_raw)]
+        pub fn subtract(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
             x.checked_sub(y)
                 .ok_or_else(|| make_err(format!("Subtraction overflow: {x} - {y}")))
-        } else {
-            Ok(x - y)
         }
-    }
-    #[rhai_fn(skip, return_raw)]
-    pub fn multiply(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
-        if cfg!(not(feature = "unchecked")) {
+        #[rhai_fn(return_raw)]
+        pub fn multiply(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
             x.checked_mul(y)
                 .ok_or_else(|| make_err(format!("Multiplication overflow: {x} * {y}")))
-        } else {
-            Ok(x * y)
         }
-    }
-    #[rhai_fn(skip, return_raw)]
-    pub fn divide(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
-        if cfg!(not(feature = "unchecked")) {
+        #[rhai_fn(return_raw)]
+        pub fn divide(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
             // Detect division by zero
             if y == Decimal::zero() {
                 Err(make_err(format!("Division by zero: {x} / {y}")))
@@ -528,26 +518,16 @@ pub mod decimal_functions {
                 x.checked_div(y)
                     .ok_or_else(|| make_err(format!("Division overflow: {x} / {y}")))
             }
-        } else {
-            Ok(x / y)
         }
-    }
-    #[rhai_fn(skip, return_raw)]
-    pub fn modulo(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
-        if cfg!(not(feature = "unchecked")) {
+        #[rhai_fn(return_raw)]
+        pub fn modulo(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
             x.checked_rem(y)
                 .ok_or_else(|| make_err(format!("Modulo division by zero or overflow: {x} % {y}")))
-        } else {
-            Ok(x % y)
         }
-    }
-    #[rhai_fn(skip, return_raw)]
-    pub fn power(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
-        if cfg!(not(feature = "unchecked")) {
+        #[rhai_fn(return_raw)]
+        pub fn power(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
             x.checked_powd(y)
                 .ok_or_else(|| make_err(format!("Exponential overflow: {x} ** {y}")))
-        } else {
-            Ok(x.pow(y))
         }
     }
     #[rhai_fn(name = "-")]

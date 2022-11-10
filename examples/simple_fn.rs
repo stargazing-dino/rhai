@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
 
     let result = engine.eval::<i64>("add(40, 2)")?;
 
-    println!("Answer: {}", result); // prints 42
+    println!("Answer: {result}"); // prints 42
 
     Ok(())
 }

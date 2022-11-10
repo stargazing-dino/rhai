@@ -2,8 +2,7 @@
 
 use crate::func::{CallableFunction, StraightHashMap};
 use crate::types::BloomFilterU64;
-use crate::{Identifier, StaticVec};
-use std::marker::PhantomData;
+use crate::{ImmutableString, StaticVec};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -14,7 +13,7 @@ pub struct FnResolutionCacheEntry {
     /// Function.
     pub func: CallableFunction,
     /// Optional source.
-    pub source: Option<Box<Identifier>>,
+    pub source: Option<ImmutableString>,
 }
 
 /// _(internals)_ A function resolution cache with a bloom filter.
@@ -45,21 +44,18 @@ impl FnResolutionCache {
 /// The following caches are contained inside this type:
 /// * A stack of [function resolution caches][FnResolutionCache]
 #[derive(Debug, Clone)]
-pub struct Caches<'a> {
+pub struct Caches {
     /// Stack of [function resolution caches][FnResolutionCache].
     stack: StaticVec<FnResolutionCache>,
-    /// Take care of the lifetime parameter.
-    dummy: PhantomData<&'a ()>,
 }
 
-impl Caches<'_> {
+impl Caches {
     /// Create an empty [`Caches`].
     #[inline(always)]
     #[must_use]
     pub const fn new() -> Self {
         Self {
             stack: StaticVec::new_const(),
-            dummy: PhantomData,
         }
     }
     /// Get the number of function resolution cache(s) in the stack.

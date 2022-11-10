@@ -32,7 +32,7 @@ pub struct TokenizerControlBlock {
 
 impl TokenizerControlBlock {
     /// Create a new `TokenizerControlBlock`.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -97,7 +97,7 @@ impl Position {
     /// # Panics
     ///
     /// Panics if `line` is zero.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn new(line: u16, position: u16) -> Self {
         assert!(line != 0, "line cannot be zero");
@@ -220,6 +220,7 @@ impl Position {
 
 impl Default for Position {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::START
     }
@@ -241,6 +242,8 @@ impl fmt::Display for Position {
 }
 
 impl fmt::Debug for Position {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_none() {
             f.write_str("none")
@@ -297,6 +300,8 @@ pub struct Span {
 }
 
 impl Default for Span {
+    #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::NONE
     }
@@ -313,7 +318,7 @@ impl Span {
         Self { start, end }
     }
     /// Is this [`Span`] non-existent?
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub const fn is_none(&self) -> bool {
         self.start.is_none() && self.end.is_none()
@@ -333,7 +338,6 @@ impl Span {
 }
 
 impl fmt::Display for Span {
-    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let _f = f;
 
@@ -360,6 +364,8 @@ impl fmt::Display for Span {
 }
 
 impl fmt::Debug for Span {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
     }
@@ -381,15 +387,15 @@ pub enum Token {
     ///
     /// Requires the `decimal` feature.
     #[cfg(feature = "decimal")]
-    DecimalConstant(rust_decimal::Decimal),
+    DecimalConstant(Box<rust_decimal::Decimal>),
     /// An identifier.
-    Identifier(Identifier),
+    Identifier(Box<Identifier>),
     /// A character constant.
     CharConstant(char),
     /// A string constant.
-    StringConstant(SmartString),
+    StringConstant(Box<SmartString>),
     /// An interpolated string.
-    InterpolatedString(SmartString),
+    InterpolatedString(Box<SmartString>),
     /// `{`
     LeftBrace,
     /// `}`
@@ -570,14 +576,14 @@ pub enum Token {
     /// A lexer error.
     LexError(Box<LexError>),
     /// A comment block.
-    Comment(SmartString),
+    Comment(Box<SmartString>),
     /// A reserved symbol.
-    Reserved(SmartString),
+    Reserved(Box<SmartString>),
     /// A custom keyword.
     ///
     /// Not available under `no_custom_syntax`.
     #[cfg(not(feature = "no_custom_syntax"))]
-    Custom(SmartString),
+    Custom(Box<SmartString>),
     /// End of the input stream.
     EOF,
 }
@@ -699,7 +705,7 @@ impl Token {
             FloatConstant(f) => f.to_string().into(),
             #[cfg(feature = "decimal")]
             DecimalConstant(d) => d.to_string().into(),
-            StringConstant(..) => "string".into(),
+            StringConstant(s) => format!("\"{s}\"").into(),
             InterpolatedString(..) => "string".into(),
             CharConstant(c) => c.to_string().into(),
             Identifier(s) => s.to_string().into(),
@@ -793,9 +799,9 @@ impl Token {
         })
     }
 
-    /// Reverse lookup a token from a piece of syntax.
+    /// Reverse lookup a symbol token from a piece of syntax.
     #[must_use]
-    pub fn lookup_from_syntax(syntax: &str) -> Option<Self> {
+    pub fn lookup_symbol_from_syntax(syntax: &str) -> Option<Self> {
         use Token::*;
 
         Some(match syntax {
@@ -873,18 +879,10 @@ impl Token {
             "**" => PowerOf,
             "**=" => PowerOfAssign,
 
-            #[cfg(feature = "no_object")]
-            "?." => Reserved(syntax.into()),
-            #[cfg(feature = "no_index")]
-            "?[" => Reserved(syntax.into()),
-
             #[cfg(not(feature = "no_function"))]
             "fn" => Fn,
             #[cfg(not(feature = "no_function"))]
             "private" => Private,
-
-            #[cfg(feature = "no_function")]
-            "fn" | "private" => Reserved(syntax.into()),
 
             #[cfg(not(feature = "no_module"))]
             "import" => Import,
@@ -893,29 +891,43 @@ impl Token {
             #[cfg(not(feature = "no_module"))]
             "as" => As,
 
+            _ => return None,
+        })
+    }
+
+    /// Is a piece of syntax a reserved keyword?
+    #[must_use]
+    pub fn is_reserved_keyword(syntax: &str) -> bool {
+        match syntax {
+            #[cfg(feature = "no_object")]
+            "?." => true,
+            #[cfg(feature = "no_index")]
+            "?[" => true,
+            #[cfg(feature = "no_function")]
+            "fn" | "private" => true,
             #[cfg(feature = "no_module")]
-            "import" | "export" | "as" => Reserved(syntax.into()),
+            "import" | "export" | "as" => true,
 
             // List of reserved operators
             "===" | "!==" | "->" | "<-" | "?" | ":=" | ":;" | "~" | "!." | "::<" | "(*" | "*)"
-            | "#" | "#!" | "@" | "$" | "++" | "--" | "..." | "<|" | "|>" => Reserved(syntax.into()),
+            | "#" | "#!" | "@" | "$" | "++" | "--" | "..." | "<|" | "|>" => true,
 
             // List of reserved keywords
             "public" | "protected" | "super" | "new" | "use" | "module" | "package" | "var"
             | "static" | "shared" | "with" | "is" | "goto" | "exit" | "match" | "case"
             | "default" | "void" | "null" | "nil" | "spawn" | "thread" | "go" | "sync"
-            | "async" | "await" | "yield" => Reserved(syntax.into()),
+            | "async" | "await" | "yield" => true,
 
             KEYWORD_PRINT | KEYWORD_DEBUG | KEYWORD_TYPE_OF | KEYWORD_EVAL | KEYWORD_FN_PTR
             | KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY | KEYWORD_THIS | KEYWORD_IS_DEF_VAR => {
-                Reserved(syntax.into())
+                true
             }
 
             #[cfg(not(feature = "no_function"))]
-            crate::engine::KEYWORD_IS_DEF_FN => Reserved(syntax.into()),
+            crate::engine::KEYWORD_IS_DEF_FN => true,
 
-            _ => return None,
-        })
+            _ => false,
+        }
     }
 
     /// Is this token [`EOF`][Token::EOF]?
@@ -1097,8 +1109,8 @@ impl Token {
     pub(crate) fn into_function_name_for_override(self) -> Result<SmartString, Self> {
         match self {
             #[cfg(not(feature = "no_custom_syntax"))]
-            Self::Custom(s) if is_valid_function_name(&s) => Ok(s),
-            Self::Identifier(s) if is_valid_function_name(&s) => Ok(s),
+            Self::Custom(s) if is_valid_function_name(&s) => Ok(*s),
+            Self::Identifier(s) if is_valid_function_name(&s) => Ok(*s),
             _ => Err(self),
         }
     }
@@ -1510,7 +1522,7 @@ fn get_next_token_inner(
         let return_comment = return_comment || is_doc_comment(comment.as_ref().expect("`Some`"));
 
         if return_comment {
-            return Some((Token::Comment(comment.expect("`Some`")), start_pos));
+            return Some((Token::Comment(comment.expect("`Some`").into()), start_pos));
         }
         if state.comment_level > 0 {
             // Reached EOF without ending comment block
@@ -1524,9 +1536,9 @@ fn get_next_token_inner(
             |(err, err_pos)| Some((Token::LexError(err.into()), err_pos)),
             |(result, interpolated, start_pos)| {
                 if interpolated {
-                    Some((Token::InterpolatedString(result), start_pos))
+                    Some((Token::InterpolatedString(result.into()), start_pos))
                 } else {
-                    Some((Token::StringConstant(result), start_pos))
+                    Some((Token::StringConstant(result.into()), start_pos))
                 }
             },
         );
@@ -1676,13 +1688,16 @@ fn get_next_token_inner(
                         // Then try decimal
                         #[cfg(feature = "decimal")]
                         let num = num.or_else(|_| {
-                            rust_decimal::Decimal::from_str(&result).map(Token::DecimalConstant)
+                            rust_decimal::Decimal::from_str(&result)
+                                .map(Box::new)
+                                .map(Token::DecimalConstant)
                         });
 
                         // Then try decimal in scientific notation
                         #[cfg(feature = "decimal")]
                         let num = num.or_else(|_| {
                             rust_decimal::Decimal::from_scientific(&result)
+                                .map(Box::new)
                                 .map(Token::DecimalConstant)
                         });
 
@@ -1697,11 +1712,11 @@ fn get_next_token_inner(
             // letter or underscore ...
             #[cfg(not(feature = "unicode-xid-ident"))]
             ('a'..='z' | '_' | 'A'..='Z', ..) => {
-                return Some(get_identifier(stream, pos, start_pos, c));
+                return Some(get_token_as_identifier(stream, pos, start_pos, c));
             }
             #[cfg(feature = "unicode-xid-ident")]
             (ch, ..) if unicode_xid::UnicodeXID::is_xid_start(ch) || ch == '_' => {
-                return Some(get_identifier(stream, pos, start_pos, c));
+                return Some(get_token_as_identifier(stream, pos, start_pos, c));
             }
 
             // " - string literal
@@ -1709,7 +1724,7 @@ fn get_next_token_inner(
                 return parse_string_literal(stream, state, pos, c, false, true, false)
                     .map_or_else(
                         |(err, err_pos)| Some((Token::LexError(err.into()), err_pos)),
-                        |(result, ..)| Some((Token::StringConstant(result), start_pos)),
+                        |(result, ..)| Some((Token::StringConstant(result.into()), start_pos)),
                     );
             }
             // ` - string literal
@@ -1737,9 +1752,9 @@ fn get_next_token_inner(
                     |(err, err_pos)| Some((Token::LexError(err.into()), err_pos)),
                     |(result, interpolated, ..)| {
                         if interpolated {
-                            Some((Token::InterpolatedString(result), start_pos))
+                            Some((Token::InterpolatedString(result.into()), start_pos))
                         } else {
-                            Some((Token::StringConstant(result), start_pos))
+                            Some((Token::StringConstant(result.into()), start_pos))
                         }
                     },
                 );
@@ -1786,7 +1801,7 @@ fn get_next_token_inner(
             // Parentheses
             ('(', '*') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("(*".into()), start_pos));
+                return Some((Token::Reserved(Box::new("(*".into())), start_pos));
             }
             ('(', ..) => return Some((Token::LeftParen, start_pos)),
             (')', ..) => return Some((Token::RightParen, start_pos)),
@@ -1802,7 +1817,7 @@ fn get_next_token_inner(
                 return Some((Token::MapStart, start_pos));
             }
             // Shebang
-            ('#', '!') => return Some((Token::Reserved("#!".into()), start_pos)),
+            ('#', '!') => return Some((Token::Reserved(Box::new("#!".into())), start_pos)),
 
             ('#', ' ') => {
                 eat_next(stream, pos);
@@ -1812,10 +1827,10 @@ fn get_next_token_inner(
                 } else {
                     "#"
                 };
-                return Some((Token::Reserved(token.into()), start_pos));
+                return Some((Token::Reserved(Box::new(token.into())), start_pos));
             }
 
-            ('#', ..) => return Some((Token::Reserved("#".into()), start_pos)),
+            ('#', ..) => return Some((Token::Reserved(Box::new("#".into())), start_pos)),
 
             // Operators
             ('+', '=') => {
@@ -1824,7 +1839,7 @@ fn get_next_token_inner(
             }
             ('+', '+') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("++".into()), start_pos));
+                return Some((Token::Reserved(Box::new("++".into())), start_pos));
             }
             ('+', ..) if !state.next_token_cannot_be_unary => {
                 return Some((Token::UnaryPlus, start_pos))
@@ -1839,11 +1854,11 @@ fn get_next_token_inner(
             }
             ('-', '>') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("->".into()), start_pos));
+                return Some((Token::Reserved(Box::new("->".into())), start_pos));
             }
             ('-', '-') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("--".into()), start_pos));
+                return Some((Token::Reserved(Box::new("--".into())), start_pos));
             }
             ('-', ..) if !state.next_token_cannot_be_unary => {
                 return Some((Token::UnaryMinus, start_pos))
@@ -1852,7 +1867,7 @@ fn get_next_token_inner(
 
             ('*', ')') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("*)".into()), start_pos));
+                return Some((Token::Reserved(Box::new("*)".into())), start_pos));
             }
             ('*', '=') => {
                 eat_next(stream, pos);
@@ -1925,7 +1940,7 @@ fn get_next_token_inner(
                             .borrow_mut()
                             .global_comments
                             .push(comment),
-                        _ => return Some((Token::Comment(comment), start_pos)),
+                        _ => return Some((Token::Comment(comment.into()), start_pos)),
                     }
                 }
             }
@@ -1953,7 +1968,7 @@ fn get_next_token_inner(
                     scan_block_comment(stream, state.comment_level, pos, comment.as_mut());
 
                 if let Some(comment) = comment {
-                    return Some((Token::Comment(comment), start_pos));
+                    return Some((Token::Comment(comment.into()), start_pos));
                 }
             }
 
@@ -1972,7 +1987,7 @@ fn get_next_token_inner(
                     match stream.peek_next() {
                         Some('.') => {
                             eat_next(stream, pos);
-                            Token::Reserved("...".into())
+                            Token::Reserved(Box::new("...".into()))
                         }
                         Some('=') => {
                             eat_next(stream, pos);
@@ -1990,7 +2005,7 @@ fn get_next_token_inner(
 
                 if stream.peek_next() == Some('=') {
                     eat_next(stream, pos);
-                    return Some((Token::Reserved("===".into()), start_pos));
+                    return Some((Token::Reserved(Box::new("===".into())), start_pos));
                 }
 
                 return Some((Token::EqualsTo, start_pos));
@@ -2007,18 +2022,18 @@ fn get_next_token_inner(
 
                 if stream.peek_next() == Some('<') {
                     eat_next(stream, pos);
-                    return Some((Token::Reserved("::<".into()), start_pos));
+                    return Some((Token::Reserved(Box::new("::<".into())), start_pos));
                 }
 
                 return Some((Token::DoubleColon, start_pos));
             }
             (':', '=') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved(":=".into()), start_pos));
+                return Some((Token::Reserved(Box::new(":=".into())), start_pos));
             }
             (':', ';') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved(":;".into()), start_pos));
+                return Some((Token::Reserved(Box::new(":;".into())), start_pos));
             }
             (':', ..) => return Some((Token::Colon, start_pos)),
 
@@ -2028,7 +2043,7 @@ fn get_next_token_inner(
             }
             ('<', '-') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("<-".into()), start_pos));
+                return Some((Token::Reserved(Box::new("<-".into())), start_pos));
             }
             ('<', '<') => {
                 eat_next(stream, pos);
@@ -2045,7 +2060,7 @@ fn get_next_token_inner(
             }
             ('<', '|') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("<|".into()), start_pos));
+                return Some((Token::Reserved(Box::new("<|".into())), start_pos));
             }
             ('<', ..) => return Some((Token::LessThan, start_pos)),
 
@@ -2073,14 +2088,14 @@ fn get_next_token_inner(
 
                 if stream.peek_next() == Some('=') {
                     eat_next(stream, pos);
-                    return Some((Token::Reserved("!==".into()), start_pos));
+                    return Some((Token::Reserved(Box::new("!==".into())), start_pos));
                 }
 
                 return Some((Token::NotEqualsTo, start_pos));
             }
             ('!', '.') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("!.".into()), start_pos));
+                return Some((Token::Reserved(Box::new("!.".into())), start_pos));
             }
             ('!', ..) => return Some((Token::Bang, start_pos)),
 
@@ -2094,7 +2109,7 @@ fn get_next_token_inner(
             }
             ('|', '>') => {
                 eat_next(stream, pos);
-                return Some((Token::Reserved("|>".into()), start_pos));
+                return Some((Token::Reserved(Box::new("|>".into())), start_pos));
             }
             ('|', ..) => return Some((Token::Pipe, start_pos)),
 
@@ -2114,7 +2129,7 @@ fn get_next_token_inner(
             }
             ('^', ..) => return Some((Token::XOr, start_pos)),
 
-            ('~', ..) => return Some((Token::Reserved("~".into()), start_pos)),
+            ('~', ..) => return Some((Token::Reserved(Box::new("~".into())), start_pos)),
 
             ('%', '=') => {
                 eat_next(stream, pos);
@@ -2122,9 +2137,9 @@ fn get_next_token_inner(
             }
             ('%', ..) => return Some((Token::Modulo, start_pos)),
 
-            ('@', ..) => return Some((Token::Reserved("@".into()), start_pos)),
+            ('@', ..) => return Some((Token::Reserved(Box::new("@".into())), start_pos)),
 
-            ('$', ..) => return Some((Token::Reserved("$".into()), start_pos)),
+            ('$', ..) => return Some((Token::Reserved(Box::new("$".into())), start_pos)),
 
             ('?', '.') => {
                 eat_next(stream, pos);
@@ -2132,7 +2147,7 @@ fn get_next_token_inner(
                     #[cfg(not(feature = "no_object"))]
                     Token::Elvis,
                     #[cfg(feature = "no_object")]
-                    Token::Reserved("?.".into()),
+                    Token::Reserved(Box::new("?.".into())),
                     start_pos,
                 ));
             }
@@ -2146,11 +2161,11 @@ fn get_next_token_inner(
                     #[cfg(not(feature = "no_index"))]
                     Token::QuestionBracket,
                     #[cfg(feature = "no_index")]
-                    Token::Reserved("?[".into()),
+                    Token::Reserved(Box::new("?[".into())),
                     start_pos,
                 ));
             }
-            ('?', ..) => return Some((Token::Reserved("?".into()), start_pos)),
+            ('?', ..) => return Some((Token::Reserved(Box::new("?".into())), start_pos)),
 
             (ch, ..) if ch.is_whitespace() => (),
 
@@ -2168,8 +2183,8 @@ fn get_next_token_inner(
     Some((Token::EOF, *pos))
 }
 
-/// Get the next identifier.
-fn get_identifier(
+/// Get the next token, parsing it as an identifier.
+fn get_token_as_identifier(
     stream: &mut impl InputStream,
     pos: &mut Position,
     start_pos: Position,
@@ -2188,20 +2203,20 @@ fn get_identifier(
         }
     }
 
-    let is_valid_identifier = is_valid_identifier(identifier.chars());
-
-    if let Some(token) = Token::lookup_from_syntax(&identifier) {
+    if let Some(token) = Token::lookup_symbol_from_syntax(&identifier) {
         return (token, start_pos);
+    } else if Token::is_reserved_keyword(&identifier) {
+        return (Token::Reserved(Box::new(identifier)), start_pos);
     }
 
-    if !is_valid_identifier {
+    if !is_valid_identifier(&identifier) {
         return (
             Token::LexError(LERR::MalformedIdentifier(identifier.to_string()).into()),
             start_pos,
         );
     }
 
-    (Token::Identifier(identifier), start_pos)
+    (Token::Identifier(identifier.into()), start_pos)
 }
 
 /// Is a keyword allowed as a function?
@@ -2222,10 +2237,10 @@ pub fn is_keyword_function(name: &str) -> bool {
 /// _(internals)_ Is a text string a valid identifier?
 /// Exported under the `internals` feature only.
 #[must_use]
-pub fn is_valid_identifier(name: impl Iterator<Item = char>) -> bool {
+pub fn is_valid_identifier(name: &str) -> bool {
     let mut first_alphabetic = false;
 
-    for ch in name {
+    for ch in name.chars() {
         match ch {
             '_' => (),
             _ if is_id_first_alphabetic(ch) => first_alphabetic = true,
@@ -2243,7 +2258,7 @@ pub fn is_valid_identifier(name: impl Iterator<Item = char>) -> bool {
 #[inline(always)]
 #[must_use]
 pub fn is_valid_function_name(name: &str) -> bool {
-    is_valid_identifier(name.chars())
+    is_valid_identifier(name) && !is_keyword_function(name)
 }
 
 /// Is a character valid to start an identifier?
@@ -2382,7 +2397,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             }
             // Reserved keyword/symbol
             Some((Token::Reserved(s), pos)) => (match
-                (&*s,
+                (s.as_str(),
                     #[cfg(not(feature = "no_custom_syntax"))]
                     (!self.engine.custom_keywords.is_empty() && self.engine.custom_keywords.contains_key(&*s)),
                     #[cfg(feature = "no_custom_syntax")]
@@ -2422,7 +2437,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 (.., true) => unreachable!("no custom operators"),
                 // Reserved keyword that is not custom and disabled.
                 (token, false) if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token) => {
-                    let msg = format!("reserved {} '{token}' is disabled", if is_valid_identifier(token.chars()) { "keyword"} else {"symbol"});
+                    let msg = format!("reserved {} '{token}' is disabled", if is_valid_identifier(token) { "keyword"} else {"symbol"});
                     Token::LexError(LERR::ImproperSymbol(s.to_string(), msg).into())
                 },
                 // Reserved keyword/operator that is not custom.
@@ -2438,7 +2453,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             Some((token, pos)) if !self.engine.custom_keywords.is_empty() && self.engine.custom_keywords.contains_key(token.literal_syntax()) => {
                 if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token.literal_syntax()) {
                     // Disabled standard keyword/symbol
-                    (Token::Custom(token.literal_syntax().into()), pos)
+                    (Token::Custom(Box::new(token.literal_syntax().into())), pos)
                 } else {
                     // Active standard keyword - should never be a custom keyword!
                     unreachable!("{:?} is an active keyword", token)
@@ -2446,7 +2461,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             }
             // Disabled symbol
             Some((token, pos)) if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token.literal_syntax()) => {
-                (Token::Reserved(token.literal_syntax().into()), pos)
+                (Token::Reserved(Box::new(token.literal_syntax().into())), pos)
             }
             // Normal symbol
             Some(r) => r,

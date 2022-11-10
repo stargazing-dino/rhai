@@ -677,8 +677,6 @@ op **(u64, int) -> u64;
 
 op **(u8, int) -> u8;
 
-op +(Decimal) -> Decimal;
-
 op +(int) -> int;
 
 op +(f32) -> f32;
@@ -800,8 +798,6 @@ op +=(Instant, float) -> ();
 
 /// Add the specified number of `seconds` to the timestamp.
 op +=(Instant, int) -> ();
-
-op -(Decimal) -> Decimal;
 
 op -(int) -> int;
 
@@ -1131,9 +1127,6 @@ op ^(u64, u64) -> u64;
 
 op ^(u8, u8) -> u8;
 
-/// Return the absolute value of the decimal number.
-fn abs(x: Decimal) -> Decimal;
-
 /// Return the absolute value of the number.
 fn abs(x: int) -> int;
 
@@ -1306,13 +1299,6 @@ fn atan(x: float, y: float) -> float;
 /// Return the arc-hyperbolic-tangent of the floating-point number, in radians.
 fn atanh(x: float) -> float;
 
-/// Get an array of object maps containing the function calls stack.
-///
-/// If there is no debugging interface registered, an empty array is returned.
-///
-/// An array of strings is returned under `no_object`.
-fn back_trace() -> Array;
-
 /// Return an iterator over all the bits in the number.
 ///
 /// # Example
@@ -1425,9 +1411,6 @@ fn blob(len: int, value: int) -> Blob;
 /// print(text.bytes);      // prints 51
 /// ```
 fn bytes(string: String) -> int;
-
-/// Return the smallest whole number larger than or equals to the decimal number.
-fn ceiling(x: Decimal) -> Decimal;
 
 /// Return the smallest whole number larger than or equals to the floating-point number.
 fn ceiling(x: float) -> float;
@@ -1570,8 +1553,63 @@ fn clear(string: String) -> ();
 /// ```
 fn contains(array: Array, value: ?) -> bool;
 
-/// Return the cosine of the decimal number in radians.
-fn cos(x: Decimal) -> Decimal;
+/// Return `true` if the BLOB contains a specified byte value.
+///
+/// # Example
+///
+/// ```rhai
+/// let text = "hello, world!";
+///
+/// print(text.contains('h'));      // prints true
+///
+/// print(text.contains('x'));      // prints false
+/// ```
+fn contains(blob: Blob, value: int) -> bool;
+
+/// Returns `true` if the object map contains a specified property.
+///
+/// # Example
+///
+/// ```rhai
+/// let m = #{a: 1, b: 2, c: 3};
+///
+/// print(m.contains("b"));     // prints true
+///
+/// print(m.contains("x"));     // prints false
+/// ```
+fn contains(map: Map, property: String) -> bool;
+
+/// Return `true` if the range contains a specified value.
+fn contains(range: ExclusiveRange, value: int) -> bool;
+
+/// Return `true` if the range contains a specified value.
+fn contains(range: InclusiveRange, value: int) -> bool;
+
+/// Return `true` if the string contains a specified character.
+///
+/// # Example
+///
+/// ```rhai
+/// let text = "hello, world!";
+///
+/// print(text.contains('h'));      // prints true
+///
+/// print(text.contains('x'));      // prints false
+/// ```
+fn contains(string: String, character: char) -> bool;
+
+/// Return `true` if the string contains a specified string.
+///
+/// # Example
+///
+/// ```rhai
+/// let text = "hello, world!";
+///
+/// print(text.contains("hello"));  // prints true
+///
+/// print(text.contains("hey"));    // prints false
+/// ```
+fn contains(string: String, match_string: String) -> bool;
 
 /// Return the cosine of the floating-point number in radians.
 fn cos(x: float) -> float;
@@ -1650,37 +1688,37 @@ fn crop(string: String, start: int) -> ();
 fn crop(string: String, start: int, len: int) -> ();
 
 /// Return the empty string.
-fn debug() -> String;
+op debug() -> String;
 
 /// Convert the array into a string.
-fn debug(array: Array) -> String;
+op debug(Array) -> String;
 
 /// Convert the string into debug format.
-fn debug(character: char) -> String;
+op debug(char) -> String;
 
 /// Convert the function pointer into a string in debug format.
-fn debug(f: FnPtr) -> String;
+op debug(FnPtr) -> String;
 
 /// Convert the value of the `item` into a string in debug format.
-fn debug(item: ?) -> String;
+op debug(?) -> String;
 
 /// Convert the object map into a string.
-fn debug(map: Map) -> String;
+op debug(Map) -> String;
 
 /// Convert the value of `number` into a string.
-fn debug(number: f32) -> String;
+op debug(f32) -> String;
 
 /// Convert the value of `number` into a string.
-fn debug(number: float) -> String;
+op debug(float) -> String;
 
 /// Convert the string into debug format.
-fn debug(string: String) -> String;
+op debug(String) -> String;
 
 /// Convert the unit into a string in debug format.
-fn debug(unit: ()) -> String;
+op debug(()) -> String;
 
 /// Convert the boolean value into a string in debug format.
-fn debug(value: bool) -> String;
+op debug(bool) -> String;
 
 /// Remove duplicated _consecutive_ elements from the array.
 ///
@@ -1986,9 +2024,6 @@ fn end(range: InclusiveRange) -> int;
 /// ```
 fn ends_with(string: String, match_string: String) -> bool;
 
-/// Return the exponential of the decimal number.
-fn exp(x: Decimal) -> Decimal;
-
 /// Return the exponential of the floating-point number.
 fn exp(x: float) -> float;
 
@@ -2199,14 +2234,8 @@ fn filter(array: Array, filter: FnPtr) -> Array;
 /// ```
 fn filter(array: Array, filter_func: String) -> Array;
 
-/// Return the largest whole number less than or equals to the decimal number.
-fn floor(x: Decimal) -> Decimal;
-
 /// Return the largest whole number less than or equals to the floating-point number.
 fn floor(x: float) -> float;
-
-/// Return the fractional part of the decimal number.
-fn fraction(x: Decimal) -> Decimal;
 
 /// Return the fractional part of the floating-point number.
 fn fraction(x: float) -> float;
@@ -2309,9 +2338,6 @@ fn get bits(value: int) -> Iterator<bool>;
 /// ```
 fn get bytes(string: String) -> int;
 
-/// Return the smallest whole number larger than or equals to the decimal number.
-fn get ceiling(x: Decimal) -> Decimal;
-
 /// Return the smallest whole number larger than or equals to the floating-point number.
 fn get ceiling(x: float) -> float;
 
@@ -2345,20 +2371,11 @@ fn get end(range: ExclusiveRange) -> int;
 /// Return the end of the inclusive range.
 fn get end(range: InclusiveRange) -> int;
 
-/// Return the largest whole number less than or equals to the decimal number.
-fn get floor(x: Decimal) -> Decimal;
-
 /// Return the largest whole number less than or equals to the floating-point number.
 fn get floor(x: float) -> float;
 
-/// Return the fractional part of the decimal number.
-fn get fraction(x: Decimal) -> Decimal;
-
 /// Return the fractional part of the floating-point number.
 fn get fraction(x: float) -> float;
-
-/// Return the integral part of the decimal number.
-fn get int(x: Decimal) -> Decimal;
 
 /// Return the integral part of the floating-point number.
 fn get int(x: float) -> float;
@@ -2470,9 +2487,6 @@ fn get is_odd(x: u64) -> bool;
 /// Return true if the number is odd.
 fn get is_odd(x: u8) -> bool;
 
-/// Return true if the decimal number is zero.
-fn get is_zero(x: Decimal) -> bool;
-
 /// Return true if the number is zero.
 fn get is_zero(x: int) -> bool;
 
@@ -2548,10 +2562,6 @@ fn get len(string: String) -> int;
 /// print(f.name);      // prints "double"
 /// ```
 fn get name(fn_ptr: FnPtr) -> String;
-
-/// Return the nearest whole number closest to the decimal number.
-/// Always round mid-point towards the closest even number.
-fn get round(x: Decimal) -> Decimal;
 
 /// Return the nearest whole number closest to the floating-point number.
 /// Rounds away from zero.
@@ -2917,9 +2927,6 @@ fn insert(array: Array, index: int, item: ?) -> ();
 /// ```
 fn insert(blob: Blob, index: int, value: int) -> ();
 
-/// Return the integral part of the decimal number.
-fn int(x: Decimal) -> Decimal;
-
 /// Return the integral part of the floating-point number.
 fn int(x: float) -> float;
 
@@ -3033,9 +3040,6 @@ fn is_odd(x: u64) -> bool;
 /// Return true if the number is odd.
 fn is_odd(x: u8) -> bool;
 
-/// Return true if the decimal number is zero.
-fn is_zero(x: Decimal) -> bool;
-
 /// Return true if the number is zero.
 fn is_zero(x: int) -> bool;
 
@@ -3113,14 +3117,8 @@ fn len(map: Map) -> int;
 /// ```
 fn len(string: String) -> int;
 
-/// Return the natural log of the decimal number.
-fn ln(x: Decimal) -> Decimal;
-
 /// Return the natural log of the floating-point number.
 fn ln(x: float) -> float;
-
-/// Return the log of the decimal number with base 10.
-fn log(x: Decimal) -> Decimal;
 
 /// Return the log of the floating-point number with base 10.
 fn log(x: float) -> float;
@@ -3422,17 +3420,6 @@ fn parse_be_int(blob: Blob, range: RangeInclusive<int>) -> int;
 /// ```
 fn parse_be_int(blob: Blob, start: int, len: int) -> int;
 
-/// Parse a string into a decimal number.
-///
-/// # Example
-///
-/// ```rhai
-/// let x = parse_decimal("123.456");
-///
-/// print(x);       // prints 123.456
-/// ```
-fn parse_decimal(string: String) -> Decimal;
-
 /// Parse a string into a floating-point number.
 ///
 /// # Example
@@ -3471,6 +3458,17 @@ fn parse_int(string: String) -> int;
 /// print(y);       // prints 1194684 (0x123abc)
 /// ```
 fn parse_int(string: String, radix: int) -> int;
+
+/// Parse a JSON string into a value.
+///
+/// # Example
+///
+/// ```rhai
+/// let m = parse_json(`{"a":1, "b":2, "c":3}`);
+///
+/// print(m);       // prints #{"a":1, "b":2, "c":3}
+/// ```
+fn parse_json(json: String) -> ?;
 
 /// Parse the bytes within an exclusive `range` in the BLOB as a `FLOAT`
 /// in little-endian byte order.
@@ -3621,34 +3619,34 @@ fn pop(string: String) -> ?;
 fn pop(string: String, len: int) -> String;
 
 /// Return the empty string.
-fn print() -> String;
+op print() -> String;
 
 /// Convert the array into a string.
-fn print(array: Array) -> String;
+op print(Array) -> String;
 
 /// Return the character into a string.
-fn print(character: char) -> String;
+op print(char) -> String;
 
 /// Convert the value of the `item` into a string.
-fn print(item: ?) -> String;
+op print(?) -> String;
 
 /// Convert the object map into a string.
-fn print(map: Map) -> String;
+op print(Map) -> String;
 
 /// Convert the value of `number` into a string.
-fn print(number: f32) -> String;
+op print(f32) -> String;
 
 /// Convert the value of `number` into a string.
-fn print(number: float) -> String;
+op print(float) -> String;
 
 /// Return the `string`.
-fn print(string: String) -> String;
+op print(String) -> String;
 
 /// Return the empty string.
-fn print(unit: ()) -> String;
+op print(()) -> String;
 
 /// Return the boolean value into a string.
-fn print(value: bool) -> String;
+op print(bool) -> String;
 
 /// Add a new element, which is not another array, to the end of the array.
 ///
@@ -3809,27 +3807,6 @@ fn range(from: u64, to: u64) -> Iterator<u64>;
 /// }
 /// ```
 fn range(from: u8, to: u8) -> Iterator<u8>;
-
-/// Return an iterator over an exclusive range, each iteration increasing by `step`.
-///
-/// If `range` is reversed and `step` < 0, iteration goes backwards.
-///
-/// Otherwise, if `range` is empty, an empty iterator is returned.
-///
-/// # Example
-///
-/// ```rhai
-/// // prints all values from 8 to 17 in steps of 3
-/// for n in range(8..18, 3) {
-///     print(n);
-/// }
-///
-/// // prints all values down from 18 to 9 in steps of -3
-/// for n in range(18..8, -3) {
-///     print(n);
-/// }
-/// ```
-fn range(range: Range<Decimal>, step: Decimal) -> Iterator<Decimal>;
 
 /// Return an iterator over an exclusive range, each iteration increasing by `step`.
 ///
@@ -4061,28 +4038,6 @@ fn range(range: Range<u64>, step: u64) -> Iterator<u64>;
 /// }
 /// ```
 fn range(range: Range<u8>, step: u8) -> Iterator<u8>;
-
-/// Return an iterator over the exclusive range of `from..to`, each iteration increasing by `step`.
-/// The value `to` is never included.
-///
-/// If `from` > `to` and `step` < 0, iteration goes backwards.
-///
-/// If `from` > `to` and `step` > 0 or `from` < `to` and `step` < 0, an empty iterator is returned.
-///
-/// # Example
-///
-/// ```rhai
-/// // prints all values from 8 to 17 in steps of 3
-/// for n in range(8, 18, 3) {
-///     print(n);
-/// }
-///
-/// // prints all values down from 18 to 9 in steps of -3
-/// for n in range(18, 8, -3) {
-///     print(n);
-/// }
-/// ```
-fn range(from: Decimal, to: Decimal, step: Decimal) -> Iterator<Decimal>;
 
 /// Return an iterator over the exclusive range of `from..to`, each iteration increasing by `step`.
 /// The value `to` is never included.
@@ -4917,33 +4872,9 @@ fn reverse(array: Array) -> ();
 /// ```
 fn reverse(blob: Blob) -> ();
 
-/// Return the nearest whole number closest to the decimal number.
-/// Always round mid-point towards the closest even number.
-fn round(x: Decimal) -> Decimal;
-
 /// Return the nearest whole number closest to the floating-point number.
 /// Rounds away from zero.
 fn round(x: float) -> float;
-
-/// Round the decimal number to the specified number of `digits` after the decimal point and return it.
-/// Always round mid-point towards the closest even number.
-fn round(x: Decimal, digits: int) -> Decimal;
-
-/// Round the decimal number to the specified number of `digits` after the decimal point and return it.
-/// Always round towards zero.
-fn round_down(x: Decimal, digits: int) -> Decimal;
-
-/// Round the decimal number to the specified number of `digits` after the decimal point and return it.
-/// Always round mid-points towards zero.
-fn round_half_down(x: Decimal, digits: int) -> Decimal;
-
-/// Round the decimal number to the specified number of `digits` after the decimal point and return it.
-/// Always round mid-points away from zero.
-fn round_half_up(x: Decimal, digits: int) -> Decimal;
-
-/// Round the decimal number to the specified number of `digits` after the decimal point and return it.
-/// Always round away from zero.
-fn round_up(x: Decimal, digits: int) -> Decimal;
 
 /// Set the element at the `index` position in the array to a new `value`.
 ///
@@ -5170,13 +5101,6 @@ fn shift(array: Array) -> ?;
 /// ```
 fn shift(blob: Blob) -> int;
 
-/// Return the sign (as an integer) of the decimal number according to the following:
-///
-/// * `0` if the number is zero
-/// * `1` if the number is positive
-/// * `-1` if the number is negative
-fn sign(x: Decimal) -> int;
-
 /// Return the sign (as an integer) of the number according to the following:
 ///
 /// * `0` if the number is zero
@@ -5225,9 +5149,6 @@ fn sign(x: i32) -> int;
 /// * `1` if the number is positive
 /// * `-1` if the number is negative
 fn sign(x: i8) -> int;
-
-/// Return the sine of the decimal number in radians.
-fn sin(x: Decimal) -> Decimal;
 
 /// Return the sine of the floating-point number in radians.
 fn sin(x: float) -> float;
@@ -5658,9 +5579,6 @@ fn split_rev(string: String, delimiter: String, segments: int) -> Array;
 /// ```
 fn split_rev(string: String, delimiter: char, segments: int) -> Array;
 
-/// Return the square root of the decimal number.
-fn sqrt(x: Decimal) -> Decimal;
-
 /// Return the square root of the floating-point number.
 fn sqrt(x: float) -> float;
 
@@ -5754,9 +5672,6 @@ fn sub_string(string: String, start: int, len: int) -> String;
 /// print(x.tag);           // prints 42
 /// ```
 fn tag(value: ?) -> int;
-
-/// Return the tangent of the decimal number in radians.
-fn tan(x: Decimal) -> Decimal;
 
 /// Return the tangent of the floating-point number in radians.
 fn tan(x: float) -> float;
@@ -5874,33 +5789,8 @@ fn to_debug(unit: ()) -> String;
 /// Convert the boolean value into a string in debug format.
 fn to_debug(value: bool) -> String;
 
-/// Convert the floating-point number to decimal.
-fn to_decimal(x: f32) -> Decimal;
-
-/// Convert the floating-point number to decimal.
-fn to_decimal(x: float) -> Decimal;
-
-fn to_decimal(x: i16) -> Decimal;
-
-fn to_decimal(x: i32) -> Decimal;
-
-fn to_decimal(x: int) -> Decimal;
-
-fn to_decimal(x: i8) -> Decimal;
-
-fn to_decimal(x: u16) -> Decimal;
-
-fn to_decimal(x: u32) -> Decimal;
-
-fn to_decimal(x: u64) -> Decimal;
-
-fn to_decimal(x: u8) -> Decimal;
-
 /// Convert radians to degrees.
 fn to_degrees(x: float) -> float;
-
-/// Convert the decimal number to floating-point.
-fn to_float(x: Decimal) -> float;
 
 /// Convert the 32-bit floating-point number to 64-bit.
 fn to_float(x: f32) -> float;
@@ -5952,9 +5842,6 @@ fn to_hex(value: u64) -> String;
 
 /// Convert the `value` into a string in hex format.
 fn to_hex(value: u8) -> String;
-
-/// Convert the decimal number into an integer.
-fn to_int(x: Decimal) -> int;
 
 fn to_int(x: char) -> int;
 

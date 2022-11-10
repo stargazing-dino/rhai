@@ -1,6 +1,79 @@
 Rhai Release Notes
 ==================
 
+Version 1.11.0
+==============
+
+Speed Improvements
+------------------
+
+* Due to a code refactor, built-in operators for standard types now run even faster, in certain cases by 20-30%.
+
+Bug fixes
+---------
+
+* `Engine::parse_json` now returns an error on unquoted keys to be consistent with JSON specifications.
+* `import` statements inside `eval` no longer cause errors in subsequent code.
+* Functions marked `global` in `import`ed modules with no alias names now work properly.
+* Incorrect loop optimizations that are too aggressive (e.g. unrolling a `do { ... } until true` with a `break` statement inside) and cause crashes are removed.
+
+Breaking changes
+----------------
+
+* `NativeCallContext::new` is completely deprecated and unimplemented (always panics) in favor of new API's.
+
+New features
+------------
+
+### Loop expressions
+
+* Loops (such as `loop`, `do`, `while` and `for`) can now act as _expressions_, with the `break` statement returning an optional value.
+* Normal loops return `()` as the value.
+* Loop expressions can be enabled/disabled via `Engine::set_allow_loop_expressions`
+
+### Static hashing
+
+* It is now possible to specify a fixed _seed_ for use with the `ahash` hasher, via a static function `rhai::config::hashing::set_ahash_seed` or an environment variable, in order to force static (i.e. deterministic) hashes for function signatures.
+* This is necessary when using Rhai across shared-library boundaries.
+* A build script is used to extract the environment variable (`RHAI_AHASH_SEED`, if any) and splice it into the source code before compilation.
+
+### No Timestamps
+
+* A new feature, `no_time`, is added to disable support timestamps.
+* This may be necessary when building for architectures without time support, such as raw WASM.
+
+### Serializable `Scope`
+
+* `Scope` is now serializable and deserializable via `serde`.
+
+### Store and recreate `NativeCallContext`
+
+* A convenient API is added to store a `NativeCallContext` into a new `NativeCallContextStore` type.
+* This allows a `NativeCallContext` to be stored and recreated later on.
+
+### Call native Rust functions in `NativeCallContext`
+
+* `NativeCallContext::call_native_fn` is added to call registered native Rust functions only.
+* `NativeCallContext::call_native_fn_raw` is added as the advanced version.
+* This is often desirable as Rust functions typically do not want a similar-named scripted function to hijack the process -- which will cause brittleness.
+
+### Custom syntax improvements
+
+* The look-ahead symbol for custom syntax now renders a string literal in quotes (instead of the generic term `string`).
+* This facilitates more accurate parsing by separating strings and identifiers.
+
+### Limits API
+
+* Methods returning maximum limits (e.g. `Engine::max_string_len`) are now available even under `unchecked`.
+* This helps avoid the proliferation of unnecessary feature flags in third-party library code.
+
+Enhancements
+------------
+
+* `parse_json` function is added to parse a JSON string into an object map.
+* `Error::ErrorNonPureMethodCallOnConstant` is added which is raised when a non-pure method is called on a constant value.
+
+
 Version 1.10.1
 ==============
 
@@ -8,7 +81,7 @@ Bug fixes
 ---------
 
 * Compiling on 32-bit architectures no longer cause a compilation error.
-* Fix type-size test fo 32-bit architectures without the `decimal` feature.
+* Fix type-size test for 32-bit architectures without the `decimal` feature.
 
 Custom syntax with state
 ------------------------

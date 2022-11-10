@@ -67,7 +67,7 @@ pub fn main() {
     scope.push_constant("MY_CONSTANT", 42_i64);
 
     // Compile the handler script.
-    println!("> Loading script file: {}", path);
+    println!("> Loading script file: {path}");
 
     let ast = match engine.compile_file_with_scope(&mut scope, path.into()) {
         Ok(ast) => ast,
@@ -89,7 +89,7 @@ pub fn main() {
     let result = engine.call_fn_raw(&mut scope, &ast, false, false, "init", None, []);
 
     if let Err(err) = result {
-        eprintln!("! {}", err)
+        eprintln!("! {err}")
     }
 
     // Create handler instance
@@ -127,7 +127,7 @@ pub fn main() {
                 let result = engine.call_fn::<()>(scope, ast, event, (arg.to_string(),));
 
                 if let Err(err) = result {
-                    eprintln!("! {}", err)
+                    eprintln!("! {err}")
                 }
             }
         }

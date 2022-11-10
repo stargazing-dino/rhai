@@ -7,6 +7,7 @@ use crate::{calc_fn_hash, Position, StaticVec, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
+    borrow::Borrow,
     collections::BTreeMap,
     fmt,
     hash::Hash,
@@ -19,16 +20,16 @@ use std::{
 /// Exported under the `internals` feature only.
 ///
 /// This type may hold a straight assignment (i.e. not an op-assignment).
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, PartialEq, Hash)]
 pub struct OpAssignment {
     /// Hash of the op-assignment call.
     pub hash_op_assign: u64,
     /// Hash of the underlying operator call (for fallback).
     pub hash_op: u64,
     /// Op-assignment operator.
-    pub op_assign: &'static str,
+    pub op_assign: Token,
     /// Underlying operator.
-    pub op: &'static str,
+    pub op: Token,
     /// [Position] of the op-assignment operator.
     pub pos: Position,
 }
@@ -41,8 +42,8 @@ impl OpAssignment {
         Self {
             hash_op_assign: 0,
             hash_op: 0,
-            op_assign: "=",
-            op: "=",
+            op_assign: Token::Equals,
+            op: Token::Equals,
             pos,
         }
     }
@@ -60,7 +61,10 @@ impl OpAssignment {
     #[must_use]
     #[inline(always)]
     pub fn new_op_assignment(name: &str, pos: Position) -> Self {
-        Self::new_op_assignment_from_token(&Token::lookup_from_syntax(name).expect("operator"), pos)
+        Self::new_op_assignment_from_token(
+            &Token::lookup_symbol_from_syntax(name).expect("operator"),
+            pos,
+        )
     }
     /// Create a new [`OpAssignment`] from a [`Token`].
     ///
@@ -71,12 +75,11 @@ impl OpAssignment {
     pub fn new_op_assignment_from_token(op: &Token, pos: Position) -> Self {
         let op_raw = op
             .get_base_op_from_assignment()
-            .expect("op-assignment operator")
-            .literal_syntax();
+            .expect("op-assignment operator");
         Self {
             hash_op_assign: calc_fn_hash(None, op.literal_syntax(), 2),
-            hash_op: calc_fn_hash(None, op_raw, 2),
-            op_assign: op.literal_syntax(),
+            hash_op: calc_fn_hash(None, op_raw.literal_syntax(), 2),
+            op_assign: op.clone(),
             op: op_raw,
             pos,
         }
@@ -90,7 +93,7 @@ impl OpAssignment {
     #[inline(always)]
     pub fn new_op_assignment_from_base(name: &str, pos: Position) -> Self {
         Self::new_op_assignment_from_base_token(
-            &Token::lookup_from_syntax(name).expect("operator"),
+            &Token::lookup_symbol_from_syntax(name).expect("operator"),
             pos,
         )
     }
@@ -107,6 +110,8 @@ impl OpAssignment {
 }
 
 impl fmt::Debug for OpAssignment {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_op_assignment() {
             f.debug_struct("OpAssignment")
@@ -179,11 +184,12 @@ pub enum RangeCase {
 }
 
 impl fmt::Debug for RangeCase {
-    #[inline]
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ExclusiveInt(r, n) => write!(f, "{}..{} => {}", r.start, r.end, n),
-            Self::InclusiveInt(r, n) => write!(f, "{}..={} => {}", *r.start(), *r.end(), n),
+            Self::ExclusiveInt(r, n) => write!(f, "{}..{} => {n}", r.start, r.end),
+            Self::InclusiveInt(r, n) => write!(f, "{}..={} => {n}", *r.start(), *r.end()),
         }
     }
 }
@@ -207,6 +213,7 @@ impl IntoIterator for RangeCase {
     type IntoIter = Box<dyn Iterator<Item = Self::Item>>;
 
     #[inline(always)]
+    #[must_use]
     fn into_iter(self) -> Self::IntoIter {
         match self {
             Self::ExclusiveInt(r, ..) => Box::new(r),
@@ -299,6 +306,10 @@ pub struct TryCatchBlock {
     pub catch_block: StmtBlock,
 }
 
+/// Number of items to keep inline for [`StmtBlockContainer`].
+#[cfg(not(feature = "no_std"))]
+const STMT_BLOCK_INLINE_SIZE: usize = 8;
+
 /// _(internals)_ The underlying container type for [`StmtBlock`].
 /// Exported under the `internals` feature only.
 ///
@@ -306,7 +317,7 @@ pub struct TryCatchBlock {
 /// hold a statements block, with the assumption that most program blocks would container fewer than
 /// 8 statements, and those that do have a lot more statements.
 #[cfg(not(feature = "no_std"))]
-pub type StmtBlockContainer = smallvec::SmallVec<[Stmt; 8]>;
+pub type StmtBlockContainer = smallvec::SmallVec<[Stmt; STMT_BLOCK_INLINE_SIZE]>;
 
 /// _(internals)_ The underlying container type for [`StmtBlock`].
 /// Exported under the `internals` feature only.
@@ -436,8 +447,17 @@ impl DerefMut for StmtBlock {
     }
 }
 
+impl Borrow<[Stmt]> for StmtBlock {
+    #[inline(always)]
+    #[must_use]
+    fn borrow(&self) -> &[Stmt] {
+        &self.block
+    }
+}
+
 impl AsRef<[Stmt]> for StmtBlock {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &[Stmt] {
         &self.block
     }
@@ -445,12 +465,15 @@ impl AsRef<[Stmt]> for StmtBlock {
 
 impl AsMut<[Stmt]> for StmtBlock {
     #[inline(always)]
+    #[must_use]
     fn as_mut(&mut self) -> &mut [Stmt] {
         &mut self.block
     }
 }
 
 impl fmt::Debug for StmtBlock {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Block")?;
         fmt::Debug::fmt(&self.block, f)?;
@@ -484,9 +507,9 @@ impl From<Stmt> for StmtBlock {
 impl IntoIterator for StmtBlock {
     type Item = Stmt;
     #[cfg(not(feature = "no_std"))]
-    type IntoIter = smallvec::IntoIter<[Stmt; 8]>;
+    type IntoIter = smallvec::IntoIter<[Stmt; STMT_BLOCK_INLINE_SIZE]>;
     #[cfg(feature = "no_std")]
-    type IntoIter = smallvec::IntoIter<[Stmt; 3]>;
+    type IntoIter = smallvec::IntoIter<[Stmt; crate::STATIC_VEC_INLINE_SIZE]>;
 
     #[inline(always)]
     fn into_iter(self) -> Self::IntoIter {
@@ -561,14 +584,14 @@ pub enum Stmt {
     TryCatch(Box<TryCatchBlock>, Position),
     /// [expression][Expr]
     Expr(Box<Expr>),
-    /// `continue`/`break`
+    /// `continue`/`break` expr
     ///
     /// ### Flags
     ///
     /// * [`NONE`][ASTFlags::NONE] = `continue`
     /// * [`BREAK`][ASTFlags::BREAK] = `break`
-    BreakLoop(ASTFlags, Position),
-    /// `return`/`throw`
+    BreakLoop(Option<Box<Expr>>, ASTFlags, Position),
+    /// `return`/`throw` expr
     ///
     /// ### Flags
     ///
@@ -585,20 +608,21 @@ pub enum Stmt {
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
     Export(Box<(Ident, Ident)>, Position),
-    /// Convert a variable to shared.
+    /// Convert a list of variables to shared.
     ///
     /// Not available under `no_closure`.
     ///
     /// # Notes
     ///
     /// This variant does not map to any language structure.  It is currently only used only to
-    /// convert a normal variable into a shared variable when the variable is _captured_ by a closure.
+    /// convert normal variables into shared variables when they are _captured_ by a closure.
     #[cfg(not(feature = "no_closure"))]
-    Share(crate::ImmutableString, Position),
+    Share(Box<crate::FnArgsVec<(crate::ImmutableString, Option<NonZeroUsize>, Position)>>),
 }
 
 impl Default for Stmt {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::Noop(Position::NONE)
     }
@@ -660,7 +684,7 @@ impl Stmt {
             Self::Export(.., pos) => *pos,
 
             #[cfg(not(feature = "no_closure"))]
-            Self::Share(.., pos) => *pos,
+            Self::Share(x) => x[0].2,
         }
     }
     /// Override the [position][Position] of this statement.
@@ -692,7 +716,7 @@ impl Stmt {
             Self::Export(.., pos) => *pos = new_pos,
 
             #[cfg(not(feature = "no_closure"))]
-            Self::Share(.., pos) => *pos = new_pos,
+            Self::Share(x) => x.iter_mut().for_each(|(_, _, pos)| *pos = new_pos),
         }
 
         self

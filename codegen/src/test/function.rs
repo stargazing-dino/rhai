@@ -285,6 +285,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -323,6 +324,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -361,6 +363,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -401,6 +404,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -434,6 +438,7 @@ mod generate_tests {
                 }
 
                 #[inline(always)] fn is_method_call(&self) -> bool { false }
+                #[inline(always)] fn is_pure(&self) -> bool { true }
             }
         };
 
@@ -467,6 +472,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -500,15 +506,13 @@ mod generate_tests {
                 impl PluginFunction for Token {
                     #[inline(always)]
                     fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
-                        if args[0usize].is_read_only() {
-                            return Err(EvalAltResult::ErrorAssignmentToConstant("x".to_string(), Position::NONE).into());
-                        }
                         let arg1 = mem::take(args[1usize]).cast::<usize>();
                         let arg0 = &mut args[0usize].write_lock::<usize>().unwrap();
                         Ok(Dynamic::from(increment(arg0, arg1)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
+                    #[inline(always)] fn is_pure(&self) -> bool { false }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -548,6 +552,7 @@ mod generate_tests {
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
+                    #[inline(always)] fn is_pure(&self) -> bool { true }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]

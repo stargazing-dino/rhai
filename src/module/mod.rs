@@ -9,8 +9,8 @@ use crate::func::{
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypesCollection};
 use crate::{
-    calc_fn_hash, calc_fn_params_hash, combine_hashes, Dynamic, Identifier, ImmutableString,
-    NativeCallContext, RhaiResultOf, Shared, SmartString, StaticVec,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Identifier, ImmutableString, NativeCallContext,
+    RhaiResultOf, Shared, SharedModule, SmartString, StaticVec,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -72,7 +72,7 @@ pub struct FuncInfo {
     /// Function access mode.
     pub access: FnAccess,
     /// Function name.
-    pub name: Identifier,
+    pub name: ImmutableString,
     /// Number of parameters.
     pub num_params: usize,
     /// Parameter types (if applicable).
@@ -150,9 +150,10 @@ pub fn calc_native_fn_hash<'a>(
     fn_name: &str,
     params: &[TypeId],
 ) -> u64 {
-    let hash_script = calc_fn_hash(modules, fn_name, params.len());
-    let hash_params = calc_fn_params_hash(params.iter().copied());
-    combine_hashes(hash_script, hash_params)
+    calc_fn_hash_full(
+        calc_fn_hash(modules, fn_name, params.len()),
+        params.iter().copied(),
+    )
 }
 
 /// A module which may contain variables, sub-modules, external Rust functions,
@@ -160,8 +161,7 @@ pub fn calc_native_fn_hash<'a>(
 #[derive(Clone)]
 pub struct Module {
     /// ID identifying the module.
-    /// No ID if string is empty.
-    id: Identifier,
+    id: Option<ImmutableString>,
     /// Module documentation.
     #[cfg(feature = "metadata")]
     doc: crate::SmartString,
@@ -172,7 +172,7 @@ pub struct Module {
     /// Custom types.
     custom_types: Option<CustomTypesCollection>,
     /// Sub-modules.
-    modules: Option<BTreeMap<Identifier, Shared<Module>>>,
+    modules: Option<BTreeMap<Identifier, SharedModule>>,
     /// [`Module`] variables.
     variables: Option<BTreeMap<Identifier, Dynamic>>,
     /// Flattened collection of all [`Module`] variables, including those in sub-modules.
@@ -196,12 +196,15 @@ pub struct Module {
 
 impl Default for Module {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl fmt::Debug for Module {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut d = f.debug_struct("Module");
 
@@ -289,7 +292,7 @@ impl Module {
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            id: Identifier::new_const(),
+            id: None,
             #[cfg(feature = "metadata")]
             doc: crate::SmartString::new_const(),
             internal: false,
@@ -321,18 +324,14 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn id(&self) -> Option<&str> {
-        if self.id_raw().is_empty() {
-            None
-        } else {
-            Some(self.id_raw())
-        }
+        self.id.as_ref().map(|s| s.as_str())
     }
 
     /// Get the ID of the [`Module`] as an [`Identifier`], if any.
     #[inline(always)]
     #[must_use]
-    pub(crate) const fn id_raw(&self) -> &Identifier {
-        &self.id
+    pub(crate) const fn id_raw(&self) -> Option<&ImmutableString> {
+        self.id.as_ref()
     }
 
     /// Set the ID of the [`Module`].
@@ -348,8 +347,15 @@ impl Module {
     /// assert_eq!(module.id(), Some("hello"));
     /// ```
     #[inline(always)]
-    pub fn set_id(&mut self, id: impl Into<Identifier>) -> &mut Self {
-        self.id = id.into();
+    pub fn set_id(&mut self, id: impl Into<ImmutableString>) -> &mut Self {
+        let id = id.into();
+
+        if id.is_empty() {
+            self.id = None;
+        } else {
+            self.id = Some(id);
+        }
+
         self
     }
 
@@ -367,7 +373,7 @@ impl Module {
     /// ```
     #[inline(always)]
     pub fn clear_id(&mut self) -> &mut Self {
-        self.id.clear();
+        self.id = None;
         self
     }
 
@@ -431,7 +437,7 @@ impl Module {
     /// Clear the [`Module`].
     #[inline(always)]
     pub fn clear(&mut self) {
-        self.id.clear();
+        self.id = None;
         #[cfg(feature = "metadata")]
         self.doc.clear();
         self.internal = false;
@@ -491,12 +497,12 @@ impl Module {
     #[inline(always)]
     pub fn set_custom_type_raw(
         &mut self,
-        type_name: impl Into<Identifier>,
+        type_path: impl Into<Identifier>,
         name: impl Into<Identifier>,
     ) -> &mut Self {
         self.custom_types
             .get_or_insert_with(CustomTypesCollection::new)
-            .add(type_name, name);
+            .add(type_path, name);
         self
     }
     /// Get the display name of a registered custom type.
@@ -748,7 +754,7 @@ impl Module {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     #[must_use]
-    pub(crate) fn get_sub_modules_mut(&mut self) -> &mut BTreeMap<Identifier, Shared<Module>> {
+    pub(crate) fn get_sub_modules_mut(&mut self) -> &mut BTreeMap<Identifier, SharedModule> {
         // We must assume that the user has changed the sub-modules
         // (otherwise why take a mutable reference?)
         self.all_functions = None;
@@ -816,7 +822,7 @@ impl Module {
     pub fn set_sub_module(
         &mut self,
         name: impl Into<Identifier>,
-        sub_module: impl Into<Shared<Module>>,
+        sub_module: impl Into<SharedModule>,
     ) -> &mut Self {
         self.modules
             .get_or_insert_with(|| Default::default())
@@ -1022,8 +1028,7 @@ impl Module {
 
         let name = name.as_ref();
         let hash_script = calc_fn_hash(None, name, param_types.len());
-        let hash_params = calc_fn_params_hash(param_types.iter().copied());
-        let hash_fn = combine_hashes(hash_script, hash_params);
+        let hash_fn = calc_fn_hash_full(hash_script, param_types.iter().copied());
 
         if is_dynamic {
             self.dynamic_functions_filter.mark(hash_script);
@@ -1739,10 +1744,9 @@ impl Module {
         }
 
         if let Some(ref variables) = other.variables {
-            if let Some(ref mut m) = self.variables {
-                m.extend(variables.iter().map(|(k, v)| (k.clone(), v.clone())));
-            } else {
-                self.variables = other.variables.clone();
+            match self.variables {
+                Some(ref mut m) => m.extend(variables.iter().map(|(k, v)| (k.clone(), v.clone()))),
+                None => self.variables = other.variables.clone(),
             }
         }
 
@@ -1764,10 +1768,9 @@ impl Module {
         self.dynamic_functions_filter += &other.dynamic_functions_filter;
 
         if let Some(ref type_iterators) = other.type_iterators {
-            if let Some(ref mut t) = self.type_iterators {
-                t.extend(type_iterators.iter().map(|(&k, v)| (k, v.clone())));
-            } else {
-                self.type_iterators = other.type_iterators.clone();
+            match self.type_iterators {
+                Some(ref mut t) => t.extend(type_iterators.iter().map(|(&k, v)| (k, v.clone()))),
+                None => self.type_iterators = other.type_iterators.clone(),
             }
         }
         self.all_functions = None;
@@ -1827,7 +1830,7 @@ impl Module {
 
     /// Get an iterator to the sub-modules in the [`Module`].
     #[inline]
-    pub fn iter_sub_modules(&self) -> impl Iterator<Item = (&str, &Shared<Module>)> {
+    pub fn iter_sub_modules(&self) -> impl Iterator<Item = (&str, &SharedModule)> {
         self.modules
             .iter()
             .flat_map(|m| m.iter().map(|(k, m)| (k.as_str(), m)))
@@ -1981,7 +1984,9 @@ impl Module {
         let orig_constants = std::mem::take(&mut global.constants);
 
         // Run the script
-        let result = engine.eval_ast_with_scope_raw(&mut scope, global, ast, 0);
+        let caches = &mut crate::eval::Caches::new();
+
+        let result = engine.eval_ast_with_scope_raw(global, caches, &mut scope, ast);
 
         // Create new module
         let mut module = Module::new();
@@ -2077,7 +2082,7 @@ impl Module {
                 });
         }
 
-        module.set_id(ast.source_raw().clone());
+        module.id = ast.source_raw().cloned();
 
         #[cfg(feature = "metadata")]
         module.set_doc(ast.doc());

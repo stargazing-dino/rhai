@@ -1,10 +1,11 @@
 //! The `FnPtr` type.
 
-use crate::tokenizer::is_valid_identifier;
+use crate::eval::GlobalRuntimeState;
+use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, FuncArgs, Identifier, Module, NativeCallContext, Position, RhaiError,
-    RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
+    Dynamic, Engine, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError, RhaiResult,
+    RhaiResultOf, SharedModule, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -18,11 +19,13 @@ use std::{
 /// to be passed onto a function during a call.
 #[derive(Clone, Hash)]
 pub struct FnPtr {
-    name: Identifier,
+    name: ImmutableString,
     curry: StaticVec<Dynamic>,
 }
 
 impl fmt::Debug for FnPtr {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_curried() {
             self.curry
@@ -40,13 +43,16 @@ impl fmt::Debug for FnPtr {
 impl FnPtr {
     /// Create a new function pointer.
     #[inline(always)]
-    pub fn new(name: impl Into<Identifier>) -> RhaiResultOf<Self> {
+    pub fn new(name: impl Into<ImmutableString>) -> RhaiResultOf<Self> {
         name.into().try_into()
     }
     /// Create a new function pointer without checking its parameters.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn new_unchecked(name: impl Into<Identifier>, curry: StaticVec<Dynamic>) -> Self {
+    pub(crate) fn new_unchecked(
+        name: impl Into<ImmutableString>,
+        curry: StaticVec<Dynamic>,
+    ) -> Self {
         Self {
             name: name.into(),
             curry,
@@ -61,13 +67,13 @@ impl FnPtr {
     /// Get the name of the function.
     #[inline(always)]
     #[must_use]
-    pub(crate) const fn fn_name_raw(&self) -> &Identifier {
+    pub(crate) const fn fn_name_raw(&self) -> &ImmutableString {
         &self.name
     }
     /// Get the underlying data of the function pointer.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn take_data(self) -> (Identifier, StaticVec<Dynamic>) {
+    pub(crate) fn take_data(self) -> (ImmutableString, StaticVec<Dynamic>) {
         (self.name, self.curry)
     }
     /// Get the curried arguments.
@@ -101,7 +107,7 @@ impl FnPtr {
     #[inline(always)]
     #[must_use]
     pub fn is_anonymous(&self) -> bool {
-        self.name.starts_with(crate::engine::FN_ANONYMOUS)
+        crate::func::is_anonymous_fn(&self.name)
     }
     /// Call the function pointer with curried arguments (if any).
     /// The function may be script-defined (not available under `no_function`) or native Rust.
@@ -145,17 +151,19 @@ impl FnPtr {
         let mut arg_values = crate::StaticVec::new_const();
         args.parse(&mut arg_values);
 
-        let lib = [
+        let lib: &[SharedModule] = &[
             #[cfg(not(feature = "no_function"))]
-            _ast.as_ref(),
+            AsRef::<SharedModule>::as_ref(ast).clone(),
         ];
-        let lib = if lib.first().map_or(true, |m: &&Module| m.is_empty()) {
-            &lib[0..0]
+        let lib = if lib.first().map_or(true, |m| m.is_empty()) {
+            &[][..]
         } else {
             &lib
         };
-        #[allow(deprecated)]
-        let ctx = NativeCallContext::new(engine, self.fn_name(), lib);
+
+        let global = &GlobalRuntimeState::new(engine);
+
+        let ctx = (engine, self.fn_name(), None, global, lib, Position::NONE).into();
 
         let result = self.call_raw(&ctx, None, arg_values)?;
 
@@ -244,12 +252,12 @@ impl fmt::Display for FnPtr {
     }
 }
 
-impl TryFrom<Identifier> for FnPtr {
+impl TryFrom<ImmutableString> for FnPtr {
     type Error = RhaiError;
 
-    #[inline]
-    fn try_from(value: Identifier) -> RhaiResultOf<Self> {
-        if is_valid_identifier(value.chars()) {
+    #[inline(always)]
+    fn try_from(value: ImmutableString) -> RhaiResultOf<Self> {
+        if is_valid_function_name(&value) {
             Ok(Self {
                 name: value,
                 curry: StaticVec::new_const(),
@@ -257,45 +265,5 @@ impl TryFrom<Identifier> for FnPtr {
         } else {
             Err(ERR::ErrorFunctionNotFound(value.to_string(), Position::NONE).into())
         }
-    }
-}
-
-impl TryFrom<crate::ImmutableString> for FnPtr {
-    type Error = RhaiError;
-
-    #[inline(always)]
-    fn try_from(value: crate::ImmutableString) -> RhaiResultOf<Self> {
-        let s: Identifier = value.into();
-        Self::try_from(s)
-    }
-}
-
-impl TryFrom<String> for FnPtr {
-    type Error = RhaiError;
-
-    #[inline(always)]
-    fn try_from(value: String) -> RhaiResultOf<Self> {
-        let s: Identifier = value.into();
-        Self::try_from(s)
-    }
-}
-
-impl TryFrom<Box<str>> for FnPtr {
-    type Error = RhaiError;
-
-    #[inline(always)]
-    fn try_from(value: Box<str>) -> RhaiResultOf<Self> {
-        let s: Identifier = value.into();
-        Self::try_from(s)
-    }
-}
-
-impl TryFrom<&str> for FnPtr {
-    type Error = RhaiError;
-
-    #[inline(always)]
-    fn try_from(value: &str) -> RhaiResultOf<Self> {
-        let s: Identifier = value.into();
-        Self::try_from(s)
     }
 }

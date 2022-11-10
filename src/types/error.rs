@@ -23,6 +23,7 @@ use std::prelude::v1::*;
 /// Turn on the `sync` feature to make it [`Send`] `+` [`Sync`].
 #[derive(Debug)]
 #[non_exhaustive]
+#[must_use]
 pub enum EvalAltResult {
     /// System error. Wrapped values are the error message and the internal error.
     #[cfg(not(feature = "sync"))]
@@ -83,6 +84,8 @@ pub enum EvalAltResult {
 
     /// Data race detected when accessing a variable. Wrapped value is the variable name.
     ErrorDataRace(String, Position),
+    /// Calling a non-pure method on a constant.  Wrapped value is the function name.
+    ErrorNonPureMethodCallOnConstant(String, Position),
     /// Assignment to a constant variable. Wrapped value is the variable name.
     ErrorAssignmentToConstant(String, Position),
     /// Inappropriate property access. Wrapped value is the property name.
@@ -114,7 +117,7 @@ pub enum EvalAltResult {
     /// Breaking out of loops - not an error if within a loop.
     /// The wrapped value, if true, means breaking clean out of the loop (i.e. a `break` statement).
     /// The wrapped value, if false, means breaking the current context (i.e. a `continue` statement).
-    LoopBreak(bool, Position),
+    LoopBreak(bool, Dynamic, Position),
     /// Not an error: Value returned from a script via the `return` keyword.
     /// Wrapped value is the result value.
     Return(Dynamic, Position),
@@ -125,47 +128,45 @@ impl Error for EvalAltResult {}
 impl fmt::Display for EvalAltResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ErrorSystem(s, err) => match s.as_str() {
-                "" => write!(f, "{}", err),
-                s => write!(f, "{}: {}", s, err),
-            }?,
+            Self::ErrorSystem(s, err) if s.is_empty() => write!(f, "{err}")?,
+            Self::ErrorSystem(s, err) => write!(f, "{s}: {err}")?,
 
-            Self::ErrorParsing(p, ..) => write!(f, "Syntax error: {}", p)?,
+            Self::ErrorParsing(p, ..) => write!(f, "Syntax error: {p}")?,
 
             #[cfg(not(feature = "no_function"))]
             Self::ErrorInFunctionCall(s, src, err, ..) if crate::parser::is_anonymous_fn(s) => {
-                write!(f, "{} in call to closure", err)?;
+                write!(f, "{err} in call to closure")?;
                 if !src.is_empty() {
-                    write!(f, " @ '{}'", src)?;
+                    write!(f, " @ '{src}'")?;
                 }
             }
             Self::ErrorInFunctionCall(s, src, err, ..) => {
-                write!(f, "{} in call to function {}", err, s)?;
+                write!(f, "{err} in call to function {s}")?;
                 if !src.is_empty() {
-                    write!(f, " @ '{}'", src)?;
+                    write!(f, " @ '{src}'")?;
                 }
             }
 
             Self::ErrorInModule(s, err, ..) if s.is_empty() => {
-                write!(f, "Error in module > {}", err)?
+                write!(f, "Error in module > {err}")?
             }
-            Self::ErrorInModule(s, err, ..) => write!(f, "Error in module '{}' > {}", s, err)?,
+            Self::ErrorInModule(s, err, ..) => write!(f, "Error in module '{s}' > {err}")?,
 
-            Self::ErrorVariableExists(s, ..) => write!(f, "Variable already defined: {}", s)?,
-            Self::ErrorForbiddenVariable(s, ..) => write!(f, "Forbidden variable name: {}", s)?,
-            Self::ErrorVariableNotFound(s, ..) => write!(f, "Variable not found: {}", s)?,
-            Self::ErrorPropertyNotFound(s, ..) => write!(f, "Property not found: {}", s)?,
-            Self::ErrorIndexNotFound(s, ..) => write!(f, "Invalid index: {}", s)?,
-            Self::ErrorFunctionNotFound(s, ..) => write!(f, "Function not found: {}", s)?,
-            Self::ErrorModuleNotFound(s, ..) => write!(f, "Module not found: {}", s)?,
+            Self::ErrorVariableExists(s, ..) => write!(f, "Variable already defined: {s}")?,
+            Self::ErrorForbiddenVariable(s, ..) => write!(f, "Forbidden variable name: {s}")?,
+            Self::ErrorVariableNotFound(s, ..) => write!(f, "Variable not found: {s}")?,
+            Self::ErrorPropertyNotFound(s, ..) => write!(f, "Property not found: {s}")?,
+            Self::ErrorIndexNotFound(s, ..) => write!(f, "Invalid index: {s}")?,
+            Self::ErrorFunctionNotFound(s, ..) => write!(f, "Function not found: {s}")?,
+            Self::ErrorModuleNotFound(s, ..) => write!(f, "Module not found: {s}")?,
             Self::ErrorDataRace(s, ..) => {
-                write!(f, "Data race detected when accessing variable: {}", s)?
+                write!(f, "Data race detected when accessing variable: {s}")?
             }
-            Self::ErrorDotExpr(s, ..) => match s.as_str() {
-                "" => f.write_str("Malformed dot expression"),
-                s => f.write_str(s),
-            }?,
-            Self::ErrorIndexingType(s, ..) => write!(f, "Indexer unavailable: {}", s)?,
+
+            Self::ErrorDotExpr(s, ..) if s.is_empty() => f.write_str("Malformed dot expression")?,
+            Self::ErrorDotExpr(s, ..) => f.write_str(s)?,
+
+            Self::ErrorIndexingType(s, ..) => write!(f, "Indexer unavailable: {s}")?,
             Self::ErrorUnboundThis(..) => f.write_str("'this' not bound")?,
             Self::ErrorFor(..) => f.write_str("For loop expects an iterable type")?,
             Self::ErrorTooManyOperations(..) => f.write_str("Too many operations")?,
@@ -180,23 +181,54 @@ impl fmt::Display for EvalAltResult {
             {
                 write!(f, "Runtime error")?
             }
-            Self::ErrorRuntime(d, ..) => write!(f, "Runtime error: {}", d)?,
+            Self::ErrorRuntime(d, ..) => write!(f, "Runtime error: {d}")?,
 
-            Self::ErrorAssignmentToConstant(s, ..) => write!(f, "Cannot modify constant: {}", s)?,
+            #[cfg(not(feature = "no_object"))]
+            Self::ErrorNonPureMethodCallOnConstant(s, ..)
+                if s.starts_with(crate::engine::FN_GET) =>
+            {
+                let prop = &s[crate::engine::FN_GET.len()..];
+                write!(
+                    f,
+                    "Property {prop} is not pure and cannot be accessed on a constant"
+                )?
+            }
+            #[cfg(not(feature = "no_object"))]
+            Self::ErrorNonPureMethodCallOnConstant(s, ..)
+                if s.starts_with(crate::engine::FN_SET) =>
+            {
+                let prop = &s[crate::engine::FN_SET.len()..];
+                write!(f, "Cannot modify property {prop} of constant")?
+            }
+            #[cfg(not(feature = "no_index"))]
+            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == crate::engine::FN_IDX_GET => {
+                write!(
+                    f,
+                    "Indexer is not pure and cannot be accessed on a constant"
+                )?
+            }
+            #[cfg(not(feature = "no_index"))]
+            Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == crate::engine::FN_IDX_SET => {
+                write!(f, "Cannot assign to indexer of constant")?
+            }
+            Self::ErrorNonPureMethodCallOnConstant(s, ..) => {
+                write!(f, "Non-pure method {s} cannot be called on constant")?
+            }
+
+            Self::ErrorAssignmentToConstant(s, ..) => write!(f, "Cannot modify constant {s}")?,
             Self::ErrorMismatchOutputType(e, a, ..) => match (a.as_str(), e.as_str()) {
-                ("", e) => write!(f, "Output type incorrect, expecting {}", e),
-                (a, "") => write!(f, "Output type incorrect: {}", a),
-                (a, e) => write!(f, "Output type incorrect: {} (expecting {})", a, e),
+                ("", e) => write!(f, "Output type incorrect, expecting {e}"),
+                (a, "") => write!(f, "Output type incorrect: {a}"),
+                (a, e) => write!(f, "Output type incorrect: {a} (expecting {e})"),
             }?,
             Self::ErrorMismatchDataType(e, a, ..) => match (a.as_str(), e.as_str()) {
-                ("", e) => write!(f, "Data type incorrect, expecting {}", e),
-                (a, "") => write!(f, "Data type incorrect: {}", a),
-                (a, e) => write!(f, "Data type incorrect: {} (expecting {})", a, e),
+                ("", e) => write!(f, "Data type incorrect, expecting {e}"),
+                (a, "") => write!(f, "Data type incorrect: {a}"),
+                (a, e) => write!(f, "Data type incorrect: {a} (expecting {e})"),
             }?,
-            Self::ErrorArithmetic(s, ..) => match s.as_str() {
-                "" => f.write_str("Arithmetic error"),
-                s => f.write_str(s),
-            }?,
+
+            Self::ErrorArithmetic(s, ..) if s.is_empty() => f.write_str("Arithmetic error")?,
+            Self::ErrorArithmetic(s, ..) => f.write_str(s)?,
 
             Self::LoopBreak(true, ..) => f.write_str("'break' not inside a loop")?,
             Self::LoopBreak(false, ..) => f.write_str("'continue' not inside a loop")?,
@@ -204,39 +236,34 @@ impl fmt::Display for EvalAltResult {
             Self::Return(..) => f.write_str("NOT AN ERROR - function returns value")?,
 
             Self::ErrorArrayBounds(max, index, ..) => match max {
-                0 => write!(f, "Array index {} out of bounds: array is empty", index),
+                0 => write!(f, "Array index {index} out of bounds: array is empty"),
                 1 => write!(
                     f,
-                    "Array index {} out of bounds: only 1 element in array",
-                    index
+                    "Array index {index} out of bounds: only 1 element in array",
                 ),
                 _ => write!(
                     f,
-                    "Array index {} out of bounds: only {} elements in array",
-                    index, max
+                    "Array index {index} out of bounds: only {max} elements in array",
                 ),
             }?,
             Self::ErrorStringBounds(max, index, ..) => match max {
-                0 => write!(f, "String index {} out of bounds: string is empty", index),
+                0 => write!(f, "String index {index} out of bounds: string is empty"),
                 1 => write!(
                     f,
-                    "String index {} out of bounds: only 1 character in string",
-                    index
+                    "String index {index} out of bounds: only 1 character in string",
                 ),
                 _ => write!(
                     f,
-                    "String index {} out of bounds: only {} characters in string",
-                    index, max
+                    "String index {index} out of bounds: only {max} characters in string",
                 ),
             }?,
             Self::ErrorBitFieldBounds(max, index, ..) => write!(
                 f,
-                "Bit-field index {} out of bounds: only {} bits in bit-field",
-                index, max
+                "Bit-field index {index} out of bounds: only {max} bits in bit-field",
             )?,
-            Self::ErrorDataTooLarge(typ, ..) => write!(f, "{} exceeds maximum limit", typ)?,
+            Self::ErrorDataTooLarge(typ, ..) => write!(f, "{typ} exceeds maximum limit")?,
 
-            Self::ErrorCustomSyntax(s, tokens, ..) => write!(f, "{}: {}", s, tokens.join(" "))?,
+            Self::ErrorCustomSyntax(s, tokens, ..) => write!(f, "{s}: {}", tokens.join(" "))?,
         }
 
         // Do not write any position if None
@@ -258,9 +285,9 @@ impl<T: AsRef<str>> From<T> for EvalAltResult {
 
 impl<T: AsRef<str>> From<T> for Box<EvalAltResult> {
     #[cold]
-    #[inline(never)]
+    #[inline(always)]
     fn from(err: T) -> Self {
-        EvalAltResult::ErrorRuntime(err.as_ref().to_string().into(), Position::NONE).into()
+        Into::<EvalAltResult>::into(err).into()
     }
 }
 
@@ -303,6 +330,7 @@ impl EvalAltResult {
             | Self::ErrorIndexNotFound(..)
             | Self::ErrorModuleNotFound(..)
             | Self::ErrorDataRace(..)
+            | Self::ErrorNonPureMethodCallOnConstant(..)
             | Self::ErrorAssignmentToConstant(..)
             | Self::ErrorMismatchOutputType(..)
             | Self::ErrorDotExpr(..)
@@ -371,7 +399,7 @@ impl EvalAltResult {
             | Self::ErrorStackOverflow(..)
             | Self::ErrorRuntime(..) => (),
 
-            Self::ErrorFunctionNotFound(f, ..) => {
+            Self::ErrorFunctionNotFound(f, ..) | Self::ErrorNonPureMethodCallOnConstant(f, ..) => {
                 map.insert("function".into(), f.into());
             }
             Self::ErrorInFunctionCall(f, s, ..) => {
@@ -466,6 +494,7 @@ impl EvalAltResult {
             | Self::ErrorIndexNotFound(.., pos)
             | Self::ErrorModuleNotFound(.., pos)
             | Self::ErrorDataRace(.., pos)
+            | Self::ErrorNonPureMethodCallOnConstant(.., pos)
             | Self::ErrorAssignmentToConstant(.., pos)
             | Self::ErrorMismatchOutputType(.., pos)
             | Self::ErrorDotExpr(.., pos)
@@ -494,6 +523,7 @@ impl EvalAltResult {
     /// The [position][Position] of this error is set to [`NONE`][Position::NONE] afterwards.
     #[cold]
     #[inline(never)]
+    #[must_use]
     pub fn take_position(&mut self) -> Position {
         let pos = self.position();
         self.set_position(Position::NONE);
@@ -524,6 +554,7 @@ impl EvalAltResult {
             | Self::ErrorIndexNotFound(.., pos)
             | Self::ErrorModuleNotFound(.., pos)
             | Self::ErrorDataRace(.., pos)
+            | Self::ErrorNonPureMethodCallOnConstant(.., pos)
             | Self::ErrorAssignmentToConstant(.., pos)
             | Self::ErrorMismatchOutputType(.., pos)
             | Self::ErrorDotExpr(.., pos)

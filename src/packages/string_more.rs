@@ -239,10 +239,9 @@ mod string_functions {
     /// Clear the string, making it empty.
     pub fn clear(string: &mut ImmutableString) {
         if !string.is_empty() {
-            if let Some(s) = string.get_mut() {
-                s.clear();
-            } else {
-                *string = ImmutableString::new();
+            match string.get_mut() {
+                Some(s) => s.clear(),
+                _ => *string = ImmutableString::new(),
             }
         }
     }
@@ -287,17 +286,20 @@ mod string_functions {
     /// print(text);    // prints "hello"
     /// ```
     pub fn trim(string: &mut ImmutableString) {
-        if let Some(s) = string.get_mut() {
-            let trimmed = s.trim();
+        match string.get_mut() {
+            Some(s) => {
+                let trimmed = s.trim();
 
-            if trimmed != s {
-                *s = trimmed.into();
+                if trimmed != s {
+                    *s = trimmed.into();
+                }
             }
-        } else {
-            let trimmed = string.trim();
+            None => {
+                let trimmed = string.trim();
 
-            if trimmed != string {
-                *string = trimmed.into();
+                if trimmed != string {
+                    *string = trimmed.into();
+                }
             }
         }
     }
@@ -504,6 +506,37 @@ mod string_functions {
     #[rhai_fn(name = "make_lower")]
     pub fn make_lower_char(character: &mut char) {
         *character = to_lower_char(*character);
+    }
+
+    /// Return `true` if the string contains a specified string.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let text = "hello, world!";
+    ///
+    /// print(text.contains("hello"));  // prints true
+    ///
+    /// print(text.contains("hey"));    // prints false
+    /// ```
+    pub fn contains(string: &str, match_string: &str) -> bool {
+        string.contains(match_string)
+    }
+
+    /// Return `true` if the string contains a specified character.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let text = "hello, world!";
+    ///
+    /// print(text.contains('h'));      // prints true
+    ///
+    /// print(text.contains('x'));      // prints false
+    /// ```
+    #[rhai_fn(name = "contains")]
+    pub fn contains_char(string: &str, character: char) -> bool {
+        string.contains(character).into()
     }
 
     /// Return `true` if the string starts with a specified string.
@@ -1185,7 +1218,6 @@ mod string_functions {
         let _ctx = ctx;
 
         // Check if string will be over max size limit
-        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
             return Err(crate::ERR::ErrorDataTooLarge(
                 "Length of string".to_string(),
@@ -1203,7 +1235,6 @@ mod string_functions {
                 p.push(character);
             }
 
-            #[cfg(not(feature = "unchecked"))]
             if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size()
             {
                 return Err(crate::ERR::ErrorDataTooLarge(
@@ -1247,7 +1278,6 @@ mod string_functions {
         let _ctx = ctx;
 
         // Check if string will be over max size limit
-        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
             return Err(crate::ERR::ErrorDataTooLarge(
                 "Length of string".to_string(),
@@ -1272,7 +1302,6 @@ mod string_functions {
                 }
             }
 
-            #[cfg(not(feature = "unchecked"))]
             if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size()
             {
                 return Err(crate::ERR::ErrorDataTooLarge(

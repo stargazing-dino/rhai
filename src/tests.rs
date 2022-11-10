@@ -22,15 +22,7 @@ fn check_struct_sizes() {
     );
     assert_eq!(
         size_of::<tokenizer::Token>(),
-        if IS_32_BIT {
-            if cfg!(feature = "decimal") {
-                24
-            } else {
-                16
-            }
-        } else {
-            32
-        }
+        if IS_32_BIT { 8 } else { 16 }
     );
     assert_eq!(size_of::<ast::Expr>(), if PACKED { 12 } else { 16 });
     assert_eq!(size_of::<Option<ast::Expr>>(), if PACKED { 12 } else { 16 });
@@ -43,19 +35,19 @@ fn check_struct_sizes() {
     #[cfg(target_pointer_width = "64")]
     {
         assert_eq!(size_of::<Scope>(), 536);
-        assert_eq!(size_of::<FnPtr>(), 80);
+        assert_eq!(size_of::<FnPtr>(), 64);
         assert_eq!(size_of::<LexError>(), 56);
         assert_eq!(
             size_of::<ParseError>(),
             if cfg!(feature = "no_position") { 8 } else { 16 }
         );
-        assert_eq!(size_of::<EvalAltResult>(), 72);
+        assert_eq!(size_of::<EvalAltResult>(), 64);
         assert_eq!(
             size_of::<NativeCallContext>(),
             if cfg!(feature = "no_position") {
-                72
+                64
             } else {
-                80
+                72
             }
         );
     }

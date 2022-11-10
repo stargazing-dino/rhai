@@ -17,7 +17,7 @@ use std::{
     fmt::Write,
     hash::Hash,
     iter::once,
-    num::{NonZeroU8, NonZeroUsize},
+    num::{NonZeroU64, NonZeroU8, NonZeroUsize},
 };
 
 #[cfg(not(feature = "no_float"))]
@@ -75,8 +75,8 @@ impl CustomExpr {
     /// Is this custom syntax self-terminated (i.e. no need for a semicolon terminator)?
     ///
     /// A self-terminated custom syntax always ends in `$block$`, `}` or `;`
-    #[must_use]
     #[inline(always)]
+    #[must_use]
     pub const fn is_self_terminated(&self) -> bool {
         self.self_terminated
     }
@@ -86,7 +86,7 @@ impl CustomExpr {
 ///
 /// Two separate hashes are pre-calculated because of the following patterns:
 ///
-/// ```js
+/// ```rhai
 /// func(a, b, c);      // Native: func(a, b, c)        - 3 parameters
 ///                     // Script: func(a, b, c)        - 3 parameters
 ///
@@ -100,30 +100,34 @@ impl CustomExpr {
 ///
 /// Function call hashes are used in the following manner:
 ///
-/// * First, the script hash is tried, which contains only the called function's name plus the
-///   number of parameters.
+/// * First, the script hash (if any) is tried, which contains only the called function's name plus
+///   the number of parameters.
 ///
 /// * Next, the actual types of arguments are hashed and _combined_ with the native hash, which is
-///   then used to search for a native function. In other words, a complete native function call
-///   hash always contains the called function's name plus the types of the arguments.  This is due
-///   to possible function overloading for different parameter types.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Default)]
+///   then used to search for a native function.
+///
+///   In other words, a complete native function call hash always contains the called function's
+///   name plus the types of the arguments.  This is due to possible function overloading for
+///   different parameter types.
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct FnCallHashes {
-    /// Pre-calculated hash for a script-defined function (zero if native functions only).
+    /// Pre-calculated hash for a script-defined function ([`None`] if native functions only).
     #[cfg(not(feature = "no_function"))]
-    pub script: u64,
+    script: Option<NonZeroU64>,
     /// Pre-calculated hash for a native Rust function with no parameter types.
-    pub native: u64,
+    native: NonZeroU64,
 }
 
 impl fmt::Debug for FnCallHashes {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         #[cfg(not(feature = "no_function"))]
-        if self.script != 0 {
-            return if self.script == self.native {
+        if let Some(script) = self.script {
+            return if script == self.native {
                 fmt::Debug::fmt(&self.native, f)
             } else {
-                write!(f, "({}, {})", self.script, self.native)
+                write!(f, "({}, {})", script, self.native)
             };
         }
 
@@ -132,13 +136,13 @@ impl fmt::Debug for FnCallHashes {
 }
 
 impl From<u64> for FnCallHashes {
-    #[inline(always)]
+    #[inline]
     fn from(hash: u64) -> Self {
-        let hash = if hash == 0 { ALT_ZERO_HASH } else { hash };
+        let hash = NonZeroU64::new(if hash == 0 { ALT_ZERO_HASH } else { hash }).unwrap();
 
         Self {
             #[cfg(not(feature = "no_function"))]
-            script: hash,
+            script: Some(hash),
             native: hash,
         }
     }
@@ -146,40 +150,61 @@ impl From<u64> for FnCallHashes {
 
 impl FnCallHashes {
     /// Create a [`FnCallHashes`] with only the native Rust hash.
-    #[inline(always)]
+    #[inline]
     #[must_use]
-    pub const fn from_native(hash: u64) -> Self {
+    pub fn from_native(hash: u64) -> Self {
         Self {
             #[cfg(not(feature = "no_function"))]
-            script: 0,
-            native: if hash == 0 { ALT_ZERO_HASH } else { hash },
+            script: None,
+            native: NonZeroU64::new(if hash == 0 { ALT_ZERO_HASH } else { hash }).unwrap(),
         }
     }
     /// Create a [`FnCallHashes`] with both native Rust and script function hashes.
-    #[inline(always)]
+    #[inline]
     #[must_use]
-    pub const fn from_all(#[cfg(not(feature = "no_function"))] script: u64, native: u64) -> Self {
+    pub fn from_all(#[cfg(not(feature = "no_function"))] script: u64, native: u64) -> Self {
         Self {
             #[cfg(not(feature = "no_function"))]
-            script: if script == 0 { ALT_ZERO_HASH } else { script },
-            native: if native == 0 { ALT_ZERO_HASH } else { native },
+            script: NonZeroU64::new(if script == 0 { ALT_ZERO_HASH } else { script }),
+            native: NonZeroU64::new(if native == 0 { ALT_ZERO_HASH } else { native }).unwrap(),
         }
     }
-    /// Is this [`FnCallHashes`] native Rust only?
+    /// Is this [`FnCallHashes`] native-only?
     #[inline(always)]
     #[must_use]
     pub const fn is_native_only(&self) -> bool {
         #[cfg(not(feature = "no_function"))]
-        return self.script == 0;
-
+        return self.script.is_none();
         #[cfg(feature = "no_function")]
         return true;
+    }
+    /// Get the native hash.
+    ///
+    /// The hash returned is never zero.
+    #[inline(always)]
+    #[must_use]
+    pub fn native(&self) -> u64 {
+        self.native.get()
+    }
+    /// Get the script hash.
+    ///
+    /// The hash returned is never zero.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this [`FnCallHashes`] is native-only.
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    #[must_use]
+    pub fn script(&self) -> u64 {
+        assert!(self.script.is_some());
+        self.script.as_ref().unwrap().get()
     }
 }
 
 /// _(internals)_ A function call.
 /// Exported under the `internals` feature only.
-#[derive(Clone, Default, Hash)]
+#[derive(Clone, Hash)]
 pub struct FnCallExpr {
     /// Namespace of the function, if any.
     #[cfg(not(feature = "no_module"))]
@@ -193,28 +218,27 @@ pub struct FnCallExpr {
     /// Does this function call capture the parent scope?
     pub capture_parent_scope: bool,
     /// Is this function call a native operator?
-    pub is_native_operator: bool,
-    /// [Position] of the function name.
-    pub pos: Position,
+    pub op_token: Option<Token>,
 }
 
 impl fmt::Debug for FnCallExpr {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ff = f.debug_struct("FnCallExpr");
         #[cfg(not(feature = "no_module"))]
         if !self.namespace.is_empty() {
             ff.field("namespace", &self.namespace);
         }
-        if self.capture_parent_scope {
-            ff.field("capture_parent_scope", &self.capture_parent_scope);
-        }
-        if self.is_native_operator {
-            ff.field("is_native_operator", &self.is_native_operator);
-        }
         ff.field("hash", &self.hashes)
             .field("name", &self.name)
             .field("args", &self.args);
-        ff.field("pos", &self.pos);
+        if let Some(ref token) = self.op_token {
+            ff.field("op_token", token);
+        }
+        if self.capture_parent_scope {
+            ff.field("capture_parent_scope", &self.capture_parent_scope);
+        }
         ff.finish()
     }
 }
@@ -237,6 +261,16 @@ impl FnCallExpr {
     pub fn into_fn_call_expr(self, pos: Position) -> Expr {
         Expr::FnCall(self.into(), pos)
     }
+    /// Are all arguments constant?
+    #[inline]
+    #[must_use]
+    pub fn constant_args(&self) -> bool {
+        if self.args.is_empty() {
+            true
+        } else {
+            self.args.iter().all(Expr::is_constant)
+        }
+    }
 }
 
 /// A type that wraps a floating-point number and implements [`Hash`].
@@ -248,7 +282,7 @@ pub struct FloatWrapper<F>(F);
 
 #[cfg(not(feature = "no_float"))]
 impl Hash for FloatWrapper<crate::FLOAT> {
-    #[inline(always)]
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.to_ne_bytes().hash(state);
     }
@@ -257,6 +291,7 @@ impl Hash for FloatWrapper<crate::FLOAT> {
 #[cfg(not(feature = "no_float"))]
 impl<F: Float> AsRef<F> for FloatWrapper<F> {
     #[inline(always)]
+    #[must_use]
     fn as_ref(&self) -> &F {
         &self.0
     }
@@ -265,6 +300,7 @@ impl<F: Float> AsRef<F> for FloatWrapper<F> {
 #[cfg(not(feature = "no_float"))]
 impl<F: Float> AsMut<F> for FloatWrapper<F> {
     #[inline(always)]
+    #[must_use]
     fn as_mut(&mut self) -> &mut F {
         &mut self.0
     }
@@ -290,7 +326,8 @@ impl<F: Float> DerefMut for FloatWrapper<F> {
 
 #[cfg(not(feature = "no_float"))]
 impl<F: Float + fmt::Debug> fmt::Debug for FloatWrapper<F> {
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.0, f)
     }
@@ -438,23 +475,26 @@ pub enum Expr {
 
 impl Default for Expr {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::Unit(Position::NONE)
     }
 }
 
 impl fmt::Debug for Expr {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut display_pos = format!(" @ {:?}", self.start_position());
 
         match self {
-            Self::DynamicConstant(value, ..) => write!(f, "{:?}", value),
-            Self::BoolConstant(value, ..) => write!(f, "{:?}", value),
-            Self::IntegerConstant(value, ..) => write!(f, "{:?}", value),
+            Self::DynamicConstant(value, ..) => write!(f, "{value:?}"),
+            Self::BoolConstant(value, ..) => write!(f, "{value:?}"),
+            Self::IntegerConstant(value, ..) => write!(f, "{value:?}"),
             #[cfg(not(feature = "no_float"))]
-            Self::FloatConstant(value, ..) => write!(f, "{:?}", value),
-            Self::CharConstant(value, ..) => write!(f, "{:?}", value),
-            Self::StringConstant(value, ..) => write!(f, "{:?}", value),
+            Self::FloatConstant(value, ..) => write!(f, "{value:?}"),
+            Self::CharConstant(value, ..) => write!(f, "{value:?}"),
+            Self::StringConstant(value, ..) => write!(f, "{value:?}"),
             Self::Unit(..) => f.write_str("()"),
 
             Self::InterpolatedString(x, ..) => {
@@ -483,8 +523,12 @@ impl fmt::Debug for Expr {
                     }
                 }
                 f.write_str(&x.3)?;
+                #[cfg(not(feature = "no_module"))]
+                if let Some(n) = x.1.index() {
+                    write!(f, " #{n}")?;
+                }
                 if let Some(n) = i.map_or_else(|| x.0, |n| NonZeroUsize::new(n.get() as usize)) {
-                    write!(f, " #{}", n)?;
+                    write!(f, " #{n}")?;
                 }
                 f.write_str(")")
             }
@@ -588,7 +632,7 @@ impl Expr {
                 let mut s = SmartString::new_const();
                 for segment in x.iter() {
                     let v = segment.get_literal_value().unwrap();
-                    write!(&mut s, "{}", v).unwrap();
+                    write!(&mut s, "{v}").unwrap();
                 }
                 s.into()
             }
@@ -598,7 +642,7 @@ impl Expr {
                 if !x.is_qualified() && x.args.len() == 1 && x.name == KEYWORD_FN_PTR =>
             {
                 if let Self::StringConstant(ref s, ..) = x.args[0] {
-                    FnPtr::new(s).ok()?.into()
+                    FnPtr::new(s.clone()).ok()?.into()
                 } else {
                     return None;
                 }
@@ -669,8 +713,7 @@ impl Expr {
                     hashes: calc_fn_hash(None, f.fn_name(), 1).into(),
                     args: once(Self::StringConstant(f.fn_name().into(), pos)).collect(),
                     capture_parent_scope: false,
-                    is_native_operator: false,
-                    pos,
+                    op_token: None,
                 }
                 .into(),
                 pos,
@@ -725,6 +768,8 @@ impl Expr {
             | Self::And(.., pos)
             | Self::Or(.., pos)
             | Self::Coalesce(.., pos)
+            | Self::FnCall(.., pos)
+            | Self::MethodCall(.., pos)
             | Self::Index(.., pos)
             | Self::Dot(.., pos)
             | Self::InterpolatedString(.., pos)
@@ -732,8 +777,6 @@ impl Expr {
 
             #[cfg(not(feature = "no_custom_syntax"))]
             Self::Custom(.., pos) => *pos,
-
-            Self::FnCall(x, ..) | Self::MethodCall(x, ..) => x.pos,
 
             Self::Stmt(x) => x.position(),
         }

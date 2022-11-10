@@ -27,12 +27,14 @@ pub enum CallableFunction {
 }
 
 impl fmt::Debug for CallableFunction {
+    #[cold]
+    #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Pure(..) => write!(f, "NativePureFunction"),
-            Self::Method(..) => write!(f, "NativeMethod"),
-            Self::Iterator(..) => write!(f, "NativeIterator"),
-            Self::Plugin(..) => write!(f, "PluginFunction"),
+            Self::Pure(..) => f.write_str("NativePureFunction"),
+            Self::Method(..) => f.write_str("NativeMethod"),
+            Self::Iterator(..) => f.write_str("NativeIterator"),
+            Self::Plugin(..) => f.write_str("PluginFunction"),
 
             #[cfg(not(feature = "no_function"))]
             Self::Script(fn_def) => fmt::Debug::fmt(fn_def, f),
@@ -43,10 +45,10 @@ impl fmt::Debug for CallableFunction {
 impl fmt::Display for CallableFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Pure(..) => write!(f, "NativePureFunction"),
-            Self::Method(..) => write!(f, "NativeMethod"),
-            Self::Iterator(..) => write!(f, "NativeIterator"),
-            Self::Plugin(..) => write!(f, "PluginFunction"),
+            Self::Pure(..) => f.write_str("NativePureFunction"),
+            Self::Method(..) => f.write_str("NativeMethod"),
+            Self::Iterator(..) => f.write_str("NativeIterator"),
+            Self::Plugin(..) => f.write_str("PluginFunction"),
 
             #[cfg(not(feature = "no_function"))]
             Self::Script(s) => fmt::Display::fmt(s, f),
@@ -197,7 +199,7 @@ impl CallableFunction {
             Self::Script(..) => None,
         }
     }
-    /// Create a new [`CallableFunction::Method`] from `FnBuiltin`.
+    /// Create a new [`CallableFunction::Method`] from a built-in function.
     #[inline(always)]
     #[must_use]
     pub fn from_fn_builtin(func: FnBuiltin) -> Self {

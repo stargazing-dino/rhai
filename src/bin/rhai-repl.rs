@@ -26,17 +26,16 @@ fn print_error(input: &str, mut err: EvalAltResult) {
     // Print error position
     if pos.is_none() {
         // No position
-        println!("{}", err);
+        println!("{err}");
     } else {
         // Specific position - print line text
-        println!("{}{}", line_no, lines[pos.line().unwrap() - 1]);
+        println!("{line_no}{}", lines[pos.line().unwrap() - 1]);
 
         // Display position marker
         println!(
-            "{0:>1$} {2}",
+            "{0:>1$} {err}",
             "^",
             line_no.len() + pos.position().unwrap(),
-            err
         );
     }
 }
@@ -119,7 +118,7 @@ fn load_script_files(engine: &mut Engine) {
     for filename in env::args().skip(1) {
         let filename = match Path::new(&filename).canonicalize() {
             Err(err) => {
-                eprintln!("Error script file path: {}\n{}", filename, err);
+                eprintln!("Error script file path: {filename}\n{err}");
                 exit(1);
             }
             Ok(f) => {
@@ -164,7 +163,7 @@ fn load_script_files(engine: &mut Engine) {
                 let filename = filename.to_string_lossy();
 
                 eprintln!("{:=<1$}", "", filename.len());
-                eprintln!("{}", filename);
+                eprintln!("{filename}");
                 eprintln!("{:=<1$}", "", filename.len());
                 eprintln!();
 
@@ -277,13 +276,13 @@ mod sample_functions {
     #[rhai_fn(name = "test")]
     pub fn test2(x: &mut INT, y: INT, z: &str) {
         *x += y + (z.len() as INT);
-        println!("{} {} {}", x, y, z);
+        println!("{x} {y} {z}");
     }
 }
 
 fn main() {
     let title = format!("Rhai REPL tool (version {})", env!("CARGO_PKG_VERSION"));
-    println!("{}", title);
+    println!("{title}");
     println!("{0:=<1$}", "", title.len());
 
     #[cfg(not(feature = "no_optimize"))]
@@ -338,11 +337,11 @@ fn main() {
                 history_offset += 1;
             }
             if input.contains('\n') {
-                println!("[{}] ~~~~", replacement_index);
-                println!("{}", input);
+                println!("[{replacement_index}] ~~~~");
+                println!("{input}");
                 println!("~~~~");
             } else {
-                println!("[{}] {}", replacement_index, input);
+                println!("[{replacement_index}] {input}");
             }
             replacement_index = 0;
         } else {
@@ -374,7 +373,7 @@ fn main() {
                     Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break 'main_loop,
 
                     Err(err) => {
-                        eprintln!("Error: {:?}", err);
+                        eprintln!("Error: {err:?}");
                         break 'main_loop;
                     }
                 }
@@ -401,12 +400,12 @@ fn main() {
             "history" => {
                 for (i, h) in rl.history().iter().enumerate() {
                     match &h.split('\n').collect::<Vec<_>>()[..] {
-                        [line] => println!("[{}] {}", history_offset + i, line),
+                        [line] => println!("[{}] {line}", history_offset + i),
                         lines => {
                             for (x, line) in lines.iter().enumerate() {
                                 let number = format!("[{}]", history_offset + i);
                                 if x == 0 {
-                                    println!("{} {}", number, line.trim_end());
+                                    println!("{number} {}", line.trim_end());
                                 } else {
                                     println!("{0:>1$} {2}", "", number.len(), line.trim_end());
                                 }
@@ -439,30 +438,30 @@ fn main() {
                 continue;
             }
             "scope" => {
-                println!("{}", scope);
+                println!("{scope}");
                 continue;
             }
             #[cfg(not(feature = "no_optimize"))]
             "astu" => {
                 // print the last un-optimized AST
-                println!("{:#?}\n", ast_u);
+                println!("{ast_u:#?}\n");
                 continue;
             }
             "ast" => {
                 // print the last AST
-                println!("{:#?}\n", ast);
+                println!("{ast:#?}\n");
                 continue;
             }
             #[cfg(feature = "metadata")]
             "functions" => {
                 // print a list of all registered functions
                 for f in engine.gen_fn_signatures(false) {
-                    println!("{}", f)
+                    println!("{f}")
                 }
 
                 #[cfg(not(feature = "no_function"))]
                 for f in main_ast.iter_functions() {
-                    println!("{}", f)
+                    println!("{f}")
                 }
 
                 println!();
@@ -482,27 +481,30 @@ fn main() {
                 continue;
             }
             "!!" => {
-                if let Some(line) = rl.history().last() {
-                    replacement = Some(line.clone());
-                    replacement_index = history_offset + rl.history().len() - 1;
-                } else {
-                    eprintln!("No lines history!");
+                match rl.history().last() {
+                    Some(line) => {
+                        replacement = Some(line.clone());
+                        replacement_index = history_offset + rl.history().len() - 1;
+                    }
+                    None => eprintln!("No lines history!"),
                 }
                 continue;
             }
             _ if cmd.starts_with("!?") => {
                 let text = cmd[2..].trim();
-                if let Some((n, line)) = rl
+                let history = rl
                     .history()
                     .iter()
                     .rev()
                     .enumerate()
-                    .find(|&(.., h)| h.contains(text))
-                {
-                    replacement = Some(line.clone());
-                    replacement_index = history_offset + (rl.history().len() - 1 - n);
-                } else {
-                    eprintln!("History line not found: {}", text);
+                    .find(|&(.., h)| h.contains(text));
+
+                match history {
+                    Some((n, line)) => {
+                        replacement = Some(line.clone());
+                        replacement_index = history_offset + (rl.history().len() - 1 - n);
+                    }
+                    None => eprintln!("History line not found: {text}"),
                 }
                 continue;
             }
@@ -558,7 +560,7 @@ fn main() {
                 engine.eval_ast_with_scope::<Dynamic>(&mut scope, &main_ast)
             }) {
             Ok(result) if !result.is::<()>() => {
-                println!("=> {:?}", result);
+                println!("=> {result:?}");
                 println!();
             }
             Ok(_) => (),

@@ -66,7 +66,7 @@ fn test_print_debug() -> Result<(), Box<EvalAltResult>> {
     );
 
     for entry in logbook.read().unwrap().iter() {
-        println!("{}", entry);
+        println!("{entry}");
     }
 
     Ok(())

@@ -36,6 +36,8 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         type Item = i64;
         type IntoIter = std::vec::IntoIter<Self::Item>;
 
+        #[inline]
+        #[must_use]
         fn into_iter(self) -> Self::IntoIter {
             vec![self.x - 1, self.x, self.x + 1].into_iter()
         }
@@ -65,7 +67,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         engine
             .gen_fn_signatures(false)
             .into_iter()
-            .for_each(|func| println!("{}", func));
+            .for_each(|func| println!("{func}"));
 
         println!();
     }
@@ -87,7 +89,7 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         ",
     )?;
 
-    println!("result: {}", result); // prints 1085764
+    println!("result: {result}"); // prints 1085764
 
     Ok(())
 }
