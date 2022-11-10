@@ -253,7 +253,7 @@ impl Engine {
         let orig_lib_len = global.lib.len();
 
         #[cfg(not(feature = "no_function"))]
-        if !ast.functions().is_empty() {
+        if ast.has_functions() {
             global.lib.push(ast.functions().clone());
         }
 

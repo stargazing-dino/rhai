@@ -116,7 +116,7 @@ impl Engine {
         global.source = ast.source_raw().cloned();
 
         #[cfg(not(feature = "no_function"))]
-        if !ast.functions().is_empty() {
+        if ast.has_functions() {
             global.lib.push(ast.functions().clone());
         }
         #[cfg(not(feature = "no_module"))]

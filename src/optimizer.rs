@@ -71,15 +71,19 @@ impl<'a> OptimizerState<'a> {
         #[cfg(not(feature = "no_function"))] lib: &'a [crate::SharedModule],
         optimization_level: OptimizationLevel,
     ) -> Self {
-        let mut global = GlobalRuntimeState::new(engine);
-        global.lib = lib.iter().cloned().collect();
+        let mut _global = GlobalRuntimeState::new(engine);
+
+        #[cfg(not(feature = "no_function"))]
+        {
+            _global.lib = lib.iter().cloned().collect();
+        }
 
         Self {
             changed: false,
             variables: StaticVec::new_const(),
             propagate_constants: true,
             engine,
-            global,
+            global: _global,
             caches: Caches::new(),
             optimization_level,
         }

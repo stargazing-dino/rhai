@@ -543,7 +543,7 @@ impl Engine {
         fn_name: &str,
         op_token: Option<&Token>,
         hashes: FnCallHashes,
-        mut args: &mut FnCallArgs,
+        mut _args: &mut FnCallArgs,
         is_ref_mut: bool,
         _is_method_call: bool,
         pos: Position,
@@ -558,7 +558,7 @@ impl Engine {
 
         // Check for data race.
         #[cfg(not(feature = "no_closure"))]
-        ensure_no_data_race(fn_name, args, is_ref_mut)?;
+        ensure_no_data_race(fn_name, _args, is_ref_mut)?;
 
         global.level += 1;
         let global = &mut *RestoreOnDrop::lock(global, move |g| g.level -= 1);
@@ -567,18 +567,18 @@ impl Engine {
         if hashes.is_native_only() {
             match fn_name {
                 // Handle type_of()
-                KEYWORD_TYPE_OF if args.len() == 1 => {
-                    let typ = self.map_type_name(args[0].type_name()).to_string().into();
+                KEYWORD_TYPE_OF if _args.len() == 1 => {
+                    let typ = self.map_type_name(_args[0].type_name()).to_string().into();
                     return Ok((typ, false));
                 }
 
                 // Handle is_def_fn()
                 #[cfg(not(feature = "no_function"))]
                 crate::engine::KEYWORD_IS_DEF_FN
-                    if args.len() == 2 && args[0].is_fnptr() && args[1].is_int() =>
+                    if _args.len() == 2 && _args[0].is_fnptr() && _args[1].is_int() =>
                 {
-                    let fn_name = args[0].read_lock::<ImmutableString>().expect("`FnPtr`");
-                    let num_params = args[1].as_int().expect("`INT`");
+                    let fn_name = _args[0].read_lock::<ImmutableString>().expect("`FnPtr`");
+                    let num_params = _args[1].as_int().expect("`INT`");
 
                     return Ok((
                         if num_params < 0 || num_params > crate::MAX_USIZE_INT {
@@ -595,15 +595,15 @@ impl Engine {
 
                 // Handle is_shared()
                 #[cfg(not(feature = "no_closure"))]
-                crate::engine::KEYWORD_IS_SHARED if args.len() == 1 => {
+                crate::engine::KEYWORD_IS_SHARED if _args.len() == 1 => {
                     return no_method_err(fn_name, pos)
                 }
 
-                KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR if args.len() == 1 => {
+                KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR if _args.len() == 1 => {
                     return no_method_err(fn_name, pos)
                 }
 
-                KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY if !args.is_empty() => {
+                KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY if !_args.is_empty() => {
                     return no_method_err(fn_name, pos)
                 }
 
@@ -644,7 +644,7 @@ impl Engine {
 
                 return if _is_method_call {
                     // Method call of script function - map first argument to `this`
-                    let (first_arg, rest_args) = args.split_first_mut().unwrap();
+                    let (first_arg, rest_args) = _args.split_first_mut().unwrap();
 
                     self.call_script_fn(
                         global, caches, scope, first_arg, func, rest_args, true, pos,
@@ -654,13 +654,13 @@ impl Engine {
                     let backup = &mut ArgBackup::new();
 
                     // The first argument is a reference?
-                    let swap = is_ref_mut && !args.is_empty();
+                    let swap = is_ref_mut && !_args.is_empty();
 
                     if swap {
-                        backup.change_first_arg_to_copy(args);
+                        backup.change_first_arg_to_copy(_args);
                     }
 
-                    let args = &mut *RestoreOnDrop::lock_if(swap, &mut args, move |a| {
+                    let args = &mut *RestoreOnDrop::lock_if(swap, &mut _args, move |a| {
                         backup.restore_first_arg(a)
                     });
 
@@ -676,7 +676,7 @@ impl Engine {
         let hash = hashes.native();
 
         self.exec_native_fn_call(
-            global, caches, fn_name, op_token, hash, args, is_ref_mut, pos,
+            global, caches, fn_name, op_token, hash, _args, is_ref_mut, pos,
         )
     }
 

@@ -1,7 +1,7 @@
 //! Evaluation context.
 
 use super::{Caches, GlobalRuntimeState};
-use crate::{Dynamic, Engine, Module, Scope, SharedModule};
+use crate::{Dynamic, Engine, Module, Scope};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -109,7 +109,7 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub fn namespaces(&self) -> &[SharedModule] {
+    pub fn namespaces(&self) -> &[crate::SharedModule] {
         &self.global.lib
     }
     /// The current bound `this` pointer, if any.

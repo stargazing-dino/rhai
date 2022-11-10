@@ -154,7 +154,7 @@ impl FnPtr {
         let global = &mut GlobalRuntimeState::new(engine);
 
         #[cfg(not(feature = "no_function"))]
-        if !_ast.functions().is_empty() {
+        if _ast.has_functions() {
             global.lib.push(_ast.functions().clone());
         }
 
