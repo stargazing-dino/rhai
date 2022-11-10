@@ -253,9 +253,7 @@ impl Engine {
         let orig_lib_len = global.lib.len();
 
         #[cfg(not(feature = "no_function"))]
-        if ast.has_functions() {
-            global.lib.push(ast.functions().clone());
-        }
+        global.lib.push(ast.shared_lib().clone());
 
         let mut no_this_ptr = Dynamic::NULL;
         let this_ptr = this_ptr.unwrap_or(&mut no_this_ptr);

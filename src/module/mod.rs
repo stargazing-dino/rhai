@@ -543,14 +543,13 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.indexed
-            && !self.contains_indexed_global_functions
+        !self.contains_indexed_global_functions
             && self.functions.is_empty()
-            && self.all_functions.as_ref().map_or(true, |m| m.is_empty())
             && self.variables.as_ref().map_or(true, |m| m.is_empty())
-            && self.all_variables.as_ref().map_or(true, |m| m.is_empty())
             && self.modules.as_ref().map_or(true, |m| m.is_empty())
             && self.type_iterators.as_ref().map_or(true, |t| t.is_empty())
+            && self.all_functions.as_ref().map_or(true, |m| m.is_empty())
+            && self.all_variables.as_ref().map_or(true, |m| m.is_empty())
             && self
                 .all_type_iterators
                 .as_ref()

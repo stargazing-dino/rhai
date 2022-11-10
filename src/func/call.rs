@@ -1445,7 +1445,7 @@ impl Engine {
 
         // If new functions are defined within the eval string, it is an error
         #[cfg(not(feature = "no_function"))]
-        if !ast.shared_lib().is_empty() {
+        if ast.has_functions() {
             return Err(crate::PERR::WrongFnDefinition.into());
         }
 

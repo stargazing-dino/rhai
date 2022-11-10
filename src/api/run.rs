@@ -116,9 +116,8 @@ impl Engine {
         global.source = ast.source_raw().cloned();
 
         #[cfg(not(feature = "no_function"))]
-        if ast.has_functions() {
-            global.lib.push(ast.functions().clone());
-        }
+        global.lib.push(ast.shared_lib().clone());
+
         #[cfg(not(feature = "no_module"))]
         {
             global.embedded_module_resolver = ast.resolver().cloned();

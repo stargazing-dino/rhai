@@ -212,9 +212,7 @@ impl Engine {
         let orig_lib_len = global.lib.len();
 
         #[cfg(not(feature = "no_function"))]
-        if ast.has_functions() {
-            global.lib.push(ast.functions().clone());
-        }
+        global.lib.push(ast.shared_lib().clone());
 
         #[cfg(not(feature = "no_module"))]
         let orig_embedded_module_resolver = mem::replace(

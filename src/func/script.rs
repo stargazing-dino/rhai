@@ -118,9 +118,7 @@ impl Engine {
                 .cloned()
                 .for_each(|(n, m)| global.push_import(n, m));
 
-            if !lib.is_empty() {
-                global.lib.push(lib.clone());
-            }
+            global.lib.push(lib.clone());
 
             Some(mem::replace(&mut global.constants, constants.clone()))
         } else {
