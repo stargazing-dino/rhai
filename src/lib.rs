@@ -95,6 +95,9 @@ mod tests;
 mod tokenizer;
 mod types;
 
+/// Export to create module resolvers.
+pub use func::native;
+
 /// Error encountered when parsing a script.
 type PERR = ParseErrorType;
 /// Evaluation result.
