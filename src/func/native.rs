@@ -533,14 +533,14 @@ pub fn locked_write<T>(value: &Locked<T>) -> LockGuardMut<T> {
     return value.write().unwrap();
 }
 
-/// General function trail object.
+/// General Rust function trail object.
 #[cfg(not(feature = "sync"))]
 pub type FnAny = dyn Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult;
-/// General function trail object.
+/// General Rust function trail object.
 #[cfg(feature = "sync")]
 pub type FnAny = dyn Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult + Send + Sync;
 
-/// Trail object for built-in functions.
+/// Built-in function trait object.
 pub type FnBuiltin = fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult;
 
 /// Function that gets an iterator from a type.
@@ -551,8 +551,10 @@ pub type IteratorFn = dyn Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dy
 pub type IteratorFn =
     dyn Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>> + Send + Sync;
 
+/// Plugin function trait object.
 #[cfg(not(feature = "sync"))]
 pub type FnPlugin = dyn PluginFunction;
+/// Plugin function trait object.
 #[cfg(feature = "sync")]
 pub type FnPlugin = dyn PluginFunction + Send + Sync;
 
