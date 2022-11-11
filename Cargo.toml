@@ -27,7 +27,7 @@ rhai_codegen = { version = "1.4.1", path = "codegen", default-features = false }
 
 no-std-compat = { version = "0.4", default-features = false, features = ["alloc"], optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
-hashbrown = { version = "0.12", optional = true }
+hashbrown = { version = "0.13", optional = true }
 core-error = { version = "0.0", default-features = false, features = ["alloc"], optional = true }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"], optional = true }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
