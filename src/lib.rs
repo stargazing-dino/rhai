@@ -96,9 +96,6 @@ mod tests;
 mod tokenizer;
 mod types;
 
-/// Export to create module resolvers.
-pub use func::native;
-
 /// Error encountered when parsing a script.
 type PERR = ParseErrorType;
 /// Evaluation result.
@@ -204,6 +201,8 @@ pub use api::{eval::eval, events::VarDefInfo, run::run};
 pub use ast::{FnAccess, AST};
 pub use engine::{Engine, OP_CONTAINS, OP_EQUALS};
 pub use eval::EvalContext;
+#[cfg(feature = "internals")]
+pub use func::native;
 pub use func::{NativeCallContext, RegisterNativeFunction};
 pub use module::{FnNamespace, Module};
 pub use tokenizer::Position;
