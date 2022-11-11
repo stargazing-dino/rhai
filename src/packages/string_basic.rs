@@ -39,7 +39,7 @@ pub fn print_with_func(
     value: &mut Dynamic,
 ) -> crate::ImmutableString {
     match ctx.call_native_fn_raw(fn_name, true, &mut [value]) {
-        Ok(result) if result.is::<crate::ImmutableString>() => {
+        Ok(result) if result.is_string() => {
             result.into_immutable_string().expect("`ImmutableString`")
         }
         Ok(result) => ctx.engine().map_type_name(result.type_name()).into(),
@@ -75,7 +75,7 @@ mod print_debug_functions {
     /// Return the empty string.
     #[rhai_fn(name = "print", name = "debug")]
     pub fn print_empty_string(ctx: NativeCallContext) -> ImmutableString {
-        ctx.engine().get_interned_string("")
+        ctx.engine().const_empty_string()
     }
 
     /// Return the `string`.
@@ -121,7 +121,7 @@ mod print_debug_functions {
     #[rhai_fn(name = "print", name = "to_string")]
     pub fn print_unit(ctx: NativeCallContext, unit: ()) -> ImmutableString {
         let _ = unit;
-        ctx.engine().get_interned_string("")
+        ctx.engine().const_empty_string()
     }
     /// Convert the unit into a string in debug format.
     #[rhai_fn(name = "debug", name = "to_debug")]
@@ -134,26 +134,26 @@ mod print_debug_functions {
     #[cfg(not(feature = "no_float"))]
     #[rhai_fn(name = "print", name = "to_string")]
     pub fn print_f64(number: f64) -> ImmutableString {
-        crate::ast::FloatWrapper::new(number).to_string().into()
+        crate::types::FloatWrapper::new(number).to_string().into()
     }
     /// Convert the value of `number` into a string.
     #[cfg(not(feature = "no_float"))]
     #[rhai_fn(name = "print", name = "to_string")]
     pub fn print_f32(number: f32) -> ImmutableString {
-        crate::ast::FloatWrapper::new(number).to_string().into()
+        crate::types::FloatWrapper::new(number).to_string().into()
     }
     /// Convert the value of `number` into a string.
     #[cfg(not(feature = "no_float"))]
     #[rhai_fn(name = "debug", name = "to_debug")]
     pub fn debug_f64(number: f64) -> ImmutableString {
-        let number = crate::ast::FloatWrapper::new(number);
+        let number = crate::types::FloatWrapper::new(number);
         format!("{number:?}").into()
     }
     /// Convert the value of `number` into a string.
     #[cfg(not(feature = "no_float"))]
     #[rhai_fn(name = "debug", name = "to_debug")]
     pub fn debug_f32(number: f32) -> ImmutableString {
-        let number = crate::ast::FloatWrapper::new(number);
+        let number = crate::types::FloatWrapper::new(number);
         format!("{number:?}").into()
     }
 

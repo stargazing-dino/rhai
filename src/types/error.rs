@@ -174,7 +174,7 @@ impl fmt::Display for EvalAltResult {
             Self::ErrorStackOverflow(..) => f.write_str("Stack overflow")?,
             Self::ErrorTerminated(..) => f.write_str("Script terminated")?,
 
-            Self::ErrorRuntime(d, ..) if d.is::<()>() => f.write_str("Runtime error")?,
+            Self::ErrorRuntime(d, ..) if d.is_unit() => f.write_str("Runtime error")?,
             Self::ErrorRuntime(d, ..)
                 if d.read_lock::<ImmutableString>()
                     .map_or(false, |v| v.is_empty()) =>

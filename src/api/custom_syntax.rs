@@ -89,6 +89,7 @@ impl Expression<'_> {
     /// # WARNING - Low Level API
     ///
     /// This function is _extremely_ low level.  It evaluates an expression from an [`AST`][crate::AST].
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     #[inline(always)]
     pub fn eval_with_context_raw(
         &self,

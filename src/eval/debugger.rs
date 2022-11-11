@@ -3,9 +3,7 @@
 
 use super::{Caches, EvalContext, GlobalRuntimeState};
 use crate::ast::{ASTNode, Expr, Stmt};
-use crate::{
-    Dynamic, Engine, EvalAltResult, ImmutableString, Position, RhaiResultOf, Scope, SharedModule,
-};
+use crate::{Dynamic, Engine, EvalAltResult, ImmutableString, Position, RhaiResultOf, Scope};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{fmt, iter::repeat, mem};
@@ -413,14 +411,13 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[SharedModule],
         scope: &mut Scope,
         this_ptr: &mut Dynamic,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<()> {
         if self.debugger.is_some() {
             if let Some(cmd) =
-                self.run_debugger_with_reset_raw(global, caches, lib, scope, this_ptr, node)?
+                self.run_debugger_with_reset_raw(global, caches, scope, this_ptr, node)?
             {
                 global.debugger.status = cmd;
             }
@@ -439,13 +436,12 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[SharedModule],
         scope: &mut Scope,
         this_ptr: &mut Dynamic,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<Option<DebuggerStatus>> {
         if self.debugger.is_some() {
-            self.run_debugger_with_reset_raw(global, caches, lib, scope, this_ptr, node)
+            self.run_debugger_with_reset_raw(global, caches, scope, this_ptr, node)
         } else {
             Ok(None)
         }
@@ -461,7 +457,6 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[SharedModule],
         scope: &mut Scope,
         this_ptr: &mut Dynamic,
         node: impl Into<ASTNode<'a>>,
@@ -494,7 +489,7 @@ impl Engine {
             },
         };
 
-        self.run_debugger_raw(global, caches, lib, scope, this_ptr, node, event)
+        self.run_debugger_raw(global, caches, scope, this_ptr, node, event)
     }
     /// Run the debugger callback unconditionally.
     ///
@@ -507,7 +502,6 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        lib: &[SharedModule],
         scope: &mut Scope,
         this_ptr: &mut Dynamic,
         node: ASTNode<'a>,
@@ -515,7 +509,7 @@ impl Engine {
     ) -> Result<Option<DebuggerStatus>, Box<crate::EvalAltResult>> {
         let src = global.source_raw().cloned();
         let src = src.as_ref().map(|s| s.as_str());
-        let context = crate::EvalContext::new(self, global, caches, lib, scope, this_ptr);
+        let context = crate::EvalContext::new(self, global, caches, scope, this_ptr);
 
         if let Some((.., ref on_debugger)) = self.debugger {
             let command = on_debugger(context, event, node, src, node.position())?;

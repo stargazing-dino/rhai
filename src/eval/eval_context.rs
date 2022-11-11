@@ -1,7 +1,7 @@
 //! Evaluation context.
 
 use super::{Caches, GlobalRuntimeState};
-use crate::{Dynamic, Engine, Module, Scope, SharedModule};
+use crate::{Dynamic, Engine, Module, Scope};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -11,14 +11,12 @@ use std::prelude::v1::*;
 pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// The current [`Engine`].
     engine: &'a Engine,
-    /// The current [`Scope`].
-    scope: &'s mut Scope<'ps>,
     /// The current [`GlobalRuntimeState`].
     global: &'g mut GlobalRuntimeState,
     /// The current [caches][Caches], if available.
     caches: &'c mut Caches,
-    /// The current stack of imported [modules][Module].
-    lib: &'a [SharedModule],
+    /// The current [`Scope`].
+    scope: &'s mut Scope<'ps>,
     /// The current bound `this` pointer, if any.
     this_ptr: &'t mut Dynamic,
 }
@@ -31,16 +29,14 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
         engine: &'a Engine,
         global: &'g mut GlobalRuntimeState,
         caches: &'c mut Caches,
-        lib: &'a [SharedModule],
         scope: &'s mut Scope<'ps>,
         this_ptr: &'t mut Dynamic,
     ) -> Self {
         Self {
             engine,
-            scope,
             global,
             caches,
-            lib,
+            scope,
             this_ptr,
         }
     }
@@ -104,17 +100,23 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
         self.global
     }
     /// Get an iterator over the namespaces containing definition of all script-defined functions.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
-        self.lib.iter().map(|m| m.as_ref())
+        self.global.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current set of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn namespaces(&self) -> &[SharedModule] {
-        self.lib
+    pub fn namespaces(&self) -> &[crate::SharedModule] {
+        &self.global.lib
     }
     /// The current bound `this` pointer, if any.
     #[inline]
@@ -181,20 +183,14 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
             crate::ast::Expr::Stmt(statements) => self.engine.eval_stmt_block(
                 self.global,
                 self.caches,
-                self.lib,
                 self.scope,
                 self.this_ptr,
                 statements,
                 rewind_scope,
             ),
-            _ => self.engine.eval_expr(
-                self.global,
-                self.caches,
-                self.lib,
-                self.scope,
-                self.this_ptr,
-                expr,
-            ),
+            _ => self
+                .engine
+                .eval_expr(self.global, self.caches, self.scope, self.this_ptr, expr),
         }
     }
 }

@@ -16,6 +16,7 @@ Bug fixes
 * `import` statements inside `eval` no longer cause errors in subsequent code.
 * Functions marked `global` in `import`ed modules with no alias names now work properly.
 * Incorrect loop optimizations that are too aggressive (e.g. unrolling a `do { ... } until true` with a `break` statement inside) and cause crashes are removed.
+* `Dynamic::is` now works properly for shared values.
 
 Breaking changes
 ----------------
@@ -25,6 +26,11 @@ Breaking changes
 New features
 ------------
 
+### `Dynamic` detection API
+
+* New methods are added to `Dynamic` in the form of `is_XXX()` where `XXX` is a type (e.g. `is_int`, `is_unit`, `is_bool`, `is_array`).
+* This new API is to make it easier to detect the data type, instead of having to call `is::<XXX>()`.
+
 ### Loop expressions
 
 * Loops (such as `loop`, `do`, `while` and `for`) can now act as _expressions_, with the `break` statement returning an optional value.
@@ -33,13 +39,13 @@ New features
 
 ### Static hashing
 
-* It is now possible to specify a fixed _seed_ for use with the `ahash` hasher, via a static function `rhai::config::hashing::set_ahash_seed` or an environment variable, in order to force static (i.e. deterministic) hashes for function signatures.
+* It is now possible to specify a fixed _seed_ for use with the `ahash` hasher, via a static function `rhai::config::hashing::set_ahash_seed` or an environment variable (`RHAI_AHASH_SEED`), in order to force static (i.e. deterministic) hashes for function signatures.
 * This is necessary when using Rhai across shared-library boundaries.
 * A build script is used to extract the environment variable (`RHAI_AHASH_SEED`, if any) and splice it into the source code before compilation.
 
-### No Timestamps
+### `no_time` for no timestamps
 
-* A new feature, `no_time`, is added to disable support timestamps.
+* A new feature, `no_time`, is added to disable support for timestamps.
 * This may be necessary when building for architectures without time support, such as raw WASM.
 
 ### Serializable `Scope`

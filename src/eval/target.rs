@@ -9,11 +9,11 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-// Calculate an offset+len pair given an actual length of the underlying array.
-//
-// Negative starting positions count from the end.
-//
-// Values going over bounds are limited to the actual length.
+/// Calculate an offset+len pair given an actual length of the underlying array.
+///
+/// Negative starting positions count from the end.
+///
+/// Values going over bounds are limited to the actual length.
 #[inline]
 #[allow(dead_code)]
 pub fn calc_offset_len(length: usize, start: crate::INT, len: crate::INT) -> (usize, usize) {
@@ -41,11 +41,11 @@ pub fn calc_offset_len(length: usize, start: crate::INT, len: crate::INT) -> (us
     (start, len)
 }
 
-// Calculate an offset+len pair given an actual length of the underlying array.
-//
-// Negative starting positions count from the end.
-//
-// Values going over bounds call the provided closure to return a default value or an error.
+/// Calculate an offset+len pair given an actual length of the underlying array.
+///
+/// Negative starting positions count from the end.
+///
+/// Values going over bounds call the provided closure to return a default value or an error.
 #[inline]
 #[allow(dead_code)]
 pub fn calc_index<E>(

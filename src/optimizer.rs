@@ -12,7 +12,7 @@ use crate::tokenizer::Token;
 use crate::types::dynamic::AccessMode;
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnPtr, Identifier, ImmutableString, Position,
-    Scope, StaticVec, AST, INT,
+    Scope, StaticVec, AST,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -59,9 +59,6 @@ struct OptimizerState<'a> {
     global: GlobalRuntimeState,
     /// Function resolution caches.
     caches: Caches,
-    /// [Module][crate::Module] containing script-defined functions.
-    #[cfg(not(feature = "no_function"))]
-    lib: &'a [crate::SharedModule],
     /// Optimization level.
     optimization_level: OptimizationLevel,
 }
@@ -74,15 +71,20 @@ impl<'a> OptimizerState<'a> {
         #[cfg(not(feature = "no_function"))] lib: &'a [crate::SharedModule],
         optimization_level: OptimizationLevel,
     ) -> Self {
+        let mut _global = GlobalRuntimeState::new(engine);
+
+        #[cfg(not(feature = "no_function"))]
+        {
+            _global.lib = lib.iter().cloned().collect();
+        }
+
         Self {
             changed: false,
             variables: StaticVec::new_const(),
             propagate_constants: true,
             engine,
-            global: GlobalRuntimeState::new(engine),
+            global: _global,
             caches: Caches::new(),
-            #[cfg(not(feature = "no_function"))]
-            lib,
             optimization_level,
         }
     }
@@ -138,16 +140,10 @@ impl<'a> OptimizerState<'a> {
         op_token: Option<&Token>,
         arg_values: &mut [Dynamic],
     ) -> Dynamic {
-        #[cfg(not(feature = "no_function"))]
-        let lib = self.lib;
-        #[cfg(feature = "no_function")]
-        let lib = &[];
-
         self.engine
             .exec_native_fn_call(
                 &mut self.global,
                 &mut self.caches,
-                lib,
                 fn_name,
                 op_token,
                 calc_fn_hash(None, fn_name, arg_values.len()),
@@ -592,7 +588,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             }
 
             // Then check ranges
-            if value.is::<INT>() && !ranges.is_empty() {
+            if value.is_int() && !ranges.is_empty() {
                 let value = value.as_int().unwrap();
 
                 // Only one range or all ranges without conditions
@@ -1138,12 +1134,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 _ if x.args.len() == 2 && x.op_token.is_some() && (state.engine.fast_operators() || !has_native_fn_override(state.engine, x.hashes.native(), &arg_types)) => {
                     if let Some(result) = get_builtin_binary_op_fn(x.op_token.as_ref().unwrap(), &arg_values[0], &arg_values[1])
                         .and_then(|f| {
-                            #[cfg(not(feature = "no_function"))]
-                            let lib = state.lib;
-                            #[cfg(feature = "no_function")]
-                            let lib = &[][..];
-
-                            let context = (state.engine, x.name.as_str(),None, &state.global, lib, *pos).into();
+                            let context = (state.engine, x.name.as_str(),None, &state.global, *pos).into();
                             let (first, second) = arg_values.split_first_mut().unwrap();
                             (f)(context, &mut [ first, &mut second[0] ]).ok()
                         }) {
@@ -1183,7 +1174,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         => {
             // First search for script-defined functions (can override built-in)
             #[cfg(not(feature = "no_function"))]
-            let has_script_fn = !x.hashes.is_native_only() && state.lib.iter().find_map(|m| m.get_script_fn(&x.name, x.args.len())).is_some();
+            let has_script_fn = !x.hashes.is_native_only() && state.global.lib.iter().find_map(|m| m.get_script_fn(&x.name, x.args.len())).is_some();
             #[cfg(feature = "no_function")]
             let has_script_fn = false;
 

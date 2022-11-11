@@ -45,9 +45,9 @@ fn check_struct_sizes() {
         assert_eq!(
             size_of::<NativeCallContext>(),
             if cfg!(feature = "no_position") {
-                64
+                48
             } else {
-                72
+                56
             }
         );
     }
