@@ -11,7 +11,7 @@ fn test_throw() {
 
     assert!(matches!(
         *engine.run(r#"throw"#).expect_err("expects error"),
-        EvalAltResult::ErrorRuntime(s, ..) if s.is::<()>()
+        EvalAltResult::ErrorRuntime(s, ..) if s.is_unit()
     ));
 }
 

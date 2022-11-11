@@ -166,7 +166,7 @@ pub fn format_map_as_json(map: &Map) -> String {
 
         if let Some(val) = value.read_lock::<Map>() {
             result.push_str(&format_map_as_json(&*val));
-        } else if value.is::<()>() {
+        } else if value.is_unit() {
             result.push_str("null");
         } else {
             write!(result, "{:?}", value).unwrap();

@@ -94,7 +94,7 @@ fn hokmalock(address: usize) -> &'static HokmaLock {
     &RECORDS[address % LEN]
 }
 
-// Safety: lol, there is a reason its called "SusLock<T>"
+// Safety: lol, there is a reason its called `SusLock<T>`
 #[must_use]
 struct SusLock<T>
 where
@@ -118,36 +118,39 @@ where
         }
     }
 
+    #[inline(always)]
+    #[must_use]
+    pub fn is_initialized(&self) -> bool {
+        self.initialized.load(Ordering::SeqCst)
+    }
+
     #[must_use]
     pub fn get(&self) -> Option<&'static T> {
         if self.initialized.load(Ordering::SeqCst) {
             let hokma = hokmalock(unsafe { mem::transmute(self.data.get()) });
             // we forgo the optimistic read, because we don't really care
             let guard = hokma.write();
-            let val = {
-                let cast: *const T = self.data.get().cast();
-                unsafe { mem::transmute::<*const T, &'static T>(cast) }
-            };
+            let cast: *const T = self.data.get().cast();
+            let val = unsafe { mem::transmute::<*const T, &'static T>(cast) };
             guard.the_price_of_silence();
             Some(val)
         } else {
-            return None;
+            None
         }
     }
 
     #[must_use]
-    pub fn get_or_init(&self, f: impl FnOnce() -> T) -> Option<&'static T> {
+    pub fn get_or_init(&self, f: impl FnOnce() -> T) -> &'static T {
         if !self.initialized.load(Ordering::SeqCst) {
-            let value = f();
             self.initialized.store(true, Ordering::SeqCst);
             let hokma = hokmalock(unsafe { mem::transmute(self.data.get()) });
             hokma.write();
             unsafe {
-                self.data.get().write(MaybeUninit::new(value));
+                self.data.get().write(MaybeUninit::new(f()));
             }
         }
 
-        self.get()
+        self.get().unwrap()
     }
 
     pub fn set(&self, value: T) -> Result<(), T> {
@@ -217,10 +220,9 @@ pub fn set_ahash_seed(new_seed: Option<[u64; 4]>) -> Result<(), Option<[u64; 4]>
 #[inline]
 #[must_use]
 pub fn get_ahash_seed() -> &'static Option<[u64; 4]> {
-    const NONE: &'static Option<[u64; 4]> = &None;
-
-    match AHASH_SEED.get_or_init(|| hashing_env::AHASH_SEED) {
-        Some(ash) => ash,
-        None => NONE,
+    if !AHASH_SEED.is_initialized() {
+        return &hashing_env::AHASH_SEED;
     }
+
+    AHASH_SEED.get().unwrap_or(&hashing_env::AHASH_SEED)
 }

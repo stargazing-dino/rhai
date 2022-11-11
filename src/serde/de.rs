@@ -370,7 +370,7 @@ impl<'de> Deserializer<'de> for DynamicDeserializer<'de> {
     }
 
     fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        if self.0.is::<()>() {
+        if self.0.is_unit() {
             visitor.visit_none()
         } else {
             visitor.visit_some(self)

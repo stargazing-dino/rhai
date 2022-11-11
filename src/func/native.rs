@@ -73,14 +73,17 @@ pub struct NativeCallContext<'a> {
     source: Option<&'a str>,
     /// The current [`GlobalRuntimeState`], if any.
     global: &'a GlobalRuntimeState,
-    /// The current stack of loaded [modules][Module].
-    lib: &'a [SharedModule],
     /// [Position] of the function call.
     pos: Position,
 }
 
 /// _(internals)_ Context of a native Rust function call.
 /// Exported under the `internals` feature only.
+///
+/// # WARNING - Volatile Type
+///
+/// This type is volatile and may change in the future.
+#[deprecated = "This type is NOT deprecated, but it is considered volatile and may change in the future."]
 #[cfg(feature = "internals")]
 #[derive(Debug, Clone)]
 pub struct NativeCallContextStore {
@@ -90,15 +93,19 @@ pub struct NativeCallContextStore {
     pub source: Option<String>,
     /// The current [`GlobalRuntimeState`], if any.
     pub global: GlobalRuntimeState,
-    /// The current stack of loaded [modules][Module].
-    pub lib: StaticVec<SharedModule>,
     /// [Position] of the function call.
     pub pos: Position,
 }
 
 #[cfg(feature = "internals")]
+#[allow(deprecated)]
 impl NativeCallContextStore {
     /// Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    ///
+    /// # WARNING - Unstable API
+    ///
+    /// This API is volatile and may change in the future.
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     #[inline(always)]
     #[must_use]
     pub fn create_context<'a>(&'a self, engine: &'a Engine) -> NativeCallContext<'a> {
@@ -112,7 +119,6 @@ impl<'a>
         &'a str,
         Option<&'a str>,
         &'a GlobalRuntimeState,
-        &'a [SharedModule],
         Position,
     )> for NativeCallContext<'a>
 {
@@ -123,7 +129,6 @@ impl<'a>
             &'a str,
             Option<&'a str>,
             &'a GlobalRuntimeState,
-            &'a [SharedModule],
             Position,
         ),
     ) -> Self {
@@ -132,8 +137,7 @@ impl<'a>
             fn_name: value.1,
             source: value.2,
             global: value.3,
-            lib: value.4,
-            pos: value.5,
+            pos: value.4,
         }
     }
 }
@@ -152,7 +156,6 @@ impl<'a> NativeCallContext<'a> {
         fn_name: &'a str,
         source: Option<&'a str>,
         global: &'a GlobalRuntimeState,
-        lib: &'a [SharedModule],
         pos: Position,
     ) -> Self {
         Self {
@@ -160,37 +163,46 @@ impl<'a> NativeCallContext<'a> {
             fn_name,
             source,
             global,
-            lib,
             pos,
         }
     }
 
     /// _(internals)_ Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
     /// Exported under the `internals` feature only.
+    ///
+    /// # WARNING - Unstable API
+    ///
+    /// This API is volatile and may change in the future.
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     #[cfg(feature = "internals")]
     #[inline]
     #[must_use]
+    #[allow(deprecated)]
     pub fn from_stored_data(engine: &'a Engine, context: &'a NativeCallContextStore) -> Self {
         Self {
             engine,
             fn_name: &context.fn_name,
             source: context.source.as_ref().map(String::as_str),
             global: &context.global,
-            lib: &context.lib,
             pos: context.pos,
         }
     }
     /// _(internals)_ Store this [`NativeCallContext`] into a [`NativeCallContextClone`].
     /// Exported under the `internals` feature only.
+    ///
+    /// # WARNING - Unstable API
+    ///
+    /// This API is volatile and may change in the future.
+    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     #[cfg(feature = "internals")]
     #[inline]
     #[must_use]
+    #[allow(deprecated)]
     pub fn store_data(&self) -> NativeCallContextStore {
         NativeCallContextStore {
             fn_name: self.fn_name.to_string(),
             source: self.source.map(|s| s.to_string()),
             global: self.global.clone(),
-            lib: self.lib.iter().cloned().collect(),
             pos: self.pos,
         }
     }
@@ -261,17 +273,23 @@ impl<'a> NativeCallContext<'a> {
     }
     /// Get an iterator over the namespaces containing definitions of all script-defined functions
     /// in reverse order (i.e. parent namespaces are iterated after child namespaces).
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
-        self.lib.iter().map(|m| m.as_ref())
+        self.global.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current stack of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn namespaces(&self) -> &[SharedModule] {
-        self.lib
+    pub fn namespaces(&self) -> &[SharedModule] {
+        &self.global.lib
     }
     /// Call a function inside the call context with the provided arguments.
     #[inline]
@@ -408,7 +426,6 @@ impl<'a> NativeCallContext<'a> {
                 .exec_native_fn_call(
                     global,
                     caches,
-                    self.lib,
                     fn_name,
                     op_token,
                     calc_fn_hash(None, fn_name, args_len),
@@ -435,7 +452,6 @@ impl<'a> NativeCallContext<'a> {
             .exec_fn_call(
                 global,
                 caches,
-                self.lib,
                 None,
                 fn_name,
                 op_token,
@@ -517,14 +533,14 @@ pub fn locked_write<T>(value: &Locked<T>) -> LockGuardMut<T> {
     return value.write().unwrap();
 }
 
-/// General function trail object.
+/// General Rust function trail object.
 #[cfg(not(feature = "sync"))]
 pub type FnAny = dyn Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult;
-/// General function trail object.
+/// General Rust function trail object.
 #[cfg(feature = "sync")]
 pub type FnAny = dyn Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult + Send + Sync;
 
-/// Trail object for built-in functions.
+/// Built-in function trait object.
 pub type FnBuiltin = fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult;
 
 /// Function that gets an iterator from a type.
@@ -535,8 +551,10 @@ pub type IteratorFn = dyn Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dy
 pub type IteratorFn =
     dyn Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>> + Send + Sync;
 
+/// Plugin function trait object.
 #[cfg(not(feature = "sync"))]
 pub type FnPlugin = dyn PluginFunction;
+/// Plugin function trait object.
 #[cfg(feature = "sync")]
 pub type FnPlugin = dyn PluginFunction + Send + Sync;
 

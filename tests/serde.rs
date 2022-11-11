@@ -19,11 +19,11 @@ use rust_decimal::Decimal;
 
 #[test]
 fn test_serde_ser_primary_types() -> Result<(), Box<EvalAltResult>> {
-    assert!(to_dynamic(42_u64)?.is::<INT>());
+    assert!(to_dynamic(42_u64)?.is_int());
     assert!(to_dynamic(u64::MAX)?.is::<u64>());
-    assert!(to_dynamic(42 as INT)?.is::<INT>());
-    assert!(to_dynamic(true)?.is::<bool>());
-    assert!(to_dynamic(())?.is::<()>());
+    assert!(to_dynamic(42 as INT)?.is_int());
+    assert!(to_dynamic(true)?.is_bool());
+    assert!(to_dynamic(())?.is_unit());
 
     #[cfg(not(feature = "no_float"))]
     {
@@ -45,14 +45,14 @@ fn test_serde_ser_primary_types() -> Result<(), Box<EvalAltResult>> {
 
 #[test]
 fn test_serde_ser_integer_types() -> Result<(), Box<EvalAltResult>> {
-    assert!(to_dynamic(42_i8)?.is::<INT>());
-    assert!(to_dynamic(42_i16)?.is::<INT>());
-    assert!(to_dynamic(42_i32)?.is::<INT>());
-    assert!(to_dynamic(42_i64)?.is::<INT>());
-    assert!(to_dynamic(42_u8)?.is::<INT>());
-    assert!(to_dynamic(42_u16)?.is::<INT>());
-    assert!(to_dynamic(42_u32)?.is::<INT>());
-    assert!(to_dynamic(42_u64)?.is::<INT>());
+    assert!(to_dynamic(42_i8)?.is_int());
+    assert!(to_dynamic(42_i16)?.is_int());
+    assert!(to_dynamic(42_i32)?.is_int());
+    assert!(to_dynamic(42_i64)?.is_int());
+    assert!(to_dynamic(42_u8)?.is_int());
+    assert!(to_dynamic(42_u16)?.is_int());
+    assert!(to_dynamic(42_u32)?.is_int());
+    assert!(to_dynamic(42_u64)?.is_int());
 
     Ok(())
 }
@@ -63,7 +63,7 @@ fn test_serde_ser_array() -> Result<(), Box<EvalAltResult>> {
     let arr: Vec<INT> = vec![123, 456, 42, 999];
 
     let d = to_dynamic(arr)?;
-    assert!(d.is::<Array>());
+    assert!(d.is_array());
     assert_eq!(4, d.cast::<Array>().len());
 
     Ok(())
@@ -94,7 +94,7 @@ fn test_serde_ser_struct() -> Result<(), Box<EvalAltResult>> {
 
     let d = to_dynamic(x)?;
 
-    assert!(d.is::<Map>());
+    assert!(d.is_map());
 
     let mut map = d.cast::<Map>();
     let obj = map.remove("obj").unwrap().cast::<Map>();
@@ -734,7 +734,7 @@ fn test_serde_json() -> serde_json::Result<()> {
 
     let d2: Dynamic = serde_json::from_str(&json)?;
 
-    assert!(d2.is::<Map>());
+    assert!(d2.is_map());
 
     let mut m = d2.cast::<Map>();
 

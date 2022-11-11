@@ -348,7 +348,7 @@ mod string_functions {
         len: INT,
     ) -> ImmutableString {
         if string.is_empty() || len <= 0 {
-            return ctx.engine().get_interned_string("");
+            return ctx.engine().const_empty_string();
         }
         let len = len.min(MAX_USIZE_INT) as usize;
 
@@ -896,18 +896,18 @@ mod string_functions {
         len: INT,
     ) -> ImmutableString {
         if string.is_empty() {
-            return ctx.engine().get_interned_string("");
+            return ctx.engine().const_empty_string();
         }
 
         let mut chars = StaticVec::with_capacity(string.len());
 
         let offset = if string.is_empty() || len <= 0 {
-            return ctx.engine().get_interned_string("");
+            return ctx.engine().const_empty_string();
         } else if start < 0 {
             let abs_start = start.unsigned_abs();
 
             if abs_start as u64 > MAX_USIZE_INT as u64 {
-                return ctx.engine().get_interned_string("");
+                return ctx.engine().const_empty_string();
             }
 
             let abs_start = abs_start as usize;
@@ -918,7 +918,7 @@ mod string_functions {
                 chars.len() - abs_start
             }
         } else if start > MAX_USIZE_INT || start as usize >= string.chars().count() {
-            return ctx.engine().get_interned_string("");
+            return ctx.engine().const_empty_string();
         } else {
             start as usize
         };
@@ -964,7 +964,7 @@ mod string_functions {
         start: INT,
     ) -> ImmutableString {
         if string.is_empty() {
-            ctx.engine().get_interned_string("")
+            ctx.engine().const_empty_string()
         } else {
             let len = string.len() as INT;
             sub_string(ctx, string, start, len)
@@ -1348,7 +1348,7 @@ mod string_functions {
 
                 if abs_index as u64 > MAX_USIZE_INT as u64 {
                     return vec![
-                        ctx.engine().get_interned_string("").into(),
+                        ctx.engine().const_empty_string().into(),
                         string.as_str().into(),
                     ];
                 }
@@ -1357,7 +1357,7 @@ mod string_functions {
                 let num_chars = string.chars().count();
                 if abs_index > num_chars {
                     vec![
-                        ctx.engine().get_interned_string("").into(),
+                        ctx.engine().const_empty_string().into(),
                         string.as_str().into(),
                     ]
                 } else {
@@ -1368,7 +1368,7 @@ mod string_functions {
             } else if index > MAX_USIZE_INT {
                 vec![
                     string.as_str().into(),
-                    ctx.engine().get_interned_string("").into(),
+                    ctx.engine().const_empty_string().into(),
                 ]
             } else {
                 let prefix: String = string.chars().take(index as usize).collect();

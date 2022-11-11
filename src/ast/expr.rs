@@ -20,16 +20,6 @@ use std::{
     num::{NonZeroU64, NonZeroU8, NonZeroUsize},
 };
 
-#[cfg(not(feature = "no_float"))]
-use std::{
-    hash::Hasher,
-    ops::{Deref, DerefMut},
-    str::FromStr,
-};
-
-#[cfg(not(feature = "no_float"))]
-use num_traits::float::FloatCore as Float;
-
 /// _(internals)_ A binary expression.
 /// Exported under the `internals` feature only.
 #[derive(Debug, Clone, Hash)]
@@ -273,120 +263,6 @@ impl FnCallExpr {
     }
 }
 
-/// A type that wraps a floating-point number and implements [`Hash`].
-///
-/// Not available under `no_float`.
-#[cfg(not(feature = "no_float"))]
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
-pub struct FloatWrapper<F>(F);
-
-#[cfg(not(feature = "no_float"))]
-impl Hash for FloatWrapper<crate::FLOAT> {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.to_ne_bytes().hash(state);
-    }
-}
-
-#[cfg(not(feature = "no_float"))]
-impl<F: Float> AsRef<F> for FloatWrapper<F> {
-    #[inline(always)]
-    #[must_use]
-    fn as_ref(&self) -> &F {
-        &self.0
-    }
-}
-
-#[cfg(not(feature = "no_float"))]
-impl<F: Float> AsMut<F> for FloatWrapper<F> {
-    #[inline(always)]
-    #[must_use]
-    fn as_mut(&mut self) -> &mut F {
-        &mut self.0
-    }
-}
-
-#[cfg(not(feature = "no_float"))]
-impl<F: Float> Deref for FloatWrapper<F> {
-    type Target = F;
-
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[cfg(not(feature = "no_float"))]
-impl<F: Float> DerefMut for FloatWrapper<F> {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[cfg(not(feature = "no_float"))]
-impl<F: Float + fmt::Debug> fmt::Debug for FloatWrapper<F> {
-    #[cold]
-    #[inline(never)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
-    }
-}
-
-#[cfg(not(feature = "no_float"))]
-impl<F: Float + fmt::Display + fmt::LowerExp + From<f32>> fmt::Display for FloatWrapper<F> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let abs = self.0.abs();
-        if abs.is_zero() {
-            f.write_str("0.0")
-        } else if abs > Self::MAX_NATURAL_FLOAT_FOR_DISPLAY.into()
-            || abs < Self::MIN_NATURAL_FLOAT_FOR_DISPLAY.into()
-        {
-            write!(f, "{:e}", self.0)
-        } else {
-            fmt::Display::fmt(&self.0, f)?;
-            if abs.fract().is_zero() {
-                f.write_str(".0")?;
-            }
-            Ok(())
-        }
-    }
-}
-
-#[cfg(not(feature = "no_float"))]
-impl<F: Float> From<F> for FloatWrapper<F> {
-    #[inline(always)]
-    fn from(value: F) -> Self {
-        Self::new(value)
-    }
-}
-
-#[cfg(not(feature = "no_float"))]
-impl<F: Float + FromStr> FromStr for FloatWrapper<F> {
-    type Err = <F as FromStr>::Err;
-
-    #[inline]
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        F::from_str(s).map(Into::into)
-    }
-}
-
-#[cfg(not(feature = "no_float"))]
-impl<F: Float> FloatWrapper<F> {
-    /// Maximum floating-point number for natural display before switching to scientific notation.
-    pub const MAX_NATURAL_FLOAT_FOR_DISPLAY: f32 = 10_000_000_000_000.0;
-
-    /// Minimum floating-point number for natural display before switching to scientific notation.
-    pub const MIN_NATURAL_FLOAT_FOR_DISPLAY: f32 = 0.000_000_000_000_1;
-
-    /// Create a new [`FloatWrapper`].
-    #[inline(always)]
-    #[must_use]
-    pub const fn new(value: F) -> Self {
-        Self(value)
-    }
-}
-
 /// _(internals)_ An expression sub-tree.
 /// Exported under the `internals` feature only.
 #[derive(Clone, Hash)]
@@ -405,7 +281,7 @@ pub enum Expr {
     IntegerConstant(INT, Position),
     /// Floating-point constant.
     #[cfg(not(feature = "no_float"))]
-    FloatConstant(FloatWrapper<crate::FLOAT>, Position),
+    FloatConstant(crate::types::FloatWrapper<crate::FLOAT>, Position),
     /// Character constant.
     CharConstant(char, Position),
     /// [String][ImmutableString] constant.
