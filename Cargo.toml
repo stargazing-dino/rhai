@@ -19,8 +19,7 @@ categories = ["no-std", "embedded", "wasm", "parser-implementations"]
 
 [dependencies]
 smallvec = { version = "1.7", default-features = false, features = ["union", "const_new", "const_generics"] }
-# 0.8.1 pulls in `getrandom/js` which breaks no-std
-ahash = { version = "=0.8.0", default-features = false, features = ["compile-time-rng"] }
+ahash = { version = "0.8.2", default-features = false, features = ["compile-time-rng"] }
 num-traits = { version = "0.2", default-features = false }
 bitflags = { version = "1", default-features = false }
 smartstring = { version = "1", default-features = false }
