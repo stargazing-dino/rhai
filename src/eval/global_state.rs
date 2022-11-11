@@ -1,6 +1,6 @@
 //! Global runtime state.
 
-use crate::{Dynamic, Engine, ImmutableString};
+use crate::{Dynamic, Engine, ImmutableString, SharedModule, StaticVec};
 use std::fmt;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -25,10 +25,13 @@ pub type GlobalConstants =
 pub struct GlobalRuntimeState {
     /// Names of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    imports: crate::StaticVec<ImmutableString>,
+    imports: StaticVec<ImmutableString>,
     /// Stack of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    modules: crate::StaticVec<crate::SharedModule>,
+    modules: StaticVec<SharedModule>,
+    /// The current stack of loaded [modules][crate::Module] containing script-defined functions.
+    #[cfg(not(feature = "no_function"))]
+    pub lib: StaticVec<SharedModule>,
     /// Source of the current context.
     ///
     /// No source if the string is empty.
@@ -81,9 +84,11 @@ impl GlobalRuntimeState {
     pub fn new(engine: &Engine) -> Self {
         Self {
             #[cfg(not(feature = "no_module"))]
-            imports: crate::StaticVec::new_const(),
+            imports: StaticVec::new_const(),
             #[cfg(not(feature = "no_module"))]
-            modules: crate::StaticVec::new_const(),
+            modules: StaticVec::new_const(),
+            #[cfg(not(feature = "no_function"))]
+            lib: StaticVec::new_const(),
             source: None,
             num_operations: 0,
             #[cfg(not(feature = "no_module"))]
@@ -130,7 +135,7 @@ impl GlobalRuntimeState {
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     #[must_use]
-    pub fn get_shared_import(&self, index: usize) -> Option<crate::SharedModule> {
+    pub fn get_shared_import(&self, index: usize) -> Option<SharedModule> {
         self.modules.get(index).cloned()
     }
     /// Get a mutable reference to the globally-imported [module][crate::Module] at a
@@ -141,10 +146,7 @@ impl GlobalRuntimeState {
     #[allow(dead_code)]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn get_shared_import_mut(
-        &mut self,
-        index: usize,
-    ) -> Option<&mut crate::SharedModule> {
+    pub(crate) fn get_shared_import_mut(&mut self, index: usize) -> Option<&mut SharedModule> {
         self.modules.get_mut(index)
     }
     /// Get the index of a globally-imported [module][crate::Module] by name.
@@ -168,7 +170,7 @@ impl GlobalRuntimeState {
     pub fn push_import(
         &mut self,
         name: impl Into<ImmutableString>,
-        module: impl Into<crate::SharedModule>,
+        module: impl Into<SharedModule>,
     ) {
         self.imports.push(name.into());
         self.modules.push(module.into());
@@ -201,7 +203,7 @@ impl GlobalRuntimeState {
     #[inline]
     pub(crate) fn iter_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&ImmutableString, &crate::SharedModule)> {
+    ) -> impl Iterator<Item = (&ImmutableString, &SharedModule)> {
         self.imports.iter().zip(self.modules.iter()).rev()
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in forward order.
@@ -209,9 +211,7 @@ impl GlobalRuntimeState {
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
     #[inline]
-    pub fn scan_imports_raw(
-        &self,
-    ) -> impl Iterator<Item = (&ImmutableString, &crate::SharedModule)> {
+    pub fn scan_imports_raw(&self) -> impl Iterator<Item = (&ImmutableString, &SharedModule)> {
         self.imports.iter().zip(self.modules.iter())
     }
     /// Can the particular function with [`Dynamic`] parameter(s) exist in the stack of
@@ -318,37 +318,7 @@ impl GlobalRuntimeState {
 }
 
 #[cfg(not(feature = "no_module"))]
-impl IntoIterator for GlobalRuntimeState {
-    type Item = (ImmutableString, crate::SharedModule);
-    type IntoIter = std::iter::Rev<
-        std::iter::Zip<
-            smallvec::IntoIter<[ImmutableString; crate::STATIC_VEC_INLINE_SIZE]>,
-            smallvec::IntoIter<[crate::SharedModule; crate::STATIC_VEC_INLINE_SIZE]>,
-        >,
-    >;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.imports.into_iter().zip(self.modules.into_iter()).rev()
-    }
-}
-
-#[cfg(not(feature = "no_module"))]
-impl<'a> IntoIterator for &'a GlobalRuntimeState {
-    type Item = (&'a ImmutableString, &'a crate::SharedModule);
-    type IntoIter = std::iter::Rev<
-        std::iter::Zip<
-            std::slice::Iter<'a, ImmutableString>,
-            std::slice::Iter<'a, crate::SharedModule>,
-        >,
-    >;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.imports.iter().zip(self.modules.iter()).rev()
-    }
-}
-
-#[cfg(not(feature = "no_module"))]
-impl<K: Into<ImmutableString>, M: Into<crate::SharedModule>> Extend<(K, M)> for GlobalRuntimeState {
+impl<K: Into<ImmutableString>, M: Into<SharedModule>> Extend<(K, M)> for GlobalRuntimeState {
     #[inline]
     fn extend<T: IntoIterator<Item = (K, M)>>(&mut self, iter: T) {
         for (k, m) in iter {
@@ -365,21 +335,30 @@ impl fmt::Debug for GlobalRuntimeState {
         let mut f = f.debug_struct("GlobalRuntimeState");
 
         #[cfg(not(feature = "no_module"))]
-        f.field("imports", &self.scan_imports_raw().collect::<Vec<_>>());
+        f.field("imports", &self.scan_imports_raw().collect::<Vec<_>>())
+            .field("num_modules_loaded", &self.num_modules_loaded)
+            .field("embedded_module_resolver", &self.embedded_module_resolver);
+
+        #[cfg(not(feature = "no_function"))]
+        f.field("lib", &self.lib);
 
         f.field("source", &self.source)
-            .field("num_operations", &self.num_operations);
+            .field("num_operations", &self.num_operations)
+            .field("level", &self.level)
+            .field("scope_level", &self.scope_level)
+            .field("always_search_scope", &self.always_search_scope);
 
         #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
         f.field("fn_hash_indexing", &self.fn_hash_indexing);
 
         #[cfg(not(feature = "no_module"))]
-        f.field("num_modules_loaded", &self.num_modules_loaded)
-            .field("embedded_module_resolver", &self.embedded_module_resolver);
-
-        #[cfg(not(feature = "no_module"))]
         #[cfg(not(feature = "no_function"))]
         f.field("constants", &self.constants);
+
+        f.field("tag", &self.tag);
+
+        #[cfg(feature = "debugging")]
+        f.field("debugger", &self.debugger);
 
         f.finish()
     }

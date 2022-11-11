@@ -303,16 +303,18 @@ pub type OptimizationLevel = ();
 pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant};
 
 #[cfg(feature = "internals")]
-pub use tokenizer::{get_next_token, parse_string_literal};
-
-#[cfg(feature = "internals")]
-pub use tokenizer::{
-    is_valid_function_name, is_valid_identifier, InputStream, MultiInputsStream, Span, Token,
-    TokenIterator, TokenizeState, TokenizerControl, TokenizerControlBlock,
-};
+#[cfg(not(feature = "no_float"))]
+pub use types::FloatWrapper;
 
 #[cfg(feature = "internals")]
 pub use types::StringsInterner;
+
+#[cfg(feature = "internals")]
+pub use tokenizer::{
+    get_next_token, is_valid_function_name, is_valid_identifier, parse_string_literal, InputStream,
+    MultiInputsStream, Span, Token, TokenIterator, TokenizeState, TokenizerControl,
+    TokenizerControlBlock,
+};
 
 #[cfg(feature = "internals")]
 pub use parser::ParseState;
@@ -337,11 +339,11 @@ pub use ast::Namespace;
 pub use ast::EncapsulatedEnviron;
 
 #[cfg(feature = "internals")]
-#[cfg(not(feature = "no_float"))]
-pub use ast::FloatWrapper;
+pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeState};
 
 #[cfg(feature = "internals")]
-pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeState};
+#[allow(deprecated)]
+pub use func::NativeCallContextStore;
 
 #[cfg(feature = "internals")]
 #[cfg(feature = "metadata")]

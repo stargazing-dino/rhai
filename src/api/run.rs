@@ -2,7 +2,7 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
-use crate::{Engine, RhaiResultOf, Scope, SharedModule, AST};
+use crate::{Engine, RhaiResultOf, Scope, AST};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -115,6 +115,9 @@ impl Engine {
         let global = &mut GlobalRuntimeState::new(self);
         global.source = ast.source_raw().cloned();
 
+        #[cfg(not(feature = "no_function"))]
+        global.lib.push(ast.shared_lib().clone());
+
         #[cfg(not(feature = "no_module"))]
         {
             global.embedded_module_resolver = ast.resolver().cloned();
@@ -122,28 +125,15 @@ impl Engine {
 
         let statements = ast.statements();
         if !statements.is_empty() {
-            let lib: &[SharedModule] = &[
-                #[cfg(not(feature = "no_function"))]
-                AsRef::<SharedModule>::as_ref(ast).clone(),
-            ];
-            let lib = if lib.first().map_or(true, |m| m.is_empty()) {
-                &[][..]
-            } else {
-                &lib
-            };
-            self.eval_global_statements(global, caches, lib, scope, statements)?;
+            self.eval_global_statements(global, caches, scope, statements)?;
         }
 
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {
             global.debugger.status = crate::eval::DebuggerStatus::Terminate;
-            let lib = &[
-                #[cfg(not(feature = "no_function"))]
-                AsRef::<crate::SharedModule>::as_ref(ast).clone(),
-            ];
             let mut this = crate::Dynamic::NULL;
             let node = &crate::ast::Stmt::Noop(crate::Position::NONE);
-            self.run_debugger(global, caches, lib, scope, &mut this, node)?;
+            self.run_debugger(global, caches, scope, &mut this, node)?;
         }
 
         Ok(())

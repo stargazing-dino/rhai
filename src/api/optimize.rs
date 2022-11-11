@@ -52,7 +52,7 @@ impl Engine {
         let mut ast = ast;
 
         #[cfg(not(feature = "no_function"))]
-        let lib = ast
+        let functions = ast
             .shared_lib()
             .iter_fn()
             .filter(|f| f.func.is_script())
@@ -64,7 +64,7 @@ impl Engine {
             scope,
             ast.take_statements(),
             #[cfg(not(feature = "no_function"))]
-            lib,
+            functions,
             optimization_level,
         );
 

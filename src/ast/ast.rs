@@ -57,12 +57,11 @@ impl fmt::Debug for AST {
         fp.field("body", &self.body.as_slice());
 
         #[cfg(not(feature = "no_function"))]
-        if !self.lib.is_empty() {
-            for (.., fn_def) in self.lib.iter_script_fn() {
-                let sig = fn_def.to_string();
-                fp.field(&sig, &fn_def.body.as_slice());
-            }
+        for (.., fn_def) in self.lib.iter_script_fn() {
+            let sig = fn_def.to_string();
+            fp.field(&sig, &fn_def.body.as_slice());
         }
+
         fp.finish()
     }
 }
@@ -739,7 +738,7 @@ impl AST {
         &mut self,
         filter: impl Fn(FnNamespace, FnAccess, &str, usize) -> bool,
     ) -> &mut Self {
-        if !self.lib.is_empty() {
+        if self.has_functions() {
             crate::func::shared_make_mut(&mut self.lib).retain_script_functions(filter);
         }
         self

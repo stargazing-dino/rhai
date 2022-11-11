@@ -70,7 +70,7 @@ pub enum Union {
     Int(INT, Tag, AccessMode),
     /// A floating-point value.
     #[cfg(not(feature = "no_float"))]
-    Float(crate::ast::FloatWrapper<crate::FLOAT>, Tag, AccessMode),
+    Float(super::FloatWrapper<crate::FLOAT>, Tag, AccessMode),
     /// _(decimal)_ A fixed-precision decimal value.
     /// Exported under the `decimal` feature only.
     #[cfg(feature = "decimal")]
@@ -260,10 +260,18 @@ impl Dynamic {
     }
     /// Is the value held by this [`Dynamic`] a particular type?
     ///
-    /// If the [`Dynamic`] is a shared variant checking is performed on top of its internal value.
+    /// # Panics or Deadlocks When Value is Shared
+    ///
+    /// Under the `sync` feature, this call may deadlock, or [panic](https://doc.rust-lang.org/std/sync/struct.RwLock.html#panics-1).
+    /// Otherwise, this call panics if the data is currently borrowed for write.
     #[inline]
     #[must_use]
     pub fn is<T: Any + Clone>(&self) -> bool {
+        #[cfg(not(feature = "no_closure"))]
+        if self.is_shared() {
+            return TypeId::of::<T>() == self.type_id();
+        }
+
         if TypeId::of::<T>() == TypeId::of::<()>() {
             return matches!(self.0, Union::Unit(..));
         }
@@ -867,7 +875,7 @@ impl Dynamic {
     #[must_use]
     pub const fn from_float(value: crate::FLOAT) -> Self {
         Self(Union::Float(
-            crate::ast::FloatWrapper::new(value),
+            super::FloatWrapper::new(value),
             DEFAULT_TAG_VALUE,
             ReadWrite,
         ))
@@ -1626,14 +1634,205 @@ impl Dynamic {
             _ => None,
         }
     }
+
+    /// Return `true` if the [`Dynamic`] holds a `()`.
+    #[inline]
+    #[must_use]
+    pub fn is_unit(&self) -> bool {
+        match self.0 {
+            Union::Unit(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Unit(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    /// Return `true` if the [`Dynamic`] holds the system integer type [`INT`].
+    #[inline]
+    #[must_use]
+    pub fn is_int(&self) -> bool {
+        match self.0 {
+            Union::Int(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Int(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    /// Return `true` if the [`Dynamic`] holds the system floating-point type [`FLOAT`][crate::FLOAT].
+    ///
+    /// Not available under `no_float`.
+    #[cfg(not(feature = "no_float"))]
+    #[inline]
+    #[must_use]
+    pub fn is_float(&self) -> bool {
+        match self.0 {
+            Union::Float(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Float(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    /// _(decimal)_ Return `true` if the [`Dynamic`] holds a [`Decimal`][rust_decimal::Decimal].
+    ///
+    /// Exported under the `decimal` feature only.
+    #[cfg(feature = "decimal")]
+    #[inline]
+    #[must_use]
+    pub fn is_decimal(&self) -> bool {
+        match self.0 {
+            Union::Decimal(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Decimal(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    /// Return `true` if the [`Dynamic`] holds a [`bool`].
+    #[inline]
+    #[must_use]
+    pub fn is_bool(&self) -> bool {
+        match self.0 {
+            Union::Bool(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Bool(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    /// Return `true` if the [`Dynamic`] holds a [`char`].
+    #[inline]
+    #[must_use]
+    pub fn is_char(&self) -> bool {
+        match self.0 {
+            Union::Char(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Char(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    /// Return `true` if the [`Dynamic`] holds an [`ImmutableString`].
+    #[inline]
+    #[must_use]
+    pub fn is_string(&self) -> bool {
+        match self.0 {
+            Union::Str(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Str(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    /// Return `true` if the [`Dynamic`] holds an [`Array`][crate::Array].
+    ///
+    /// Not available under `no_index`.
+    #[cfg(not(feature = "no_index"))]
+    #[inline]
+    #[must_use]
+    pub fn is_array(&self) -> bool {
+        match self.0 {
+            Union::Array(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Array(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    /// Return `true` if the [`Dynamic`] holds a [`Blob`][crate::Blob].
+    ///
+    /// Not available under `no_index`.
+    #[cfg(not(feature = "no_index"))]
+    #[inline]
+    #[must_use]
+    pub fn is_blob(&self) -> bool {
+        match self.0 {
+            Union::Blob(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Blob(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    /// Return `true` if the [`Dynamic`] holds a [`Map`][crate::Map].
+    ///
+    /// Not available under `no_object`.
+    #[cfg(not(feature = "no_object"))]
+    #[inline]
+    #[must_use]
+    pub fn is_map(&self) -> bool {
+        match self.0 {
+            Union::Map(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Map(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    /// Return `true` if the [`Dynamic`] holds a [`FnPtr`].
+    #[inline]
+    #[must_use]
+    pub(crate) fn is_fnptr(&self) -> bool {
+        match self.0 {
+            Union::FnPtr(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::FnPtr(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    /// Return `true` if the [`Dynamic`] holds a [timestamp][Instant].
+    ///
+    /// Not available under `no_time`.
+    #[cfg(not(feature = "no_time"))]
+    #[inline]
+    #[must_use]
+    pub fn is_timestamp(&self) -> bool {
+        match self.0 {
+            Union::TimeStamp(..) => true,
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::TimeStamp(..) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
     /// Cast the [`Dynamic`] as a unit `()`.
     /// Returns the name of the actual type if the cast fails.
     #[inline]
     pub fn as_unit(&self) -> Result<(), &'static str> {
         match self.0 {
-            Union::Unit(v, ..) => Ok(v),
+            Union::Unit(..) => Ok(()),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Unit(..) => Ok(()),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1644,7 +1843,10 @@ impl Dynamic {
         match self.0 {
             Union::Int(n, ..) => Ok(n),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Int(n, ..) => Ok(n),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1658,7 +1860,10 @@ impl Dynamic {
         match self.0 {
             Union::Float(n, ..) => Ok(*n),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Float(n, ..) => Ok(*n),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1672,7 +1877,10 @@ impl Dynamic {
         match self.0 {
             Union::Decimal(ref n, ..) => Ok(**n),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Decimal(ref n, ..) => Ok(**n),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1683,7 +1891,10 @@ impl Dynamic {
         match self.0 {
             Union::Bool(b, ..) => Ok(b),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Bool(b, ..) => Ok(b),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1692,12 +1903,16 @@ impl Dynamic {
     #[inline]
     pub fn as_char(&self) -> Result<char, &'static str> {
         match self.0 {
-            Union::Char(n, ..) => Ok(n),
+            Union::Char(c, ..) => Ok(c),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => self.read_lock().map(|v| *v).ok_or_else(|| self.type_name()),
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Char(c, ..) => Ok(c),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
+
     /// Cast the [`Dynamic`] as a string slice.
     /// Returns the name of the actual type if the cast fails.
     ///
@@ -1728,38 +1943,34 @@ impl Dynamic {
         match self.0 {
             Union::Str(s, ..) => Ok(s),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                let value = crate::func::locked_read(cell);
-
-                match value.0 {
-                    Union::Str(ref s, ..) => Ok(s.clone()),
-                    _ => Err((*value).type_name()),
-                }
-            }
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Str(ref s, ..) => Ok(s.clone()),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
     /// Convert the [`Dynamic`] into an [`Array`][crate::Array].
     /// Returns the name of the actual type if the cast fails.
+    ///
+    /// Not available under `no_index`.
     #[cfg(not(feature = "no_index"))]
     #[inline(always)]
     pub fn into_array(self) -> Result<crate::Array, &'static str> {
         match self.0 {
             Union::Array(a, ..) => Ok(*a),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                let value = crate::func::locked_read(cell);
-
-                match value.0 {
-                    Union::Array(ref a, ..) => Ok(a.as_ref().clone()),
-                    _ => Err((*value).type_name()),
-                }
-            }
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Array(ref a, ..) => Ok(a.as_ref().clone()),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
     /// Convert the [`Dynamic`] into a [`Vec`].
     /// Returns the name of the actual type if any cast fails.
+    ///
+    /// Not available under `no_index`.
     #[cfg(not(feature = "no_index"))]
     #[inline(always)]
     pub fn into_typed_array<T: Variant + Clone>(self) -> Result<Vec<T>, &'static str> {
@@ -1780,12 +1991,12 @@ impl Dynamic {
                     v.try_cast::<T>().ok_or(typ)
                 })
                 .collect(),
-            Union::Blob(..) if TypeId::of::<T>() == TypeId::of::<u8>() => Ok(self.cast::<Vec<T>>()),
+            Union::Blob(b, ..) if TypeId::of::<T>() == TypeId::of::<u8>() => {
+                Ok(reify!(*b => Vec<T>))
+            }
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) => {
-                let value = crate::func::locked_read(cell);
-
-                match value.0 {
+                match crate::func::locked_read(cell).0 {
                     Union::Array(ref a, ..) => {
                         a.iter()
                             .map(|v| {
@@ -1803,10 +2014,10 @@ impl Dynamic {
                             })
                             .collect()
                     }
-                    Union::Blob(..) if TypeId::of::<T>() == TypeId::of::<u8>() => {
-                        Ok((*value).clone().cast::<Vec<T>>())
+                    Union::Blob(ref b, ..) if TypeId::of::<T>() == TypeId::of::<u8>() => {
+                        Ok(reify!(b.clone() => Vec<T>))
                     }
-                    _ => Err((*value).type_name()),
+                    _ => Err(cell.type_name()),
                 }
             }
             _ => Err(self.type_name()),
@@ -1814,20 +2025,18 @@ impl Dynamic {
     }
     /// Convert the [`Dynamic`] into a [`Blob`][crate::Blob].
     /// Returns the name of the actual type if the cast fails.
+    ///
+    /// Not available under `no_index`.
     #[cfg(not(feature = "no_index"))]
     #[inline(always)]
     pub fn into_blob(self) -> Result<crate::Blob, &'static str> {
         match self.0 {
-            Union::Blob(a, ..) => Ok(*a),
+            Union::Blob(b, ..) => Ok(*b),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                let value = crate::func::locked_read(cell);
-
-                match value.0 {
-                    Union::Blob(ref a, ..) => Ok(a.as_ref().clone()),
-                    _ => Err((*value).type_name()),
-                }
-            }
+            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
+                Union::Blob(ref b, ..) => Ok(b.as_ref().clone()),
+                _ => Err(cell.type_name()),
+            },
             _ => Err(self.type_name()),
         }
     }
@@ -1859,9 +2068,9 @@ impl From<crate::FLOAT> for Dynamic {
     }
 }
 #[cfg(not(feature = "no_float"))]
-impl From<crate::ast::FloatWrapper<crate::FLOAT>> for Dynamic {
+impl From<super::FloatWrapper<crate::FLOAT>> for Dynamic {
     #[inline(always)]
-    fn from(value: crate::ast::FloatWrapper<crate::FLOAT>) -> Self {
+    fn from(value: super::FloatWrapper<crate::FLOAT>) -> Self {
         Self(Union::Float(value, DEFAULT_TAG_VALUE, ReadWrite))
     }
 }

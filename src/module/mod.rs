@@ -543,14 +543,13 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.indexed
-            && !self.contains_indexed_global_functions
+        !self.contains_indexed_global_functions
             && self.functions.is_empty()
-            && self.all_functions.as_ref().map_or(true, |m| m.is_empty())
             && self.variables.as_ref().map_or(true, |m| m.is_empty())
-            && self.all_variables.as_ref().map_or(true, |m| m.is_empty())
             && self.modules.as_ref().map_or(true, |m| m.is_empty())
             && self.type_iterators.as_ref().map_or(true, |t| t.is_empty())
+            && self.all_functions.as_ref().map_or(true, |m| m.is_empty())
+            && self.all_variables.as_ref().map_or(true, |m| m.is_empty())
             && self
                 .all_type_iterators
                 .as_ref()
@@ -1980,6 +1979,10 @@ impl Module {
         // Save global state
         let orig_imports_len = global.num_imports();
         let orig_source = global.source.clone();
+
+        #[cfg(not(feature = "no_function"))]
+        let orig_lib_len = global.lib.len();
+
         #[cfg(not(feature = "no_function"))]
         let orig_constants = std::mem::take(&mut global.constants);
 
@@ -2007,7 +2010,12 @@ impl Module {
         // Restore global state
         #[cfg(not(feature = "no_function"))]
         let constants = std::mem::replace(&mut global.constants, orig_constants);
+
         global.truncate_imports(orig_imports_len);
+
+        #[cfg(not(feature = "no_function"))]
+        global.lib.truncate(orig_lib_len);
+
         global.source = orig_source;
 
         result?;

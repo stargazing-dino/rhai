@@ -147,15 +147,11 @@ impl Engine {
             return Err(ERR::ErrorTooManyOperations(pos).into());
         }
 
-        // Report progress - only in steps
-        if let Some(ref progress) = self.progress {
-            if let Some(token) = progress(num_operations) {
-                // Terminate script if progress returns a termination token
-                return Err(ERR::ErrorTerminated(token, pos).into());
-            }
-        }
-
-        Ok(())
+        // Report progress
+        self.progress
+            .as_ref()
+            .and_then(|p| p(num_operations))
+            .map_or(Ok(()), |token| Err(ERR::ErrorTerminated(token, pos).into()))
     }
 
     /// Check a result to ensure that it is valid.

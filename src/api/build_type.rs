@@ -99,6 +99,10 @@ impl Engine {
 ///
 /// To define a pretty-print name, call [`with_name`][`TypeBuilder::with_name`],
 /// to use [`Engine::register_type_with_name`] instead.
+///
+/// # WARNING - Volatile Type
+///
+/// This type is volatile and may change in the future.
 #[deprecated = "This type is NOT deprecated, but it is considered volatile and may change in the future."]
 pub struct TypeBuilder<'a, T: Variant + Clone> {
     engine: &'a mut Engine,

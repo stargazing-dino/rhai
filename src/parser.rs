@@ -374,7 +374,7 @@ impl Expr {
     fn ensure_bool_expr(self) -> ParseResult<Expr> {
         let type_name = match self {
             Expr::Unit(..) => "()",
-            Expr::DynamicConstant(ref v, ..) if !v.is::<bool>() => v.type_name(),
+            Expr::DynamicConstant(ref v, ..) if !v.is_bool() => v.type_name(),
             Expr::IntegerConstant(..) => "a number",
             #[cfg(not(feature = "no_float"))]
             Expr::FloatConstant(..) => "a floating-point number",
@@ -1248,7 +1248,7 @@ impl Engine {
                         continue;
                     }
 
-                    if value.is::<INT>() && !ranges.is_empty() {
+                    if value.is_int() && !ranges.is_empty() {
                         return Err(PERR::WrongSwitchIntegerCase.into_err(expr.start_position()));
                     }
 
@@ -2909,14 +2909,8 @@ impl Engine {
             let caches = &mut Caches::new();
             let mut this = Dynamic::NULL;
 
-            let context = EvalContext::new(
-                self,
-                &mut state.global,
-                caches,
-                &[],
-                &mut state.stack,
-                &mut this,
-            );
+            let context =
+                EvalContext::new(self, &mut state.global, caches, &mut state.stack, &mut this);
 
             match filter(false, info, context) {
                 Ok(true) => (),
