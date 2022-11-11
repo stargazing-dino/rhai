@@ -100,7 +100,7 @@ pub struct NativeCallContextStore {
 #[cfg(feature = "internals")]
 #[allow(deprecated)]
 impl NativeCallContextStore {
-    /// Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    /// Create a [`NativeCallContext`] from a [`NativeCallContextStore`].
     ///
     /// # WARNING - Unstable API
     ///
@@ -167,7 +167,7 @@ impl<'a> NativeCallContext<'a> {
         }
     }
 
-    /// _(internals)_ Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    /// _(internals)_ Create a [`NativeCallContext`] from a [`NativeCallContextStore`].
     /// Exported under the `internals` feature only.
     ///
     /// # WARNING - Unstable API
@@ -187,7 +187,7 @@ impl<'a> NativeCallContext<'a> {
             pos: context.pos,
         }
     }
-    /// _(internals)_ Store this [`NativeCallContext`] into a [`NativeCallContextClone`].
+    /// _(internals)_ Store this [`NativeCallContext`] into a [`NativeCallContextStore`].
     /// Exported under the `internals` feature only.
     ///
     /// # WARNING - Unstable API

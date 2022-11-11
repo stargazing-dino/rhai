@@ -2,7 +2,7 @@ use crate::{Engine, ModuleResolver, Position, RhaiResultOf, SharedModule, ERR};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
-/// Empty/disabled [module][Module] resolution service that acts as a dummy.
+/// Empty/disabled [module][crate::Module] resolution service that acts as a dummy.
 ///
 /// # Example
 ///
