@@ -848,8 +848,8 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         Stmt::Expr(expr) => {
             optimize_expr(expr, state, false);
 
-            if matches!(**expr, Expr::FnCall(..) | Expr::Stmt(..)) {
-                state.set_dirty();
+            // Do not promote until the expression is fully optimized
+            if !state.is_dirty() && matches!(**expr, Expr::FnCall(..) | Expr::Stmt(..)) {
                 *stmt = match *mem::take(expr) {
                     // func(...);
                     Expr::FnCall(x, pos) => Stmt::FnCall(x, pos),
@@ -859,6 +859,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                     Expr::Stmt(x) => (*x).into(),
                     _ => unreachable!(),
                 };
+                state.set_dirty();
             }
         }
 
