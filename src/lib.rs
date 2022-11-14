@@ -202,7 +202,7 @@ pub use ast::{FnAccess, AST};
 pub use engine::{Engine, OP_CONTAINS, OP_EQUALS};
 pub use eval::EvalContext;
 #[cfg(feature = "internals")]
-pub use func::native;
+pub use func::native::{locked_read, locked_write};
 pub use func::{NativeCallContext, RegisterNativeFunction};
 pub use module::{FnNamespace, Module};
 pub use tokenizer::Position;
