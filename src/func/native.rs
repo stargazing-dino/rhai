@@ -509,7 +509,8 @@ pub fn shared_take<T>(value: Shared<T>) -> T {
     shared_try_take(value).ok().expect("not shared")
 }
 
-/// Lock a [`Locked`] resource for mutable access.
+/// _(internals)_ Lock a [`Locked`] resource for mutable access.
+/// Exported under the `internals` feature only.
 #[inline(always)]
 #[must_use]
 #[allow(dead_code)]
@@ -521,7 +522,8 @@ pub fn locked_read<T>(value: &Locked<T>) -> LockGuard<T> {
     return value.read().unwrap();
 }
 
-/// Lock a [`Locked`] resource for mutable access.
+/// _(internals)_ Lock a [`Locked`] resource for mutable access.
+/// Exported under the `internals` feature only.
 #[inline(always)]
 #[must_use]
 #[allow(dead_code)]
