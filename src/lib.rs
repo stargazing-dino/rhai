@@ -340,7 +340,7 @@ pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeS
 
 #[cfg(feature = "internals")]
 #[allow(deprecated)]
-pub use func::{locked_read, locked_write, NativeCallContextStore};
+pub use func::{locked_read, locked_write, CallableFunction, NativeCallContextStore};
 
 #[cfg(feature = "internals")]
 #[cfg(feature = "metadata")]

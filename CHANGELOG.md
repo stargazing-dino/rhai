@@ -1,6 +1,15 @@
 Rhai Release Notes
 ==================
 
+Version 1.12.0
+==============
+
+Enhancements
+------------
+
+* `CallableFunction` is exported under `internals`.
+
+
 Version 1.11.0
 ==============
 

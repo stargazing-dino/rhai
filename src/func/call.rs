@@ -12,7 +12,7 @@ use crate::tokenizer::{is_valid_function_name, Token};
 use crate::types::RestoreOnDrop;
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString,
-    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, ERR,
+    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
 };
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
@@ -223,17 +223,17 @@ impl Engine {
 
                     if let Some((f, s)) = func {
                         // Specific version found
-                        let new_entry = Some(FnResolutionCacheEntry {
+                        let new_entry = FnResolutionCacheEntry {
                             func: f.clone(),
                             source: s.cloned(),
-                        });
+                        };
                         return if cache.filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
-                            *local_entry = new_entry;
+                            *local_entry = Some(new_entry);
                             local_entry.as_ref()
                         } else {
                             // Cache entry
-                            entry.insert(new_entry).as_ref()
+                            entry.insert(Some(new_entry)).as_ref()
                         };
                     }
 
@@ -279,13 +279,13 @@ impl Engine {
 
                                     get_builtin_op_assignment_fn(token, *first_arg, rest_args[0])
                                         .map(|f| FnResolutionCacheEntry {
-                                            func: CallableFunction::from_fn_builtin(f),
+                                            func: CallableFunction::Method(Shared::new(f)),
                                             source: None,
                                         })
                                 }
                                 Some(token) => get_builtin_binary_op_fn(token, args[0], args[1])
                                     .map(|f| FnResolutionCacheEntry {
-                                        func: CallableFunction::from_fn_builtin(f),
+                                        func: CallableFunction::Method(Shared::new(f)),
                                         source: None,
                                     }),
 
@@ -363,15 +363,12 @@ impl Engine {
             true,
         );
 
-        if func.is_some() {
-            let is_method = func.map_or(false, |f| f.func.is_method());
+        if let Some(FnResolutionCacheEntry { func, source }) = func {
+            assert!(func.is_native());
 
             // Push a new call stack frame
             #[cfg(feature = "debugging")]
             let orig_call_stack_len = global.debugger.call_stack().len();
-
-            let FnResolutionCacheEntry { func, source } = func.unwrap();
-            assert!(func.is_native());
 
             let backup = &mut ArgBackup::new();
 
@@ -411,11 +408,15 @@ impl Engine {
                 func.get_native_fn().unwrap()(context, args)
             };
 
+            let is_method = func.is_method();
+
             #[cfg(feature = "debugging")]
             {
+                use crate::eval::{DebuggerEvent, DebuggerStatus};
+
                 let trigger = match global.debugger.status {
-                    crate::eval::DebuggerStatus::FunctionExit(n) => n >= global.level,
-                    crate::eval::DebuggerStatus::Next(.., true) => true,
+                    DebuggerStatus::FunctionExit(n) => n >= global.level,
+                    DebuggerStatus::Next(.., true) => true,
                     _ => false,
                 };
                 if trigger {
@@ -424,8 +425,8 @@ impl Engine {
                     let node = crate::ast::Stmt::Noop(pos);
                     let node = (&node).into();
                     let event = match _result {
-                        Ok(ref r) => crate::eval::DebuggerEvent::FunctionExitWithValue(r),
-                        Err(ref err) => crate::eval::DebuggerEvent::FunctionExitWithError(err),
+                        Ok(ref r) => DebuggerEvent::FunctionExitWithValue(r),
+                        Err(ref err) => DebuggerEvent::FunctionExitWithError(err),
                     };
 
                     if let Err(err) =
