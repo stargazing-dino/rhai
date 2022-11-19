@@ -656,6 +656,34 @@ impl Stmt {
     pub const fn is_noop(&self) -> bool {
         matches!(self, Self::Noop(..))
     }
+    /// Get the [options][ASTFlags] of this statement.
+    #[inline]
+    #[must_use]
+    pub const fn options(&self) -> ASTFlags {
+        match self {
+            Self::Do(_, options, _)
+            | Self::Var(_, options, _)
+            | Self::BreakLoop(_, options, _)
+            | Self::Return(_, options, _) => *options,
+
+            Self::Noop(..)
+            | Self::If(..)
+            | Self::Switch(..)
+            | Self::Block(..)
+            | Self::Expr(..)
+            | Self::FnCall(..)
+            | Self::While(..)
+            | Self::For(..)
+            | Self::TryCatch(..)
+            | Self::Assignment(..) => ASTFlags::NONE,
+
+            #[cfg(not(feature = "no_module"))]
+            Self::Import(..) | Self::Export(..) => ASTFlags::NONE,
+
+            #[cfg(not(feature = "no_closure"))]
+            Self::Share(..) => ASTFlags::NONE,
+        }
+    }
     /// Get the [position][Position] of this statement.
     #[must_use]
     pub fn position(&self) -> Position {

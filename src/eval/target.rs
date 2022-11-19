@@ -1,6 +1,5 @@
 //! Type to hold a mutable reference to the target of an evaluation.
 
-use crate::types::dynamic::Variant;
 use crate::{Dynamic, Position, RhaiResultOf};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -180,35 +179,12 @@ impl<'a> Target<'a> {
             Self::RefMut(r) => r.is_shared(),
             #[cfg(not(feature = "no_closure"))]
             Self::SharedValue { .. } => true,
-            Self::TempValue(r) => r.is_shared(),
+            Self::TempValue(value) => value.is_shared(),
             #[cfg(not(feature = "no_index"))]
             Self::Bit { .. }
             | Self::BitField { .. }
             | Self::BlobByte { .. }
             | Self::StringChar { .. } => false,
-        }
-    }
-    /// Is the [`Target`] a specific type?
-    #[allow(dead_code)]
-    #[inline]
-    #[must_use]
-    pub fn is<T: Variant + Clone>(&self) -> bool {
-        #[allow(unused_imports)]
-        use std::any::TypeId;
-
-        match self {
-            Self::RefMut(r) => r.is::<T>(),
-            #[cfg(not(feature = "no_closure"))]
-            Self::SharedValue { source, .. } => source.is::<T>(),
-            Self::TempValue(r) => r.is::<T>(),
-            #[cfg(not(feature = "no_index"))]
-            Self::Bit { .. } => TypeId::of::<T>() == TypeId::of::<bool>(),
-            #[cfg(not(feature = "no_index"))]
-            Self::BitField { .. } => TypeId::of::<T>() == TypeId::of::<crate::INT>(),
-            #[cfg(not(feature = "no_index"))]
-            Self::BlobByte { .. } => TypeId::of::<T>() == TypeId::of::<crate::Blob>(),
-            #[cfg(not(feature = "no_index"))]
-            Self::StringChar { .. } => TypeId::of::<T>() == TypeId::of::<char>(),
         }
     }
     /// Get the value of the [`Target`] as a [`Dynamic`], cloning a referenced value if necessary.
@@ -219,7 +195,7 @@ impl<'a> Target<'a> {
             Self::RefMut(r) => r.clone(), // Referenced value is cloned
             #[cfg(not(feature = "no_closure"))]
             Self::SharedValue { value, .. } => value, // Original shared value is simply taken
-            Self::TempValue(v) => v,      // Owned value is simply taken
+            Self::TempValue(value) => value, // Owned value is simply taken
             #[cfg(not(feature = "no_index"))]
             Self::Bit { value, .. } => value, // boolean is taken
             #[cfg(not(feature = "no_index"))]
@@ -259,7 +235,7 @@ impl<'a> Target<'a> {
             Self::RefMut(r) => r,
             #[cfg(not(feature = "no_closure"))]
             Self::SharedValue { source, .. } => source,
-            Self::TempValue(v) => v,
+            Self::TempValue(value) => value,
             #[cfg(not(feature = "no_index"))]
             Self::Bit { source, .. } => source,
             #[cfg(not(feature = "no_index"))]
@@ -407,7 +383,7 @@ impl Deref for Target<'_> {
             Self::RefMut(r) => r,
             #[cfg(not(feature = "no_closure"))]
             Self::SharedValue { source, .. } => source,
-            Self::TempValue(ref r) => r,
+            Self::TempValue(ref value) => value,
             #[cfg(not(feature = "no_index"))]
             Self::Bit { ref value, .. }
             | Self::BitField { ref value, .. }
@@ -440,7 +416,7 @@ impl DerefMut for Target<'_> {
             Self::RefMut(r) => r,
             #[cfg(not(feature = "no_closure"))]
             Self::SharedValue { source, .. } => &mut *source,
-            Self::TempValue(ref mut r) => r,
+            Self::TempValue(ref mut value) => value,
             #[cfg(not(feature = "no_index"))]
             Self::Bit { ref mut value, .. }
             | Self::BitField { ref mut value, .. }

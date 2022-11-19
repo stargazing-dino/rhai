@@ -303,7 +303,7 @@ impl<'a> NativeCallContext<'a> {
 
         let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
-        let result = self._call_fn_raw(fn_name, false, false, false, &mut args)?;
+        let result = self._call_fn_raw(fn_name, &mut args, false, false, false)?;
 
         let typ = self.engine().map_type_name(result.type_name());
 
@@ -328,7 +328,7 @@ impl<'a> NativeCallContext<'a> {
 
         let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
-        let result = self._call_fn_raw(fn_name, true, false, false, &mut args)?;
+        let result = self._call_fn_raw(fn_name, &mut args, true, false, false)?;
 
         let typ = self.engine().map_type_name(result.type_name());
 
@@ -369,7 +369,7 @@ impl<'a> NativeCallContext<'a> {
         #[cfg(not(feature = "no_function"))]
         let native_only = native_only && !crate::parser::is_anonymous_fn(name);
 
-        self._call_fn_raw(fn_name, native_only, is_ref_mut, is_method_call, args)
+        self._call_fn_raw(fn_name, args, native_only, is_ref_mut, is_method_call)
     }
     /// Call a registered native Rust function inside the call context.
     ///
@@ -398,17 +398,17 @@ impl<'a> NativeCallContext<'a> {
         is_ref_mut: bool,
         args: &mut [&mut Dynamic],
     ) -> RhaiResult {
-        self._call_fn_raw(fn_name, true, is_ref_mut, false, args)
+        self._call_fn_raw(fn_name, args, true, is_ref_mut, false)
     }
 
     /// Call a function (native Rust or scripted) inside the call context.
     fn _call_fn_raw(
         &self,
         fn_name: impl AsRef<str>,
+        args: &mut [&mut Dynamic],
         native_only: bool,
         is_ref_mut: bool,
         is_method_call: bool,
-        args: &mut [&mut Dynamic],
     ) -> RhaiResult {
         let mut global = &mut self.global.clone();
         let caches = &mut Caches::new();

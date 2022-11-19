@@ -102,7 +102,7 @@ impl Default for Limits {
 
 impl Engine {
     /// Is there a data size limit set?
-    #[inline]
+    #[inline(always)]
     pub(crate) const fn has_data_size_limit(&self) -> bool {
         self.limits.max_string_size.is_some()
             || {

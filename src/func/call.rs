@@ -394,6 +394,7 @@ impl Engine {
             }
 
             // Run external function
+            let is_method = func.is_method();
             let src = source.as_ref().map(|s| s.as_str());
             let context = (self, name, src, &*global, pos).into();
 
@@ -403,12 +404,14 @@ impl Engine {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
                 } else {
                     f.call(context, args)
+                        .and_then(|r| self.check_data_size(r, pos))
+                        .map_err(|err| err.fill_position(pos))
                 }
             } else {
                 func.get_native_fn().unwrap()(context, args)
+                    .and_then(|r| self.check_data_size(r, pos))
+                    .map_err(|err| err.fill_position(pos))
             };
-
-            let is_method = func.is_method();
 
             #[cfg(feature = "debugging")]
             {
@@ -440,13 +443,12 @@ impl Engine {
                 global.debugger.rewind_call_stack(orig_call_stack_len);
             }
 
-            // Check the return value (including data sizes)
-            let result = self.check_return_value(_result, pos)?;
+            let result = _result?;
 
             // Check the data size of any `&mut` object, which may be changed.
             #[cfg(not(feature = "unchecked"))]
             if is_ref_mut && !args.is_empty() {
-                self.check_data_size(args[0], pos)?;
+                self.check_data_size(&*args[0], pos)?;
             }
 
             // See if the function match print/debug (which requires special processing)
@@ -1189,14 +1191,14 @@ impl Engine {
                         .map(|(value, ..)| arg_values.push(value.flatten()))
                 })?;
 
-                let (mut target, _pos) =
+                let mut target =
                     self.search_namespace(global, caches, scope, this_ptr, first_expr)?;
 
                 if target.is_read_only() {
                     target = target.into_owned();
                 }
 
-                self.track_operation(global, _pos)?;
+                self.track_operation(global, first_expr.position())?;
 
                 #[cfg(not(feature = "no_closure"))]
                 let target_is_shared = target.is_shared();
@@ -1270,10 +1272,9 @@ impl Engine {
 
                 // Get target reference to first argument
                 let first_arg = &args_expr[0];
-                let (target, _pos) =
-                    self.search_scope_only(global, caches, scope, this_ptr, first_arg)?;
+                let target = self.search_scope_only(global, caches, scope, this_ptr, first_arg)?;
 
-                self.track_operation(global, _pos)?;
+                self.track_operation(global, first_arg.position())?;
 
                 #[cfg(not(feature = "no_closure"))]
                 let target_is_shared = target.is_shared();
@@ -1383,19 +1384,18 @@ impl Engine {
             Some(f) if f.is_plugin_fn() => {
                 let context = (self, fn_name, module.id(), &*global, pos).into();
                 let f = f.get_plugin_fn().expect("plugin function");
-                let result = if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
+                if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
                 } else {
                     f.call(context, &mut args)
-                };
-                self.check_return_value(result, pos)
+                        .and_then(|r| self.check_data_size(r, pos))
+                }
             }
 
             Some(f) if f.is_native() => {
                 let func = f.get_native_fn().expect("native function");
                 let context = (self, fn_name, module.id(), &*global, pos).into();
-                let result = func(context, &mut args);
-                self.check_return_value(result, pos)
+                func(context, &mut args).and_then(|r| self.check_data_size(r, pos))
             }
 
             Some(f) => unreachable!("unknown function type: {:?}", f),
