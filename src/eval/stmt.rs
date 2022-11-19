@@ -8,7 +8,7 @@ use crate::ast::{
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::types::dynamic::AccessMode;
 use crate::types::RestoreOnDrop;
-use crate::{Dynamic, Engine, ImmutableString, RhaiResult, RhaiResultOf, Scope, ERR, INT};
+use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, ERR, INT};
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -228,7 +228,7 @@ impl Engine {
                 // (returned by a variable resolver, for example)
                 let is_temp_result = !target.is_ref() && !target.is_shared();
                 #[cfg(feature = "no_closure")]
-                let is_temp_result = !lhs_ptr.is_ref();
+                let is_temp_result = !target.is_ref();
 
                 // Cannot assign to temp result from expression
                 if is_temp_result {
@@ -773,8 +773,8 @@ impl Engine {
 
                 let v = self.eval_expr(global, caches, scope, this_ptr, expr)?;
                 let typ = v.type_name();
-                let path = v.try_cast::<ImmutableString>().ok_or_else(|| {
-                    self.make_type_mismatch_err::<ImmutableString>(typ, expr.position())
+                let path = v.try_cast::<crate::ImmutableString>().ok_or_else(|| {
+                    self.make_type_mismatch_err::<crate::ImmutableString>(typ, expr.position())
                 })?;
 
                 use crate::ModuleResolver;

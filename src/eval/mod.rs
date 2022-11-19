@@ -25,7 +25,7 @@ pub use target::{calc_index, calc_offset_len, Target};
 
 #[cfg(feature = "unchecked")]
 mod unchecked {
-    use crate::{eval::GlobalRuntimeState, Dynamic, Engine, Position, RhaiResult, RhaiResultOf};
+    use crate::{eval::GlobalRuntimeState, Dynamic, Engine, Position, RhaiResultOf};
     use std::borrow::Borrow;
     #[cfg(feature = "no_std")]
     use std::prelude::v1::*;

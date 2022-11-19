@@ -7,8 +7,8 @@ use crate::plugin::PluginFunction;
 use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
-    calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Module, Position, RhaiResult,
-    RhaiResultOf, SharedModule, StaticVec, VarDefInfo, ERR,
+    calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Position, RhaiResult, RhaiResultOf,
+    StaticVec, VarDefInfo, ERR,
 };
 use std::any::type_name;
 #[cfg(feature = "no_std")]
@@ -249,7 +249,7 @@ impl<'a> NativeCallContext<'a> {
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
     #[inline]
-    pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &Module)> {
+    pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &crate::Module)> {
         self.global.iter_imports()
     }
     /// Get an iterator over the current set of modules imported via `import` statements in reverse order.
@@ -258,7 +258,7 @@ impl<'a> NativeCallContext<'a> {
     #[inline]
     pub(crate) fn iter_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&crate::ImmutableString, &SharedModule)> {
+    ) -> impl Iterator<Item = (&crate::ImmutableString, &crate::SharedModule)> {
         self.global.iter_imports_raw()
     }
     /// _(internals)_ The current [`GlobalRuntimeState`], if any.
@@ -277,7 +277,7 @@ impl<'a> NativeCallContext<'a> {
     /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     #[inline]
-    pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
+    pub fn iter_namespaces(&self) -> impl Iterator<Item = &crate::Module> {
         self.global.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current stack of namespaces containing definitions of all script-defined functions.
@@ -288,7 +288,7 @@ impl<'a> NativeCallContext<'a> {
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub fn namespaces(&self) -> &[SharedModule] {
+    pub fn namespaces(&self) -> &[crate::SharedModule] {
         &self.global.lib
     }
     /// Call a function inside the call context with the provided arguments.

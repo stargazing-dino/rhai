@@ -166,7 +166,7 @@ impl Engine {
     #[must_use]
     fn resolve_fn<'s>(
         &self,
-        global: &GlobalRuntimeState,
+        _global: &GlobalRuntimeState,
         caches: &'s mut Caches,
         local_entry: &'s mut Option<FnResolutionCacheEntry>,
         op_token: Option<&Token>,
@@ -194,7 +194,7 @@ impl Engine {
 
                 loop {
                     #[cfg(not(feature = "no_function"))]
-                    let func = global
+                    let func = _global
                         .lib
                         .iter()
                         .rev()
@@ -214,7 +214,7 @@ impl Engine {
                         // Scripted functions are not exposed globally
                         func
                     } else {
-                        func.or_else(|| global.get_qualified_fn(hash)).or_else(|| {
+                        func.or_else(|| _global.get_qualified_fn(hash)).or_else(|| {
                             self.global_sub_modules
                                 .values()
                                 .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id_raw())))
@@ -246,14 +246,14 @@ impl Engine {
 
                         #[cfg(not(feature = "no_function"))]
                         let is_dynamic = is_dynamic
-                            || global
+                            || _global
                                 .lib
                                 .iter()
                                 .any(|m| m.may_contain_dynamic_fn(hash_base));
 
                         #[cfg(not(feature = "no_module"))]
                         let is_dynamic = is_dynamic
-                            || global.may_contain_dynamic_fn(hash_base)
+                            || _global.may_contain_dynamic_fn(hash_base)
                             || self
                                 .global_sub_modules
                                 .values()

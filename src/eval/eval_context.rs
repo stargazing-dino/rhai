@@ -1,7 +1,7 @@
 //! Evaluation context.
 
 use super::{Caches, GlobalRuntimeState};
-use crate::{Dynamic, Engine, Module, Scope};
+use crate::{Dynamic, Engine, Scope};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -68,7 +68,7 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// in reverse order (i.e. modules imported last come first).
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
-    pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &Module)> {
+    pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &crate::Module)> {
         self.global.iter_imports()
     }
     /// Custom state kept in a [`Dynamic`].
@@ -104,7 +104,7 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     #[inline]
-    pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
+    pub fn iter_namespaces(&self) -> impl Iterator<Item = &crate::Module> {
         self.global.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current set of namespaces containing definitions of all script-defined functions.

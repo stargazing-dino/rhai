@@ -4,7 +4,7 @@ use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::ast::{Expr, OpAssignment};
 use crate::engine::{KEYWORD_THIS, OP_CONCAT};
 use crate::types::dynamic::AccessMode;
-use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, SharedModule, ERR};
+use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, ERR};
 use std::num::NonZeroUsize;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -18,7 +18,7 @@ impl Engine {
         &self,
         global: &GlobalRuntimeState,
         namespace: &crate::ast::Namespace,
-    ) -> Option<SharedModule> {
+    ) -> Option<crate::SharedModule> {
         assert!(!namespace.is_empty());
 
         let root = namespace.root();
