@@ -8,6 +8,7 @@ Enhancements
 ------------
 
 * `CallableFunction` is exported under `internals`.
+* The `TypeBuilder` type and `CustomType` trait are no longer marked as volatile.
 
 
 Version 1.11.0
