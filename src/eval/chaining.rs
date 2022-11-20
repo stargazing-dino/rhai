@@ -35,8 +35,469 @@ impl From<&Expr> for ChainType {
 }
 
 impl Engine {
+    /// Call a get indexer.
+    #[inline]
+    fn call_indexer_get(
+        &self,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        target: &mut Dynamic,
+        idx: &mut Dynamic,
+        pos: Position,
+    ) -> RhaiResultOf<Dynamic> {
+        let args = &mut [target, idx];
+        let hash = global.hash_idx_get();
+        let fn_name = crate::engine::FN_IDX_GET;
+
+        let orig_level = global.level;
+        global.level += 1;
+        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
+
+        self.exec_native_fn_call(global, caches, fn_name, None, hash, args, true, pos)
+            .map(|(r, ..)| r)
+    }
+
+    /// Call a set indexer.
+    #[inline]
+    fn call_indexer_set(
+        &self,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        target: &mut Dynamic,
+        idx: &mut Dynamic,
+        new_val: &mut Dynamic,
+        is_ref_mut: bool,
+        pos: Position,
+    ) -> RhaiResultOf<(Dynamic, bool)> {
+        let hash = global.hash_idx_set();
+        let args = &mut [target, idx, new_val];
+        let fn_name = crate::engine::FN_IDX_SET;
+
+        let orig_level = global.level;
+        global.level += 1;
+        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
+
+        self.exec_native_fn_call(global, caches, fn_name, None, hash, args, is_ref_mut, pos)
+    }
+
+    /// Get the value at the indexed position of a base type.
+    fn get_indexed_mut<'t>(
+        &self,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        target: &'t mut Dynamic,
+        idx: &mut Dynamic,
+        idx_pos: Position,
+        op_pos: Position,
+        _add_if_not_found: bool,
+        use_indexers: bool,
+    ) -> RhaiResultOf<Target<'t>> {
+        self.track_operation(global, Position::NONE)?;
+
+        match target {
+            #[cfg(not(feature = "no_index"))]
+            Dynamic(Union::Array(arr, ..)) => {
+                // val_array[idx]
+                let index = idx
+                    .as_int()
+                    .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
+                let len = arr.len();
+                let arr_idx = super::calc_index(len, index, true, || {
+                    ERR::ErrorArrayBounds(len, index, idx_pos).into()
+                })?;
+
+                Ok(arr.get_mut(arr_idx).map(Target::from).unwrap())
+            }
+
+            #[cfg(not(feature = "no_index"))]
+            Dynamic(Union::Blob(arr, ..)) => {
+                // val_blob[idx]
+                let index = idx
+                    .as_int()
+                    .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
+                let len = arr.len();
+                let arr_idx = super::calc_index(len, index, true, || {
+                    ERR::ErrorArrayBounds(len, index, idx_pos).into()
+                })?;
+
+                let value = arr.get(arr_idx).map(|&v| (v as crate::INT).into()).unwrap();
+
+                Ok(Target::BlobByte {
+                    source: target,
+                    value,
+                    index: arr_idx,
+                })
+            }
+
+            #[cfg(not(feature = "no_object"))]
+            Dynamic(Union::Map(map, ..)) => {
+                // val_map[idx]
+                let index = idx.read_lock::<crate::ImmutableString>().ok_or_else(|| {
+                    self.make_type_mismatch_err::<crate::ImmutableString>(idx.type_name(), idx_pos)
+                })?;
+
+                if _add_if_not_found && (map.is_empty() || !map.contains_key(index.as_str())) {
+                    map.insert(index.clone().into(), Dynamic::UNIT);
+                }
+
+                map.get_mut(index.as_str()).map_or_else(
+                    || {
+                        if self.fail_on_invalid_map_property() {
+                            Err(ERR::ErrorPropertyNotFound(index.to_string(), idx_pos).into())
+                        } else {
+                            Ok(Target::from(Dynamic::UNIT))
+                        }
+                    },
+                    |value| Ok(Target::from(value)),
+                )
+            }
+
+            #[cfg(not(feature = "no_index"))]
+            Dynamic(Union::Int(value, ..))
+                if idx.is::<crate::ExclusiveRange>() || idx.is::<crate::InclusiveRange>() =>
+            {
+                // val_int[range]
+                let (shift, mask) = if let Some(range) = idx.read_lock::<crate::ExclusiveRange>() {
+                    let start = range.start;
+                    let end = range.end;
+
+                    let start = super::calc_index(crate::INT_BITS, start, false, || {
+                        ERR::ErrorBitFieldBounds(crate::INT_BITS, start, idx_pos).into()
+                    })?;
+                    let end = super::calc_index(crate::INT_BITS, end, false, || {
+                        ERR::ErrorBitFieldBounds(crate::INT_BITS, end, idx_pos).into()
+                    })?;
+
+                    if end <= start {
+                        (0, 0)
+                    } else if end == crate::INT_BITS && start == 0 {
+                        // -1 = all bits set
+                        (0, -1)
+                    } else {
+                        (
+                            start as u8,
+                            // 2^bits - 1
+                            (((2 as crate::UNSIGNED_INT).pow((end - start) as u32) - 1)
+                                as crate::INT)
+                                << start,
+                        )
+                    }
+                } else if let Some(range) = idx.read_lock::<crate::InclusiveRange>() {
+                    let start = *range.start();
+                    let end = *range.end();
+
+                    let start = super::calc_index(crate::INT_BITS, start, false, || {
+                        ERR::ErrorBitFieldBounds(crate::INT_BITS, start, idx_pos).into()
+                    })?;
+                    let end = super::calc_index(crate::INT_BITS, end, false, || {
+                        ERR::ErrorBitFieldBounds(crate::INT_BITS, end, idx_pos).into()
+                    })?;
+
+                    if end < start {
+                        (0, 0)
+                    } else if end == crate::INT_BITS - 1 && start == 0 {
+                        // -1 = all bits set
+                        (0, -1)
+                    } else {
+                        (
+                            start as u8,
+                            // 2^bits - 1
+                            (((2 as crate::UNSIGNED_INT).pow((end - start + 1) as u32) - 1)
+                                as crate::INT)
+                                << start,
+                        )
+                    }
+                } else {
+                    unreachable!("Range or RangeInclusive expected but gets {:?}", idx);
+                };
+
+                let field_value = (*value & mask) >> shift;
+
+                Ok(Target::BitField {
+                    source: target,
+                    value: field_value.into(),
+                    mask,
+                    shift,
+                })
+            }
+
+            #[cfg(not(feature = "no_index"))]
+            Dynamic(Union::Int(value, ..)) => {
+                // val_int[idx]
+                let index = idx
+                    .as_int()
+                    .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
+
+                let bit = super::calc_index(crate::INT_BITS, index, true, || {
+                    ERR::ErrorBitFieldBounds(crate::INT_BITS, index, idx_pos).into()
+                })?;
+
+                let bit_value = (*value & (1 << bit)) != 0;
+
+                Ok(Target::Bit {
+                    source: target,
+                    value: bit_value.into(),
+                    bit: bit as u8,
+                })
+            }
+
+            #[cfg(not(feature = "no_index"))]
+            Dynamic(Union::Str(s, ..)) => {
+                // val_string[idx]
+                let index = idx
+                    .as_int()
+                    .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
+
+                let (ch, offset) = if index >= 0 {
+                    if index >= crate::MAX_USIZE_INT {
+                        return Err(
+                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
+                        );
+                    }
+
+                    let offset = index as usize;
+                    (
+                        s.chars().nth(offset).ok_or_else(|| {
+                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos)
+                        })?,
+                        offset,
+                    )
+                } else {
+                    let abs_index = index.unsigned_abs();
+
+                    if abs_index as u64 > usize::MAX as u64 {
+                        return Err(
+                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
+                        );
+                    }
+
+                    let offset = abs_index as usize;
+                    (
+                        // Count from end if negative
+                        s.chars().rev().nth(offset - 1).ok_or_else(|| {
+                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos)
+                        })?,
+                        offset,
+                    )
+                };
+
+                Ok(Target::StringChar {
+                    source: target,
+                    value: ch.into(),
+                    index: offset,
+                })
+            }
+
+            #[cfg(not(feature = "no_closure"))]
+            Dynamic(Union::Shared(..)) => {
+                unreachable!("`get_indexed_mut` cannot handle shared values")
+            }
+
+            _ if use_indexers => self
+                .call_indexer_get(global, caches, target, idx, op_pos)
+                .map(Into::into),
+
+            _ => Err(ERR::ErrorIndexingType(
+                format!(
+                    "{} [{}]",
+                    self.map_type_name(target.type_name()),
+                    self.map_type_name(idx.type_name())
+                ),
+                op_pos,
+            )
+            .into()),
+        }
+    }
+
+    /// Evaluate a dot/index chain.
+    pub(crate) fn eval_dot_index_chain(
+        &self,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        scope: &mut Scope,
+        this_ptr: &mut Dynamic,
+        expr: &Expr,
+        new_val: &mut Option<(Dynamic, &OpAssignment)>,
+    ) -> RhaiResult {
+        let chain_type = ChainType::from(expr);
+
+        let crate::ast::BinaryExpr { lhs, rhs } = match expr {
+            #[cfg(not(feature = "no_index"))]
+            Expr::Index(x, ..) => &**x,
+            #[cfg(not(feature = "no_object"))]
+            Expr::Dot(x, ..) => &**x,
+            expr => unreachable!("Expr::Index or Expr::Dot expected but gets {:?}", expr),
+        };
+
+        let idx_values = &mut FnArgsVec::new_const();
+
+        match rhs {
+            // Short-circuit for simple property access: {expr}.prop
+            #[cfg(not(feature = "no_object"))]
+            Expr::Property(..) if chain_type == ChainType::Dotting => (),
+            #[cfg(not(feature = "no_object"))]
+            Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
+            // Short-circuit for simple method call: {expr}.func()
+            #[cfg(not(feature = "no_object"))]
+            Expr::FnCall(x, ..) if chain_type == ChainType::Dotting && x.args.is_empty() => (),
+            // Short-circuit for method call with all literal arguments: {expr}.func(1, 2, 3)
+            #[cfg(not(feature = "no_object"))]
+            Expr::FnCall(x, ..)
+                if chain_type == ChainType::Dotting && x.args.iter().all(Expr::is_constant) =>
+            {
+                idx_values.extend(x.args.iter().map(|expr| expr.get_literal_value().unwrap()))
+            }
+            // Short-circuit for indexing with literal: {expr}[1]
+            #[cfg(not(feature = "no_index"))]
+            _ if chain_type == ChainType::Indexing && rhs.is_constant() => {
+                idx_values.push(rhs.get_literal_value().unwrap())
+            }
+            // All other patterns - evaluate the arguments chain
+            _ => {
+                self.eval_dot_index_chain_arguments(
+                    global, caches, scope, this_ptr, expr, rhs, idx_values,
+                )?;
+            }
+        }
+
+        match lhs {
+            // id.??? or id[???]
+            Expr::Variable(.., var_pos) => {
+                #[cfg(feature = "debugging")]
+                self.run_debugger(global, caches, scope, this_ptr, lhs)?;
+                self.track_operation(global, *var_pos)?;
+
+                let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
+
+                let obj_ptr = &mut target;
+                let mut this = Dynamic::NULL;
+
+                self.eval_dot_index_chain_raw(
+                    global, caches, &mut this, lhs, expr, obj_ptr, rhs, idx_values, new_val,
+                )
+            }
+            // {expr}.??? = ??? or {expr}[???] = ???
+            _ if new_val.is_some() => unreachable!("cannot assign to an expression"),
+            // {expr}.??? or {expr}[???]
+            lhs_expr => {
+                let value = self
+                    .eval_expr(global, caches, scope, this_ptr, lhs_expr)?
+                    .flatten();
+                let obj_ptr = &mut value.into();
+
+                self.eval_dot_index_chain_raw(
+                    global, caches, this_ptr, lhs_expr, expr, obj_ptr, rhs, idx_values, new_val,
+                )
+            }
+        }
+        .map(|(v, ..)| v)
+    }
+
+    /// Evaluate a chain of indexes and store the results in a [`FnArgsVec`].
+    fn eval_dot_index_chain_arguments(
+        &self,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        scope: &mut Scope,
+        this_ptr: &mut Dynamic,
+        parent: &Expr,
+        expr: &Expr,
+        idx_values: &mut FnArgsVec<Dynamic>,
+    ) -> RhaiResultOf<()> {
+        self.track_operation(global, expr.position())?;
+
+        let chain_type = ChainType::from(parent);
+
+        match expr {
+            #[cfg(not(feature = "no_object"))]
+            Expr::MethodCall(x, ..) if chain_type == ChainType::Dotting && !x.is_qualified() => {
+                for arg_expr in &x.args {
+                    idx_values.push(
+                        self.get_arg_value(global, caches, scope, this_ptr, arg_expr)?
+                            .0
+                            .flatten(),
+                    );
+                }
+            }
+            #[cfg(not(feature = "no_object"))]
+            Expr::MethodCall(..) if chain_type == ChainType::Dotting => {
+                unreachable!("function call in dot chain should not be namespace-qualified")
+            }
+
+            #[cfg(not(feature = "no_object"))]
+            Expr::Property(..) if chain_type == ChainType::Dotting => (),
+            Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
+
+            Expr::Index(x, ..) | Expr::Dot(x, ..)
+                if !parent.options().contains(ASTFlags::BREAK) =>
+            {
+                let crate::ast::BinaryExpr { lhs, rhs, .. } = &**x;
+
+                let mut _arg_values = FnArgsVec::new_const();
+
+                // Evaluate in left-to-right order
+                match lhs {
+                    #[cfg(not(feature = "no_object"))]
+                    Expr::Property(..) if chain_type == ChainType::Dotting => (),
+                    Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
+
+                    #[cfg(not(feature = "no_object"))]
+                    Expr::MethodCall(x, ..)
+                        if chain_type == ChainType::Dotting && !x.is_qualified() =>
+                    {
+                        for arg_expr in &x.args {
+                            _arg_values.push(
+                                self.get_arg_value(global, caches, scope, this_ptr, arg_expr)?
+                                    .0
+                                    .flatten(),
+                            );
+                        }
+                    }
+                    #[cfg(not(feature = "no_object"))]
+                    Expr::MethodCall(..) if chain_type == ChainType::Dotting => {
+                        unreachable!("function call in dot chain should not be namespace-qualified")
+                    }
+                    #[cfg(not(feature = "no_object"))]
+                    expr if chain_type == ChainType::Dotting => {
+                        unreachable!("invalid dot expression: {:?}", expr);
+                    }
+                    #[cfg(not(feature = "no_index"))]
+                    _ if chain_type == ChainType::Indexing => {
+                        _arg_values.push(
+                            self.eval_expr(global, caches, scope, this_ptr, lhs)?
+                                .flatten(),
+                        );
+                    }
+                    expr => unreachable!("unknown chained expression: {:?}", expr),
+                }
+
+                // Push in reverse order
+                self.eval_dot_index_chain_arguments(
+                    global, caches, scope, this_ptr, expr, rhs, idx_values,
+                )?;
+
+                if !_arg_values.is_empty() {
+                    idx_values.extend(_arg_values);
+                }
+            }
+
+            #[cfg(not(feature = "no_object"))]
+            _ if chain_type == ChainType::Dotting => {
+                unreachable!("invalid dot expression: {:?}", expr);
+            }
+            #[cfg(not(feature = "no_index"))]
+            _ if chain_type == ChainType::Indexing => idx_values.push(
+                self.eval_expr(global, caches, scope, this_ptr, expr)?
+                    .flatten(),
+            ),
+            _ => unreachable!("unknown chained expression: {:?}", expr),
+        }
+
+        Ok(())
+    }
+
     /// Chain-evaluate a dot/index chain.
-    fn eval_dot_index_chain_helper(
+    fn eval_dot_index_chain_raw(
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
@@ -44,8 +505,8 @@ impl Engine {
         root: &Expr,
         parent: &Expr,
         target: &mut Target,
-        idx_values: &mut FnArgsVec<Dynamic>,
         rhs: &Expr,
+        idx_values: &mut FnArgsVec<Dynamic>,
         new_val: &mut Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResultOf<(Dynamic, bool)> {
         let is_ref_mut = target.is_ref();
@@ -83,8 +544,8 @@ impl Engine {
                             let is_obj_temp_val = obj.is_temp_value();
                             let obj_ptr = &mut obj;
 
-                            match self.eval_dot_index_chain_helper(
-                                global, caches, this_ptr, root, rhs, obj_ptr, idx_values, &x.rhs,
+                            match self.eval_dot_index_chain_raw(
+                                global, caches, this_ptr, root, rhs, obj_ptr, &x.rhs, idx_values,
                                 new_val,
                             ) {
                                 Ok((result, true)) if is_obj_temp_val => {
@@ -396,8 +857,8 @@ impl Engine {
                             ref expr => unreachable!("invalid dot expression: {:?}", expr),
                         };
 
-                        self.eval_dot_index_chain_helper(
-                            global, caches, this_ptr, root, rhs, val_target, idx_values, &x.rhs,
+                        self.eval_dot_index_chain_raw(
+                            global, caches, this_ptr, root, rhs, val_target, &x.rhs, idx_values,
                             new_val,
                         )
                     }
@@ -441,8 +902,8 @@ impl Engine {
 
                                 let val = &mut (&mut val).into();
 
-                                let (result, may_be_changed) = self.eval_dot_index_chain_helper(
-                                    global, caches, this_ptr, root, rhs, val, idx_values, &x.rhs,
+                                let (result, may_be_changed) = self.eval_dot_index_chain_raw(
+                                    global, caches, this_ptr, root, rhs, val, &x.rhs, idx_values,
                                     new_val,
                                 )?;
 
@@ -515,8 +976,8 @@ impl Engine {
 
                                 let val = &mut val.into();
 
-                                self.eval_dot_index_chain_helper(
-                                    global, caches, this_ptr, root, rhs, val, idx_values, &x.rhs,
+                                self.eval_dot_index_chain_raw(
+                                    global, caches, this_ptr, root, rhs, val, &x.rhs, idx_values,
                                     new_val,
                                 )
                             }
@@ -532,468 +993,6 @@ impl Engine {
                     expr => unreachable!("invalid chaining expression: {:?}", expr),
                 }
             }
-        }
-    }
-
-    /// Evaluate a dot/index chain.
-    pub(crate) fn eval_dot_index_chain(
-        &self,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        scope: &mut Scope,
-        this_ptr: &mut Dynamic,
-        expr: &Expr,
-        new_val: &mut Option<(Dynamic, &OpAssignment)>,
-    ) -> RhaiResult {
-        let chain_type = ChainType::from(expr);
-        let crate::ast::BinaryExpr { lhs, rhs } = match expr {
-            #[cfg(not(feature = "no_index"))]
-            Expr::Index(x, ..) => &**x,
-            #[cfg(not(feature = "no_object"))]
-            Expr::Dot(x, ..) => &**x,
-            expr => unreachable!("Expr::Index or Expr::Dot expected but gets {:?}", expr),
-        };
-
-        let idx_values = &mut FnArgsVec::new_const();
-
-        match rhs {
-            // Short-circuit for simple property access: {expr}.prop
-            #[cfg(not(feature = "no_object"))]
-            Expr::Property(..) if chain_type == ChainType::Dotting => (),
-            #[cfg(not(feature = "no_object"))]
-            Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
-            // Short-circuit for simple method call: {expr}.func()
-            #[cfg(not(feature = "no_object"))]
-            Expr::FnCall(x, ..) if chain_type == ChainType::Dotting && x.args.is_empty() => (),
-            // Short-circuit for method call with all literal arguments: {expr}.func(1, 2, 3)
-            #[cfg(not(feature = "no_object"))]
-            Expr::FnCall(x, ..)
-                if chain_type == ChainType::Dotting && x.args.iter().all(Expr::is_constant) =>
-            {
-                idx_values.extend(x.args.iter().map(|expr| expr.get_literal_value().unwrap()))
-            }
-            // Short-circuit for indexing with literal: {expr}[1]
-            #[cfg(not(feature = "no_index"))]
-            _ if chain_type == ChainType::Indexing && rhs.is_constant() => {
-                idx_values.push(rhs.get_literal_value().unwrap())
-            }
-            // All other patterns - evaluate the arguments chain
-            _ => {
-                self.eval_dot_index_chain_arguments(
-                    global, caches, scope, this_ptr, expr, idx_values, rhs,
-                )?;
-            }
-        }
-
-        match lhs {
-            // id.??? or id[???]
-            Expr::Variable(.., var_pos) => {
-                #[cfg(feature = "debugging")]
-                self.run_debugger(global, caches, scope, this_ptr, lhs)?;
-                self.track_operation(global, *var_pos)?;
-
-                let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
-
-                let obj_ptr = &mut target;
-                let mut this = Dynamic::NULL;
-
-                self.eval_dot_index_chain_helper(
-                    global, caches, &mut this, lhs, expr, obj_ptr, idx_values, rhs, new_val,
-                )
-            }
-            // {expr}.??? = ??? or {expr}[???] = ???
-            _ if new_val.is_some() => unreachable!("cannot assign to an expression"),
-            // {expr}.??? or {expr}[???]
-            lhs_expr => {
-                let value = self
-                    .eval_expr(global, caches, scope, this_ptr, lhs_expr)?
-                    .flatten();
-                let obj_ptr = &mut value.into();
-
-                self.eval_dot_index_chain_helper(
-                    global, caches, this_ptr, lhs_expr, expr, obj_ptr, idx_values, rhs, new_val,
-                )
-            }
-        }
-        .map(|(v, ..)| v)
-    }
-
-    /// Evaluate a chain of indexes and store the results in a [`FnArgsVec`].
-    fn eval_dot_index_chain_arguments(
-        &self,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        scope: &mut Scope,
-        this_ptr: &mut Dynamic,
-        parent: &Expr,
-        idx_values: &mut FnArgsVec<Dynamic>,
-        expr: &Expr,
-    ) -> RhaiResultOf<()> {
-        self.track_operation(global, expr.position())?;
-
-        let parent_chain_type = ChainType::from(parent);
-
-        match expr {
-            #[cfg(not(feature = "no_object"))]
-            Expr::MethodCall(x, ..)
-                if parent_chain_type == ChainType::Dotting && !x.is_qualified() =>
-            {
-                for arg_expr in &x.args {
-                    idx_values.push(
-                        self.get_arg_value(global, caches, scope, this_ptr, arg_expr)?
-                            .0
-                            .flatten(),
-                    );
-                }
-            }
-            #[cfg(not(feature = "no_object"))]
-            Expr::MethodCall(..) if parent_chain_type == ChainType::Dotting => {
-                unreachable!("function call in dot chain should not be namespace-qualified")
-            }
-
-            #[cfg(not(feature = "no_object"))]
-            Expr::Property(..) if parent_chain_type == ChainType::Dotting => (),
-            Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
-
-            Expr::Index(x, ..) | Expr::Dot(x, ..)
-                if !parent.options().contains(ASTFlags::BREAK) =>
-            {
-                let crate::ast::BinaryExpr { lhs, rhs, .. } = &**x;
-
-                let mut _arg_values = FnArgsVec::new_const();
-
-                // Evaluate in left-to-right order
-                match lhs {
-                    #[cfg(not(feature = "no_object"))]
-                    Expr::Property(..) if parent_chain_type == ChainType::Dotting => (),
-                    Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
-
-                    #[cfg(not(feature = "no_object"))]
-                    Expr::MethodCall(x, ..)
-                        if parent_chain_type == ChainType::Dotting && !x.is_qualified() =>
-                    {
-                        for arg_expr in &x.args {
-                            _arg_values.push(
-                                self.get_arg_value(global, caches, scope, this_ptr, arg_expr)?
-                                    .0
-                                    .flatten(),
-                            );
-                        }
-                    }
-                    #[cfg(not(feature = "no_object"))]
-                    Expr::MethodCall(..) if parent_chain_type == ChainType::Dotting => {
-                        unreachable!("function call in dot chain should not be namespace-qualified")
-                    }
-                    #[cfg(not(feature = "no_object"))]
-                    expr if parent_chain_type == ChainType::Dotting => {
-                        unreachable!("invalid dot expression: {:?}", expr);
-                    }
-                    #[cfg(not(feature = "no_index"))]
-                    _ if parent_chain_type == ChainType::Indexing => {
-                        _arg_values.push(
-                            self.eval_expr(global, caches, scope, this_ptr, lhs)?
-                                .flatten(),
-                        );
-                    }
-                    expr => unreachable!("unknown chained expression: {:?}", expr),
-                }
-
-                // Push in reverse order
-                self.eval_dot_index_chain_arguments(
-                    global, caches, scope, this_ptr, expr, idx_values, rhs,
-                )?;
-
-                if !_arg_values.is_empty() {
-                    idx_values.extend(_arg_values);
-                }
-            }
-
-            #[cfg(not(feature = "no_object"))]
-            _ if parent_chain_type == ChainType::Dotting => {
-                unreachable!("invalid dot expression: {:?}", expr);
-            }
-            #[cfg(not(feature = "no_index"))]
-            _ if parent_chain_type == ChainType::Indexing => idx_values.push(
-                self.eval_expr(global, caches, scope, this_ptr, expr)?
-                    .flatten(),
-            ),
-            _ => unreachable!("unknown chained expression: {:?}", expr),
-        }
-
-        Ok(())
-    }
-
-    /// Call a get indexer.
-    #[inline(always)]
-    fn call_indexer_get(
-        &self,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        target: &mut Dynamic,
-        idx: &mut Dynamic,
-        pos: Position,
-    ) -> RhaiResultOf<Dynamic> {
-        let args = &mut [target, idx];
-        let hash = global.hash_idx_get();
-        let fn_name = crate::engine::FN_IDX_GET;
-
-        let orig_level = global.level;
-        global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
-
-        self.exec_native_fn_call(global, caches, fn_name, None, hash, args, true, pos)
-            .map(|(r, ..)| r)
-    }
-
-    /// Call a set indexer.
-    #[inline(always)]
-    fn call_indexer_set(
-        &self,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        target: &mut Dynamic,
-        idx: &mut Dynamic,
-        new_val: &mut Dynamic,
-        is_ref_mut: bool,
-        pos: Position,
-    ) -> RhaiResultOf<(Dynamic, bool)> {
-        let hash = global.hash_idx_set();
-        let args = &mut [target, idx, new_val];
-        let fn_name = crate::engine::FN_IDX_SET;
-
-        let orig_level = global.level;
-        global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
-
-        self.exec_native_fn_call(global, caches, fn_name, None, hash, args, is_ref_mut, pos)
-    }
-
-    /// Get the value at the indexed position of a base type.
-    fn get_indexed_mut<'t>(
-        &self,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        target: &'t mut Dynamic,
-        idx: &mut Dynamic,
-        idx_pos: Position,
-        op_pos: Position,
-        _add_if_not_found: bool,
-        use_indexers: bool,
-    ) -> RhaiResultOf<Target<'t>> {
-        self.track_operation(global, Position::NONE)?;
-
-        match target {
-            #[cfg(not(feature = "no_index"))]
-            Dynamic(Union::Array(arr, ..)) => {
-                // val_array[idx]
-                let index = idx
-                    .as_int()
-                    .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
-                let len = arr.len();
-                let arr_idx = super::calc_index(len, index, true, || {
-                    ERR::ErrorArrayBounds(len, index, idx_pos).into()
-                })?;
-
-                Ok(arr.get_mut(arr_idx).map(Target::from).unwrap())
-            }
-
-            #[cfg(not(feature = "no_index"))]
-            Dynamic(Union::Blob(arr, ..)) => {
-                // val_blob[idx]
-                let index = idx
-                    .as_int()
-                    .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
-                let len = arr.len();
-                let arr_idx = super::calc_index(len, index, true, || {
-                    ERR::ErrorArrayBounds(len, index, idx_pos).into()
-                })?;
-
-                let value = arr.get(arr_idx).map(|&v| (v as crate::INT).into()).unwrap();
-
-                Ok(Target::BlobByte {
-                    source: target,
-                    value,
-                    index: arr_idx,
-                })
-            }
-
-            #[cfg(not(feature = "no_object"))]
-            Dynamic(Union::Map(map, ..)) => {
-                // val_map[idx]
-                let index = idx.read_lock::<crate::ImmutableString>().ok_or_else(|| {
-                    self.make_type_mismatch_err::<crate::ImmutableString>(idx.type_name(), idx_pos)
-                })?;
-
-                if _add_if_not_found && (map.is_empty() || !map.contains_key(index.as_str())) {
-                    map.insert(index.clone().into(), Dynamic::UNIT);
-                }
-
-                map.get_mut(index.as_str()).map_or_else(
-                    || {
-                        if self.fail_on_invalid_map_property() {
-                            Err(ERR::ErrorPropertyNotFound(index.to_string(), idx_pos).into())
-                        } else {
-                            Ok(Target::from(Dynamic::UNIT))
-                        }
-                    },
-                    |value| Ok(Target::from(value)),
-                )
-            }
-
-            #[cfg(not(feature = "no_index"))]
-            Dynamic(Union::Int(value, ..))
-                if idx.is::<crate::ExclusiveRange>() || idx.is::<crate::InclusiveRange>() =>
-            {
-                // val_int[range]
-                let (shift, mask) = if let Some(range) = idx.read_lock::<crate::ExclusiveRange>() {
-                    let start = range.start;
-                    let end = range.end;
-
-                    let start = super::calc_index(crate::INT_BITS, start, false, || {
-                        ERR::ErrorBitFieldBounds(crate::INT_BITS, start, idx_pos).into()
-                    })?;
-                    let end = super::calc_index(crate::INT_BITS, end, false, || {
-                        ERR::ErrorBitFieldBounds(crate::INT_BITS, end, idx_pos).into()
-                    })?;
-
-                    if end <= start {
-                        (0, 0)
-                    } else if end == crate::INT_BITS && start == 0 {
-                        // -1 = all bits set
-                        (0, -1)
-                    } else {
-                        (
-                            start as u8,
-                            // 2^bits - 1
-                            (((2 as crate::UNSIGNED_INT).pow((end - start) as u32) - 1)
-                                as crate::INT)
-                                << start,
-                        )
-                    }
-                } else if let Some(range) = idx.read_lock::<crate::InclusiveRange>() {
-                    let start = *range.start();
-                    let end = *range.end();
-
-                    let start = super::calc_index(crate::INT_BITS, start, false, || {
-                        ERR::ErrorBitFieldBounds(crate::INT_BITS, start, idx_pos).into()
-                    })?;
-                    let end = super::calc_index(crate::INT_BITS, end, false, || {
-                        ERR::ErrorBitFieldBounds(crate::INT_BITS, end, idx_pos).into()
-                    })?;
-
-                    if end < start {
-                        (0, 0)
-                    } else if end == crate::INT_BITS - 1 && start == 0 {
-                        // -1 = all bits set
-                        (0, -1)
-                    } else {
-                        (
-                            start as u8,
-                            // 2^bits - 1
-                            (((2 as crate::UNSIGNED_INT).pow((end - start + 1) as u32) - 1)
-                                as crate::INT)
-                                << start,
-                        )
-                    }
-                } else {
-                    unreachable!("Range or RangeInclusive expected but gets {:?}", idx);
-                };
-
-                let field_value = (*value & mask) >> shift;
-
-                Ok(Target::BitField {
-                    source: target,
-                    value: field_value.into(),
-                    mask,
-                    shift,
-                })
-            }
-
-            #[cfg(not(feature = "no_index"))]
-            Dynamic(Union::Int(value, ..)) => {
-                // val_int[idx]
-                let index = idx
-                    .as_int()
-                    .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
-
-                let bit = super::calc_index(crate::INT_BITS, index, true, || {
-                    ERR::ErrorBitFieldBounds(crate::INT_BITS, index, idx_pos).into()
-                })?;
-
-                let bit_value = (*value & (1 << bit)) != 0;
-
-                Ok(Target::Bit {
-                    source: target,
-                    value: bit_value.into(),
-                    bit: bit as u8,
-                })
-            }
-
-            #[cfg(not(feature = "no_index"))]
-            Dynamic(Union::Str(s, ..)) => {
-                // val_string[idx]
-                let index = idx
-                    .as_int()
-                    .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
-
-                let (ch, offset) = if index >= 0 {
-                    if index >= crate::MAX_USIZE_INT {
-                        return Err(
-                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
-                        );
-                    }
-
-                    let offset = index as usize;
-                    (
-                        s.chars().nth(offset).ok_or_else(|| {
-                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos)
-                        })?,
-                        offset,
-                    )
-                } else {
-                    let abs_index = index.unsigned_abs();
-
-                    if abs_index as u64 > usize::MAX as u64 {
-                        return Err(
-                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
-                        );
-                    }
-
-                    let offset = abs_index as usize;
-                    (
-                        // Count from end if negative
-                        s.chars().rev().nth(offset - 1).ok_or_else(|| {
-                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos)
-                        })?,
-                        offset,
-                    )
-                };
-
-                Ok(Target::StringChar {
-                    source: target,
-                    value: ch.into(),
-                    index: offset,
-                })
-            }
-
-            #[cfg(not(feature = "no_closure"))]
-            Dynamic(Union::Shared(..)) => {
-                unreachable!("`get_indexed_mut` cannot handle shared values")
-            }
-
-            _ if use_indexers => self
-                .call_indexer_get(global, caches, target, idx, op_pos)
-                .map(Into::into),
-
-            _ => Err(ERR::ErrorIndexingType(
-                format!(
-                    "{} [{}]",
-                    self.map_type_name(target.type_name()),
-                    self.map_type_name(idx.type_name())
-                ),
-                op_pos,
-            )
-            .into()),
         }
     }
 }

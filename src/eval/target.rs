@@ -51,26 +51,23 @@ pub fn calc_index<E>(
     length: usize,
     start: crate::INT,
     negative_count_from_end: bool,
-    err: impl FnOnce() -> Result<usize, E>,
+    err_func: impl FnOnce() -> Result<usize, E>,
 ) -> Result<usize, E> {
     if start < 0 {
         if negative_count_from_end {
             let abs_start = start.unsigned_abs() as usize;
 
             // Count from end if negative
-            if abs_start > length {
-                err()
-            } else {
-                Ok(length - abs_start)
+            if abs_start <= length {
+                return Ok(length - abs_start);
             }
-        } else {
-            err()
         }
-    } else if start > crate::MAX_USIZE_INT || start as usize >= length {
-        err()
-    } else {
-        Ok(start as usize)
     }
+    if start <= crate::MAX_USIZE_INT && (start as usize) < length {
+        return Ok(start as usize);
+    }
+
+    err_func()
 }
 
 /// A type that encapsulates a mutation target for an expression with side effects.
@@ -318,13 +315,7 @@ impl<'a> Target<'a> {
 
                 let value = &mut *source.write_lock::<crate::Blob>().expect("`Blob`");
 
-                let index = *index;
-
-                if index < value.len() {
-                    value[index] = (new_byte & 0x00ff) as u8;
-                } else {
-                    unreachable!("blob index out of bounds: {}", index);
-                }
+                value[*index] = (new_byte & 0x00ff) as u8;
             }
             #[cfg(not(feature = "no_index"))]
             Self::StringChar {
@@ -345,12 +336,10 @@ impl<'a> Target<'a> {
                     .write_lock::<crate::ImmutableString>()
                     .expect("`ImmutableString`");
 
-                let index = *index;
-
                 *s = s
                     .chars()
                     .enumerate()
-                    .map(|(i, ch)| if i == index { new_ch } else { ch })
+                    .map(|(i, ch)| if i == *index { new_ch } else { ch })
                     .collect();
             }
         }

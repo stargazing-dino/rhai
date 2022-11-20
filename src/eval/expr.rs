@@ -23,18 +23,14 @@ impl Engine {
 
         let root = namespace.root();
 
-        let index = if global.always_search_scope {
-            None
-        } else {
-            namespace.index()
-        };
-
         // Qualified - check if the root module is directly indexed
-        if let Some(index) = index {
-            let offset = global.num_imports() - index.get();
+        if !global.always_search_scope {
+            if let Some(index) = namespace.index() {
+                let offset = global.num_imports() - index.get();
 
-            if let m @ Some(_) = global.get_shared_import(offset) {
-                return m;
+                if let m @ Some(_) = global.get_shared_import(offset) {
+                    return m;
+                }
             }
         }
 

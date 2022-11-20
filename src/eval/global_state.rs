@@ -99,7 +99,10 @@ impl GlobalRuntimeState {
             #[cfg(not(feature = "no_module"))]
             embedded_module_resolver: None,
             #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-            fn_hash_indexing: (0, 0),
+            fn_hash_indexing: (
+                crate::calc_fn_hash(None, crate::engine::FN_IDX_GET, 2),
+                crate::calc_fn_hash(None, crate::engine::FN_IDX_SET, 3),
+            ),
             #[cfg(not(feature = "no_module"))]
             #[cfg(not(feature = "no_function"))]
             constants: None,
@@ -296,29 +299,17 @@ impl GlobalRuntimeState {
     }
     /// Get the pre-calculated index getter hash.
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+    #[inline(always)]
     #[must_use]
     pub(crate) fn hash_idx_get(&mut self) -> u64 {
-        if self.fn_hash_indexing == (0, 0) {
-            let n1 = crate::calc_fn_hash(None, crate::engine::FN_IDX_GET, 2);
-            let n2 = crate::calc_fn_hash(None, crate::engine::FN_IDX_SET, 3);
-            self.fn_hash_indexing = (n1, n2);
-            n1
-        } else {
-            self.fn_hash_indexing.0
-        }
+        self.fn_hash_indexing.0
     }
     /// Get the pre-calculated index setter hash.
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+    #[inline(always)]
     #[must_use]
     pub(crate) fn hash_idx_set(&mut self) -> u64 {
-        if self.fn_hash_indexing == (0, 0) {
-            let n1 = crate::calc_fn_hash(None, crate::engine::FN_IDX_GET, 2);
-            let n2 = crate::calc_fn_hash(None, crate::engine::FN_IDX_SET, 3);
-            self.fn_hash_indexing = (n1, n2);
-            n2
-        } else {
-            self.fn_hash_indexing.1
-        }
+        self.fn_hash_indexing.1
     }
 }
 
