@@ -923,6 +923,22 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             }
             // var.rhs
             (Expr::Variable(..), rhs) => optimize_expr(rhs, state, true),
+            // const.type_of()
+            (lhs, Expr::MethodCall(x, pos)) if lhs.is_constant() && x.name == KEYWORD_TYPE_OF && x.args.is_empty() => {
+                if let Some(value) = lhs.get_literal_value() {
+                    state.set_dirty();
+                    let typ = state.engine.map_type_name(value.type_name()).into();
+                    *expr = Expr::from_dynamic(typ, *pos);
+                }
+            }
+            // const.is_shared()
+            #[cfg(not(feature = "no_closure"))]
+            (lhs, Expr::MethodCall(x, pos)) if lhs.is_constant() && x.name == crate::engine::KEYWORD_IS_SHARED && x.args.is_empty() => {
+                if let Some(..) = lhs.get_literal_value() {
+                    state.set_dirty();
+                    *expr = Expr::from_dynamic(Dynamic::FALSE, *pos);
+                }
+            }
             // lhs.rhs
             (lhs, rhs) => { optimize_expr(lhs, state, false); optimize_expr(rhs, state, true); }
         }
