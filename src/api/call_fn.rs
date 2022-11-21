@@ -8,9 +8,70 @@ use crate::{
     reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, StaticVec, AST,
     ERR,
 };
-use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+use std::{
+    any::{type_name, TypeId},
+    mem,
+};
+
+/// Options for calling a script-defined function via [`Engine::call_fn_with_options`].
+#[derive(Debug, Hash)]
+#[non_exhaustive]
+pub struct CallFnOptions<'t> {
+    /// A value for binding to the `this` pointer (if any).
+    pub this_ptr: Option<&'t mut Dynamic>,
+    /// The custom state of this evaluation run (if any), overrides [`Engine::default_tag`].
+    pub tag: Option<Dynamic>,
+    /// Evaluate the [`AST`] to load necessary modules before calling the function? Default `true`.
+    pub eval_ast: bool,
+    /// Rewind the [`Scope`] after the function call? Default `true`.
+    pub rewind_scope: bool,
+}
+
+impl Default for CallFnOptions<'_> {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'a> CallFnOptions<'a> {
+    /// Create a default [`CallFnOptions`].
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self {
+            this_ptr: None,
+            tag: None,
+            eval_ast: true,
+            rewind_scope: true,
+        }
+    }
+    /// Bind to the `this` pointer.
+    #[inline(always)]
+    pub fn bind_this_ptr(mut self, value: &'a mut Dynamic) -> Self {
+        self.this_ptr = Some(value);
+        self
+    }
+    /// Set the custom state of this evaluation run (if any).
+    #[inline(always)]
+    pub fn with_tag(mut self, value: impl Variant + Clone) -> Self {
+        self.tag = Some(Dynamic::from(value));
+        self
+    }
+    /// Set whether to evaluate the [`AST`] to load necessary modules before calling the function.
+    #[inline(always)]
+    pub const fn eval_ast(mut self, value: bool) -> Self {
+        self.eval_ast = value;
+        self
+    }
+    /// Set whether to rewind the [`Scope`] after the function call.
+    #[inline(always)]
+    pub const fn rewind_scope(mut self, value: bool) -> Self {
+        self.rewind_scope = value;
+        self
+    }
+}
 
 impl Engine {
     /// Call a script function defined in an [`AST`] with multiple arguments.
@@ -19,15 +80,12 @@ impl Engine {
     ///
     /// The [`AST`] is evaluated before calling the function.
     /// This allows a script to load the necessary modules.
-    /// This is usually desired. If not, a specialized [`AST`] can be prepared that contains only
-    /// function definitions without any body script via [`AST::clear_statements`].
+    /// This is usually desired. If not, use [`call_fn_with_options`] instead.
     ///
     /// # Example
     ///
     /// ```
     /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
-    /// # #[cfg(not(feature = "no_function"))]
-    /// # {
     /// use rhai::{Engine, Scope};
     ///
     /// let engine = Engine::new();
@@ -51,13 +109,61 @@ impl Engine {
     ///
     /// let result = engine.call_fn::<i64>(&mut scope, &ast, "bar", () )?;
     /// assert_eq!(result, 21);
-    /// # }
     /// # Ok(())
     /// # }
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn call_fn<T: Variant + Clone>(
         &self,
+        scope: &mut Scope,
+        ast: &AST,
+        name: impl AsRef<str>,
+        args: impl FuncArgs,
+    ) -> RhaiResultOf<T> {
+        self.call_fn_with_options(Default::default(), scope, ast, name, args)
+    }
+    /// Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
+    ///
+    /// Options are provided via the [`CallFnOptions`] type.
+    /// This is an advanced API.
+    ///
+    /// Not available under `no_function`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
+    /// use rhai::{Engine, Scope, Dynamic, CallFnOptions};
+    ///
+    /// let engine = Engine::new();
+    ///
+    /// let ast = engine.compile("
+    ///     fn action(x) { this += x; }         // function using 'this' pointer
+    ///     fn decl(x)   { let hello = x; }     // declaring variables
+    /// ")?;
+    ///
+    /// let mut scope = Scope::new();
+    /// scope.push("foo", 42_i64);
+    ///
+    /// // Binding the 'this' pointer
+    /// let mut value = 1_i64.into();
+    /// let options = CallFnOptions::new().bind_this_ptr(&mut value);
+    ///
+    /// engine.call_fn_with_options(options, &mut scope, &ast, "action", ( 41_i64, ))?;
+    /// assert_eq!(value.as_int().unwrap(), 42);
+    ///
+    /// // Do not rewind scope
+    /// let options = CallFnOptions::default().rewind_scope(false);
+    ///
+    /// engine.call_fn_with_options(options, &mut scope, &ast, "decl", ( 42_i64, ))?;
+    /// assert_eq!(scope.get_value::<i64>("hello").unwrap(), 42);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline(always)]
+    pub fn call_fn_with_options<T: Variant + Clone>(
+        &self,
+        options: CallFnOptions,
         scope: &mut Scope,
         ast: &AST,
         name: impl AsRef<str>,
@@ -66,14 +172,19 @@ impl Engine {
         let mut arg_values = StaticVec::new_const();
         args.parse(&mut arg_values);
 
-        let result = self.call_fn_raw(scope, ast, true, true, name, None, arg_values)?;
+        let result = self._call_fn(
+            options,
+            scope,
+            &mut GlobalRuntimeState::new(self),
+            &mut Caches::new(),
+            ast,
+            name.as_ref(),
+            arg_values.as_mut(),
+        )?;
 
         // Bail out early if the return type needs no cast
         if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
             return Ok(reify!(result => T));
-        }
-        if TypeId::of::<T>() == TypeId::of::<()>() {
-            return Ok(reify!(() => T));
         }
 
         // Cast return type
@@ -86,120 +197,6 @@ impl Engine {
     }
     /// Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
     ///
-    /// The following options are available:
-    ///
-    /// * whether to evaluate the [`AST`] to load necessary modules before calling the function
-    /// * whether to rewind the [`Scope`] after the function call
-    /// * a value for binding to the `this` pointer (if any)
-    ///
-    /// Not available under `no_function`.
-    ///
-    /// # WARNING - Low Level API
-    ///
-    /// This function is very low level.
-    ///
-    /// # Arguments
-    ///
-    /// All the arguments are _consumed_, meaning that they're replaced by `()`.
-    /// This is to avoid unnecessarily cloning the arguments.
-    ///
-    /// Do not use the arguments after this call. If they are needed afterwards, clone them _before_
-    /// calling this function.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
-    /// # #[cfg(not(feature = "no_function"))]
-    /// # {
-    /// use rhai::{Engine, Scope, Dynamic};
-    ///
-    /// let engine = Engine::new();
-    ///
-    /// let ast = engine.compile("
-    ///     fn add(x, y) { len(x) + y + foo }
-    ///     fn add1(x)   { len(x) + 1 + foo }
-    ///     fn bar()     { foo/2 }
-    ///     fn action(x) { this += x; }         // function using 'this' pointer
-    ///     fn decl(x)   { let hello = x; }     // declaring variables
-    /// ")?;
-    ///
-    /// let mut scope = Scope::new();
-    /// scope.push("foo", 42_i64);
-    ///
-    /// // Call the script-defined function
-    /// let result = engine.call_fn_raw(&mut scope, &ast, true, true, "add", None, [ "abc".into(), 123_i64.into() ])?;
-    /// //                                                                   ^^^^ no 'this' pointer
-    /// assert_eq!(result.cast::<i64>(), 168);
-    ///
-    /// let result = engine.call_fn_raw(&mut scope, &ast, true, true, "add1", None, [ "abc".into() ])?;
-    /// assert_eq!(result.cast::<i64>(), 46);
-    ///
-    /// let result = engine.call_fn_raw(&mut scope, &ast, true, true, "bar", None, [])?;
-    /// assert_eq!(result.cast::<i64>(), 21);
-    ///
-    /// let mut value = 1_i64.into();
-    /// let result = engine.call_fn_raw(&mut scope, &ast, true, true, "action", Some(&mut value), [ 41_i64.into() ])?;
-    /// //                                                                      ^^^^^^^^^^^^^^^^ binding the 'this' pointer
-    /// assert_eq!(value.as_int().unwrap(), 42);
-    ///
-    /// engine.call_fn_raw(&mut scope, &ast, true, false, "decl", None, [ 42_i64.into() ])?;
-    /// //                                         ^^^^^ do not rewind scope
-    /// assert_eq!(scope.get_value::<i64>("hello").unwrap(), 42);
-    /// # }
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[inline(always)]
-    pub fn call_fn_raw(
-        &self,
-        scope: &mut Scope,
-        ast: &AST,
-        eval_ast: bool,
-        rewind_scope: bool,
-        name: impl AsRef<str>,
-        this_ptr: Option<&mut Dynamic>,
-        arg_values: impl AsMut<[Dynamic]>,
-    ) -> RhaiResult {
-        let mut arg_values = arg_values;
-
-        self._call_fn(
-            scope,
-            &mut GlobalRuntimeState::new(self),
-            &mut Caches::new(),
-            ast,
-            eval_ast,
-            rewind_scope,
-            name.as_ref(),
-            this_ptr,
-            arg_values.as_mut(),
-        )
-    }
-    /// _(internals)_ Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
-    /// Exported under the `internals` feature only.
-    ///
-    /// The following options are available:
-    ///
-    /// * whether to evaluate the [`AST`] to load necessary modules before calling the function
-    /// * whether to rewind the [`Scope`] after the function call
-    /// * a value for binding to the `this` pointer (if any)
-    ///
-    /// Not available under `no_function`.
-    ///
-    /// # WARNING - Unstable API
-    ///
-    /// This API is volatile and may change in the future.
-    ///
-    /// # WARNING - Low Level API
-    ///
-    /// This function is _extremely_ low level.
-    ///
-    /// A [`GlobalRuntimeState`] and [`Caches`] need to be passed into the function, which can be
-    /// created via [`GlobalRuntimeState::new`] and [`Caches::new`].
-    ///
-    /// This makes repeatedly calling particular functions more efficient as the functions
-    /// resolution cache is kept intact.
-    ///
     /// # Arguments
     ///
     /// All the arguments are _consumed_, meaning that they're replaced by `()`. This is to avoid
@@ -207,56 +204,31 @@ impl Engine {
     ///
     /// Do not use the arguments after this call. If they are needed afterwards, clone them _before_
     /// calling this function.
-    #[cfg(feature = "internals")]
-    #[deprecated = "This API is NOT deprecated, but it is considered volatile and may change in the future."]
     #[inline(always)]
-    pub fn call_fn_raw_raw(
+    pub(crate) fn _call_fn(
         &self,
+        options: CallFnOptions,
         scope: &mut Scope,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         ast: &AST,
-        eval_ast: bool,
-        rewind_scope: bool,
         name: &str,
-        this_ptr: Option<&mut Dynamic>,
-        arg_values: &mut [Dynamic],
-    ) -> RhaiResult {
-        self._call_fn(
-            scope,
-            global,
-            caches,
-            ast,
-            eval_ast,
-            rewind_scope,
-            name,
-            this_ptr,
-            arg_values,
-        )
-    }
-
-    /// Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
-    fn _call_fn(
-        &self,
-        scope: &mut Scope,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        ast: &AST,
-        eval_ast: bool,
-        rewind_scope: bool,
-        name: &str,
-        this_ptr: Option<&mut Dynamic>,
         arg_values: &mut [Dynamic],
     ) -> RhaiResult {
         let statements = ast.statements();
 
         let orig_lib_len = global.lib.len();
 
-        #[cfg(not(feature = "no_function"))]
+        let mut orig_tag = None;
+
+        if let Some(value) = options.tag {
+            orig_tag = Some(mem::replace(&mut global.tag, value));
+        }
+
         global.lib.push(ast.shared_lib().clone());
 
         let mut no_this_ptr = Dynamic::NULL;
-        let this_ptr = this_ptr.unwrap_or(&mut no_this_ptr);
+        let this_ptr = options.this_ptr.unwrap_or(&mut no_this_ptr);
 
         #[cfg(not(feature = "no_module"))]
         let orig_embedded_module_resolver = std::mem::replace(
@@ -264,7 +236,9 @@ impl Engine {
             ast.resolver().cloned(),
         );
 
-        let result = if eval_ast && !statements.is_empty() {
+        let rewind_scope = options.rewind_scope;
+
+        let result = if options.eval_ast && !statements.is_empty() {
             let orig_scope_len = scope.len();
             let scope = &mut *RestoreOnDrop::lock_if(rewind_scope, scope, move |s| {
                 s.rewind(orig_scope_len);
@@ -308,6 +282,11 @@ impl Engine {
         {
             global.embedded_module_resolver = orig_embedded_module_resolver;
         }
+
+        if let Some(value) = orig_tag {
+            global.tag = value;
+        }
+
         global.lib.truncate(orig_lib_len);
 
         result

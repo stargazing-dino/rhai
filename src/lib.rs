@@ -253,6 +253,9 @@ pub use func::Func;
 #[cfg(not(feature = "no_function"))]
 pub use ast::ScriptFnMetadata;
 
+#[cfg(not(feature = "no_function"))]
+pub use api::call_fn::CallFnOptions;
+
 /// Variable-sized array of [`Dynamic`] values.
 ///
 /// Not available under `no_index`.

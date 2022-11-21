@@ -7,10 +7,10 @@ use crate::plugin::PluginFunction;
 use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
-    calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Position, RhaiResult, RhaiResultOf,
-    StaticVec, VarDefInfo, ERR,
+    calc_fn_hash, reify, Dynamic, Engine, EvalContext, FuncArgs, Position, RhaiResult,
+    RhaiResultOf, StaticVec, VarDefInfo, ERR,
 };
-use std::any::type_name;
+use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -305,6 +305,11 @@ impl<'a> NativeCallContext<'a> {
 
         let result = self._call_fn_raw(fn_name, &mut args, false, false, false)?;
 
+        // Bail out early if the return type needs no cast
+        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+            return Ok(reify!(result => T));
+        }
+
         let typ = self.engine().map_type_name(result.type_name());
 
         result.try_cast().ok_or_else(|| {
@@ -329,6 +334,11 @@ impl<'a> NativeCallContext<'a> {
         let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
         let result = self._call_fn_raw(fn_name, &mut args, true, false, false)?;
+
+        // Bail out early if the return type needs no cast
+        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+            return Ok(reify!(result => T));
+        }
 
         let typ = self.engine().map_type_name(result.type_name());
 

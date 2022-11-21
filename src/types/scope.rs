@@ -445,7 +445,8 @@ impl Scope<'_> {
             .rev()
             .enumerate()
             .find(|(.., key)| &name == key)
-            .and_then(|(index, ..)| self.values[len - 1 - index].flatten_clone().try_cast())
+            .map(|(index, ..)| self.values[len - 1 - index].flatten_clone())
+            .and_then(Dynamic::try_cast)
     }
     /// Check if the named entry in the [`Scope`] is constant.
     ///

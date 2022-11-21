@@ -66,6 +66,13 @@ impl<T: Variant + Clone> FuncArgs for Vec<T> {
     }
 }
 
+impl<T: Variant + Clone, const N: usize> FuncArgs for [T; N] {
+    #[inline]
+    fn parse<ARGS: Extend<Dynamic>>(self, args: &mut ARGS) {
+        args.extend(IntoIterator::into_iter(self).map(Dynamic::from));
+    }
+}
+
 /// Macro to implement [`FuncArgs`] for tuples of standard types (each can be converted into a [`Dynamic`]).
 macro_rules! impl_args {
     ($($p:ident),*) => {

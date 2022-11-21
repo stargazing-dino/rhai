@@ -8,7 +8,7 @@ pub fn main() {
 #[cfg(not(feature = "no_function"))]
 #[cfg(not(feature = "no_object"))]
 pub fn main() {
-    use rhai::{Dynamic, Engine, Map, Scope, AST};
+    use rhai::{CallFnOptions, Dynamic, Engine, ImmutableString, Map, Scope, AST};
     use std::io::{stdin, stdout, Write};
 
     const SCRIPT_FILE: &str = "event_handler_js/script.rhai";
@@ -98,7 +98,12 @@ pub fn main() {
     println!();
 
     // Run the 'init' function to initialize the state, retaining variables.
-    let result = engine.call_fn_raw(&mut scope, &ast, false, true, "init", Some(&mut states), []);
+
+    let options = CallFnOptions::new()
+        .eval_ast(false)
+        .bind_this_ptr(&mut states);
+
+    let result = engine.call_fn_with_options::<()>(options, &mut scope, &ast, "init", ());
 
     if let Err(err) = result {
         eprintln!("! {err}")
@@ -124,7 +129,7 @@ pub fn main() {
         let mut fields = input.trim().splitn(2, ' ');
 
         let event = fields.next().expect("event").trim();
-        let arg = fields.next().unwrap_or("");
+        let arg = fields.next().unwrap_or("").to_string();
 
         // Process event
         match event {
@@ -146,10 +151,11 @@ pub fn main() {
                 let engine = &handler.engine;
                 let scope = &mut handler.scope;
                 let ast = &handler.ast;
-                let this_ptr = Some(&mut handler.states);
+                let options = CallFnOptions::new()
+                    .eval_ast(false)
+                    .bind_this_ptr(&mut handler.states);
 
-                let result =
-                    engine.call_fn_raw(scope, ast, false, true, event, this_ptr, [arg.into()]);
+                let result = engine.call_fn_with_options::<()>(options, scope, ast, event, (arg,));
 
                 if let Err(err) = result {
                     eprintln!("! {err}")

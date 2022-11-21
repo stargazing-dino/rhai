@@ -1,5 +1,5 @@
 #![cfg(not(feature = "no_function"))]
-use rhai::{Dynamic, Engine, EvalAltResult, FnPtr, Func, FuncArgs, Scope, AST, INT};
+use rhai::{CallFnOptions, Dynamic, Engine, EvalAltResult, FnPtr, Func, FuncArgs, Scope, AST, INT};
 use std::any::TypeId;
 
 #[test]
@@ -50,11 +50,10 @@ fn test_call_fn() -> Result<(), Box<EvalAltResult>> {
 
     assert!(!scope.contains("bar"));
 
-    let args = [(2 as INT).into()];
-    let r = engine
-        .call_fn_raw(&mut scope, &ast, false, false, "define_var", None, args)?
-        .as_int()
-        .unwrap();
+    let options = CallFnOptions::new().eval_ast(false).rewind_scope(false);
+
+    let r =
+        engine.call_fn_with_options::<INT>(options, &mut scope, &ast, "define_var", (2 as INT,))?;
     assert_eq!(r, 42);
 
     assert_eq!(
@@ -87,9 +86,13 @@ fn test_call_fn_scope() -> Result<(), Box<EvalAltResult>> {
 
     for _ in 0..50 {
         assert_eq!(
-            engine
-                .call_fn_raw(&mut scope, &ast, true, false, "foo", None, [Dynamic::THREE])?
-                .as_int()?,
+            engine.call_fn_with_options::<INT>(
+                CallFnOptions::new().rewind_scope(false),
+                &mut scope,
+                &ast,
+                "foo",
+                [Dynamic::THREE],
+            )?,
             168
         );
     }

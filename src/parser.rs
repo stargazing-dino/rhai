@@ -3818,7 +3818,7 @@ impl Engine {
         &self,
         input: &mut TokenStream,
         state: &mut ParseState,
-        process_settings: impl Fn(&mut ParseSettings),
+        process_settings: impl FnOnce(&mut ParseSettings),
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
         let mut functions = StraightHashMap::default();
@@ -3882,7 +3882,7 @@ impl Engine {
         &self,
         input: &mut TokenStream,
         state: &mut ParseState,
-        process_settings: impl Fn(&mut ParseSettings),
+        process_settings: impl FnOnce(&mut ParseSettings),
     ) -> ParseResult<(StmtBlockContainer, StaticVec<Shared<ScriptFnDef>>)> {
         let mut statements = StmtBlockContainer::new_const();
         let mut functions = StraightHashMap::default();

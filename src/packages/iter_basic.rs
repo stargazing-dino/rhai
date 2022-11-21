@@ -23,7 +23,7 @@ use rust_decimal::Decimal;
 #[inline(always)]
 fn std_add<T>(x: T, y: T) -> Option<T>
 where
-    T: Debug + Copy + PartialOrd + num_traits::CheckedAdd<Output = T>,
+    T: num_traits::CheckedAdd<Output = T>,
 {
     x.checked_add(&y)
 }
@@ -31,14 +31,14 @@ where
 #[allow(dead_code)]
 fn regular_add<T>(x: T, y: T) -> Option<T>
 where
-    T: Debug + Copy + PartialOrd + std::ops::Add<Output = T>,
+    T: std::ops::Add<Output = T>,
 {
     Some(x + y)
 }
 
 // Range iterator with step
 #[derive(Clone, Hash, Eq, PartialEq)]
-pub struct StepRange<T: Debug + Copy + PartialOrd> {
+pub struct StepRange<T> {
     pub from: T,
     pub to: T,
     pub step: T,
@@ -46,7 +46,7 @@ pub struct StepRange<T: Debug + Copy + PartialOrd> {
     pub dir: i8,
 }
 
-impl<T: Debug + Copy + PartialOrd> Debug for StepRange<T> {
+impl<T: Debug> Debug for StepRange<T> {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -58,7 +58,7 @@ impl<T: Debug + Copy + PartialOrd> Debug for StepRange<T> {
     }
 }
 
-impl<T: Debug + Copy + PartialOrd> StepRange<T> {
+impl<T: Copy + PartialOrd> StepRange<T> {
     pub fn new(from: T, to: T, step: T, add: fn(T, T) -> Option<T>) -> RhaiResultOf<Self> {
         let mut dir = 0;
 
@@ -95,7 +95,7 @@ impl<T: Debug + Copy + PartialOrd> StepRange<T> {
     }
 }
 
-impl<T: Debug + Copy + PartialOrd> Iterator for StepRange<T> {
+impl<T: Copy + PartialOrd> Iterator for StepRange<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
@@ -118,7 +118,7 @@ impl<T: Debug + Copy + PartialOrd> Iterator for StepRange<T> {
     }
 }
 
-impl<T: Debug + Copy + PartialOrd> FusedIterator for StepRange<T> {}
+impl<T: Copy + PartialOrd> FusedIterator for StepRange<T> {}
 
 // Bit-field iterator with step
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

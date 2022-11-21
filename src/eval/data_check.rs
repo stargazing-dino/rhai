@@ -150,16 +150,15 @@ impl Engine {
 
         // Guard against too many operations
         let max = self.max_operations();
-        let num_operations = global.num_operations;
 
-        if max > 0 && num_operations > max {
+        if max > 0 && global.num_operations > max {
             return Err(ERR::ErrorTooManyOperations(pos).into());
         }
 
         // Report progress
         self.progress
             .as_ref()
-            .and_then(|p| p(num_operations))
+            .and_then(|p| p(global.num_operations))
             .map_or(Ok(()), |token| Err(ERR::ErrorTerminated(token, pos).into()))
     }
 }

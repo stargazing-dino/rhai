@@ -4,13 +4,13 @@ use crate::eval::GlobalRuntimeState;
 use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError, RhaiResult,
-    RhaiResultOf, StaticVec, AST, ERR,
+    reify, Dynamic, Engine, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError,
+    RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
-    any::type_name,
+    any::{type_name, TypeId},
     convert::{TryFrom, TryInto},
     fmt, mem,
 };
@@ -160,6 +160,11 @@ impl FnPtr {
 
         let result = self.call_raw(&ctx, None, arg_values)?;
 
+        // Bail out early if the return type needs no cast
+        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+            return Ok(reify!(result => T));
+        }
+
         let typ = engine.map_type_name(result.type_name());
 
         result.try_cast().ok_or_else(|| {
@@ -183,6 +188,11 @@ impl FnPtr {
         args.parse(&mut arg_values);
 
         let result = self.call_raw(context, None, arg_values)?;
+
+        // Bail out early if the return type needs no cast
+        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+            return Ok(reify!(result => T));
+        }
 
         let typ = context.engine().map_type_name(result.type_name());
 
