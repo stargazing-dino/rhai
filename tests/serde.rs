@@ -798,6 +798,7 @@ fn test_serde_optional() -> Result<(), Box<EvalAltResult>> {
 
 #[test]
 #[cfg(not(feature = "no_index"))]
+#[cfg(not(feature = "no_object"))]
 fn test_serde_blob() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
 
@@ -805,35 +806,17 @@ fn test_serde_blob() -> Result<(), Box<EvalAltResult>> {
         "
             let x = blob(10);
             for i in 0..10 { x[i] = i; }
-            x
+            #{ x: x }
         ",
     )?;
 
-    let json = serde_json::to_string(&r).unwrap();
+    let data = format!("{r:?}");
 
-    assert_eq!(json, "[0,1,2,3,4,5,6,7,8,9]");
+    let encoded = rmp_serde::to_vec(&r).unwrap();
+    let decoded: Dynamic = rmp_serde::from_slice(&encoded).unwrap();
 
-    let r = from_dynamic::<serde_bytes::ByteBuf>(&r)?;
+    assert_eq!(format!("{decoded:?}"), data);
 
-    assert_eq!(r.to_vec(), vec![0_u8, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-
-    #[cfg(not(feature = "no_object"))]
-    {
-        let r = engine.eval::<Dynamic>(
-            "
-            let x = blob(10);
-            for i in 0..10 { x[i] = i; }
-            #{ x: x }
-        ",
-        )?;
-
-        let data = format!("{r:?}");
-
-        let encoded = rmp_serde::to_vec(&r).unwrap();
-        let decoded: Dynamic = rmp_serde::from_slice(&encoded).unwrap();
-
-        assert_eq!(format!("{decoded:?}"), data);
-    }
     Ok(())
 }
 
