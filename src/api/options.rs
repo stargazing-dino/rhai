@@ -68,8 +68,9 @@ impl Engine {
     }
     /// Set whether `if`-expression is allowed.
     #[inline(always)]
-    pub fn set_allow_if_expression(&mut self, enable: bool) {
+    pub fn set_allow_if_expression(&mut self, enable: bool) -> &mut Self {
         self.options.set(LangOptions::IF_EXPR, enable);
+        self
     }
     /// Is `switch` expression allowed?
     /// Default is `true`.
@@ -80,8 +81,9 @@ impl Engine {
     }
     /// Set whether `switch` expression is allowed.
     #[inline(always)]
-    pub fn set_allow_switch_expression(&mut self, enable: bool) {
+    pub fn set_allow_switch_expression(&mut self, enable: bool) -> &mut Self {
         self.options.set(LangOptions::SWITCH_EXPR, enable);
+        self
     }
     /// Are loop expressions allowed?
     /// Default is `true`.
@@ -92,8 +94,9 @@ impl Engine {
     }
     /// Set whether loop expressions are allowed.
     #[inline(always)]
-    pub fn set_allow_loop_expressions(&mut self, enable: bool) {
+    pub fn set_allow_loop_expressions(&mut self, enable: bool) -> &mut Self {
         self.options.set(LangOptions::LOOP_EXPR, enable);
+        self
     }
     /// Is statement-expression allowed?
     /// Default is `true`.
@@ -104,8 +107,9 @@ impl Engine {
     }
     /// Set whether statement-expression is allowed.
     #[inline(always)]
-    pub fn set_allow_statement_expression(&mut self, enable: bool) {
+    pub fn set_allow_statement_expression(&mut self, enable: bool) -> &mut Self {
         self.options.set(LangOptions::STMT_EXPR, enable);
+        self
     }
     /// Is anonymous function allowed?
     /// Default is `true`.
@@ -122,8 +126,9 @@ impl Engine {
     /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
-    pub fn set_allow_anonymous_fn(&mut self, enable: bool) {
+    pub fn set_allow_anonymous_fn(&mut self, enable: bool) -> &mut Self {
         self.options.set(LangOptions::ANON_FN, enable);
+        self
     }
     /// Is looping allowed?
     /// Default is `true`.
@@ -134,8 +139,9 @@ impl Engine {
     }
     /// Set whether looping is allowed.
     #[inline(always)]
-    pub fn set_allow_looping(&mut self, enable: bool) {
+    pub fn set_allow_looping(&mut self, enable: bool) -> &mut Self {
         self.options.set(LangOptions::LOOPING, enable);
+        self
     }
     /// Is variables shadowing allowed?
     /// Default is `true`.
@@ -146,8 +152,9 @@ impl Engine {
     }
     /// Set whether variables shadowing is allowed.
     #[inline(always)]
-    pub fn set_allow_shadowing(&mut self, enable: bool) {
+    pub fn set_allow_shadowing(&mut self, enable: bool) -> &mut Self {
         self.options.set(LangOptions::SHADOW, enable);
+        self
     }
     /// Is strict variables mode enabled?
     /// Default is `false`.
@@ -158,8 +165,9 @@ impl Engine {
     }
     /// Set whether strict variables mode is enabled.
     #[inline(always)]
-    pub fn set_strict_variables(&mut self, enable: bool) {
+    pub fn set_strict_variables(&mut self, enable: bool) -> &mut Self {
         self.options.set(LangOptions::STRICT_VAR, enable);
+        self
     }
     /// Raise error if an object map property does not exist?
     /// Default is `false`.
@@ -177,9 +185,10 @@ impl Engine {
     /// Not available under `no_object`.
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn set_fail_on_invalid_map_property(&mut self, enable: bool) {
+    pub fn set_fail_on_invalid_map_property(&mut self, enable: bool) -> &mut Self {
         self.options
             .set(LangOptions::FAIL_ON_INVALID_MAP_PROPERTY, enable);
+        self
     }
     /// Is fast operators mode enabled?
     /// Default is `false`.
@@ -190,7 +199,8 @@ impl Engine {
     }
     /// Set whether fast operators mode is enabled.
     #[inline(always)]
-    pub fn set_fast_operators(&mut self, enable: bool) {
+    pub fn set_fast_operators(&mut self, enable: bool) -> &mut Self {
         self.options.set(LangOptions::FAST_OPS, enable);
+        self
     }
 }
