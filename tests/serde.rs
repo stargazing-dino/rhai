@@ -825,7 +825,14 @@ fn test_serde_blob() -> Result<(), Box<EvalAltResult>> {
 fn test_serde_json_borrowed_string() {
     let value = json!({ "a": "b" });
     println!("value: {value:?}");
-    let _: Dynamic = serde_json::from_value(value).unwrap();
+
+    let result: Dynamic = serde_json::from_value(value.clone()).unwrap();
+    println!("result: {result:?}");
+
+    let value2 = serde_json::to_value(&result).unwrap();
+    println!("value2: {value2:?}");
+
+    assert_eq!(value, value2);
 }
 
 #[test]
