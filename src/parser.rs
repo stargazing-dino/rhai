@@ -333,8 +333,12 @@ impl ParseSettings {
 #[cfg(not(feature = "no_function"))]
 #[inline]
 #[must_use]
-pub fn make_anonymous_fn(hash: u64) -> String {
-    format!("{}{:016x}", crate::engine::FN_ANONYMOUS, hash)
+pub fn make_anonymous_fn(hash: u64) -> Identifier {
+    use std::fmt::Write;
+
+    let mut buf = Identifier::new_const();
+    write!(&mut buf, "{}{:016x}", crate::engine::FN_ANONYMOUS, hash).unwrap();
+    buf
 }
 
 /// Is this function an anonymous function?
@@ -387,7 +391,7 @@ impl Expr {
         };
 
         Err(
-            PERR::MismatchedType("a boolean expression".to_string(), type_name.to_string())
+            PERR::MismatchedType("a boolean expression".into(), type_name.into())
                 .into_err(self.start_position()),
         )
     }
@@ -405,7 +409,7 @@ impl Expr {
         };
 
         Err(
-            PERR::MismatchedType("an iterable value".to_string(), type_name.to_string())
+            PERR::MismatchedType("an iterable value".into(), type_name.into())
                 .into_err(self.start_position()),
         )
     }
@@ -426,8 +430,8 @@ fn ensure_not_statement_expr(
 fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
     match input.peek().expect(NEVER_ENDS) {
         (Token::Equals, pos) => Err(LexError::ImproperSymbol(
-            "=".to_string(),
-            "Possibly a typo of '=='?".to_string(),
+            "=".into(),
+            "Possibly a typo of '=='?".into(),
         )
         .into_err(*pos)),
         _ => Ok(()),
@@ -438,15 +442,15 @@ fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
 ///
 /// # Panics
 ///
-/// Panics if the next token is not the expected one.
+/// Panics if the next token is not the expected one, or either tokens is not a literal symbol.
 fn eat_token(input: &mut TokenStream, expected_token: Token) -> Position {
     let (t, pos) = input.next().expect(NEVER_ENDS);
 
     if t != expected_token {
         unreachable!(
             "{} expected but gets {} at {}",
-            expected_token.syntax(),
-            t.syntax(),
+            expected_token.literal_syntax(),
+            t.literal_syntax(),
             pos
         );
     }
@@ -588,7 +592,7 @@ impl Engine {
                         && !self.global_sub_modules.contains_key(root)
                     {
                         return Err(
-                            PERR::ModuleUndefined(root.to_string()).into_err(namespace.position())
+                            PERR::ModuleUndefined(root.into()).into_err(namespace.position())
                         );
                     }
 
@@ -655,8 +659,9 @@ impl Engine {
                             && !state.global_imports.iter().any(|m| m.as_str() == root)
                             && !self.global_sub_modules.contains_key(root)
                         {
-                            return Err(PERR::ModuleUndefined(root.to_string())
-                                .into_err(namespace.position()));
+                            return Err(
+                                PERR::ModuleUndefined(root.into()).into_err(namespace.position())
+                            );
                         }
 
                         namespace.set_index(index);
@@ -901,7 +906,7 @@ impl Engine {
 
             if self.max_array_size() > 0 && array.len() >= self.max_array_size() {
                 return Err(PERR::LiteralTooLarge(
-                    "Size of array literal".to_string(),
+                    "Size of array literal".into(),
                     self.max_array_size(),
                 )
                 .into_err(input.peek().expect(NEVER_ENDS).1));
@@ -1037,7 +1042,7 @@ impl Engine {
 
             if self.max_map_size() > 0 && map.len() >= self.max_map_size() {
                 return Err(PERR::LiteralTooLarge(
-                    "Number of properties in object map literal".to_string(),
+                    "Number of properties in object map literal".into(),
                     self.max_map_size(),
                 )
                 .into_err(input.peek().expect(NEVER_ENDS).1));
@@ -1185,7 +1190,7 @@ impl Engine {
                 (.., pos) => {
                     return Err(PERR::MissingToken(
                         Token::DoubleArrow.into(),
-                        "in this switch case".to_string(),
+                        "in this switch case".into(),
                     )
                     .into_err(pos))
                 }
@@ -1213,7 +1218,7 @@ impl Engine {
             } else {
                 for expr in case_expr_list {
                     let value = expr.get_literal_value().ok_or_else(|| {
-                        PERR::ExprExpected("a literal".to_string()).into_err(expr.start_position())
+                        PERR::ExprExpected("a literal".into()).into_err(expr.start_position())
                     })?;
 
                     let mut range_value: Option<RangeCase> = None;
@@ -1315,9 +1320,7 @@ impl Engine {
 
         let root_expr = match token {
             _ if !(state.expr_filter)(token) => {
-                return Err(
-                    LexError::UnexpectedInput(token.syntax().to_string()).into_err(settings.pos)
-                )
+                return Err(LexError::UnexpectedInput(token.to_string()).into_err(settings.pos))
             }
 
             Token::EOF => return Err(PERR::UnexpectedEOF.into_err(settings.pos)),
@@ -1674,11 +1677,7 @@ impl Engine {
                 token => unreachable!("Token::LexError expected but gets {:?}", token),
             },
 
-            _ => {
-                return Err(
-                    LexError::UnexpectedInput(token.syntax().to_string()).into_err(settings.pos)
-                )
-            }
+            _ => return Err(LexError::UnexpectedInput(token.to_string()).into_err(settings.pos)),
         };
 
         if !(state.expr_filter)(&input.peek().expect(NEVER_ENDS).0) {
@@ -1716,12 +1715,11 @@ impl Engine {
                 (Expr::Variable(x, ..), Token::Bang) if !x.1.is_empty() => {
                     return match input.peek().expect(NEVER_ENDS) {
                         (Token::LeftParen | Token::Unit, ..) => {
-                            Err(LexError::UnexpectedInput(Token::Bang.syntax().to_string())
-                                .into_err(tail_pos))
+                            Err(LexError::UnexpectedInput(Token::Bang.into()).into_err(tail_pos))
                         }
                         _ => Err(LexError::ImproperSymbol(
-                            "!".to_string(),
-                            "'!' cannot be used to call module functions".to_string(),
+                            "!".into(),
+                            "'!' cannot be used to call module functions".into(),
                         )
                         .into_err(tail_pos)),
                     };
@@ -1732,7 +1730,7 @@ impl Engine {
                         (Token::LeftParen | Token::Unit, ..) => (),
                         (_, pos) => {
                             return Err(PERR::MissingToken(
-                                Token::LeftParen.syntax().into(),
+                                Token::LeftParen.into(),
                                 "to start arguments list of function call".into(),
                             )
                             .into_err(*pos))
@@ -1821,11 +1819,9 @@ impl Engine {
                     Self::make_dot_expr(state, expr, rhs, ASTFlags::NONE, op_flags, tail_pos)?
                 }
                 // Unknown postfix operator
-                (expr, token) => unreachable!(
-                    "unknown postfix operator '{}' for {:?}",
-                    token.syntax(),
-                    expr
-                ),
+                (expr, token) => {
+                    unreachable!("unknown postfix operator '{}' for {:?}", token, expr)
+                }
             }
         }
 
@@ -1863,7 +1859,7 @@ impl Engine {
                         && !self.global_sub_modules.contains_key(root)
                     {
                         return Err(
-                            PERR::ModuleUndefined(root.to_string()).into_err(namespace.position())
+                            PERR::ModuleUndefined(root.into()).into_err(namespace.position())
                         );
                     }
 
@@ -1890,7 +1886,7 @@ impl Engine {
         let (token, token_pos) = input.peek().expect(NEVER_ENDS);
 
         if !(state.expr_filter)(token) {
-            return Err(LexError::UnexpectedInput(token.syntax().to_string()).into_err(*token_pos));
+            return Err(LexError::UnexpectedInput(token.to_string()).into_err(*token_pos));
         }
 
         let mut settings = settings;
@@ -2092,8 +2088,8 @@ impl Engine {
             }
             // ??? && ??? = rhs, ??? || ??? = rhs, xxx ?? xxx = rhs
             Expr::And(..) | Expr::Or(..) | Expr::Coalesce(..) => Err(LexError::ImproperSymbol(
-                "=".to_string(),
-                "Possibly a typo of '=='?".to_string(),
+                "=".into(),
+                "Possibly a typo of '=='?".into(),
             )
             .into_err(op_pos)),
             // expr = rhs
@@ -2362,7 +2358,7 @@ impl Engine {
             #[cfg(not(feature = "unchecked"))]
             settings.ensure_level_within_max_limit(state.max_expr_depth)?;
 
-            let op = op_token.syntax();
+            let op = op_token.to_string();
             let hash = calc_fn_hash(None, &op, 2);
             let is_valid_script_function = is_valid_function_name(&op);
             let operator_token = if is_valid_script_function {
@@ -2379,7 +2375,7 @@ impl Engine {
             let mut op_base = FnCallExpr {
                 #[cfg(not(feature = "no_module"))]
                 namespace: Default::default(),
-                name: state.get_interned_string(op.as_ref()),
+                name: state.get_interned_string(&op),
                 hashes: FnCallHashes::from_native(hash),
                 args,
                 op_token: operator_token,
@@ -2492,7 +2488,7 @@ impl Engine {
             settings.pos = *fwd_pos;
             let settings = settings.level_up();
 
-            required_token = match parse_func(&segments, &*fwd_token.syntax(), &mut user_state) {
+            required_token = match parse_func(&segments, &fwd_token.to_string(), &mut user_state) {
                 Ok(Some(seg))
                     if seg.starts_with(CUSTOM_SYNTAX_MARKER_SYNTAX_VARIANT)
                         && seg.len() > CUSTOM_SYNTAX_MARKER_SYNTAX_VARIANT.len() =>
@@ -2551,8 +2547,7 @@ impl Engine {
                     }
                     (.., pos) => {
                         return Err(
-                            PERR::MissingSymbol("Expecting 'true' or 'false'".to_string())
-                                .into_err(pos),
+                            PERR::MissingSymbol("Expecting 'true' or 'false'".into()).into_err(pos)
                         )
                     }
                 },
@@ -2564,8 +2559,7 @@ impl Engine {
                     }
                     (.., pos) => {
                         return Err(
-                            PERR::MissingSymbol("Expecting an integer number".to_string())
-                                .into_err(pos),
+                            PERR::MissingSymbol("Expecting an integer number".into()).into_err(pos)
                         )
                     }
                 },
@@ -2577,10 +2571,10 @@ impl Engine {
                         tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_FLOAT));
                     }
                     (.., pos) => {
-                        return Err(PERR::MissingSymbol(
-                            "Expecting a floating-point number".to_string(),
+                        return Err(
+                            PERR::MissingSymbol("Expecting a floating-point number".into())
+                                .into_err(pos),
                         )
-                        .into_err(pos))
                     }
                 },
                 CUSTOM_SYNTAX_MARKER_STRING => match input.next().expect(NEVER_ENDS) {
@@ -2591,20 +2585,26 @@ impl Engine {
                         tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_STRING));
                     }
                     (.., pos) => {
-                        return Err(
-                            PERR::MissingSymbol("Expecting a string".to_string()).into_err(pos)
-                        )
+                        return Err(PERR::MissingSymbol("Expecting a string".into()).into_err(pos))
                     }
                 },
                 s => match input.next().expect(NEVER_ENDS) {
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
-                    (t, ..) if &*t.syntax() == s => {
+                    (Token::Identifier(t), ..)
+                    | (Token::Reserved(t), ..)
+                    | (Token::Custom(t), ..)
+                        if *t == s =>
+                    {
+                        segments.push(required_token.clone());
+                        tokens.push(required_token.clone().into());
+                    }
+                    (t, ..) if t.is_literal() && t.literal_syntax() == s => {
                         segments.push(required_token.clone());
                         tokens.push(required_token.clone().into());
                     }
                     (.., pos) => {
                         return Err(PERR::MissingToken(
-                            s.to_string(),
+                            s.into(),
                             format!("for '{}' expression", segments[0]),
                         )
                         .into_err(pos))
@@ -2805,9 +2805,7 @@ impl Engine {
             let (counter_name, counter_pos) = parse_var_name(input)?;
 
             if counter_name == name {
-                return Err(
-                    PERR::DuplicatedVariable(counter_name.to_string()).into_err(counter_pos)
-                );
+                return Err(PERR::DuplicatedVariable(counter_name.into()).into_err(counter_pos));
             }
 
             let (has_close_paren, pos) = match_token(input, Token::RightParen);
@@ -2893,7 +2891,7 @@ impl Engine {
         let (name, pos) = parse_var_name(input)?;
 
         if !self.allow_shadowing() && state.stack.iter().any(|(v, ..)| v == name) {
-            return Err(PERR::VariableExists(name.to_string()).into_err(pos));
+            return Err(PERR::VariableExists(name.into()).into_err(pos));
         }
 
         if let Some(ref filter) = self.def_var_filter {
@@ -2914,10 +2912,10 @@ impl Engine {
 
             match filter(false, info, context) {
                 Ok(true) => (),
-                Ok(false) => return Err(PERR::ForbiddenVariable(name.to_string()).into_err(pos)),
+                Ok(false) => return Err(PERR::ForbiddenVariable(name.into()).into_err(pos)),
                 Err(err) => match *err {
                     EvalAltResult::ErrorParsing(e, pos) => return Err(e.into_err(pos)),
-                    _ => return Err(PERR::ForbiddenVariable(name.to_string()).into_err(pos)),
+                    _ => return Err(PERR::ForbiddenVariable(name.into()).into_err(pos)),
                 },
             }
         }
@@ -3361,7 +3359,7 @@ impl Engine {
 
                     (.., pos) => Err(PERR::MissingToken(
                         Token::Fn.into(),
-                        format!("following '{}'", Token::Private.syntax()),
+                        format!("following '{}'", Token::Private),
                     )
                     .into_err(pos)),
                 }
@@ -3564,7 +3562,7 @@ impl Engine {
                 eat_token(input, Token::Unit);
                 true
             }
-            (.., pos) => return Err(PERR::FnMissingParams(name.to_string()).into_err(*pos)),
+            (.., pos) => return Err(PERR::FnMissingParams(name.into()).into_err(*pos)),
         };
 
         let mut params = StaticVec::<(ImmutableString, _)>::new_const();
@@ -3577,8 +3575,9 @@ impl Engine {
                     (Token::RightParen, ..) => break,
                     (Token::Identifier(s), pos) => {
                         if params.iter().any(|(p, _)| p.as_str() == &*s) {
-                            return Err(PERR::FnDuplicatedParam(name.to_string(), s.to_string())
-                                .into_err(pos));
+                            return Err(
+                                PERR::FnDuplicatedParam(name.into(), s.to_string()).into_err(pos)
+                            );
                         }
                         let s = state.get_interned_string(*s);
                         state.stack.push(s.clone(), ());
@@ -3611,7 +3610,7 @@ impl Engine {
                 settings.is_breakable = false;
                 self.parse_block(input, state, lib, settings.level_up())?
             }
-            (.., pos) => return Err(PERR::FnMissingBody(name.to_string()).into_err(*pos)),
+            (.., pos) => return Err(PERR::FnMissingBody(name.into()).into_err(*pos)),
         }
         .into();
 
@@ -3851,9 +3850,7 @@ impl Engine {
         match input.peek().expect(NEVER_ENDS) {
             (Token::EOF, ..) => (),
             // Return error if the expression doesn't end
-            (token, pos) => {
-                return Err(LexError::UnexpectedInput(token.syntax().to_string()).into_err(*pos))
-            }
+            (token, pos) => return Err(LexError::UnexpectedInput(token.to_string()).into_err(*pos)),
         }
 
         let mut statements = StmtBlockContainer::new_const();

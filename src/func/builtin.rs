@@ -4,11 +4,12 @@ use super::call::FnCallArgs;
 use super::native::FnBuiltin;
 use crate::tokenizer::{Token, Token::*};
 use crate::{
-    Dynamic, ExclusiveRange, ImmutableString, InclusiveRange, NativeCallContext, RhaiResult, INT,
+    Dynamic, ExclusiveRange, ImmutableString, InclusiveRange, NativeCallContext, RhaiResult,
+    SmartString, INT,
 };
-use std::any::TypeId;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+use std::{any::TypeId, fmt::Write};
 
 #[cfg(not(feature = "no_float"))]
 use crate::FLOAT;
@@ -241,7 +242,9 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
                     let x = args[0].as_char().expect(BUILTIN);
                     let y = args[1].as_char().expect(BUILTIN);
 
-                    let result = format!("{x}{y}");
+                    let mut result = SmartString::new_const();
+                    result.push(x);
+                    result.push(y);
 
                     #[cfg(not(feature = "unchecked"))]
                     _ctx.engine()
@@ -399,7 +402,10 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
             Plus => Some(|_ctx, args| {
                 let x = args[0].as_char().expect(BUILTIN);
                 let y = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
-                let result = format!("{x}{y}");
+
+                let mut result = SmartString::new_const();
+                result.push(x);
+                result.push_str(y);
 
                 #[cfg(not(feature = "unchecked"))]
                 _ctx.engine()
@@ -679,7 +685,12 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                 PlusAssign => Some(|_, args| {
                     let y = args[1].as_char().expect(BUILTIN);
                     let x = &mut *args[0].write_lock::<Dynamic>().expect(BUILTIN);
-                    Ok((*x = format!("{x}{y}").into()).into())
+
+                    let mut buf = SmartString::new_const();
+                    write!(&mut buf, "{y}").unwrap();
+                    buf.push(y);
+
+                    Ok((*x = buf.into()).into())
                 }),
                 _ => None,
             };

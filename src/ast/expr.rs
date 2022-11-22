@@ -361,7 +361,7 @@ impl fmt::Debug for Expr {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut display_pos = format!(" @ {:?}", self.start_position());
+        let mut display_pos = self.start_position();
 
         match self {
             Self::DynamicConstant(value, ..) => write!(f, "{value:?}"),
@@ -395,7 +395,7 @@ impl fmt::Debug for Expr {
                     write!(f, "{}{}", x.1, Token::DoubleColon.literal_syntax())?;
                     let pos = x.1.position();
                     if !pos.is_none() {
-                        display_pos = format!(" @ {pos:?}");
+                        display_pos = pos;
                     }
                 }
                 f.write_str(&x.3)?;
@@ -413,7 +413,7 @@ impl fmt::Debug for Expr {
             Self::Stmt(x) => {
                 let pos = x.span();
                 if !pos.is_none() {
-                    display_pos = format!(" @ {pos:?}");
+                    display_pos = pos.start();
                 }
                 f.write_str("ExprStmtBlock")?;
                 f.debug_list().entries(x.iter()).finish()
@@ -421,7 +421,7 @@ impl fmt::Debug for Expr {
             Self::FnCall(x, ..) => fmt::Debug::fmt(x, f),
             Self::Index(x, options, pos) => {
                 if !pos.is_none() {
-                    display_pos = format!(" @ {pos:?}");
+                    display_pos = *pos;
                 }
 
                 let mut f = f.debug_struct("Index");
@@ -434,7 +434,7 @@ impl fmt::Debug for Expr {
             }
             Self::Dot(x, options, pos) => {
                 if !pos.is_none() {
-                    display_pos = format!(" @ {pos:?}");
+                    display_pos = *pos;
                 }
 
                 let mut f = f.debug_struct("Dot");
@@ -454,7 +454,7 @@ impl fmt::Debug for Expr {
                 };
 
                 if !pos.is_none() {
-                    display_pos = format!(" @ {pos:?}");
+                    display_pos = *pos;
                 }
 
                 f.debug_struct(op_name)
@@ -466,7 +466,7 @@ impl fmt::Debug for Expr {
             Self::Custom(x, ..) => f.debug_tuple("Custom").field(x).finish(),
         }?;
 
-        f.write_str(&display_pos)
+        write!(f, " @ {display_pos:?}")
     }
 }
 

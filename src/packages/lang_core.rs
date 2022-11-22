@@ -269,9 +269,13 @@ fn collect_fn_metadata(
                 .iter_script_fn()
                 .filter(|(s, a, n, p, f)| filter(*s, *a, n, *p, f))
                 .for_each(|(.., f)| list.push(make_metadata(dict, namespace.into(), f).into()));
-            for (ns, m) in module.iter_sub_modules() {
-                let ns = format!(
-                    "{namespace}{}{ns}",
+            for (name, m) in module.iter_sub_modules() {
+                use std::fmt::Write;
+
+                let mut ns = crate::SmartString::new_const();
+                write!(
+                    &mut ns,
+                    "{namespace}{}{name}",
                     crate::tokenizer::Token::DoubleColon.literal_syntax()
                 );
                 scan_module(dict, list, &ns, &**m, filter);

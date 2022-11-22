@@ -9,7 +9,6 @@ use crate::{Engine, Identifier, LexError, SmartString, StaticVec, INT, UNSIGNED_
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
-    borrow::Cow,
     cell::RefCell,
     char, fmt,
     iter::{FusedIterator, Peekable},
@@ -591,12 +590,62 @@ pub enum Token {
 impl fmt::Display for Token {
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.syntax())
+        use Token::*;
+
+        match self {
+            IntegerConstant(i) => write!(f, "{i}"),
+            #[cfg(not(feature = "no_float"))]
+            FloatConstant(v) => write!(f, "{v}"),
+            #[cfg(feature = "decimal")]
+            DecimalConstant(d) => write!(f, "{d}"),
+            StringConstant(s) => write!(f, r#""{s}""#),
+            InterpolatedString(..) => f.write_str("string"),
+            CharConstant(c) => write!(f, "{c}"),
+            Identifier(s) => f.write_str(s),
+            Reserved(s) => f.write_str(s),
+            #[cfg(not(feature = "no_custom_syntax"))]
+            Custom(s) => f.write_str(s),
+            LexError(err) => write!(f, "{err}"),
+            Comment(s) => f.write_str(s),
+
+            EOF => f.write_str("{EOF}"),
+
+            token => f.write_str(token.literal_syntax()),
+        }
     }
 }
 
 impl Token {
+    /// Is the token a literal symbol?
+    #[must_use]
+    pub const fn is_literal(&self) -> bool {
+        use Token::*;
+
+        match self {
+            IntegerConstant(..) => false,
+            #[cfg(not(feature = "no_float"))]
+            FloatConstant(..) => false,
+            #[cfg(feature = "decimal")]
+            DecimalConstant(..) => false,
+            StringConstant(..)
+            | InterpolatedString(..)
+            | CharConstant(..)
+            | Identifier(..)
+            | Reserved(..) => false,
+            #[cfg(not(feature = "no_custom_syntax"))]
+            Custom(..) => false,
+            LexError(..) | Comment(..) => false,
+
+            EOF => false,
+
+            _ => true,
+        }
+    }
     /// Get the literal syntax of the token.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the token is not a literal symbol.
     #[must_use]
     pub const fn literal_syntax(&self) -> &'static str {
         use Token::*;
@@ -690,34 +739,7 @@ impl Token {
             #[cfg(not(feature = "no_module"))]
             As => "as",
 
-            _ => "ERROR: NOT A KEYWORD",
-        }
-    }
-
-    /// Get the syntax of the token.
-    #[must_use]
-    pub fn syntax(&self) -> Cow<'static, str> {
-        use Token::*;
-
-        match self {
-            IntegerConstant(i) => i.to_string().into(),
-            #[cfg(not(feature = "no_float"))]
-            FloatConstant(f) => f.to_string().into(),
-            #[cfg(feature = "decimal")]
-            DecimalConstant(d) => d.to_string().into(),
-            StringConstant(s) => format!("\"{s}\"").into(),
-            InterpolatedString(..) => "string".into(),
-            CharConstant(c) => c.to_string().into(),
-            Identifier(s) => s.to_string().into(),
-            Reserved(s) => s.to_string().into(),
-            #[cfg(not(feature = "no_custom_syntax"))]
-            Custom(s) => s.to_string().into(),
-            LexError(err) => err.to_string().into(),
-            Comment(s) => s.to_string().into(),
-
-            EOF => "{EOF}".into(),
-
-            token => token.literal_syntax().into(),
+            _ => panic!("token is not a literal symbol"),
         }
     }
 
@@ -1127,7 +1149,7 @@ impl Token {
 impl From<Token> for String {
     #[inline(always)]
     fn from(token: Token) -> Self {
-        token.syntax().into()
+        token.to_string()
     }
 }
 
@@ -2399,7 +2421,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             Some((Token::Reserved(s), pos)) => (match
                 (s.as_str(),
                     #[cfg(not(feature = "no_custom_syntax"))]
-                    (!self.engine.custom_keywords.is_empty() && self.engine.custom_keywords.contains_key(&*s)),
+                    self.engine.custom_keywords.contains_key(&*s),
                     #[cfg(feature = "no_custom_syntax")]
                     false
                 )
@@ -2436,7 +2458,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 #[cfg(feature = "no_custom_syntax")]
                 (.., true) => unreachable!("no custom operators"),
                 // Reserved keyword that is not custom and disabled.
-                (token, false) if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token) => {
+                (token, false) if self.engine.disabled_symbols.contains(token) => {
                     let msg = format!("reserved {} '{token}' is disabled", if is_valid_identifier(token) { "keyword"} else {"symbol"});
                     Token::LexError(LERR::ImproperSymbol(s.to_string(), msg).into())
                 },
@@ -2445,13 +2467,13 @@ impl<'a> Iterator for TokenIterator<'a> {
             }, pos),
             // Custom keyword
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((Token::Identifier(s), pos)) if !self.engine.custom_keywords.is_empty() && self.engine.custom_keywords.contains_key(&*s) => {
+            Some((Token::Identifier(s), pos)) if self.engine.custom_keywords.contains_key(&*s) => {
                 (Token::Custom(s), pos)
             }
             // Custom keyword/symbol - must be disabled
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((token, pos)) if !self.engine.custom_keywords.is_empty() && self.engine.custom_keywords.contains_key(token.literal_syntax()) => {
-                if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token.literal_syntax()) {
+            Some((token, pos)) if token.is_literal() && self.engine.custom_keywords.contains_key(token.literal_syntax()) => {
+                if self.engine.disabled_symbols.contains(token.literal_syntax()) {
                     // Disabled standard keyword/symbol
                     (Token::Custom(Box::new(token.literal_syntax().into())), pos)
                 } else {
@@ -2460,7 +2482,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 }
             }
             // Disabled symbol
-            Some((token, pos)) if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token.literal_syntax()) => {
+            Some((token, pos)) if token.is_literal() && self.engine.disabled_symbols.contains(token.literal_syntax()) => {
                 (Token::Reserved(Box::new(token.literal_syntax().into())), pos)
             }
             // Normal symbol

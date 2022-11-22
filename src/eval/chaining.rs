@@ -317,7 +317,7 @@ impl Engine {
         scope: &mut Scope,
         this_ptr: &mut Dynamic,
         expr: &Expr,
-        new_val: &mut Option<(Dynamic, &OpAssignment)>,
+        new_val: Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResult {
         let chain_type = ChainType::from(expr);
 
@@ -507,7 +507,7 @@ impl Engine {
         target: &mut Target,
         rhs: &Expr,
         idx_values: &mut FnArgsVec<Dynamic>,
-        new_val: &mut Option<(Dynamic, &OpAssignment)>,
+        new_val: Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResultOf<(Dynamic, bool)> {
         let is_ref_mut = target.is_ref();
         let op_pos = parent.position();
@@ -576,7 +576,7 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, parent)?;
 
-                        let (new_val, op_info) = new_val.take().expect("`Some`");
+                        let (new_val, op_info) = new_val.expect("`Some`");
                         let idx_val = &mut idx_values.pop().unwrap();
                         let idx = &mut idx_val.clone();
 
@@ -686,12 +686,12 @@ impl Engine {
                         unreachable!("function call in dot chain should not be namespace-qualified")
                     }
                     // {xxx:map}.id op= ???
-                    Expr::Property(x, pos) if target.is_map() && new_val.is_some() => {
+                    Expr::Property(x, pos) if new_val.is_some() && target.is_map() => {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, rhs)?;
 
                         let index = &mut x.2.clone().into();
-                        let (new_val, op_info) = new_val.take().expect("`Some`");
+                        let (new_val, op_info) = new_val.expect("`Some`");
                         {
                             let val_target = &mut self.get_indexed_mut(
                                 global, caches, target, index, *pos, op_pos, true, false,
@@ -720,7 +720,7 @@ impl Engine {
                         self.run_debugger(global, caches, scope, this_ptr, rhs)?;
 
                         let ((getter, hash_get), (setter, hash_set), name) = &**x;
-                        let (mut new_val, op_info) = new_val.take().expect("`Some`");
+                        let (mut new_val, op_info) = new_val.expect("`Some`");
 
                         if op_info.is_op_assignment() {
                             let args = &mut [target.as_mut()];

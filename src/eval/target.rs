@@ -13,8 +13,8 @@ use std::{
 /// Negative starting positions count from the end.
 ///
 /// Values going over bounds are limited to the actual length.
+#[cfg(not(feature = "no_index"))]
 #[inline]
-#[allow(dead_code)]
 pub fn calc_offset_len(length: usize, start: crate::INT, len: crate::INT) -> (usize, usize) {
     let start = if start < 0 {
         let abs_start = start.unsigned_abs();

@@ -21,7 +21,9 @@ pub use eval_context::EvalContext;
 #[cfg(not(feature = "no_function"))]
 pub use global_state::GlobalConstants;
 pub use global_state::GlobalRuntimeState;
-pub use target::{calc_index, calc_offset_len, Target};
+#[cfg(not(feature = "no_index"))]
+pub use target::calc_offset_len;
+pub use target::{calc_index, Target};
 
 #[cfg(feature = "unchecked")]
 mod unchecked {

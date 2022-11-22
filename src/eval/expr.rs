@@ -307,7 +307,7 @@ impl Engine {
 
                             #[cfg(not(feature = "unchecked"))]
                             if self.has_data_size_limit() {
-                                let val_sizes = Self::calc_data_sizes(&value, true);
+                                let val_sizes = value.calc_data_sizes(true);
 
                                 total_data_sizes = (
                                     total_data_sizes.0 + val_sizes.0,
@@ -339,7 +339,7 @@ impl Engine {
 
                         #[cfg(not(feature = "unchecked"))]
                         if self.has_data_size_limit() {
-                            let delta = Self::calc_data_sizes(&value, true);
+                            let delta = value.calc_data_sizes(true);
                             total_data_sizes = (
                                 total_data_sizes.0 + delta.0,
                                 total_data_sizes.1 + delta.1,
@@ -411,13 +411,11 @@ impl Engine {
 
             #[cfg(not(feature = "no_index"))]
             Expr::Index(..) => {
-                self.eval_dot_index_chain(global, caches, scope, this_ptr, expr, &mut None)
+                self.eval_dot_index_chain(global, caches, scope, this_ptr, expr, None)
             }
 
             #[cfg(not(feature = "no_object"))]
-            Expr::Dot(..) => {
-                self.eval_dot_index_chain(global, caches, scope, this_ptr, expr, &mut None)
-            }
+            Expr::Dot(..) => self.eval_dot_index_chain(global, caches, scope, this_ptr, expr, None),
 
             _ => unreachable!("expression cannot be evaluated: {:?}", expr),
         }

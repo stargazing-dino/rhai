@@ -8,7 +8,7 @@ use std::borrow::Borrow;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
-impl Engine {
+impl Dynamic {
     /// Recursively calculate the sizes of a value.
     ///
     /// Sizes returned are `(` [`Array`][crate::Array], [`Map`][crate::Map] and [`String`] `)`.
@@ -16,20 +16,20 @@ impl Engine {
     /// # Panics
     ///
     /// Panics if any interior data is shared (should never happen).
-    pub(crate) fn calc_data_sizes(value: &Dynamic, _top: bool) -> (usize, usize, usize) {
-        match value.0 {
+    pub(crate) fn calc_data_sizes(&self, _top: bool) -> (usize, usize, usize) {
+        match self.0 {
             #[cfg(not(feature = "no_index"))]
             Union::Array(ref arr, ..) => {
                 arr.iter()
                     .fold((0, 0, 0), |(ax, mx, sx), value| match value.0 {
                         Union::Array(..) => {
-                            let (a, m, s) = Self::calc_data_sizes(value, false);
+                            let (a, m, s) = value.calc_data_sizes(false);
                             (ax + a + 1, mx + m, sx + s)
                         }
                         Union::Blob(ref a, ..) => (ax + 1 + a.len(), mx, sx),
                         #[cfg(not(feature = "no_object"))]
                         Union::Map(..) => {
-                            let (a, m, s) = Self::calc_data_sizes(value, false);
+                            let (a, m, s) = value.calc_data_sizes(false);
                             (ax + a + 1, mx + m, sx + s)
                         }
                         Union::Str(ref s, ..) => (ax + 1, mx, sx + s.len()),
@@ -44,13 +44,13 @@ impl Engine {
                     .fold((0, 0, 0), |(ax, mx, sx), value| match value.0 {
                         #[cfg(not(feature = "no_index"))]
                         Union::Array(..) => {
-                            let (a, m, s) = Self::calc_data_sizes(value, false);
+                            let (a, m, s) = value.calc_data_sizes(false);
                             (ax + a, mx + m + 1, sx + s)
                         }
                         #[cfg(not(feature = "no_index"))]
                         Union::Blob(ref a, ..) => (ax + a.len(), mx, sx),
                         Union::Map(..) => {
-                            let (a, m, s) = Self::calc_data_sizes(value, false);
+                            let (a, m, s) = value.calc_data_sizes(false);
                             (ax + a, mx + m + 1, sx + s)
                         }
                         Union::Str(ref s, ..) => (ax, mx + 1, sx + s.len()),
@@ -59,17 +59,17 @@ impl Engine {
             }
             Union::Str(ref s, ..) => (0, 0, s.len()),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) if _top => {
-                Self::calc_data_sizes(&*value.read_lock::<Dynamic>().unwrap(), true)
-            }
+            Union::Shared(..) if _top => self.read_lock::<Dynamic>().unwrap().calc_data_sizes(true),
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => {
-                unreachable!("shared values discovered within data: {}", value)
+                unreachable!("shared values discovered within data: {}", self)
             }
             _ => (0, 0, 0),
         }
     }
+}
 
+impl Engine {
     /// Raise an error if any data size exceeds limit.
     ///
     /// [`Position`] in [`EvalAltResult`][crate::EvalAltResult] is always [`NONE`][Position::NONE]
@@ -125,7 +125,7 @@ impl Engine {
             return Ok(value);
         }
 
-        let sizes = Self::calc_data_sizes(value.borrow(), true);
+        let sizes = value.borrow().calc_data_sizes(true);
 
         self.raise_err_if_over_data_size_limit(sizes)
             .map(|_| value)

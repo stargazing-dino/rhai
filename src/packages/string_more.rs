@@ -33,7 +33,9 @@ mod string_functions {
         if s.is_empty() {
             string.clone()
         } else {
-            format!("{string}{s}").into()
+            let mut buf = SmartString::from(string.as_str());
+            buf.push_str(&s);
+            buf.into()
         }
     }
     #[rhai_fn(name = "+=", name = "append")]
@@ -41,7 +43,9 @@ mod string_functions {
         let s = print_with_func(FUNC_TO_STRING, &ctx, &mut item);
 
         if !s.is_empty() {
-            *string = format!("{string}{s}").into();
+            let mut buf = SmartString::from(string.as_str());
+            buf.push_str(&s);
+            *string = buf.into();
         }
     }
     #[rhai_fn(name = "+", pure)]
@@ -74,7 +78,10 @@ mod string_functions {
     }
     #[rhai_fn(name = "+")]
     pub fn add_prepend_char(character: char, string: &str) -> ImmutableString {
-        format!("{character}{string}").into()
+        let mut buf = SmartString::new_const();
+        buf.push(character);
+        buf.push_str(string);
+        buf.into()
     }
 
     #[rhai_fn(name = "+")]

@@ -258,7 +258,7 @@ impl Engine {
                     rhs_val = self.get_interned_string(value).into();
                 }
 
-                let _new_val = &mut Some((rhs_val, op_info));
+                let _new_val = Some((rhs_val, op_info));
 
                 // Must be either `var[index] op= val` or `var.prop op= val`
                 match lhs {

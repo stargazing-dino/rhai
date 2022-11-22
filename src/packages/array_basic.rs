@@ -247,8 +247,8 @@ pub mod array_functions {
                 let mut arr_len = array.len();
                 let mut arr = Dynamic::from_array(mem::take(array));
 
-                let (mut a1, mut m1, mut s1) = crate::Engine::calc_data_sizes(&arr, true);
-                let (a2, m2, s2) = crate::Engine::calc_data_sizes(&item, true);
+                let (mut a1, mut m1, mut s1) = arr.calc_data_sizes(true);
+                let (a2, m2, s2) = item.calc_data_sizes(true);
 
                 {
                     let mut guard = arr.write_lock::<Array>().unwrap();
