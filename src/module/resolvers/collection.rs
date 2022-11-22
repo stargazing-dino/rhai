@@ -6,7 +6,7 @@ use crate::{
 use std::prelude::v1::*;
 use std::{ops::AddAssign, slice::Iter};
 
-/// [Module] resolution service that holds a collection of module resolvers,
+/// [Module][crate::Module] resolution service that holds a collection of module resolvers,
 /// to be searched in sequential order.
 ///
 /// # Example

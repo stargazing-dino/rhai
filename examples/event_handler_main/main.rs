@@ -7,7 +7,7 @@ pub fn main() {
 
 #[cfg(not(feature = "no_function"))]
 pub fn main() {
-    use rhai::{Dynamic, Engine, Scope, AST};
+    use rhai::{CallFnOptions, Dynamic, Engine, Scope, AST};
     use std::io::{stdin, stdout, Write};
 
     const SCRIPT_FILE: &str = "event_handler_main/script.rhai";
@@ -86,7 +86,9 @@ pub fn main() {
     println!();
 
     // Run the 'init' function to initialize the state, retaining variables.
-    let result = engine.call_fn_raw(&mut scope, &ast, false, false, "init", None, []);
+    let options = CallFnOptions::new().eval_ast(false).rewind_scope(false);
+
+    let result = engine.call_fn_with_options::<()>(options, &mut scope, &ast, "init", ());
 
     if let Err(err) = result {
         eprintln!("! {err}")
@@ -107,7 +109,7 @@ pub fn main() {
         let mut fields = input.trim().splitn(2, ' ');
 
         let event = fields.next().expect("event").trim();
-        let arg = fields.next().unwrap_or("");
+        let arg = fields.next().unwrap_or("").to_string();
 
         // Process event
         match event {
@@ -124,7 +126,7 @@ pub fn main() {
                 let scope = &mut handler.scope;
                 let ast = &handler.ast;
 
-                let result = engine.call_fn::<()>(scope, ast, event, (arg.to_string(),));
+                let result = engine.call_fn::<()>(scope, ast, event, (arg,));
 
                 if let Err(err) = result {
                     eprintln!("! {err}")

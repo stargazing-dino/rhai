@@ -4,7 +4,7 @@ use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::ast::{Expr, OpAssignment};
 use crate::engine::{KEYWORD_THIS, OP_CONCAT};
 use crate::types::dynamic::AccessMode;
-use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, SharedModule, ERR};
+use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, ERR};
 use std::num::NonZeroUsize;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -18,23 +18,19 @@ impl Engine {
         &self,
         global: &GlobalRuntimeState,
         namespace: &crate::ast::Namespace,
-    ) -> Option<SharedModule> {
+    ) -> Option<crate::SharedModule> {
         assert!(!namespace.is_empty());
 
         let root = namespace.root();
 
-        let index = if global.always_search_scope {
-            None
-        } else {
-            namespace.index()
-        };
-
         // Qualified - check if the root module is directly indexed
-        if let Some(index) = index {
-            let offset = global.num_imports() - index.get();
+        if !global.always_search_scope {
+            if let Some(index) = namespace.index() {
+                let offset = global.num_imports() - index.get();
 
-            if let m @ Some(_) = global.get_shared_import(offset) {
-                return m;
+                if let m @ Some(_) = global.get_shared_import(offset) {
+                    return m;
+                }
             }
         }
 
@@ -54,12 +50,12 @@ impl Engine {
         scope: &'s mut Scope,
         this_ptr: &'s mut Dynamic,
         expr: &Expr,
-    ) -> RhaiResultOf<(Target<'s>, Position)> {
+    ) -> RhaiResultOf<Target<'s>> {
         match expr {
             Expr::Variable(_, Some(_), _) => {
                 self.search_scope_only(global, caches, scope, this_ptr, expr)
             }
-            Expr::Variable(v, None, _var_pos) => match &**v {
+            Expr::Variable(v, None, ..) => match &**v {
                 // Normal variable access
                 #[cfg(not(feature = "no_module"))]
                 (_, ns, ..) if ns.is_empty() => {
@@ -86,7 +82,7 @@ impl Engine {
                             |mut target| {
                                 // Module variables are constant
                                 target.set_access_mode(AccessMode::ReadOnly);
-                                Ok((target.into(), *_var_pos))
+                                Ok(target.into())
                             },
                         );
                     }
@@ -101,7 +97,7 @@ impl Engine {
                                 let mut target: Target = value.clone().into();
                                 // Module variables are constant
                                 target.set_access_mode(AccessMode::ReadOnly);
-                                return Ok((target, *_var_pos));
+                                return Ok(target);
                             }
                         }
 
@@ -136,23 +132,23 @@ impl Engine {
         scope: &'s mut Scope,
         this_ptr: &'s mut Dynamic,
         expr: &Expr,
-    ) -> RhaiResultOf<(Target<'s>, Position)> {
+    ) -> RhaiResultOf<Target<'s>> {
         // Make sure that the pointer indirection is taken only when absolutely necessary.
 
-        let (index, var_pos) = match expr {
+        let index = match expr {
             // Check if the variable is `this`
-            Expr::Variable(v, None, pos) if v.0.is_none() && v.3 == KEYWORD_THIS => {
+            Expr::Variable(v, None, ..) if v.0.is_none() && v.3 == KEYWORD_THIS => {
                 return if this_ptr.is_null() {
-                    Err(ERR::ErrorUnboundThis(*pos).into())
+                    Err(ERR::ErrorUnboundThis(expr.position()).into())
                 } else {
-                    Ok((this_ptr.into(), *pos))
+                    Ok(this_ptr.into())
                 };
             }
-            _ if global.always_search_scope => (0, expr.start_position()),
-            Expr::Variable(.., Some(i), pos) => (i.get() as usize, *pos),
+            _ if global.always_search_scope => 0,
+            Expr::Variable(_, Some(i), ..) => i.get() as usize,
             // Scripted function with the same name
             #[cfg(not(feature = "no_function"))]
-            Expr::Variable(v, None, pos)
+            Expr::Variable(v, None, ..)
                 if global
                     .lib
                     .iter()
@@ -161,9 +157,9 @@ impl Engine {
             {
                 let val: Dynamic =
                     crate::FnPtr::new_unchecked(v.3.as_str(), Default::default()).into();
-                return Ok((val.into(), *pos));
+                return Ok(val.into());
             }
-            Expr::Variable(v, None, pos) => (v.0.map_or(0, NonZeroUsize::get), *pos),
+            Expr::Variable(v, None, ..) => v.0.map_or(0, NonZeroUsize::get),
             _ => unreachable!("Expr::Variable expected but gets {:?}", expr),
         };
 
@@ -174,10 +170,10 @@ impl Engine {
             match resolve_var(var_name, index, context) {
                 Ok(Some(mut result)) => {
                     result.set_access_mode(AccessMode::ReadOnly);
-                    return Ok((result.into(), var_pos));
+                    return Ok(result.into());
                 }
                 Ok(None) => (),
-                Err(err) => return Err(err.fill_position(var_pos)),
+                Err(err) => return Err(err.fill_position(expr.position())),
             }
         }
 
@@ -191,10 +187,12 @@ impl Engine {
                 Some(index) => index,
                 None => {
                     return match self.global_modules.iter().find_map(|m| m.get_var(var_name)) {
-                        Some(val) => Ok((val.into(), var_pos)),
-                        None => {
-                            Err(ERR::ErrorVariableNotFound(var_name.to_string(), var_pos).into())
-                        }
+                        Some(val) => Ok(val.into()),
+                        None => Err(ERR::ErrorVariableNotFound(
+                            var_name.to_string(),
+                            expr.position(),
+                        )
+                        .into()),
                     }
                 }
             }
@@ -202,17 +200,10 @@ impl Engine {
 
         let val = scope.get_mut_by_index(index);
 
-        Ok((val.into(), var_pos))
+        Ok(val.into())
     }
 
     /// Evaluate an expression.
-    //
-    // # Implementation Notes
-    //
-    // Do not use the `?` operator within the main body as it makes this function return early,
-    // possibly by-passing important cleanup tasks at the end.
-    //
-    // Errors that are not recoverable, such as system errors or safety errors, can use `?`.
     pub(crate) fn eval_expr(
         &self,
         global: &mut GlobalRuntimeState,
@@ -256,7 +247,7 @@ impl Engine {
                 }
             } else {
                 self.search_namespace(global, caches, scope, this_ptr, expr)
-                    .map(|(val, ..)| val.take_or_clone())
+                    .map(Target::take_or_clone)
             };
         }
 
@@ -286,10 +277,8 @@ impl Engine {
                 let target = &mut concat;
 
                 let mut op_info = OpAssignment::new_op_assignment(OP_CONCAT, Position::NONE);
-                let root = ("", Position::NONE);
 
-                let result = x
-                    .iter()
+                x.iter()
                     .try_for_each(|expr| {
                         let item = self
                             .eval_expr(global, caches, scope, this_ptr, expr)?
@@ -297,11 +286,10 @@ impl Engine {
 
                         op_info.pos = expr.start_position();
 
-                        self.eval_op_assignment(global, caches, &op_info, target, root, item)
+                        self.eval_op_assignment(global, caches, &op_info, expr, target, item)
                     })
-                    .map(|_| concat.take_or_clone());
-
-                self.check_return_value(result, expr.start_position())
+                    .map(|_| concat.take_or_clone())
+                    .and_then(|r| self.check_data_size(r, expr.start_position()))
             }
 
             #[cfg(not(feature = "no_index"))]
@@ -414,9 +402,8 @@ impl Engine {
                 })?;
                 let mut context = EvalContext::new(self, global, caches, scope, this_ptr);
 
-                let result = (custom_def.func)(&mut context, &expressions, &custom.state);
-
-                self.check_return_value(result, expr.start_position())
+                (custom_def.func)(&mut context, &expressions, &custom.state)
+                    .and_then(|r| self.check_data_size(r, expr.start_position()))
             }
 
             Expr::Stmt(x) if x.is_empty() => Ok(Dynamic::UNIT),

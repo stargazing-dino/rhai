@@ -7,10 +7,10 @@ use crate::plugin::PluginFunction;
 use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
-    calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Module, Position, RhaiResult,
-    RhaiResultOf, SharedModule, StaticVec, VarDefInfo, ERR,
+    calc_fn_hash, reify, Dynamic, Engine, EvalContext, FuncArgs, Position, RhaiResult,
+    RhaiResultOf, StaticVec, VarDefInfo, ERR,
 };
-use std::any::type_name;
+use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -100,7 +100,7 @@ pub struct NativeCallContextStore {
 #[cfg(feature = "internals")]
 #[allow(deprecated)]
 impl NativeCallContextStore {
-    /// Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    /// Create a [`NativeCallContext`] from a [`NativeCallContextStore`].
     ///
     /// # WARNING - Unstable API
     ///
@@ -167,7 +167,7 @@ impl<'a> NativeCallContext<'a> {
         }
     }
 
-    /// _(internals)_ Create a [`NativeCallContext`] from a [`NativeCallContextClone`].
+    /// _(internals)_ Create a [`NativeCallContext`] from a [`NativeCallContextStore`].
     /// Exported under the `internals` feature only.
     ///
     /// # WARNING - Unstable API
@@ -187,7 +187,7 @@ impl<'a> NativeCallContext<'a> {
             pos: context.pos,
         }
     }
-    /// _(internals)_ Store this [`NativeCallContext`] into a [`NativeCallContextClone`].
+    /// _(internals)_ Store this [`NativeCallContext`] into a [`NativeCallContextStore`].
     /// Exported under the `internals` feature only.
     ///
     /// # WARNING - Unstable API
@@ -249,7 +249,7 @@ impl<'a> NativeCallContext<'a> {
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
     #[inline]
-    pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &Module)> {
+    pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &crate::Module)> {
         self.global.iter_imports()
     }
     /// Get an iterator over the current set of modules imported via `import` statements in reverse order.
@@ -258,7 +258,7 @@ impl<'a> NativeCallContext<'a> {
     #[inline]
     pub(crate) fn iter_imports_raw(
         &self,
-    ) -> impl Iterator<Item = (&crate::ImmutableString, &SharedModule)> {
+    ) -> impl Iterator<Item = (&crate::ImmutableString, &crate::SharedModule)> {
         self.global.iter_imports_raw()
     }
     /// _(internals)_ The current [`GlobalRuntimeState`], if any.
@@ -277,7 +277,7 @@ impl<'a> NativeCallContext<'a> {
     /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     #[inline]
-    pub fn iter_namespaces(&self) -> impl Iterator<Item = &Module> {
+    pub fn iter_namespaces(&self) -> impl Iterator<Item = &crate::Module> {
         self.global.lib.iter().map(|m| m.as_ref())
     }
     /// _(internals)_ The current stack of namespaces containing definitions of all script-defined functions.
@@ -288,7 +288,7 @@ impl<'a> NativeCallContext<'a> {
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub fn namespaces(&self) -> &[SharedModule] {
+    pub fn namespaces(&self) -> &[crate::SharedModule] {
         &self.global.lib
     }
     /// Call a function inside the call context with the provided arguments.
@@ -303,7 +303,12 @@ impl<'a> NativeCallContext<'a> {
 
         let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
-        let result = self._call_fn_raw(fn_name, false, false, false, &mut args)?;
+        let result = self._call_fn_raw(fn_name, &mut args, false, false, false)?;
+
+        // Bail out early if the return type needs no cast
+        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+            return Ok(reify!(result => T));
+        }
 
         let typ = self.engine().map_type_name(result.type_name());
 
@@ -328,7 +333,12 @@ impl<'a> NativeCallContext<'a> {
 
         let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
-        let result = self._call_fn_raw(fn_name, true, false, false, &mut args)?;
+        let result = self._call_fn_raw(fn_name, &mut args, true, false, false)?;
+
+        // Bail out early if the return type needs no cast
+        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+            return Ok(reify!(result => T));
+        }
 
         let typ = self.engine().map_type_name(result.type_name());
 
@@ -369,7 +379,7 @@ impl<'a> NativeCallContext<'a> {
         #[cfg(not(feature = "no_function"))]
         let native_only = native_only && !crate::parser::is_anonymous_fn(name);
 
-        self._call_fn_raw(fn_name, native_only, is_ref_mut, is_method_call, args)
+        self._call_fn_raw(fn_name, args, native_only, is_ref_mut, is_method_call)
     }
     /// Call a registered native Rust function inside the call context.
     ///
@@ -398,17 +408,17 @@ impl<'a> NativeCallContext<'a> {
         is_ref_mut: bool,
         args: &mut [&mut Dynamic],
     ) -> RhaiResult {
-        self._call_fn_raw(fn_name, true, is_ref_mut, false, args)
+        self._call_fn_raw(fn_name, args, true, is_ref_mut, false)
     }
 
     /// Call a function (native Rust or scripted) inside the call context.
     fn _call_fn_raw(
         &self,
         fn_name: impl AsRef<str>,
+        args: &mut [&mut Dynamic],
         native_only: bool,
         is_ref_mut: bool,
         is_method_call: bool,
-        args: &mut [&mut Dynamic],
     ) -> RhaiResult {
         let mut global = &mut self.global.clone();
         let caches = &mut Caches::new();
@@ -509,7 +519,8 @@ pub fn shared_take<T>(value: Shared<T>) -> T {
     shared_try_take(value).ok().expect("not shared")
 }
 
-/// Lock a [`Locked`] resource for mutable access.
+/// _(internals)_ Lock a [`Locked`] resource for mutable access.
+/// Exported under the `internals` feature only.
 #[inline(always)]
 #[must_use]
 #[allow(dead_code)]
@@ -521,7 +532,8 @@ pub fn locked_read<T>(value: &Locked<T>) -> LockGuard<T> {
     return value.read().unwrap();
 }
 
-/// Lock a [`Locked`] resource for mutable access.
+/// _(internals)_ Lock a [`Locked`] resource for mutable access.
+/// Exported under the `internals` feature only.
 #[inline(always)]
 #[must_use]
 #[allow(dead_code)]

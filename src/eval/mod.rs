@@ -25,7 +25,10 @@ pub use target::{calc_index, calc_offset_len, Target};
 
 #[cfg(feature = "unchecked")]
 mod unchecked {
-    use crate::{eval::GlobalRuntimeState, Dynamic, Engine, Position, RhaiResult, RhaiResultOf};
+    use crate::{eval::GlobalRuntimeState, Dynamic, Engine, Position, RhaiResultOf};
+    use std::borrow::Borrow;
+    #[cfg(feature = "no_std")]
+    use std::prelude::v1::*;
 
     impl Engine {
         /// Check if the number of operations stay within limit.
@@ -40,18 +43,12 @@ mod unchecked {
 
         /// Check whether the size of a [`Dynamic`] is within limits.
         #[inline(always)]
-        pub(crate) const fn check_data_size(&self, _: &Dynamic, _: Position) -> RhaiResultOf<()> {
-            Ok(())
-        }
-
-        /// Check a result to ensure that it is valid.
-        #[inline(always)]
-        pub(crate) const fn check_return_value(
+        pub(crate) const fn check_data_size<T: Borrow<Dynamic>>(
             &self,
-            result: RhaiResult,
+            value: T,
             _: Position,
-        ) -> RhaiResult {
-            result
+        ) -> RhaiResultOf<T> {
+            Ok(value)
         }
     }
 }

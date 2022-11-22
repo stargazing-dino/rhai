@@ -8,22 +8,13 @@ use crate::ast::{
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::types::dynamic::AccessMode;
 use crate::types::RestoreOnDrop;
-use crate::{
-    Dynamic, Engine, ImmutableString, Position, RhaiResult, RhaiResultOf, Scope, ERR, INT,
-};
+use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, ERR, INT};
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
 impl Engine {
     /// Evaluate a statements block.
-    //
-    // # Implementation Notes
-    //
-    // Do not use the `?` operator within the main body as it makes this function return early,
-    // possibly by-passing important cleanup tasks at the end.
-    //
-    // Errors that are not recoverable, such as system errors or safety errors, can use `?`.
     pub(crate) fn eval_stmt_block(
         &self,
         global: &mut GlobalRuntimeState,
@@ -112,13 +103,15 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         op_info: &OpAssignment,
+        root: &Expr,
         target: &mut Target,
-        root: (&str, Position),
         mut new_val: Dynamic,
     ) -> RhaiResultOf<()> {
         // Assignment to constant variable?
         if target.is_read_only() {
-            return Err(ERR::ErrorAssignmentToConstant(root.0.to_string(), root.1).into());
+            let name = root.get_variable_name(false).unwrap_or_default();
+            let pos = root.start_position();
+            return Err(ERR::ErrorAssignmentToConstant(name.to_string(), pos).into());
         }
 
         if op_info.is_op_assignment() {
@@ -166,14 +159,13 @@ impl Engine {
                     *args[0] = self
                         .exec_native_fn_call(
                             global, caches, op, token, *hash_op, args, true, *op_pos,
-                        )
-                        .map_err(|err| err.fill_position(op_info.pos))?
+                        )?
                         .0;
                 }
                 Err(err) => return Err(err),
             }
 
-            self.check_data_size(args[0], root.1)?;
+            self.check_data_size(&*args[0], root.position())?;
         } else {
             // Normal assignment
 
@@ -190,13 +182,6 @@ impl Engine {
     }
 
     /// Evaluate a statement.
-    //
-    // # Implementation Notes
-    //
-    // Do not use the `?` operator within the main body as it makes this function return early,
-    // possibly by-passing important cleanup tasks at the end.
-    //
-    // Errors that are not recoverable, such as system errors or safety errors, can use `?`.
     pub(crate) fn eval_stmt(
         &self,
         global: &mut GlobalRuntimeState,
@@ -234,29 +219,29 @@ impl Engine {
                     .eval_expr(global, caches, scope, this_ptr, rhs)?
                     .flatten();
 
-                let (mut lhs_ptr, pos) =
-                    self.search_namespace(global, caches, scope, this_ptr, lhs)?;
+                let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
 
                 let var_name = x.3.as_str();
 
                 #[cfg(not(feature = "no_closure"))]
                 // Also handle case where target is a `Dynamic` shared value
                 // (returned by a variable resolver, for example)
-                let is_temp_result = !lhs_ptr.is_ref() && !lhs_ptr.is_shared();
+                let is_temp_result = !target.is_ref() && !target.is_shared();
                 #[cfg(feature = "no_closure")]
-                let is_temp_result = !lhs_ptr.is_ref();
+                let is_temp_result = !target.is_ref();
 
                 // Cannot assign to temp result from expression
                 if is_temp_result {
-                    return Err(ERR::ErrorAssignmentToConstant(var_name.to_string(), pos).into());
+                    return Err(ERR::ErrorAssignmentToConstant(
+                        var_name.to_string(),
+                        lhs.position(),
+                    )
+                    .into());
                 }
 
-                self.track_operation(global, pos)?;
+                self.track_operation(global, lhs.position())?;
 
-                let root = (var_name, pos);
-                let lhs_ptr = &mut lhs_ptr;
-
-                self.eval_op_assignment(global, caches, op_info, lhs_ptr, root, rhs_val)?;
+                self.eval_op_assignment(global, caches, op_info, lhs, &mut target, rhs_val)?;
 
                 return Ok(Dynamic::UNIT);
             }
@@ -788,8 +773,8 @@ impl Engine {
 
                 let v = self.eval_expr(global, caches, scope, this_ptr, expr)?;
                 let typ = v.type_name();
-                let path = v.try_cast::<ImmutableString>().ok_or_else(|| {
-                    self.make_type_mismatch_err::<ImmutableString>(typ, expr.position())
+                let path = v.try_cast::<crate::ImmutableString>().ok_or_else(|| {
+                    self.make_type_mismatch_err::<crate::ImmutableString>(typ, expr.position())
                 })?;
 
                 use crate::ModuleResolver;

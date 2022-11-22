@@ -4,11 +4,14 @@ use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
+    reify, Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{any::type_name, mem};
+use std::{
+    any::{type_name, TypeId},
+    mem,
+};
 
 impl Engine {
     /// Evaluate a string as a script, returning the result value or an error.
@@ -189,6 +192,11 @@ impl Engine {
         let caches = &mut Caches::new();
 
         let result = self.eval_ast_with_scope_raw(global, caches, scope, ast)?;
+
+        // Bail out early if the return type needs no cast
+        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+            return Ok(reify!(result => T));
+        }
 
         let typ = self.map_type_name(result.type_name());
 

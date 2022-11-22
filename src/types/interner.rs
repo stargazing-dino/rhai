@@ -80,7 +80,7 @@ impl StringsInterner<'_> {
     pub fn get_with_mapper<S: AsRef<str>>(
         &mut self,
         id: &str,
-        mapper: impl Fn(S) -> ImmutableString,
+        mapper: impl FnOnce(S) -> ImmutableString,
         text: S,
     ) -> ImmutableString {
         let key = text.as_ref();

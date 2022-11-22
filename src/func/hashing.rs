@@ -92,7 +92,7 @@ pub fn get_hasher() -> ahash::AHasher {
 ///
 /// # Zeros
 ///
-/// If the hash happens to be zero, it is mapped to `DEFAULT_HASH`.
+/// If the hash happens to be zero, it is mapped to `ALT_ZERO_HASH`.
 ///
 /// # Note
 ///
@@ -107,9 +107,8 @@ pub fn calc_var_hash<'a>(
 
     // We always skip the first module
     let iter = modules.into_iter();
-    let len = iter.len();
+    iter.len().hash(s);
     iter.skip(1).for_each(|m| m.hash(s));
-    len.hash(s);
     var_name.hash(s);
 
     match s.finish() {
@@ -128,7 +127,7 @@ pub fn calc_var_hash<'a>(
 ///
 /// # Zeros
 ///
-/// If the hash happens to be zero, it is mapped to `DEFAULT_HASH`.
+/// If the hash happens to be zero, it is mapped to `ALT_ZERO_HASH`.
 ///
 /// # Note
 ///
@@ -144,9 +143,8 @@ pub fn calc_fn_hash<'a>(
 
     // We always skip the first module
     let iter = namespace.into_iter();
-    let len = iter.len();
+    iter.len().hash(s);
     iter.skip(1).for_each(|m| m.hash(s));
-    len.hash(s);
     fn_name.hash(s);
     num.hash(s);
 
@@ -162,7 +160,7 @@ pub fn calc_fn_hash<'a>(
 ///
 /// # Zeros
 ///
-/// If the hash happens to be zero, it is mapped to `DEFAULT_HASH`.
+/// If the hash happens to be zero, it is mapped to `ALT_ZERO_HASH`.
 #[inline]
 #[must_use]
 pub fn calc_fn_hash_full(
@@ -172,11 +170,10 @@ pub fn calc_fn_hash_full(
     let s = &mut get_hasher();
     base.hash(s);
     let iter = params.into_iter();
-    let len = iter.len();
+    iter.len().hash(s);
     iter.for_each(|t| {
         t.hash(s);
     });
-    len.hash(s);
 
     match s.finish() {
         0 => ALT_ZERO_HASH,

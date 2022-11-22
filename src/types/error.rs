@@ -198,7 +198,7 @@ impl fmt::Display for EvalAltResult {
                 if s.starts_with(crate::engine::FN_SET) =>
             {
                 let prop = &s[crate::engine::FN_SET.len()..];
-                write!(f, "Cannot modify property {prop} of constant")?
+                write!(f, "Cannot modify property '{prop}' of a constant")?
             }
             #[cfg(not(feature = "no_index"))]
             Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == crate::engine::FN_IDX_GET => {
@@ -209,10 +209,10 @@ impl fmt::Display for EvalAltResult {
             }
             #[cfg(not(feature = "no_index"))]
             Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == crate::engine::FN_IDX_SET => {
-                write!(f, "Cannot assign to indexer of constant")?
+                write!(f, "Cannot assign to the indexer of a constant")?
             }
             Self::ErrorNonPureMethodCallOnConstant(s, ..) => {
-                write!(f, "Non-pure method {s} cannot be called on constant")?
+                write!(f, "Non-pure method '{s}' cannot be called on a constant")?
             }
 
             Self::ErrorAssignmentToConstant(s, ..) => write!(f, "Cannot modify constant {s}")?,
@@ -230,8 +230,8 @@ impl fmt::Display for EvalAltResult {
             Self::ErrorArithmetic(s, ..) if s.is_empty() => f.write_str("Arithmetic error")?,
             Self::ErrorArithmetic(s, ..) => f.write_str(s)?,
 
-            Self::LoopBreak(true, ..) => f.write_str("'break' not inside a loop")?,
-            Self::LoopBreak(false, ..) => f.write_str("'continue' not inside a loop")?,
+            Self::LoopBreak(true, ..) => f.write_str("'break' must be inside a loop")?,
+            Self::LoopBreak(false, ..) => f.write_str("'continue' must be inside a loop")?,
 
             Self::Return(..) => f.write_str("NOT AN ERROR - function returns value")?,
 

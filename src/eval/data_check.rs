@@ -3,7 +3,8 @@
 
 use super::GlobalRuntimeState;
 use crate::types::dynamic::Union;
-use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, ERR};
+use crate::{Dynamic, Engine, Position, RhaiResultOf, ERR};
+use std::borrow::Borrow;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -70,6 +71,9 @@ impl Engine {
     }
 
     /// Raise an error if any data size exceeds limit.
+    ///
+    /// [`Position`] in [`EvalAltResult`][crate::EvalAltResult] is always [`NONE`][Position::NONE]
+    /// and should be set afterwards.
     pub(crate) fn raise_err_if_over_data_size_limit(
         &self,
         (_arr, _map, s): (usize, usize, usize),
@@ -111,15 +115,20 @@ impl Engine {
 
     /// Check whether the size of a [`Dynamic`] is within limits.
     #[inline]
-    pub(crate) fn check_data_size(&self, value: &Dynamic, pos: Position) -> RhaiResultOf<()> {
+    pub(crate) fn check_data_size<T: Borrow<Dynamic>>(
+        &self,
+        value: T,
+        pos: Position,
+    ) -> RhaiResultOf<T> {
         // If no data size limits, just return
         if !self.has_data_size_limit() {
-            return Ok(());
+            return Ok(value);
         }
 
-        let sizes = Self::calc_data_sizes(value, true);
+        let sizes = Self::calc_data_sizes(value.borrow(), true);
 
         self.raise_err_if_over_data_size_limit(sizes)
+            .map(|_| value)
             .map_err(|err| err.fill_position(pos))
     }
 
@@ -128,7 +137,7 @@ impl Engine {
     /// Not available under `unchecked`.
     #[inline(always)]
     pub fn ensure_data_size_within_limits(&self, value: &Dynamic) -> RhaiResultOf<()> {
-        self.check_data_size(value, Position::NONE)
+        self.check_data_size(value, Position::NONE).map(|_| ())
     }
 
     /// Check if the number of operations stay within limit.
@@ -141,26 +150,15 @@ impl Engine {
 
         // Guard against too many operations
         let max = self.max_operations();
-        let num_operations = global.num_operations;
 
-        if max > 0 && num_operations > max {
+        if max > 0 && global.num_operations > max {
             return Err(ERR::ErrorTooManyOperations(pos).into());
         }
 
         // Report progress
         self.progress
             .as_ref()
-            .and_then(|p| p(num_operations))
+            .and_then(|p| p(global.num_operations))
             .map_or(Ok(()), |token| Err(ERR::ErrorTerminated(token, pos).into()))
-    }
-
-    /// Check a result to ensure that it is valid.
-    #[inline]
-    pub(crate) fn check_return_value(&self, result: RhaiResult, pos: Position) -> RhaiResult {
-        if let Ok(ref r) = result {
-            self.check_data_size(r, pos)?;
-        }
-
-        result
     }
 }

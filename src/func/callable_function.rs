@@ -1,6 +1,6 @@
 //! Module defining the standard Rhai function type.
 
-use super::native::{FnAny, FnBuiltin, FnPlugin, IteratorFn, SendSync};
+use super::native::{FnAny, FnPlugin, IteratorFn, SendSync};
 use crate::ast::FnAccess;
 use crate::plugin::PluginFunction;
 use crate::Shared;
@@ -8,7 +8,8 @@ use std::fmt;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
-/// A type encapsulating a function callable by Rhai.
+/// _(internals)_ A type encapsulating a function callable by Rhai.
+/// Exported under the `internals` feature only.
 #[derive(Clone)]
 #[non_exhaustive]
 pub enum CallableFunction {
@@ -199,18 +200,6 @@ impl CallableFunction {
             Self::Script(..) => None,
         }
     }
-    /// Create a new [`CallableFunction::Method`] from a built-in function.
-    #[inline(always)]
-    #[must_use]
-    pub fn from_fn_builtin(func: FnBuiltin) -> Self {
-        Self::Method(Shared::new(func))
-    }
-    /// Create a new [`CallableFunction::Plugin`].
-    #[inline(always)]
-    #[must_use]
-    pub fn from_plugin(func: impl PluginFunction + 'static + SendSync) -> Self {
-        Self::Plugin(Shared::new(func))
-    }
 }
 
 #[cfg(not(feature = "no_function"))]
@@ -232,7 +221,7 @@ impl From<Shared<crate::ast::ScriptFnDef>> for CallableFunction {
 impl<T: PluginFunction + 'static + SendSync> From<T> for CallableFunction {
     #[inline(always)]
     fn from(func: T) -> Self {
-        Self::from_plugin(func)
+        Self::Plugin(Shared::new(func))
     }
 }
 

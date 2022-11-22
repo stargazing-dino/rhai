@@ -2,7 +2,7 @@
 //!
 //! Set to [`None`] to disable stable hashing.
 //!
-//! See [`set_rhai_ahash_seed`].
+//! See [`rhai::config::hashing::set_ahash_seed`][set_ahash_seed].
 //!
 //! # Example
 //!
@@ -189,7 +189,7 @@ static AHASH_SEED: SusLock<Option<[u64; 4]>> = SusLock::new();
 /// # Warning
 ///
 /// * You can only call this function **ONCE** for the entire duration of program execution.
-/// * You **MUST** call this before performing **ANY** Rhai operation (e.g. creating an [`Engine`]).
+/// * You **MUST** call this before performing **ANY** Rhai operation (e.g. creating an [`Engine`][crate::Engine]).
 ///
 /// # Error
 ///
@@ -216,7 +216,7 @@ pub fn set_ahash_seed(new_seed: Option<[u64; 4]>) -> Result<(), Option<[u64; 4]>
 ///
 /// Otherwise, the hashing seed is randomized to protect against DOS attacks.
 ///
-/// See [`set_rhai_ahash_seed`] for more.
+/// See [`rhai::config::hashing::set_ahash_seed`][set_ahash_seed] for more.
 #[inline]
 #[must_use]
 pub fn get_ahash_seed() -> &'static Option<[u64; 4]> {

@@ -1,6 +1,4 @@
 //! Trait to build a custom type for use with [`Engine`].
-#![allow(deprecated)]
-
 use crate::{types::dynamic::Variant, Engine, Identifier, RegisterNativeFunction};
 use std::marker::PhantomData;
 #[cfg(feature = "no_std")]
@@ -11,10 +9,6 @@ use crate::func::register::Mut;
 
 /// Trait to build the API of a custom type for use with an [`Engine`]
 /// (i.e. register the type and its getters, setters, methods, etc.).
-///
-/// # WARNING - Volatile Trait
-///
-/// This API is volatile and may change in the future.
 ///
 /// # Example
 ///
@@ -66,7 +60,6 @@ use crate::func::register::Mut;
 /// # Ok(())
 /// # }
 /// ```
-#[deprecated = "This trait is NOT deprecated, but it is considered volatile and may change in the future."]
 pub trait CustomType: Variant + Clone {
     /// Builds the custom type for use with the [`Engine`].
     ///
@@ -78,10 +71,6 @@ impl Engine {
     /// Build the API of a custom type for use with the [`Engine`].
     ///
     /// The custom type must implement [`CustomType`].
-    ///
-    /// # WARNING - Unstable API
-    ///
-    /// This API is volatile and may change in the future.
     #[inline]
     pub fn build_type<T: CustomType>(&mut self) -> &mut Self {
         T::build(TypeBuilder::new(self));
@@ -99,11 +88,6 @@ impl Engine {
 ///
 /// To define a pretty-print name, call [`with_name`][`TypeBuilder::with_name`],
 /// to use [`Engine::register_type_with_name`] instead.
-///
-/// # WARNING - Volatile Type
-///
-/// This type is volatile and may change in the future.
-#[deprecated = "This type is NOT deprecated, but it is considered volatile and may change in the future."]
 pub struct TypeBuilder<'a, T: Variant + Clone> {
     engine: &'a mut Engine,
     name: Option<&'static str>,

@@ -624,6 +624,38 @@ impl Expr {
             _ => None,
         }
     }
+    /// Get the [options][ASTFlags] of the expression.
+    #[inline]
+    #[must_use]
+    pub const fn options(&self) -> ASTFlags {
+        match self {
+            Self::Index(_, options, _) | Self::Dot(_, options, _) => *options,
+
+            #[cfg(not(feature = "no_float"))]
+            Self::FloatConstant(..) => ASTFlags::NONE,
+
+            Self::DynamicConstant(..)
+            | Self::BoolConstant(..)
+            | Self::IntegerConstant(..)
+            | Self::CharConstant(..)
+            | Self::Unit(..)
+            | Self::StringConstant(..)
+            | Self::Array(..)
+            | Self::Map(..)
+            | Self::Variable(..)
+            | Self::And(..)
+            | Self::Or(..)
+            | Self::Coalesce(..)
+            | Self::FnCall(..)
+            | Self::MethodCall(..)
+            | Self::InterpolatedString(..)
+            | Self::Property(..)
+            | Self::Stmt(..) => ASTFlags::NONE,
+
+            #[cfg(not(feature = "no_custom_syntax"))]
+            Self::Custom(..) => ASTFlags::NONE,
+        }
+    }
     /// Get the [position][Position] of the expression.
     #[inline]
     #[must_use]

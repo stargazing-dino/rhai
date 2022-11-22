@@ -121,7 +121,7 @@ pub fn main() {
         let mut fields = input.trim().splitn(2, ' ');
 
         let event = fields.next().expect("event").trim();
-        let arg = fields.next().unwrap_or("");
+        let arg = fields.next().unwrap_or("").to_string();
 
         // Process event
         match event {
@@ -138,7 +138,7 @@ pub fn main() {
                 let scope = &mut handler.scope;
                 let ast = &handler.ast;
 
-                let result = engine.call_fn::<()>(scope, ast, event, (arg.to_string(),));
+                let result = engine.call_fn::<()>(scope, ast, event, (arg,));
 
                 if let Err(err) = result {
                     eprintln!("! {err}")

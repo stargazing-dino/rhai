@@ -117,10 +117,10 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`run_ast_with_scope`][Engine::run_ast_with_scope] instead.
+    /// This method is deprecated. Use [`call_fn_with_options`][Engine::call_fn_with_options] instead.
     ///
     /// This method will be removed in the next major version.
-    #[deprecated(since = "1.1.0", note = "use `call_fn_raw` instead")]
+    #[deprecated(since = "1.1.0", note = "use `call_fn_with_options` instead")]
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     pub fn call_fn_dynamic(
@@ -132,7 +132,55 @@ impl Engine {
         this_ptr: Option<&mut Dynamic>,
         arg_values: impl AsMut<[Dynamic]>,
     ) -> RhaiResult {
+        #[allow(deprecated)]
         self.call_fn_raw(scope, ast, eval_ast, true, name, this_ptr, arg_values)
+    }
+    /// Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
+    ///
+    /// The following options are available:
+    ///
+    /// * whether to evaluate the [`AST`] to load necessary modules before calling the function
+    /// * whether to rewind the [`Scope`] after the function call
+    /// * a value for binding to the `this` pointer (if any)
+    ///
+    /// Not available under `no_function`.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated. Use [`call_fn_with_options`][Engine::call_fn_with_options] instead.
+    ///
+    /// This method will be removed in the next major version.
+    #[deprecated(since = "1.12.0", note = "use `call_fn_with_options` instead")]
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    pub fn call_fn_raw(
+        &self,
+        scope: &mut Scope,
+        ast: &AST,
+        eval_ast: bool,
+        rewind_scope: bool,
+        name: impl AsRef<str>,
+        this_ptr: Option<&mut Dynamic>,
+        arg_values: impl AsMut<[Dynamic]>,
+    ) -> RhaiResult {
+        let mut arg_values = arg_values;
+
+        let options = crate::CallFnOptions {
+            this_ptr,
+            eval_ast,
+            rewind_scope,
+            ..Default::default()
+        };
+
+        self._call_fn(
+            options,
+            scope,
+            &mut crate::eval::GlobalRuntimeState::new(self),
+            &mut crate::eval::Caches::new(),
+            ast,
+            name.as_ref(),
+            arg_values.as_mut(),
+        )
     }
     /// Register a custom fallible function with the [`Engine`].
     ///

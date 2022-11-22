@@ -22,7 +22,7 @@ pub enum ChainType {
 }
 
 impl From<&Expr> for ChainType {
-    #[inline]
+    #[inline(always)]
     fn from(expr: &Expr) -> Self {
         match expr {
             #[cfg(not(feature = "no_index"))]
@@ -35,712 +35,19 @@ impl From<&Expr> for ChainType {
 }
 
 impl Engine {
-    /// Chain-evaluate a dot/index chain.
-    /// [`Position`] in [`EvalAltResult`][crate::EvalAltResult] may be [`NONE`][Position::NONE] and should be set afterwards.
-    fn eval_dot_index_chain_helper(
-        &self,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        this_ptr: &mut Dynamic,
-        target: &mut Target,
-        root: (&str, Position),
-        _parent: &Expr,
-        parent_options: ASTFlags,
-        rhs: &Expr,
-        idx_values: &mut FnArgsVec<Dynamic>,
-        chain_type: ChainType,
-        new_val: &mut Option<(Dynamic, &OpAssignment)>,
-    ) -> RhaiResultOf<(Dynamic, bool)> {
-        let is_ref_mut = target.is_ref();
-
-        #[cfg(feature = "debugging")]
-        let scope = &mut Scope::new();
-
-        match chain_type {
-            #[cfg(not(feature = "no_index"))]
-            ChainType::Indexing => {
-                // Check for existence with the null conditional operator
-                if parent_options.contains(ASTFlags::NEGATED) && target.is_unit() {
-                    return Ok((Dynamic::UNIT, false));
-                }
-
-                let pos = rhs.start_position();
-
-                match rhs {
-                    // xxx[idx].expr... | xxx[idx][expr]...
-                    Expr::Dot(x, options, x_pos) | Expr::Index(x, options, x_pos)
-                        if !parent_options.contains(ASTFlags::BREAK) =>
-                    {
-                        #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, scope, this_ptr, _parent)?;
-
-                        let idx_val = &mut idx_values.pop().unwrap();
-                        let mut idx_val_for_setter = idx_val.clone();
-                        let idx_pos = x.lhs.start_position();
-                        let rhs_chain = rhs.into();
-
-                        let (try_setter, result) = {
-                            let mut obj = self.get_indexed_mut(
-                                global, caches, target, idx_val, idx_pos, false, true,
-                            )?;
-                            let is_obj_temp_val = obj.is_temp_value();
-                            let obj_ptr = &mut obj;
-
-                            match self.eval_dot_index_chain_helper(
-                                global, caches, this_ptr, obj_ptr, root, rhs, *options, &x.rhs,
-                                idx_values, rhs_chain, new_val,
-                            ) {
-                                Ok((result, true)) if is_obj_temp_val => {
-                                    (Some(obj.take_or_clone()), (result, true))
-                                }
-                                Ok(result) => (None, result),
-                                Err(err) => return Err(err.fill_position(*x_pos)),
-                            }
-                        };
-
-                        if let Some(mut new_val) = try_setter {
-                            // Try to call index setter if value is changed
-                            let idx = &mut idx_val_for_setter;
-                            let new_val = &mut new_val;
-                            self.call_indexer_set(global, caches, target, idx, new_val, is_ref_mut)
-                                .or_else(|e| match *e {
-                                    ERR::ErrorIndexingType(..) => Ok((Dynamic::UNIT, false)),
-                                    _ => Err(e),
-                                })?;
-                        }
-
-                        Ok(result)
-                    }
-                    // xxx[rhs] op= new_val
-                    _ if new_val.is_some() => {
-                        #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, scope, this_ptr, _parent)?;
-
-                        let (new_val, op_info) = new_val.take().expect("`Some`");
-                        let idx_val = &mut idx_values.pop().unwrap();
-                        let idx = &mut idx_val.clone();
-
-                        let try_setter = match self
-                            .get_indexed_mut(global, caches, target, idx, pos, true, false)
-                        {
-                            // Indexed value is not a temp value - update directly
-                            Ok(ref mut obj_ptr) => {
-                                self.eval_op_assignment(
-                                    global, caches, op_info, obj_ptr, root, new_val,
-                                )?;
-                                self.check_data_size(obj_ptr, op_info.pos)?;
-                                None
-                            }
-                            // Indexed value cannot be referenced - use indexer
-                            #[cfg(not(feature = "no_index"))]
-                            Err(err) if matches!(*err, ERR::ErrorIndexingType(..)) => Some(new_val),
-                            // Any other error
-                            Err(err) => return Err(err),
-                        };
-
-                        if let Some(mut new_val) = try_setter {
-                            // Is this an op-assignment?
-                            if op_info.is_op_assignment() {
-                                let idx = &mut idx_val.clone();
-
-                                // Call the index getter to get the current value
-                                if let Ok(val) = self.call_indexer_get(global, caches, target, idx)
-                                {
-                                    let mut val = val.into();
-                                    // Run the op-assignment
-                                    self.eval_op_assignment(
-                                        global, caches, op_info, &mut val, root, new_val,
-                                    )?;
-                                    // Replace new value
-                                    new_val = val.take_or_clone();
-                                    self.check_data_size(&new_val, op_info.pos)?;
-                                }
-                            }
-
-                            // Try to call index setter
-                            let new_val = &mut new_val;
-
-                            self.call_indexer_set(
-                                global, caches, target, idx_val, new_val, is_ref_mut,
-                            )?;
-                        }
-
-                        Ok((Dynamic::UNIT, true))
-                    }
-                    // xxx[rhs]
-                    _ => {
-                        #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, scope, this_ptr, _parent)?;
-
-                        let idx_val = &mut idx_values.pop().unwrap();
-
-                        self.get_indexed_mut(global, caches, target, idx_val, pos, false, true)
-                            .map(|v| (v.take_or_clone(), false))
-                    }
-                }
-            }
-
-            #[cfg(not(feature = "no_object"))]
-            ChainType::Dotting => {
-                // Check for existence with the Elvis operator
-                if parent_options.contains(ASTFlags::NEGATED) && target.is_unit() {
-                    return Ok((Dynamic::UNIT, false));
-                }
-
-                match rhs {
-                    // xxx.fn_name(arg_expr_list)
-                    Expr::MethodCall(x, pos) if !x.is_qualified() && new_val.is_none() => {
-                        #[cfg(feature = "debugging")]
-                        let reset =
-                            self.run_debugger_with_reset(global, caches, scope, this_ptr, rhs)?;
-                        #[cfg(feature = "debugging")]
-                        let global = &mut *RestoreOnDrop::lock(global, move |g| {
-                            g.debugger.reset_status(reset)
-                        });
-
-                        let crate::ast::FnCallExpr {
-                            name, hashes, args, ..
-                        } = &**x;
-
-                        // Truncate the index values upon exit
-                        let offset = idx_values.len() - args.len();
-                        let idx_values =
-                            &mut *RestoreOnDrop::lock(idx_values, move |v| v.truncate(offset));
-
-                        let call_args = &mut idx_values[offset..];
-                        let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
-
-                        self.make_method_call(
-                            global, caches, name, *hashes, target, call_args, pos1, *pos,
-                        )
-                    }
-                    // xxx.fn_name(...) = ???
-                    Expr::MethodCall(..) if new_val.is_some() => {
-                        unreachable!("method call cannot be assigned to")
-                    }
-                    // xxx.module::fn_name(...) - syntax error
-                    Expr::MethodCall(..) => {
-                        unreachable!("function call in dot chain should not be namespace-qualified")
-                    }
-                    // {xxx:map}.id op= ???
-                    Expr::Property(x, pos) if target.is_map() && new_val.is_some() => {
-                        #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, scope, this_ptr, rhs)?;
-
-                        let index = &mut x.2.clone().into();
-                        let (new_val, op_info) = new_val.take().expect("`Some`");
-                        {
-                            let val_target = &mut self.get_indexed_mut(
-                                global, caches, target, index, *pos, true, false,
-                            )?;
-                            self.eval_op_assignment(
-                                global, caches, op_info, val_target, root, new_val,
-                            )?;
-                        }
-                        self.check_data_size(target.source(), op_info.pos)?;
-                        Ok((Dynamic::UNIT, true))
-                    }
-                    // {xxx:map}.id
-                    Expr::Property(x, pos) if target.is_map() => {
-                        #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, scope, this_ptr, rhs)?;
-
-                        let index = &mut x.2.clone().into();
-                        let val = self
-                            .get_indexed_mut(global, caches, target, index, *pos, false, false)?;
-                        Ok((val.take_or_clone(), false))
-                    }
-                    // xxx.id op= ???
-                    Expr::Property(x, pos) if new_val.is_some() => {
-                        #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, scope, this_ptr, rhs)?;
-
-                        let ((getter, hash_get), (setter, hash_set), name) = &**x;
-                        let (mut new_val, op_info) = new_val.take().expect("`Some`");
-
-                        if op_info.is_op_assignment() {
-                            let args = &mut [target.as_mut()];
-                            let (mut orig_val, ..) = self
-                                .exec_native_fn_call(
-                                    global, caches, getter, None, *hash_get, args, is_ref_mut, *pos,
-                                )
-                                .or_else(|err| match *err {
-                                    // Try an indexer if property does not exist
-                                    ERR::ErrorDotExpr(..) => {
-                                        let mut prop = name.into();
-                                        self.call_indexer_get(global, caches, target, &mut prop)
-                                            .map(|r| (r, false))
-                                            .map_err(|e| match *e {
-                                                ERR::ErrorIndexingType(..) => err,
-                                                _ => e,
-                                            })
-                                    }
-                                    _ => Err(err),
-                                })?;
-
-                            {
-                                let orig_val = &mut (&mut orig_val).into();
-
-                                self.eval_op_assignment(
-                                    global, caches, op_info, orig_val, root, new_val,
-                                )?;
-                            }
-
-                            new_val = orig_val;
-                        }
-
-                        let args = &mut [target.as_mut(), &mut new_val];
-                        self.exec_native_fn_call(
-                            global, caches, setter, None, *hash_set, args, is_ref_mut, *pos,
-                        )
-                        .or_else(|err| match *err {
-                            // Try an indexer if property does not exist
-                            ERR::ErrorDotExpr(..) => {
-                                let idx = &mut name.into();
-                                let new_val = &mut new_val;
-                                self.call_indexer_set(
-                                    global, caches, target, idx, new_val, is_ref_mut,
-                                )
-                                .map_err(|e| match *e {
-                                    ERR::ErrorIndexingType(..) => err,
-                                    _ => e,
-                                })
-                            }
-                            _ => Err(err),
-                        })
-                    }
-                    // xxx.id
-                    Expr::Property(x, pos) => {
-                        #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, scope, this_ptr, rhs)?;
-
-                        let ((getter, hash_get), _, name) = &**x;
-                        let args = &mut [target.as_mut()];
-                        self.exec_native_fn_call(
-                            global, caches, getter, None, *hash_get, args, is_ref_mut, *pos,
-                        )
-                        .map_or_else(
-                            |err| match *err {
-                                // Try an indexer if property does not exist
-                                ERR::ErrorDotExpr(..) => {
-                                    let mut prop = name.into();
-                                    self.call_indexer_get(global, caches, target, &mut prop)
-                                        .map(|r| (r, false))
-                                        .map_err(|e| match *e {
-                                            ERR::ErrorIndexingType(..) => err,
-                                            _ => e,
-                                        })
-                                }
-                                _ => Err(err),
-                            },
-                            // Assume getters are always pure
-                            |(v, ..)| Ok((v, false)),
-                        )
-                    }
-                    // {xxx:map}.sub_lhs[expr] | {xxx:map}.sub_lhs.expr
-                    Expr::Index(x, options, x_pos) | Expr::Dot(x, options, x_pos)
-                        if target.is_map() =>
-                    {
-                        let _node = &x.lhs;
-
-                        let val_target = &mut match x.lhs {
-                            Expr::Property(ref p, pos) => {
-                                #[cfg(feature = "debugging")]
-                                self.run_debugger(global, caches, scope, this_ptr, _node)?;
-
-                                let index = &mut p.2.clone().into();
-                                self.get_indexed_mut(
-                                    global, caches, target, index, pos, false, true,
-                                )?
-                            }
-                            // {xxx:map}.fn_name(arg_expr_list)[expr] | {xxx:map}.fn_name(arg_expr_list).expr
-                            Expr::MethodCall(ref x, pos) if !x.is_qualified() => {
-                                #[cfg(feature = "debugging")]
-                                let reset = self.run_debugger_with_reset(
-                                    global, caches, scope, this_ptr, _node,
-                                )?;
-                                #[cfg(feature = "debugging")]
-                                let global = &mut *RestoreOnDrop::lock(global, move |g| {
-                                    g.debugger.reset_status(reset)
-                                });
-
-                                let crate::ast::FnCallExpr {
-                                    name, hashes, args, ..
-                                } = &**x;
-
-                                // Truncate the index values upon exit
-                                let offset = idx_values.len() - args.len();
-                                let idx_values = &mut *RestoreOnDrop::lock(idx_values, move |v| {
-                                    v.truncate(offset)
-                                });
-
-                                let call_args = &mut idx_values[offset..];
-                                let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
-
-                                self.make_method_call(
-                                    global, caches, name, *hashes, target, call_args, pos1, pos,
-                                )?
-                                .0
-                                .into()
-                            }
-                            // {xxx:map}.module::fn_name(...) - syntax error
-                            Expr::MethodCall(..) => unreachable!(
-                                "function call in dot chain should not be namespace-qualified"
-                            ),
-                            // Others - syntax error
-                            ref expr => unreachable!("invalid dot expression: {:?}", expr),
-                        };
-                        let rhs_chain = rhs.into();
-
-                        self.eval_dot_index_chain_helper(
-                            global, caches, this_ptr, val_target, root, rhs, *options, &x.rhs,
-                            idx_values, rhs_chain, new_val,
-                        )
-                        .map_err(|err| err.fill_position(*x_pos))
-                    }
-                    // xxx.sub_lhs[expr] | xxx.sub_lhs.expr
-                    Expr::Index(x, options, x_pos) | Expr::Dot(x, options, x_pos) => {
-                        let _node = &x.lhs;
-
-                        match x.lhs {
-                            // xxx.prop[expr] | xxx.prop.expr
-                            Expr::Property(ref p, pos) => {
-                                #[cfg(feature = "debugging")]
-                                self.run_debugger(global, caches, scope, this_ptr, _node)?;
-
-                                let ((getter, hash_get), (setter, hash_set), name) = &**p;
-                                let rhs_chain = rhs.into();
-                                let mut arg_values = [target.as_mut(), &mut Dynamic::UNIT.clone()];
-                                let args = &mut arg_values[..1];
-
-                                // Assume getters are always pure
-                                let (mut val, ..) = self
-                                    .exec_native_fn_call(
-                                        global, caches, getter, None, *hash_get, args, is_ref_mut,
-                                        pos,
-                                    )
-                                    .or_else(|err| match *err {
-                                        // Try an indexer if property does not exist
-                                        ERR::ErrorDotExpr(..) => {
-                                            let mut prop = name.into();
-                                            self.call_indexer_get(global, caches, target, &mut prop)
-                                                .map(|r| (r, false))
-                                                .map_err(|e| match *e {
-                                                    ERR::ErrorIndexingType(..) => err,
-                                                    _ => e,
-                                                })
-                                        }
-                                        _ => Err(err),
-                                    })?;
-
-                                let val = &mut (&mut val).into();
-
-                                let (result, may_be_changed) = self
-                                    .eval_dot_index_chain_helper(
-                                        global, caches, this_ptr, val, root, rhs, *options, &x.rhs,
-                                        idx_values, rhs_chain, new_val,
-                                    )
-                                    .map_err(|err| err.fill_position(*x_pos))?;
-
-                                // Feed the value back via a setter just in case it has been updated
-                                if may_be_changed {
-                                    // Re-use args because the first &mut parameter will not be consumed
-                                    let mut arg_values = [target.as_mut(), val.as_mut()];
-                                    let args = &mut arg_values;
-                                    self.exec_native_fn_call(
-                                        global, caches, setter, None, *hash_set, args, is_ref_mut,
-                                        pos,
-                                    )
-                                    .or_else(
-                                        |err| match *err {
-                                            // Try an indexer if property does not exist
-                                            ERR::ErrorDotExpr(..) => {
-                                                let idx = &mut name.into();
-                                                let new_val = val;
-                                                self.call_indexer_set(
-                                                    global, caches, target, idx, new_val,
-                                                    is_ref_mut,
-                                                )
-                                                .or_else(|e| match *e {
-                                                    // If there is no setter, no need to feed it
-                                                    // back because the property is read-only
-                                                    ERR::ErrorIndexingType(..) => {
-                                                        Ok((Dynamic::UNIT, false))
-                                                    }
-                                                    _ => Err(e),
-                                                })
-                                            }
-                                            _ => Err(err),
-                                        },
-                                    )?;
-                                }
-
-                                Ok((result, may_be_changed))
-                            }
-                            // xxx.fn_name(arg_expr_list)[expr] | xxx.fn_name(arg_expr_list).expr
-                            Expr::MethodCall(ref f, pos) if !f.is_qualified() => {
-                                let val = {
-                                    #[cfg(feature = "debugging")]
-                                    let reset = self.run_debugger_with_reset(
-                                        global, caches, scope, this_ptr, _node,
-                                    )?;
-                                    #[cfg(feature = "debugging")]
-                                    let global = &mut *RestoreOnDrop::lock(global, move |g| {
-                                        g.debugger.reset_status(reset)
-                                    });
-
-                                    let crate::ast::FnCallExpr {
-                                        name, hashes, args, ..
-                                    } = &**f;
-
-                                    // Truncate the index values upon exit
-                                    let offset = idx_values.len() - args.len();
-                                    let idx_values =
-                                        &mut *RestoreOnDrop::lock(idx_values, move |v| {
-                                            v.truncate(offset)
-                                        });
-
-                                    let call_args = &mut idx_values[offset..];
-                                    let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
-
-                                    self.make_method_call(
-                                        global, caches, name, *hashes, target, call_args, pos1, pos,
-                                    )?
-                                    .0
-                                };
-
-                                let val = &mut val.into();
-                                let rhs_chain = rhs.into();
-
-                                self.eval_dot_index_chain_helper(
-                                    global, caches, this_ptr, val, root, rhs, *options, &x.rhs,
-                                    idx_values, rhs_chain, new_val,
-                                )
-                                .map_err(|err| err.fill_position(pos))
-                            }
-                            // xxx.module::fn_name(...) - syntax error
-                            Expr::MethodCall(..) => unreachable!(
-                                "function call in dot chain should not be namespace-qualified"
-                            ),
-                            // Others - syntax error
-                            ref expr => unreachable!("invalid dot expression: {:?}", expr),
-                        }
-                    }
-                    // Syntax error
-                    _ => Err(ERR::ErrorDotExpr("".into(), rhs.start_position()).into()),
-                }
-            }
-        }
-    }
-
-    /// Evaluate a dot/index chain.
-    pub(crate) fn eval_dot_index_chain(
-        &self,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        scope: &mut Scope,
-        this_ptr: &mut Dynamic,
-        expr: &Expr,
-        new_val: &mut Option<(Dynamic, &OpAssignment)>,
-    ) -> RhaiResult {
-        let chain_type = ChainType::from(expr);
-        let (crate::ast::BinaryExpr { lhs, rhs }, options, op_pos) = match expr {
-            #[cfg(not(feature = "no_index"))]
-            Expr::Index(x, options, pos) => (&**x, *options, *pos),
-            #[cfg(not(feature = "no_object"))]
-            Expr::Dot(x, options, pos) => (&**x, *options, *pos),
-            expr => unreachable!("Expr::Index or Expr::Dot expected but gets {:?}", expr),
-        };
-
-        let idx_values = &mut FnArgsVec::new_const();
-
-        match rhs {
-            // Short-circuit for simple property access: {expr}.prop
-            #[cfg(not(feature = "no_object"))]
-            Expr::Property(..) if chain_type == ChainType::Dotting => (),
-            #[cfg(not(feature = "no_object"))]
-            Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
-            // Short-circuit for simple method call: {expr}.func()
-            #[cfg(not(feature = "no_object"))]
-            Expr::FnCall(x, ..) if chain_type == ChainType::Dotting && x.args.is_empty() => (),
-            // Short-circuit for method call with all literal arguments: {expr}.func(1, 2, 3)
-            #[cfg(not(feature = "no_object"))]
-            Expr::FnCall(x, ..)
-                if chain_type == ChainType::Dotting && x.args.iter().all(Expr::is_constant) =>
-            {
-                idx_values.extend(x.args.iter().map(|expr| expr.get_literal_value().unwrap()))
-            }
-            // Short-circuit for indexing with literal: {expr}[1]
-            #[cfg(not(feature = "no_index"))]
-            _ if chain_type == ChainType::Indexing && rhs.is_constant() => {
-                idx_values.push(rhs.get_literal_value().unwrap())
-            }
-            // All other patterns - evaluate the arguments chain
-            _ => {
-                self.eval_dot_index_chain_arguments(
-                    global, caches, scope, this_ptr, rhs, options, chain_type, idx_values,
-                )?;
-            }
-        }
-
-        match lhs {
-            // id.??? or id[???]
-            Expr::Variable(x, .., var_pos) => {
-                #[cfg(feature = "debugging")]
-                self.run_debugger(global, caches, scope, this_ptr, lhs)?;
-                self.track_operation(global, *var_pos)?;
-
-                let (mut target, ..) =
-                    self.search_namespace(global, caches, scope, this_ptr, lhs)?;
-
-                let obj_ptr = &mut target;
-                let root = (x.3.as_str(), *var_pos);
-                let mut this = Dynamic::NULL;
-
-                self.eval_dot_index_chain_helper(
-                    global, caches, &mut this, obj_ptr, root, expr, options, rhs, idx_values,
-                    chain_type, new_val,
-                )
-            }
-            // {expr}.??? = ??? or {expr}[???] = ???
-            _ if new_val.is_some() => unreachable!("cannot assign to an expression"),
-            // {expr}.??? or {expr}[???]
-            expr => {
-                let value = self
-                    .eval_expr(global, caches, scope, this_ptr, expr)?
-                    .flatten();
-                let obj_ptr = &mut value.into();
-                let root = ("", expr.start_position());
-
-                self.eval_dot_index_chain_helper(
-                    global, caches, this_ptr, obj_ptr, root, expr, options, rhs, idx_values,
-                    chain_type, new_val,
-                )
-            }
-        }
-        .map(|(v, ..)| v)
-        .map_err(|err| err.fill_position(op_pos))
-    }
-
-    /// Evaluate a chain of indexes and store the results in a [`FnArgsVec`].
-    fn eval_dot_index_chain_arguments(
-        &self,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        scope: &mut Scope,
-        this_ptr: &mut Dynamic,
-        expr: &Expr,
-        parent_options: ASTFlags,
-        parent_chain_type: ChainType,
-        idx_values: &mut FnArgsVec<Dynamic>,
-    ) -> RhaiResultOf<()> {
-        self.track_operation(global, expr.position())?;
-
-        match expr {
-            #[cfg(not(feature = "no_object"))]
-            Expr::MethodCall(x, ..)
-                if parent_chain_type == ChainType::Dotting && !x.is_qualified() =>
-            {
-                for arg_expr in &x.args {
-                    idx_values.push(
-                        self.get_arg_value(global, caches, scope, this_ptr, arg_expr)?
-                            .0
-                            .flatten(),
-                    );
-                }
-            }
-            #[cfg(not(feature = "no_object"))]
-            Expr::MethodCall(..) if parent_chain_type == ChainType::Dotting => {
-                unreachable!("function call in dot chain should not be namespace-qualified")
-            }
-
-            #[cfg(not(feature = "no_object"))]
-            Expr::Property(..) if parent_chain_type == ChainType::Dotting => (),
-            Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
-
-            Expr::Index(x, options, ..) | Expr::Dot(x, options, ..)
-                if !parent_options.contains(ASTFlags::BREAK) =>
-            {
-                let crate::ast::BinaryExpr { lhs, rhs, .. } = &**x;
-
-                let mut _arg_values = FnArgsVec::new_const();
-
-                // Evaluate in left-to-right order
-                match lhs {
-                    #[cfg(not(feature = "no_object"))]
-                    Expr::Property(..) if parent_chain_type == ChainType::Dotting => (),
-                    Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
-
-                    #[cfg(not(feature = "no_object"))]
-                    Expr::MethodCall(x, ..)
-                        if parent_chain_type == ChainType::Dotting && !x.is_qualified() =>
-                    {
-                        for arg_expr in &x.args {
-                            _arg_values.push(
-                                self.get_arg_value(global, caches, scope, this_ptr, arg_expr)?
-                                    .0
-                                    .flatten(),
-                            );
-                        }
-                    }
-                    #[cfg(not(feature = "no_object"))]
-                    Expr::MethodCall(..) if parent_chain_type == ChainType::Dotting => {
-                        unreachable!("function call in dot chain should not be namespace-qualified")
-                    }
-                    #[cfg(not(feature = "no_object"))]
-                    expr if parent_chain_type == ChainType::Dotting => {
-                        unreachable!("invalid dot expression: {:?}", expr);
-                    }
-                    #[cfg(not(feature = "no_index"))]
-                    _ if parent_chain_type == ChainType::Indexing => {
-                        _arg_values.push(
-                            self.eval_expr(global, caches, scope, this_ptr, lhs)?
-                                .flatten(),
-                        );
-                    }
-                    expr => unreachable!("unknown chained expression: {:?}", expr),
-                }
-
-                // Push in reverse order
-                let chain_type = expr.into();
-
-                self.eval_dot_index_chain_arguments(
-                    global, caches, scope, this_ptr, rhs, *options, chain_type, idx_values,
-                )?;
-
-                if !_arg_values.is_empty() {
-                    idx_values.extend(_arg_values);
-                }
-            }
-
-            #[cfg(not(feature = "no_object"))]
-            _ if parent_chain_type == ChainType::Dotting => {
-                unreachable!("invalid dot expression: {:?}", expr);
-            }
-            #[cfg(not(feature = "no_index"))]
-            _ if parent_chain_type == ChainType::Indexing => idx_values.push(
-                self.eval_expr(global, caches, scope, this_ptr, expr)?
-                    .flatten(),
-            ),
-            _ => unreachable!("unknown chained expression: {:?}", expr),
-        }
-
-        Ok(())
-    }
-
     /// Call a get indexer.
-    #[inline(always)]
+    #[inline]
     fn call_indexer_get(
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         target: &mut Dynamic,
         idx: &mut Dynamic,
+        pos: Position,
     ) -> RhaiResultOf<Dynamic> {
         let args = &mut [target, idx];
         let hash = global.hash_idx_get();
         let fn_name = crate::engine::FN_IDX_GET;
-        let pos = Position::NONE;
 
         let orig_level = global.level;
         global.level += 1;
@@ -751,7 +58,7 @@ impl Engine {
     }
 
     /// Call a set indexer.
-    #[inline(always)]
+    #[inline]
     fn call_indexer_set(
         &self,
         global: &mut GlobalRuntimeState,
@@ -760,11 +67,11 @@ impl Engine {
         idx: &mut Dynamic,
         new_val: &mut Dynamic,
         is_ref_mut: bool,
+        pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
         let hash = global.hash_idx_set();
         let args = &mut [target, idx, new_val];
         let fn_name = crate::engine::FN_IDX_SET;
-        let pos = Position::NONE;
 
         let orig_level = global.level;
         global.level += 1;
@@ -774,7 +81,6 @@ impl Engine {
     }
 
     /// Get the value at the indexed position of a base type.
-    /// [`Position`] in [`EvalAltResult`][crate::EvalAltResult] may be [`NONE`][Position::NONE] and should be set afterwards.
     fn get_indexed_mut<'t>(
         &self,
         global: &mut GlobalRuntimeState,
@@ -782,6 +88,7 @@ impl Engine {
         target: &'t mut Dynamic,
         idx: &mut Dynamic,
         idx_pos: Position,
+        op_pos: Position,
         _add_if_not_found: bool,
         use_indexers: bool,
     ) -> RhaiResultOf<Target<'t>> {
@@ -987,7 +294,7 @@ impl Engine {
             }
 
             _ if use_indexers => self
-                .call_indexer_get(global, caches, target, idx)
+                .call_indexer_get(global, caches, target, idx, op_pos)
                 .map(Into::into),
 
             _ => Err(ERR::ErrorIndexingType(
@@ -996,9 +303,696 @@ impl Engine {
                     self.map_type_name(target.type_name()),
                     self.map_type_name(idx.type_name())
                 ),
-                Position::NONE,
+                op_pos,
             )
             .into()),
+        }
+    }
+
+    /// Evaluate a dot/index chain.
+    pub(crate) fn eval_dot_index_chain(
+        &self,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        scope: &mut Scope,
+        this_ptr: &mut Dynamic,
+        expr: &Expr,
+        new_val: &mut Option<(Dynamic, &OpAssignment)>,
+    ) -> RhaiResult {
+        let chain_type = ChainType::from(expr);
+
+        let crate::ast::BinaryExpr { lhs, rhs } = match expr {
+            #[cfg(not(feature = "no_index"))]
+            Expr::Index(x, ..) => &**x,
+            #[cfg(not(feature = "no_object"))]
+            Expr::Dot(x, ..) => &**x,
+            expr => unreachable!("Expr::Index or Expr::Dot expected but gets {:?}", expr),
+        };
+
+        let idx_values = &mut FnArgsVec::new_const();
+
+        match rhs {
+            // Short-circuit for simple property access: {expr}.prop
+            #[cfg(not(feature = "no_object"))]
+            Expr::Property(..) if chain_type == ChainType::Dotting => (),
+            #[cfg(not(feature = "no_object"))]
+            Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
+            // Short-circuit for simple method call: {expr}.func()
+            #[cfg(not(feature = "no_object"))]
+            Expr::FnCall(x, ..) if chain_type == ChainType::Dotting && x.args.is_empty() => (),
+            // Short-circuit for method call with all literal arguments: {expr}.func(1, 2, 3)
+            #[cfg(not(feature = "no_object"))]
+            Expr::FnCall(x, ..)
+                if chain_type == ChainType::Dotting && x.args.iter().all(Expr::is_constant) =>
+            {
+                idx_values.extend(x.args.iter().map(|expr| expr.get_literal_value().unwrap()))
+            }
+            // Short-circuit for indexing with literal: {expr}[1]
+            #[cfg(not(feature = "no_index"))]
+            _ if chain_type == ChainType::Indexing && rhs.is_constant() => {
+                idx_values.push(rhs.get_literal_value().unwrap())
+            }
+            // All other patterns - evaluate the arguments chain
+            _ => {
+                self.eval_dot_index_chain_arguments(
+                    global, caches, scope, this_ptr, expr, rhs, idx_values,
+                )?;
+            }
+        }
+
+        match lhs {
+            // id.??? or id[???]
+            Expr::Variable(.., var_pos) => {
+                #[cfg(feature = "debugging")]
+                self.run_debugger(global, caches, scope, this_ptr, lhs)?;
+                self.track_operation(global, *var_pos)?;
+
+                let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
+
+                let obj_ptr = &mut target;
+                let mut this = Dynamic::NULL;
+
+                self.eval_dot_index_chain_raw(
+                    global, caches, &mut this, lhs, expr, obj_ptr, rhs, idx_values, new_val,
+                )
+            }
+            // {expr}.??? = ??? or {expr}[???] = ???
+            _ if new_val.is_some() => unreachable!("cannot assign to an expression"),
+            // {expr}.??? or {expr}[???]
+            lhs_expr => {
+                let value = self
+                    .eval_expr(global, caches, scope, this_ptr, lhs_expr)?
+                    .flatten();
+                let obj_ptr = &mut value.into();
+
+                self.eval_dot_index_chain_raw(
+                    global, caches, this_ptr, lhs_expr, expr, obj_ptr, rhs, idx_values, new_val,
+                )
+            }
+        }
+        .map(|(v, ..)| v)
+    }
+
+    /// Evaluate a chain of indexes and store the results in a [`FnArgsVec`].
+    fn eval_dot_index_chain_arguments(
+        &self,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        scope: &mut Scope,
+        this_ptr: &mut Dynamic,
+        parent: &Expr,
+        expr: &Expr,
+        idx_values: &mut FnArgsVec<Dynamic>,
+    ) -> RhaiResultOf<()> {
+        self.track_operation(global, expr.position())?;
+
+        let chain_type = ChainType::from(parent);
+
+        match expr {
+            #[cfg(not(feature = "no_object"))]
+            Expr::MethodCall(x, ..) if chain_type == ChainType::Dotting && !x.is_qualified() => {
+                for arg_expr in &x.args {
+                    idx_values.push(
+                        self.get_arg_value(global, caches, scope, this_ptr, arg_expr)?
+                            .0
+                            .flatten(),
+                    );
+                }
+            }
+            #[cfg(not(feature = "no_object"))]
+            Expr::MethodCall(..) if chain_type == ChainType::Dotting => {
+                unreachable!("function call in dot chain should not be namespace-qualified")
+            }
+
+            #[cfg(not(feature = "no_object"))]
+            Expr::Property(..) if chain_type == ChainType::Dotting => (),
+            Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
+
+            Expr::Index(x, ..) | Expr::Dot(x, ..)
+                if !parent.options().contains(ASTFlags::BREAK) =>
+            {
+                let crate::ast::BinaryExpr { lhs, rhs, .. } = &**x;
+
+                let mut _arg_values = FnArgsVec::new_const();
+
+                // Evaluate in left-to-right order
+                match lhs {
+                    #[cfg(not(feature = "no_object"))]
+                    Expr::Property(..) if chain_type == ChainType::Dotting => (),
+                    Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
+
+                    #[cfg(not(feature = "no_object"))]
+                    Expr::MethodCall(x, ..)
+                        if chain_type == ChainType::Dotting && !x.is_qualified() =>
+                    {
+                        for arg_expr in &x.args {
+                            _arg_values.push(
+                                self.get_arg_value(global, caches, scope, this_ptr, arg_expr)?
+                                    .0
+                                    .flatten(),
+                            );
+                        }
+                    }
+                    #[cfg(not(feature = "no_object"))]
+                    Expr::MethodCall(..) if chain_type == ChainType::Dotting => {
+                        unreachable!("function call in dot chain should not be namespace-qualified")
+                    }
+                    #[cfg(not(feature = "no_object"))]
+                    expr if chain_type == ChainType::Dotting => {
+                        unreachable!("invalid dot expression: {:?}", expr);
+                    }
+                    #[cfg(not(feature = "no_index"))]
+                    _ if chain_type == ChainType::Indexing => {
+                        _arg_values.push(
+                            self.eval_expr(global, caches, scope, this_ptr, lhs)?
+                                .flatten(),
+                        );
+                    }
+                    expr => unreachable!("unknown chained expression: {:?}", expr),
+                }
+
+                // Push in reverse order
+                self.eval_dot_index_chain_arguments(
+                    global, caches, scope, this_ptr, expr, rhs, idx_values,
+                )?;
+
+                if !_arg_values.is_empty() {
+                    idx_values.extend(_arg_values);
+                }
+            }
+
+            #[cfg(not(feature = "no_object"))]
+            _ if chain_type == ChainType::Dotting => {
+                unreachable!("invalid dot expression: {:?}", expr);
+            }
+            #[cfg(not(feature = "no_index"))]
+            _ if chain_type == ChainType::Indexing => idx_values.push(
+                self.eval_expr(global, caches, scope, this_ptr, expr)?
+                    .flatten(),
+            ),
+            _ => unreachable!("unknown chained expression: {:?}", expr),
+        }
+
+        Ok(())
+    }
+
+    /// Chain-evaluate a dot/index chain.
+    fn eval_dot_index_chain_raw(
+        &self,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        this_ptr: &mut Dynamic,
+        root: &Expr,
+        parent: &Expr,
+        target: &mut Target,
+        rhs: &Expr,
+        idx_values: &mut FnArgsVec<Dynamic>,
+        new_val: &mut Option<(Dynamic, &OpAssignment)>,
+    ) -> RhaiResultOf<(Dynamic, bool)> {
+        let is_ref_mut = target.is_ref();
+        let op_pos = parent.position();
+
+        #[cfg(feature = "debugging")]
+        let scope = &mut Scope::new();
+
+        match ChainType::from(parent) {
+            #[cfg(not(feature = "no_index"))]
+            ChainType::Indexing => {
+                // Check for existence with the null conditional operator
+                if parent.options().contains(ASTFlags::NEGATED) && target.is_unit() {
+                    return Ok((Dynamic::UNIT, false));
+                }
+
+                let pos = rhs.start_position();
+
+                match rhs {
+                    // xxx[idx].expr... | xxx[idx][expr]...
+                    Expr::Dot(x, ..) | Expr::Index(x, ..)
+                        if !parent.options().contains(ASTFlags::BREAK) =>
+                    {
+                        #[cfg(feature = "debugging")]
+                        self.run_debugger(global, caches, scope, this_ptr, parent)?;
+
+                        let idx_val = &mut idx_values.pop().unwrap();
+                        let mut idx_val_for_setter = idx_val.clone();
+                        let idx_pos = x.lhs.start_position();
+
+                        let (try_setter, result) = {
+                            let mut obj = self.get_indexed_mut(
+                                global, caches, target, idx_val, idx_pos, op_pos, false, true,
+                            )?;
+                            let is_obj_temp_val = obj.is_temp_value();
+                            let obj_ptr = &mut obj;
+
+                            match self.eval_dot_index_chain_raw(
+                                global, caches, this_ptr, root, rhs, obj_ptr, &x.rhs, idx_values,
+                                new_val,
+                            ) {
+                                Ok((result, true)) if is_obj_temp_val => {
+                                    (Some(obj.take_or_clone()), (result, true))
+                                }
+                                Ok(result) => (None, result),
+                                Err(err) => return Err(err),
+                            }
+                        };
+
+                        if let Some(mut new_val) = try_setter {
+                            // Try to call index setter if value is changed
+                            let idx = &mut idx_val_for_setter;
+                            let new_val = &mut new_val;
+                            self.call_indexer_set(
+                                global, caches, target, idx, new_val, is_ref_mut, op_pos,
+                            )
+                            .or_else(|e| match *e {
+                                ERR::ErrorIndexingType(..) => Ok((Dynamic::UNIT, false)),
+                                _ => Err(e),
+                            })?;
+                        }
+
+                        Ok(result)
+                    }
+                    // xxx[rhs] op= new_val
+                    _ if new_val.is_some() => {
+                        #[cfg(feature = "debugging")]
+                        self.run_debugger(global, caches, scope, this_ptr, parent)?;
+
+                        let (new_val, op_info) = new_val.take().expect("`Some`");
+                        let idx_val = &mut idx_values.pop().unwrap();
+                        let idx = &mut idx_val.clone();
+
+                        let try_setter = match self
+                            .get_indexed_mut(global, caches, target, idx, pos, op_pos, true, false)
+                        {
+                            // Indexed value is not a temp value - update directly
+                            Ok(ref mut obj_ptr) => {
+                                self.eval_op_assignment(
+                                    global, caches, op_info, root, obj_ptr, new_val,
+                                )?;
+                                self.check_data_size(obj_ptr.as_ref(), op_info.pos)?;
+                                None
+                            }
+                            // Indexed value cannot be referenced - use indexer
+                            #[cfg(not(feature = "no_index"))]
+                            Err(err) if matches!(*err, ERR::ErrorIndexingType(..)) => Some(new_val),
+                            // Any other error
+                            Err(err) => return Err(err),
+                        };
+
+                        if let Some(mut new_val) = try_setter {
+                            // Is this an op-assignment?
+                            if op_info.is_op_assignment() {
+                                let idx = &mut idx_val.clone();
+
+                                // Call the index getter to get the current value
+                                if let Ok(val) =
+                                    self.call_indexer_get(global, caches, target, idx, op_pos)
+                                {
+                                    let mut val = val.into();
+                                    // Run the op-assignment
+                                    self.eval_op_assignment(
+                                        global, caches, op_info, root, &mut val, new_val,
+                                    )?;
+                                    // Replace new value
+                                    new_val = val.take_or_clone();
+                                    self.check_data_size(&new_val, op_info.pos)?;
+                                }
+                            }
+
+                            // Try to call index setter
+                            let new_val = &mut new_val;
+
+                            self.call_indexer_set(
+                                global, caches, target, idx_val, new_val, is_ref_mut, op_pos,
+                            )?;
+                        }
+
+                        Ok((Dynamic::UNIT, true))
+                    }
+                    // xxx[rhs]
+                    _ => {
+                        #[cfg(feature = "debugging")]
+                        self.run_debugger(global, caches, scope, this_ptr, parent)?;
+
+                        let idx_val = &mut idx_values.pop().unwrap();
+
+                        self.get_indexed_mut(
+                            global, caches, target, idx_val, pos, op_pos, false, true,
+                        )
+                        .map(|v| (v.take_or_clone(), false))
+                    }
+                }
+            }
+
+            #[cfg(not(feature = "no_object"))]
+            ChainType::Dotting => {
+                // Check for existence with the Elvis operator
+                if parent.options().contains(ASTFlags::NEGATED) && target.is_unit() {
+                    return Ok((Dynamic::UNIT, false));
+                }
+
+                match rhs {
+                    // xxx.fn_name(arg_expr_list)
+                    Expr::MethodCall(x, pos) if !x.is_qualified() && new_val.is_none() => {
+                        #[cfg(feature = "debugging")]
+                        let reset =
+                            self.run_debugger_with_reset(global, caches, scope, this_ptr, rhs)?;
+                        #[cfg(feature = "debugging")]
+                        let global = &mut *RestoreOnDrop::lock(global, move |g| {
+                            g.debugger.reset_status(reset)
+                        });
+
+                        let crate::ast::FnCallExpr {
+                            name, hashes, args, ..
+                        } = &**x;
+
+                        // Truncate the index values upon exit
+                        let offset = idx_values.len() - args.len();
+                        let idx_values =
+                            &mut *RestoreOnDrop::lock(idx_values, move |v| v.truncate(offset));
+
+                        let call_args = &mut idx_values[offset..];
+                        let arg1_pos = args.get(0).map_or(Position::NONE, Expr::position);
+
+                        self.make_method_call(
+                            global, caches, name, *hashes, target, call_args, arg1_pos, *pos,
+                        )
+                    }
+                    // xxx.fn_name(...) = ???
+                    Expr::MethodCall(..) if new_val.is_some() => {
+                        unreachable!("method call cannot be assigned to")
+                    }
+                    // xxx.module::fn_name(...) - syntax error
+                    Expr::MethodCall(..) => {
+                        unreachable!("function call in dot chain should not be namespace-qualified")
+                    }
+                    // {xxx:map}.id op= ???
+                    Expr::Property(x, pos) if target.is_map() && new_val.is_some() => {
+                        #[cfg(feature = "debugging")]
+                        self.run_debugger(global, caches, scope, this_ptr, rhs)?;
+
+                        let index = &mut x.2.clone().into();
+                        let (new_val, op_info) = new_val.take().expect("`Some`");
+                        {
+                            let val_target = &mut self.get_indexed_mut(
+                                global, caches, target, index, *pos, op_pos, true, false,
+                            )?;
+                            self.eval_op_assignment(
+                                global, caches, op_info, root, val_target, new_val,
+                            )?;
+                        }
+                        self.check_data_size(target.source(), op_info.pos)?;
+                        Ok((Dynamic::UNIT, true))
+                    }
+                    // {xxx:map}.id
+                    Expr::Property(x, pos) if target.is_map() => {
+                        #[cfg(feature = "debugging")]
+                        self.run_debugger(global, caches, scope, this_ptr, rhs)?;
+
+                        let index = &mut x.2.clone().into();
+                        let val = self.get_indexed_mut(
+                            global, caches, target, index, *pos, op_pos, false, false,
+                        )?;
+                        Ok((val.take_or_clone(), false))
+                    }
+                    // xxx.id op= ???
+                    Expr::Property(x, pos) if new_val.is_some() => {
+                        #[cfg(feature = "debugging")]
+                        self.run_debugger(global, caches, scope, this_ptr, rhs)?;
+
+                        let ((getter, hash_get), (setter, hash_set), name) = &**x;
+                        let (mut new_val, op_info) = new_val.take().expect("`Some`");
+
+                        if op_info.is_op_assignment() {
+                            let args = &mut [target.as_mut()];
+                            let (mut orig_val, ..) = self
+                                .exec_native_fn_call(
+                                    global, caches, getter, None, *hash_get, args, is_ref_mut, *pos,
+                                )
+                                .or_else(|err| match *err {
+                                    // Try an indexer if property does not exist
+                                    ERR::ErrorDotExpr(..) => {
+                                        let mut prop = name.into();
+                                        self.call_indexer_get(
+                                            global, caches, target, &mut prop, op_pos,
+                                        )
+                                        .map(|r| (r, false))
+                                        .map_err(|e| {
+                                            match *e {
+                                                ERR::ErrorIndexingType(..) => err,
+                                                _ => e,
+                                            }
+                                        })
+                                    }
+                                    _ => Err(err),
+                                })?;
+
+                            {
+                                let orig_val = &mut (&mut orig_val).into();
+
+                                self.eval_op_assignment(
+                                    global, caches, op_info, root, orig_val, new_val,
+                                )?;
+                            }
+
+                            new_val = orig_val;
+                        }
+
+                        let args = &mut [target.as_mut(), &mut new_val];
+                        self.exec_native_fn_call(
+                            global, caches, setter, None, *hash_set, args, is_ref_mut, *pos,
+                        )
+                        .or_else(|err| match *err {
+                            // Try an indexer if property does not exist
+                            ERR::ErrorDotExpr(..) => {
+                                let idx = &mut name.into();
+                                let new_val = &mut new_val;
+                                self.call_indexer_set(
+                                    global, caches, target, idx, new_val, is_ref_mut, op_pos,
+                                )
+                                .map_err(|e| match *e {
+                                    ERR::ErrorIndexingType(..) => err,
+                                    _ => e,
+                                })
+                            }
+                            _ => Err(err),
+                        })
+                    }
+                    // xxx.id
+                    Expr::Property(x, pos) => {
+                        #[cfg(feature = "debugging")]
+                        self.run_debugger(global, caches, scope, this_ptr, rhs)?;
+
+                        let ((getter, hash_get), _, name) = &**x;
+                        let args = &mut [target.as_mut()];
+                        self.exec_native_fn_call(
+                            global, caches, getter, None, *hash_get, args, is_ref_mut, *pos,
+                        )
+                        .map_or_else(
+                            |err| match *err {
+                                // Try an indexer if property does not exist
+                                ERR::ErrorDotExpr(..) => {
+                                    let mut prop = name.into();
+                                    self.call_indexer_get(global, caches, target, &mut prop, op_pos)
+                                        .map(|r| (r, false))
+                                        .map_err(|e| match *e {
+                                            ERR::ErrorIndexingType(..) => err,
+                                            _ => e,
+                                        })
+                                }
+                                _ => Err(err),
+                            },
+                            // Assume getters are always pure
+                            |(v, ..)| Ok((v, false)),
+                        )
+                    }
+                    // {xxx:map}.sub_lhs[expr] | {xxx:map}.sub_lhs.expr
+                    Expr::Index(x, ..) | Expr::Dot(x, ..) if target.is_map() => {
+                        let _node = &x.lhs;
+
+                        let val_target = &mut match x.lhs {
+                            Expr::Property(ref p, pos) => {
+                                #[cfg(feature = "debugging")]
+                                self.run_debugger(global, caches, scope, this_ptr, _node)?;
+
+                                let index = &mut p.2.clone().into();
+                                self.get_indexed_mut(
+                                    global, caches, target, index, pos, op_pos, false, true,
+                                )?
+                            }
+                            // {xxx:map}.fn_name(arg_expr_list)[expr] | {xxx:map}.fn_name(arg_expr_list).expr
+                            Expr::MethodCall(ref x, pos) if !x.is_qualified() => {
+                                #[cfg(feature = "debugging")]
+                                let reset = self.run_debugger_with_reset(
+                                    global, caches, scope, this_ptr, _node,
+                                )?;
+                                #[cfg(feature = "debugging")]
+                                let global = &mut *RestoreOnDrop::lock(global, move |g| {
+                                    g.debugger.reset_status(reset)
+                                });
+
+                                let crate::ast::FnCallExpr {
+                                    name, hashes, args, ..
+                                } = &**x;
+
+                                // Truncate the index values upon exit
+                                let offset = idx_values.len() - args.len();
+                                let idx_values = &mut *RestoreOnDrop::lock(idx_values, move |v| {
+                                    v.truncate(offset)
+                                });
+
+                                let call_args = &mut idx_values[offset..];
+                                let arg1_pos = args.get(0).map_or(Position::NONE, Expr::position);
+
+                                self.make_method_call(
+                                    global, caches, name, *hashes, target, call_args, arg1_pos, pos,
+                                )?
+                                .0
+                                .into()
+                            }
+                            // {xxx:map}.module::fn_name(...) - syntax error
+                            Expr::MethodCall(..) => unreachable!(
+                                "function call in dot chain should not be namespace-qualified"
+                            ),
+                            // Others - syntax error
+                            ref expr => unreachable!("invalid dot expression: {:?}", expr),
+                        };
+
+                        self.eval_dot_index_chain_raw(
+                            global, caches, this_ptr, root, rhs, val_target, &x.rhs, idx_values,
+                            new_val,
+                        )
+                    }
+                    // xxx.sub_lhs[expr] | xxx.sub_lhs.expr
+                    Expr::Index(x, ..) | Expr::Dot(x, ..) => {
+                        let _node = &x.lhs;
+
+                        match x.lhs {
+                            // xxx.prop[expr] | xxx.prop.expr
+                            Expr::Property(ref p, pos) => {
+                                #[cfg(feature = "debugging")]
+                                self.run_debugger(global, caches, scope, this_ptr, _node)?;
+
+                                let ((getter, hash_get), (setter, hash_set), name) = &**p;
+                                let mut arg_values = [target.as_mut(), &mut Dynamic::UNIT.clone()];
+                                let args = &mut arg_values[..1];
+
+                                // Assume getters are always pure
+                                let (mut val, ..) = self
+                                    .exec_native_fn_call(
+                                        global, caches, getter, None, *hash_get, args, is_ref_mut,
+                                        pos,
+                                    )
+                                    .or_else(|err| match *err {
+                                        // Try an indexer if property does not exist
+                                        ERR::ErrorDotExpr(..) => {
+                                            let mut prop = name.into();
+                                            self.call_indexer_get(
+                                                global, caches, target, &mut prop, op_pos,
+                                            )
+                                            .map(|r| (r, false))
+                                            .map_err(
+                                                |e| match *e {
+                                                    ERR::ErrorIndexingType(..) => err,
+                                                    _ => e,
+                                                },
+                                            )
+                                        }
+                                        _ => Err(err),
+                                    })?;
+
+                                let val = &mut (&mut val).into();
+
+                                let (result, may_be_changed) = self.eval_dot_index_chain_raw(
+                                    global, caches, this_ptr, root, rhs, val, &x.rhs, idx_values,
+                                    new_val,
+                                )?;
+
+                                // Feed the value back via a setter just in case it has been updated
+                                if may_be_changed {
+                                    // Re-use args because the first &mut parameter will not be consumed
+                                    let mut arg_values = [target.as_mut(), val.as_mut()];
+                                    let args = &mut arg_values;
+                                    self.exec_native_fn_call(
+                                        global, caches, setter, None, *hash_set, args, is_ref_mut,
+                                        pos,
+                                    )
+                                    .or_else(
+                                        |err| match *err {
+                                            // Try an indexer if property does not exist
+                                            ERR::ErrorDotExpr(..) => {
+                                                let idx = &mut name.into();
+                                                let new_val = val;
+                                                self.call_indexer_set(
+                                                    global, caches, target, idx, new_val,
+                                                    is_ref_mut, op_pos,
+                                                )
+                                                .or_else(|e| match *e {
+                                                    // If there is no setter, no need to feed it
+                                                    // back because the property is read-only
+                                                    ERR::ErrorIndexingType(..) => {
+                                                        Ok((Dynamic::UNIT, false))
+                                                    }
+                                                    _ => Err(e),
+                                                })
+                                            }
+                                            _ => Err(err),
+                                        },
+                                    )?;
+                                }
+
+                                Ok((result, may_be_changed))
+                            }
+                            // xxx.fn_name(arg_expr_list)[expr] | xxx.fn_name(arg_expr_list).expr
+                            Expr::MethodCall(ref f, pos) if !f.is_qualified() => {
+                                let val = {
+                                    #[cfg(feature = "debugging")]
+                                    let reset = self.run_debugger_with_reset(
+                                        global, caches, scope, this_ptr, _node,
+                                    )?;
+                                    #[cfg(feature = "debugging")]
+                                    let global = &mut *RestoreOnDrop::lock(global, move |g| {
+                                        g.debugger.reset_status(reset)
+                                    });
+
+                                    let crate::ast::FnCallExpr {
+                                        name, hashes, args, ..
+                                    } = &**f;
+
+                                    // Truncate the index values upon exit
+                                    let offset = idx_values.len() - args.len();
+                                    let idx_values =
+                                        &mut *RestoreOnDrop::lock(idx_values, move |v| {
+                                            v.truncate(offset)
+                                        });
+
+                                    let call_args = &mut idx_values[offset..];
+                                    let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
+
+                                    self.make_method_call(
+                                        global, caches, name, *hashes, target, call_args, pos1, pos,
+                                    )?
+                                    .0
+                                };
+
+                                let val = &mut val.into();
+
+                                self.eval_dot_index_chain_raw(
+                                    global, caches, this_ptr, root, rhs, val, &x.rhs, idx_values,
+                                    new_val,
+                                )
+                            }
+                            // xxx.module::fn_name(...) - syntax error
+                            Expr::MethodCall(..) => unreachable!(
+                                "function call in dot chain should not be namespace-qualified"
+                            ),
+                            // Others - syntax error
+                            ref expr => unreachable!("invalid dot expression: {:?}", expr),
+                        }
+                    }
+                    // Syntax error
+                    expr => unreachable!("invalid chaining expression: {:?}", expr),
+                }
+            }
         }
     }
 }

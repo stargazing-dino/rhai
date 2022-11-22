@@ -12,7 +12,7 @@ use crate::tokenizer::{is_valid_function_name, Token};
 use crate::types::RestoreOnDrop;
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString,
-    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, ERR,
+    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
 };
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
@@ -166,7 +166,7 @@ impl Engine {
     #[must_use]
     fn resolve_fn<'s>(
         &self,
-        global: &GlobalRuntimeState,
+        _global: &GlobalRuntimeState,
         caches: &'s mut Caches,
         local_entry: &'s mut Option<FnResolutionCacheEntry>,
         op_token: Option<&Token>,
@@ -194,7 +194,7 @@ impl Engine {
 
                 loop {
                     #[cfg(not(feature = "no_function"))]
-                    let func = global
+                    let func = _global
                         .lib
                         .iter()
                         .rev()
@@ -214,7 +214,7 @@ impl Engine {
                         // Scripted functions are not exposed globally
                         func
                     } else {
-                        func.or_else(|| global.get_qualified_fn(hash)).or_else(|| {
+                        func.or_else(|| _global.get_qualified_fn(hash)).or_else(|| {
                             self.global_sub_modules
                                 .values()
                                 .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id_raw())))
@@ -223,17 +223,17 @@ impl Engine {
 
                     if let Some((f, s)) = func {
                         // Specific version found
-                        let new_entry = Some(FnResolutionCacheEntry {
+                        let new_entry = FnResolutionCacheEntry {
                             func: f.clone(),
                             source: s.cloned(),
-                        });
+                        };
                         return if cache.filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
-                            *local_entry = new_entry;
+                            *local_entry = Some(new_entry);
                             local_entry.as_ref()
                         } else {
                             // Cache entry
-                            entry.insert(new_entry).as_ref()
+                            entry.insert(Some(new_entry)).as_ref()
                         };
                     }
 
@@ -246,14 +246,14 @@ impl Engine {
 
                         #[cfg(not(feature = "no_function"))]
                         let is_dynamic = is_dynamic
-                            || global
+                            || _global
                                 .lib
                                 .iter()
                                 .any(|m| m.may_contain_dynamic_fn(hash_base));
 
                         #[cfg(not(feature = "no_module"))]
                         let is_dynamic = is_dynamic
-                            || global.may_contain_dynamic_fn(hash_base)
+                            || _global.may_contain_dynamic_fn(hash_base)
                             || self
                                 .global_sub_modules
                                 .values()
@@ -279,13 +279,13 @@ impl Engine {
 
                                     get_builtin_op_assignment_fn(token, *first_arg, rest_args[0])
                                         .map(|f| FnResolutionCacheEntry {
-                                            func: CallableFunction::from_fn_builtin(f),
+                                            func: CallableFunction::Method(Shared::new(f)),
                                             source: None,
                                         })
                                 }
                                 Some(token) => get_builtin_binary_op_fn(token, args[0], args[1])
                                     .map(|f| FnResolutionCacheEntry {
-                                        func: CallableFunction::from_fn_builtin(f),
+                                        func: CallableFunction::Method(Shared::new(f)),
                                         source: None,
                                     }),
 
@@ -363,15 +363,12 @@ impl Engine {
             true,
         );
 
-        if func.is_some() {
-            let is_method = func.map_or(false, |f| f.func.is_method());
+        if let Some(FnResolutionCacheEntry { func, source }) = func {
+            assert!(func.is_native());
 
             // Push a new call stack frame
             #[cfg(feature = "debugging")]
             let orig_call_stack_len = global.debugger.call_stack().len();
-
-            let FnResolutionCacheEntry { func, source } = func.unwrap();
-            assert!(func.is_native());
 
             let backup = &mut ArgBackup::new();
 
@@ -397,6 +394,7 @@ impl Engine {
             }
 
             // Run external function
+            let is_method = func.is_method();
             let src = source.as_ref().map(|s| s.as_str());
             let context = (self, name, src, &*global, pos).into();
 
@@ -406,16 +404,22 @@ impl Engine {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
                 } else {
                     f.call(context, args)
+                        .and_then(|r| self.check_data_size(r, pos))
+                        .map_err(|err| err.fill_position(pos))
                 }
             } else {
                 func.get_native_fn().unwrap()(context, args)
+                    .and_then(|r| self.check_data_size(r, pos))
+                    .map_err(|err| err.fill_position(pos))
             };
 
             #[cfg(feature = "debugging")]
             {
+                use crate::eval::{DebuggerEvent, DebuggerStatus};
+
                 let trigger = match global.debugger.status {
-                    crate::eval::DebuggerStatus::FunctionExit(n) => n >= global.level,
-                    crate::eval::DebuggerStatus::Next(.., true) => true,
+                    DebuggerStatus::FunctionExit(n) => n >= global.level,
+                    DebuggerStatus::Next(.., true) => true,
                     _ => false,
                 };
                 if trigger {
@@ -424,8 +428,8 @@ impl Engine {
                     let node = crate::ast::Stmt::Noop(pos);
                     let node = (&node).into();
                     let event = match _result {
-                        Ok(ref r) => crate::eval::DebuggerEvent::FunctionExitWithValue(r),
-                        Err(ref err) => crate::eval::DebuggerEvent::FunctionExitWithError(err),
+                        Ok(ref r) => DebuggerEvent::FunctionExitWithValue(r),
+                        Err(ref err) => DebuggerEvent::FunctionExitWithError(err),
                     };
 
                     if let Err(err) =
@@ -439,13 +443,12 @@ impl Engine {
                 global.debugger.rewind_call_stack(orig_call_stack_len);
             }
 
-            // Check the return value (including data sizes)
-            let result = self.check_return_value(_result, pos)?;
+            let result = _result?;
 
             // Check the data size of any `&mut` object, which may be changed.
             #[cfg(not(feature = "unchecked"))]
             if is_ref_mut && !args.is_empty() {
-                self.check_data_size(args[0], pos)?;
+                self.check_data_size(&*args[0], pos)?;
             }
 
             // See if the function match print/debug (which requires special processing)
@@ -1188,14 +1191,14 @@ impl Engine {
                         .map(|(value, ..)| arg_values.push(value.flatten()))
                 })?;
 
-                let (mut target, _pos) =
+                let mut target =
                     self.search_namespace(global, caches, scope, this_ptr, first_expr)?;
 
                 if target.is_read_only() {
                     target = target.into_owned();
                 }
 
-                self.track_operation(global, _pos)?;
+                self.track_operation(global, first_expr.position())?;
 
                 #[cfg(not(feature = "no_closure"))]
                 let target_is_shared = target.is_shared();
@@ -1269,10 +1272,9 @@ impl Engine {
 
                 // Get target reference to first argument
                 let first_arg = &args_expr[0];
-                let (target, _pos) =
-                    self.search_scope_only(global, caches, scope, this_ptr, first_arg)?;
+                let target = self.search_scope_only(global, caches, scope, this_ptr, first_arg)?;
 
-                self.track_operation(global, _pos)?;
+                self.track_operation(global, first_arg.position())?;
 
                 #[cfg(not(feature = "no_closure"))]
                 let target_is_shared = target.is_shared();
@@ -1382,19 +1384,18 @@ impl Engine {
             Some(f) if f.is_plugin_fn() => {
                 let context = (self, fn_name, module.id(), &*global, pos).into();
                 let f = f.get_plugin_fn().expect("plugin function");
-                let result = if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
+                if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
                 } else {
                     f.call(context, &mut args)
-                };
-                self.check_return_value(result, pos)
+                        .and_then(|r| self.check_data_size(r, pos))
+                }
             }
 
             Some(f) if f.is_native() => {
                 let func = f.get_native_fn().expect("native function");
                 let context = (self, fn_name, module.id(), &*global, pos).into();
-                let result = func(context, &mut args);
-                self.check_return_value(result, pos)
+                func(context, &mut args).and_then(|r| self.check_data_size(r, pos))
             }
 
             Some(f) => unreachable!("unknown function type: {:?}", f),

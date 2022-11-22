@@ -1,10 +1,31 @@
 Rhai Release Notes
 ==================
 
+Version 1.12.0
+==============
+
+Net features
+------------
+
+### `Engine::call_fn_with_options`
+
+* `Engine::call_fn_raw` is deprecated in favor of `Engine::call_fn_with_options` which allows setting options for the function call.
+* The options are for future-proofing the API.
+* In this version, it gains the ability to set the value of the _custom state_ (accessible via `NativeCallContext::tag`) for a function evaluation, overriding `Engine::set_default_tag`.
+
+Enhancements
+------------
+
+* `CallableFunction` is exported under `internals`.
+* The `TypeBuilder` type and `CustomType` trait are no longer marked as volatile.
+* `FuncArgs` is also implemented for arrays.
+* `Engine::set_XXX` API can now be chained.
+
+
 Version 1.11.0
 ==============
 
-Speed Improvements
+Speed improvements
 ------------------
 
 * Due to a code refactor, built-in operators for standard types now run even faster, in certain cases by 20-30%.

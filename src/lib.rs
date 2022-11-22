@@ -201,8 +201,6 @@ pub use api::{eval::eval, events::VarDefInfo, run::run};
 pub use ast::{FnAccess, AST};
 pub use engine::{Engine, OP_CONTAINS, OP_EQUALS};
 pub use eval::EvalContext;
-#[cfg(feature = "internals")]
-pub use func::native::{locked_read, locked_write};
 pub use func::{NativeCallContext, RegisterNativeFunction};
 pub use module::{FnNamespace, Module};
 pub use tokenizer::Position;
@@ -254,6 +252,9 @@ pub use func::Func;
 
 #[cfg(not(feature = "no_function"))]
 pub use ast::ScriptFnMetadata;
+
+#[cfg(not(feature = "no_function"))]
+pub use api::call_fn::CallFnOptions;
 
 /// Variable-sized array of [`Dynamic`] values.
 ///
@@ -342,7 +343,7 @@ pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeS
 
 #[cfg(feature = "internals")]
 #[allow(deprecated)]
-pub use func::NativeCallContextStore;
+pub use func::{locked_read, locked_write, CallableFunction, NativeCallContextStore};
 
 #[cfg(feature = "internals")]
 #[cfg(feature = "metadata")]
