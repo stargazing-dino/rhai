@@ -137,6 +137,7 @@ impl<'de> Visitor<'de> for DynamicVisitor {
     fn visit_string<E: Error>(self, v: String) -> Result<Self::Value, E> {
         Ok(v.into())
     }
+    #[cfg(not(feature = "no_index"))]
     #[inline(always)]
     fn visit_bytes<E: Error>(self, v: &[u8]) -> Result<Self::Value, E> {
         Ok(Dynamic::from_blob(v.to_vec()))
