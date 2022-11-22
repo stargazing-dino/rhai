@@ -20,7 +20,7 @@ impl Serialize for Dynamic {
             Union::Unit(..) => ser.serialize_unit(),
             Union::Bool(x, ..) => ser.serialize_bool(x),
             Union::Str(ref s, ..) => ser.serialize_str(s.as_str()),
-            Union::Char(c, ..) => ser.serialize_str(&c.to_string()),
+            Union::Char(c, ..) => ser.serialize_char(c),
 
             #[cfg(not(feature = "only_i32"))]
             Union::Int(x, ..) => ser.serialize_i64(x),
@@ -58,7 +58,7 @@ impl Serialize for Dynamic {
             #[cfg(not(feature = "no_index"))]
             Union::Array(ref a, ..) => (**a).serialize(ser),
             #[cfg(not(feature = "no_index"))]
-            Union::Blob(ref a, ..) => (**a).serialize(ser),
+            Union::Blob(ref a, ..) => ser.serialize_bytes(&**a),
             #[cfg(not(feature = "no_object"))]
             Union::Map(ref m, ..) => {
                 let mut map = ser.serialize_map(Some(m.len()))?;

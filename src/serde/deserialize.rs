@@ -127,19 +127,19 @@ impl<'de> Visitor<'de> for DynamicVisitor {
 
     #[inline(always)]
     fn visit_char<E: Error>(self, v: char) -> Result<Self::Value, E> {
-        self.visit_string(v.to_string())
+        Ok(v.into())
     }
     #[inline(always)]
     fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
         Ok(v.into())
     }
     #[inline(always)]
-    fn visit_borrowed_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
-        self.visit_str(v)
-    }
-    #[inline(always)]
     fn visit_string<E: Error>(self, v: String) -> Result<Self::Value, E> {
         Ok(v.into())
+    }
+    #[inline(always)]
+    fn visit_bytes<E: Error>(self, v: &[u8]) -> Result<Self::Value, E> {
+        Ok(Dynamic::from_blob(v.to_vec()))
     }
 
     #[inline(always)]
