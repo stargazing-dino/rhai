@@ -274,8 +274,7 @@ fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
                     Ok(None)
                 }
                 s => Err(LexError::ImproperSymbol(s.to_string(), String::new())
-                    .into_err(Position::NONE)
-                    .into()),
+                    .into_err(Position::NONE)),
             },
             _ => unreachable!(),
         },

@@ -1,6 +1,7 @@
 #![cfg(feature = "debugging")]
 
 use crate::def_package;
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -17,7 +18,7 @@ use crate::Map;
 def_package! {
     /// Package of basic debugging utilities.
     pub DebuggingPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         combine_with_exported_module!(lib, "debugging", debugging_functions);
     }

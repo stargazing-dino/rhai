@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{def_package, Position, RhaiError, RhaiResultOf, ERR, INT};
 #[cfg(feature = "no_std")]
@@ -192,7 +193,7 @@ macro_rules! reg_functions {
 def_package! {
     /// Basic arithmetic package.
     pub ArithmeticPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         combine_with_exported_module!(lib, "int", int_functions);
         reg_functions!(lib += signed_basic; INT);

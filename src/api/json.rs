@@ -1,7 +1,7 @@
 //! Module that defines JSON manipulation functions for [`Engine`].
 #![cfg(not(feature = "no_object"))]
 
-use crate::parser::ParseState;
+use crate::parser::{ParseSettingFlags, ParseState};
 use crate::tokenizer::Token;
 use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf, Scope};
 #[cfg(feature = "no_std")]
@@ -122,7 +122,7 @@ impl Engine {
         let ast = self.parse_global_expr(
             &mut stream.peekable(),
             &mut state,
-            |s| s.allow_unquoted_map_properties = false,
+            |s| s.flags |= ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES,
             #[cfg(not(feature = "no_optimize"))]
             OptimizationLevel::None,
             #[cfg(feature = "no_optimize")]

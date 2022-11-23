@@ -313,7 +313,7 @@ impl Parse for ExportedFn {
             }
         }
 
-        let skip_slots = if pass_context { 1 } else { 0 };
+        let skip_slots = usize::from(pass_context);
 
         // Determine whether function generates a special calling convention for a mutable receiver.
         let mut_receiver = match fn_all.sig.inputs.iter().nth(skip_slots) {
@@ -485,12 +485,12 @@ impl ExportedFn {
     }
 
     pub fn arg_list(&self) -> impl Iterator<Item = &syn::FnArg> {
-        let skip = if self.pass_context { 1 } else { 0 };
+        let skip = usize::from(self.pass_context);
         self.signature.inputs.iter().skip(skip)
     }
 
     pub fn arg_count(&self) -> usize {
-        let skip = if self.pass_context { 1 } else { 0 };
+        let skip = usize::from(self.pass_context);
         self.signature.inputs.len() - skip
     }
 

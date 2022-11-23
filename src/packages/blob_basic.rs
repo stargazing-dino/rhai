@@ -1,6 +1,7 @@
 #![cfg(not(feature = "no_index"))]
 
 use crate::eval::{calc_index, calc_offset_len};
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
     def_package, Array, Blob, Dynamic, ExclusiveRange, InclusiveRange, NativeCallContext, Position,
@@ -16,7 +17,7 @@ use crate::{FLOAT, FLOAT_BYTES};
 def_package! {
     /// Package of basic BLOB utilities.
     pub BasicBlobPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         combine_with_exported_module!(lib, "blob", blob_functions);
         combine_with_exported_module!(lib, "parse_int", parse_int_functions);

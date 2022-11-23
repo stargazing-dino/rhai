@@ -8,6 +8,7 @@ use crate::engine::{KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_PRINT, 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::builtin::get_builtin_binary_op_fn;
 use crate::func::hashing::get_hasher;
+use crate::module::ModuleFlags;
 use crate::tokenizer::Token;
 use crate::types::dynamic::AccessMode;
 use crate::{
@@ -168,7 +169,7 @@ fn has_native_fn_override(
     if engine
         .global_modules
         .iter()
-        .filter(|m| !m.standard)
+        .filter(|m| !m.flags.contains(ModuleFlags::STANDARD_LIB))
         .any(|m| m.contains_fn(hash))
     {
         return true;

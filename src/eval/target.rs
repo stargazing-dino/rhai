@@ -53,14 +53,12 @@ pub fn calc_index<E>(
     negative_count_from_end: bool,
     err_func: impl FnOnce() -> Result<usize, E>,
 ) -> Result<usize, E> {
-    if start < 0 {
-        if negative_count_from_end {
-            let abs_start = start.unsigned_abs() as usize;
+    if start < 0 && negative_count_from_end {
+        let abs_start = start.unsigned_abs() as usize;
 
-            // Count from end if negative
-            if abs_start <= length {
-                return Ok(length - abs_start);
-            }
+        // Count from end if negative
+        if abs_start <= length {
+            return Ok(length - abs_start);
         }
     }
     if start <= crate::MAX_USIZE_INT && (start as usize) < length {

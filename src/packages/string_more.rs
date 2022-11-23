@@ -1,3 +1,4 @@
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
     def_package, Dynamic, ExclusiveRange, InclusiveRange, RhaiResultOf, StaticVec, INT,
@@ -12,7 +13,7 @@ use super::string_basic::{print_with_func, FUNC_TO_STRING};
 def_package! {
     /// Package of additional string utilities over [`BasicStringPackage`][super::BasicStringPackage]
     pub MoreStringPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         combine_with_exported_module!(lib, "string", string_functions);
     }

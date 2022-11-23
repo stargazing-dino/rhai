@@ -2,6 +2,7 @@
 
 use crate::engine::OP_EQUALS;
 use crate::eval::{calc_index, calc_offset_len};
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
     def_package, Array, Dynamic, ExclusiveRange, FnPtr, InclusiveRange, NativeCallContext,
@@ -14,7 +15,7 @@ use std::{any::TypeId, cmp::Ordering, mem};
 def_package! {
     /// Package of basic array utilities.
     pub BasicArrayPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         combine_with_exported_module!(lib, "array", array_functions);
 

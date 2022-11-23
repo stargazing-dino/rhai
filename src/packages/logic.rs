@@ -1,4 +1,5 @@
 use crate::def_package;
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -38,7 +39,7 @@ macro_rules! reg_functions {
 def_package! {
     /// Package of basic logic operators.
     pub LogicPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         #[cfg(not(feature = "only_i32"))]
         #[cfg(not(feature = "only_i64"))]

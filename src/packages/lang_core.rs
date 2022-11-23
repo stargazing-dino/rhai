@@ -1,4 +1,5 @@
 use crate::def_package;
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::types::dynamic::Tag;
 use crate::{Dynamic, RhaiResultOf, ERR, INT};
@@ -8,7 +9,7 @@ use std::prelude::v1::*;
 def_package! {
     /// Package of core language features.
     pub LanguageCorePackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         combine_with_exported_module!(lib, "core", core_functions);
 
@@ -277,7 +278,8 @@ fn collect_fn_metadata(
                     &mut ns,
                     "{namespace}{}{name}",
                     crate::tokenizer::Token::DoubleColon.literal_syntax()
-                );
+                )
+                .unwrap();
                 scan_module(dict, list, &ns, &**m, filter);
             }
         }

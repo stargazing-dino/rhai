@@ -5,6 +5,7 @@ use crate::func::native::{
     locked_write, OnDebugCallback, OnDefVarCallback, OnParseTokenCallback, OnPrintCallback,
     OnVarCallback,
 };
+use crate::module::ModuleFlags;
 use crate::packages::{Package, StandardPackage};
 use crate::tokenizer::Token;
 use crate::types::StringsInterner;
@@ -303,7 +304,7 @@ impl Engine {
 
         // Add the global namespace module
         let mut global_namespace = Module::with_capacity(0);
-        global_namespace.internal = true;
+        global_namespace.flags |= ModuleFlags::INTERNAL;
         engine.global_modules.push(global_namespace.into());
 
         engine

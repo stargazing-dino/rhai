@@ -2,7 +2,7 @@
 #![cfg(feature = "metadata")]
 
 use crate::api::type_names::format_type;
-use crate::module::{calc_native_fn_hash, FuncInfo};
+use crate::module::{calc_native_fn_hash, FuncInfo, ModuleFlags};
 use crate::{calc_fn_hash, Engine, FnAccess, SmartString, StaticVec, AST};
 use serde::Serialize;
 #[cfg(feature = "no_std")]
@@ -174,10 +174,16 @@ pub fn gen_metadata_to_json(
         global.modules.insert(name, m.as_ref().into());
     }
 
+    let exclude_flags = if !include_standard_packages {
+        ModuleFlags::STANDARD_LIB
+    } else {
+        ModuleFlags::empty()
+    };
+
     engine
         .global_modules
         .iter()
-        .filter(|m| include_standard_packages || !m.standard)
+        .filter(|m| !m.flags.contains(exclude_flags))
         .flat_map(|m| m.iter_fn())
         .for_each(|f| {
             #[allow(unused_mut)]

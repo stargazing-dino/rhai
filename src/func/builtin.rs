@@ -529,24 +529,20 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
     }
 
     // Handle ranges here because ranges are implemented as custom type
-    if type1 == TypeId::of::<ExclusiveRange>() {
-        if type1 == type2 {
-            return match op {
-                EqualsTo => Some(impl_op!(ExclusiveRange == ExclusiveRange)),
-                NotEqualsTo => Some(impl_op!(ExclusiveRange != ExclusiveRange)),
-                _ => None,
-            };
-        }
+    if type1 == TypeId::of::<ExclusiveRange>() && type1 == type2 {
+        return match op {
+            EqualsTo => Some(impl_op!(ExclusiveRange == ExclusiveRange)),
+            NotEqualsTo => Some(impl_op!(ExclusiveRange != ExclusiveRange)),
+            _ => None,
+        };
     }
 
-    if type1 == TypeId::of::<InclusiveRange>() {
-        if type1 == type2 {
-            return match op {
-                EqualsTo => Some(impl_op!(InclusiveRange == InclusiveRange)),
-                NotEqualsTo => Some(impl_op!(InclusiveRange != InclusiveRange)),
-                _ => None,
-            };
-        }
+    if type1 == TypeId::of::<InclusiveRange>() && type1 == type2 {
+        return match op {
+            EqualsTo => Some(impl_op!(InclusiveRange == InclusiveRange)),
+            NotEqualsTo => Some(impl_op!(InclusiveRange != InclusiveRange)),
+            _ => None,
+        };
     }
 
     // One of the operands is a custom type, so it is never built-in

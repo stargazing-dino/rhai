@@ -1,4 +1,5 @@
 use crate::eval::calc_index;
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
     def_package, ExclusiveRange, InclusiveRange, RhaiResultOf, INT, INT_BITS, MAX_USIZE_INT,
@@ -329,7 +330,7 @@ macro_rules! reg_range {
 def_package! {
     /// Package of basic range iterators
     pub BasicIteratorPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         reg_range!(lib | "range" => INT);
 

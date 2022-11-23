@@ -1,3 +1,4 @@
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{def_package, FnPtr, SmartString, INT};
 use std::any::TypeId;
@@ -17,7 +18,7 @@ pub const FUNC_TO_DEBUG: &str = "to_debug";
 def_package! {
     /// Package of basic string utilities (e.g. printing)
     pub BasicStringPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         combine_with_exported_module!(lib, "print_debug", print_debug_functions);
         combine_with_exported_module!(lib, "number_formatting", number_formatting);

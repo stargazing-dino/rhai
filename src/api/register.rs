@@ -1,6 +1,7 @@
 //! Module that defines the public function/module registration API of [`Engine`].
 
 use crate::func::{FnCallArgs, RegisterNativeFunction, SendSync};
+use crate::module::ModuleFlags;
 use crate::types::dynamic::Variant;
 use crate::{
     Engine, FnAccess, FnNamespace, Identifier, Module, NativeCallContext, RhaiResultOf, Shared,
@@ -741,11 +742,17 @@ impl Engine {
             signatures.extend(m.gen_fn_signatures().map(|f| format!("{name}::{f}")));
         }
 
+        let exclude_flags = if !include_packages {
+            ModuleFlags::INTERNAL | ModuleFlags::STANDARD_LIB
+        } else {
+            ModuleFlags::INTERNAL
+        };
+
         signatures.extend(
             self.global_modules
                 .iter()
                 .skip(1)
-                .filter(|m| !m.internal && (include_packages || !m.standard))
+                .filter(|m| !m.flags.contains(exclude_flags))
                 .flat_map(|m| m.gen_fn_signatures()),
         );
 

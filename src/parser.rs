@@ -21,6 +21,7 @@ use crate::{
     ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position, Scope,
     Shared, SmartString, StaticVec, AST, INT, PERR,
 };
+use bitflags::bitflags;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -280,24 +281,32 @@ impl<'e> ParseState<'e> {
     }
 }
 
+bitflags! {
+    /// Bit-flags containing all status for [`ParseSettings`].
+    pub struct ParseSettingFlags: u8 {
+        /// Is the construct being parsed located at global level?
+        const GLOBAL_LEVEL = 0b0000_0001;
+        /// Is the construct being parsed located inside a function definition?
+        #[cfg(not(feature = "no_function"))]
+        const FN_SCOPE = 0b0000_0010;
+        /// Is the construct being parsed located inside a closure definition?
+        #[cfg(not(feature = "no_function"))]
+        #[cfg(not(feature = "no_closure"))]
+        const CLOSURE_SCOPE = 0b0000_0100;
+        /// Is the construct being parsed located inside a breakable loop?
+        const BREAKABLE = 0b0000_1000;
+        /// Disallow statements in blocks?
+        const DISALLOW_STATEMENTS_IN_BLOCKS = 0b0001_0000;
+        /// Disallow unquoted map properties?
+        const DISALLOW_UNQUOTED_MAP_PROPERTIES = 0b0010_0000;
+    }
+}
+
 /// A type that encapsulates all the settings for a particular parsing function.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub(crate) struct ParseSettings {
-    /// Is the construct being parsed located at global level?
-    pub at_global_level: bool,
-    /// Is the construct being parsed located inside a function definition?
-    #[cfg(not(feature = "no_function"))]
-    pub in_fn_scope: bool,
-    /// Is the construct being parsed located inside a closure definition?
-    #[cfg(not(feature = "no_function"))]
-    #[cfg(not(feature = "no_closure"))]
-    pub in_closure: bool,
-    /// Is the construct being parsed located inside a breakable loop?
-    pub is_breakable: bool,
-    /// Allow statements in blocks?
-    pub allow_statements: bool,
-    /// Allow unquoted map properties?
-    pub allow_unquoted_map_properties: bool,
+pub struct ParseSettings {
+    /// Flags.
+    pub flags: ParseSettingFlags,
     /// Language options in effect (overrides Engine options).
     pub options: LangOptions,
     /// Current expression nesting level.
@@ -307,6 +316,18 @@ pub(crate) struct ParseSettings {
 }
 
 impl ParseSettings {
+    /// Is a particular flag on?
+    #[inline(always)]
+    #[must_use]
+    pub const fn has_flag(&self, flag: ParseSettingFlags) -> bool {
+        self.flags.contains(flag)
+    }
+    /// Is a particular language option on?
+    #[inline(always)]
+    #[must_use]
+    pub const fn has_option(&self, option: LangOptions) -> bool {
+        self.options.contains(option)
+    }
     /// Create a new `ParseSettings` with one higher expression level.
     #[inline]
     #[must_use]
@@ -585,7 +606,7 @@ impl Engine {
                     #[cfg(any(feature = "no_function", feature = "no_module"))]
                     let is_global = false;
 
-                    if settings.options.contains(LangOptions::STRICT_VAR)
+                    if settings.has_option(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
                         && !state.global_imports.iter().any(|m| m.as_str() == root)
@@ -653,7 +674,7 @@ impl Engine {
                         #[cfg(any(feature = "no_function", feature = "no_module"))]
                         let is_global = false;
 
-                        if settings.options.contains(LangOptions::STRICT_VAR)
+                        if settings.has_option(LangOptions::STRICT_VAR)
                             && index.is_none()
                             && !is_global
                             && !state.global_imports.iter().any(|m| m.as_str() == root)
@@ -995,7 +1016,9 @@ impl Engine {
             }
 
             let (name, pos) = match input.next().expect(NEVER_ENDS) {
-                (Token::Identifier(..), pos) if !settings.allow_unquoted_map_properties => {
+                (Token::Identifier(..), pos)
+                    if settings.has_flag(ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES) =>
+                {
                     return Err(PERR::PropertyExpected.into_err(pos))
                 }
                 (Token::Identifier(s) | Token::StringConstant(s), pos) => {
@@ -1196,18 +1219,19 @@ impl Engine {
                 }
             };
 
-            let (action_expr, need_comma) = if settings.allow_statements {
-                let stmt = self.parse_stmt(input, state, lib, settings.level_up())?;
-                let need_comma = !stmt.is_self_terminated();
+            let (action_expr, need_comma) =
+                if !settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
+                    let stmt = self.parse_stmt(input, state, lib, settings.level_up())?;
+                    let need_comma = !stmt.is_self_terminated();
 
-                let stmt_block: StmtBlock = stmt.into();
-                (Expr::Stmt(stmt_block.into()), need_comma)
-            } else {
-                (
-                    self.parse_expr(input, state, lib, settings.level_up())?,
-                    true,
-                )
-            };
+                    let stmt_block: StmtBlock = stmt.into();
+                    (Expr::Stmt(stmt_block.into()), need_comma)
+                } else {
+                    (
+                        self.parse_expr(input, state, lib, settings.level_up())?,
+                        true,
+                    )
+                };
             let has_condition = !matches!(condition, Expr::BoolConstant(true, ..));
 
             expressions.push((condition, action_expr).into());
@@ -1358,7 +1382,7 @@ impl Engine {
             }
 
             // { - block statement as expression
-            Token::LeftBrace if settings.options.contains(LangOptions::STMT_EXPR) => {
+            Token::LeftBrace if settings.has_option(LangOptions::STMT_EXPR) => {
                 match self.parse_block(input, state, lib, settings.level_up())? {
                     block @ Stmt::Block(..) => Expr::Stmt(Box::new(block.into())),
                     stmt => unreachable!("Stmt::Block expected but gets {:?}", stmt),
@@ -1369,38 +1393,34 @@ impl Engine {
             Token::LeftParen => self.parse_paren_expr(input, state, lib, settings.level_up())?,
 
             // If statement is allowed to act as expressions
-            Token::If if settings.options.contains(LangOptions::IF_EXPR) => Expr::Stmt(Box::new(
+            Token::If if settings.has_option(LangOptions::IF_EXPR) => Expr::Stmt(Box::new(
                 self.parse_if(input, state, lib, settings.level_up())?
                     .into(),
             )),
             // Loops are allowed to act as expressions
-            Token::While | Token::Loop if settings.options.contains(LangOptions::LOOP_EXPR) => {
+            Token::While | Token::Loop if settings.has_option(LangOptions::LOOP_EXPR) => {
                 Expr::Stmt(Box::new(
                     self.parse_while_loop(input, state, lib, settings.level_up())?
                         .into(),
                 ))
             }
-            Token::Do if settings.options.contains(LangOptions::LOOP_EXPR) => Expr::Stmt(Box::new(
+            Token::Do if settings.has_option(LangOptions::LOOP_EXPR) => Expr::Stmt(Box::new(
                 self.parse_do(input, state, lib, settings.level_up())?
                     .into(),
             )),
-            Token::For if settings.options.contains(LangOptions::LOOP_EXPR) => {
-                Expr::Stmt(Box::new(
-                    self.parse_for(input, state, lib, settings.level_up())?
-                        .into(),
-                ))
-            }
+            Token::For if settings.has_option(LangOptions::LOOP_EXPR) => Expr::Stmt(Box::new(
+                self.parse_for(input, state, lib, settings.level_up())?
+                    .into(),
+            )),
             // Switch statement is allowed to act as expressions
-            Token::Switch if settings.options.contains(LangOptions::SWITCH_EXPR) => {
-                Expr::Stmt(Box::new(
-                    self.parse_switch(input, state, lib, settings.level_up())?
-                        .into(),
-                ))
-            }
+            Token::Switch if settings.has_option(LangOptions::SWITCH_EXPR) => Expr::Stmt(Box::new(
+                self.parse_switch(input, state, lib, settings.level_up())?
+                    .into(),
+            )),
 
             // | ...
             #[cfg(not(feature = "no_function"))]
-            Token::Pipe | Token::Or if settings.options.contains(LangOptions::ANON_FN) => {
+            Token::Pipe | Token::Or if settings.has_option(LangOptions::ANON_FN) => {
                 // Build new parse state
                 let interned_strings = std::mem::take(&mut state.interned_strings);
 
@@ -1429,24 +1449,24 @@ impl Engine {
                     new_state.max_expr_depth = self.max_function_expr_depth();
                 }
 
-                let mut options = self.options;
-                options.set(
-                    LangOptions::STRICT_VAR,
-                    if cfg!(feature = "no_closure") {
-                        settings.options.contains(LangOptions::STRICT_VAR)
-                    } else {
-                        // A capturing closure can access variables not defined locally
-                        false
-                    },
-                );
+                #[cfg(not(feature = "no_closure"))]
+                let options = self.options & !LangOptions::STRICT_VAR; // A capturing closure can access variables not defined locally
+                #[cfg(feature = "no_closure")]
+                let options = self.options | (settings.options & LangOptions::STRICT_VAR);
+
+                let mut flags = (settings.flags
+                    & !ParseSettingFlags::GLOBAL_LEVEL
+                    & ParseSettingFlags::BREAKABLE)
+                    | ParseSettingFlags::FN_SCOPE;
+
+                #[cfg(not(feature = "no_closure"))]
+                {
+                    flags |= ParseSettingFlags::CLOSURE_SCOPE;
+                }
 
                 let new_settings = ParseSettings {
-                    at_global_level: false,
-                    in_fn_scope: true,
-                    #[cfg(not(feature = "no_closure"))]
-                    in_closure: true,
-                    is_breakable: false,
                     level: 0,
+                    flags,
                     options,
                     ..settings
                 };
@@ -1465,8 +1485,8 @@ impl Engine {
 
                         if !is_func
                             && index.is_none()
-                            && !settings.in_closure
-                            && settings.options.contains(LangOptions::STRICT_VAR)
+                            && !settings.has_flag(ParseSettingFlags::CLOSURE_SCOPE)
+                            && settings.has_option(LangOptions::STRICT_VAR)
                             && !state.scope.contains(name)
                         {
                             // If the parent scope is not inside another capturing closure
@@ -1612,7 +1632,7 @@ impl Engine {
                         if !is_property
                             && !is_func
                             && index.is_none()
-                            && settings.options.contains(LangOptions::STRICT_VAR)
+                            && settings.has_option(LangOptions::STRICT_VAR)
                             && !state.scope.contains(&s)
                         {
                             return Err(
@@ -1656,11 +1676,13 @@ impl Engine {
                     }
                     // Access to `this` as a variable is OK within a function scope
                     #[cfg(not(feature = "no_function"))]
-                    _ if &*s == KEYWORD_THIS && settings.in_fn_scope => Expr::Variable(
-                        (None, ns, 0, state.get_interned_string(*s)).into(),
-                        None,
-                        settings.pos,
-                    ),
+                    _ if &*s == KEYWORD_THIS && settings.has_flag(ParseSettingFlags::FN_SCOPE) => {
+                        Expr::Variable(
+                            (None, ns, 0, state.get_interned_string(*s)).into(),
+                            None,
+                            settings.pos,
+                        )
+                    }
                     // Cannot access to `this` as a variable not in a function scope
                     _ if &*s == KEYWORD_THIS => {
                         let msg = format!("'{s}' can only be used in functions");
@@ -1852,7 +1874,7 @@ impl Engine {
                     #[cfg(any(feature = "no_function", feature = "no_module"))]
                     let is_global = false;
 
-                    if settings.options.contains(LangOptions::STRICT_VAR)
+                    if settings.has_option(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
                         && !state.global_imports.iter().any(|m| m.as_str() == root)
@@ -2399,12 +2421,12 @@ impl Engine {
                 Token::Or => {
                     let rhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
                     let lhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
-                    Expr::Or(BinaryExpr { lhs: lhs, rhs: rhs }.into(), pos)
+                    Expr::Or(BinaryExpr { lhs, rhs }.into(), pos)
                 }
                 Token::And => {
                     let rhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
                     let lhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
-                    Expr::And(BinaryExpr { lhs: lhs, rhs: rhs }.into(), pos)
+                    Expr::And(BinaryExpr { lhs, rhs }.into(), pos)
                 }
                 Token::DoubleQuestion => {
                     let rhs = op_base.args.pop().unwrap();
@@ -2590,9 +2612,7 @@ impl Engine {
                 },
                 s => match input.next().expect(NEVER_ENDS) {
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
-                    (Token::Identifier(t), ..)
-                    | (Token::Reserved(t), ..)
-                    | (Token::Custom(t), ..)
+                    (Token::Identifier(t) | Token::Reserved(t) | Token::Custom(t), ..)
                         if *t == s =>
                     {
                         segments.push(required_token.clone());
@@ -2726,7 +2746,7 @@ impl Engine {
             token => unreachable!("Token::While or Token::Loop expected but gets {:?}", token),
         };
         settings.pos = token_pos;
-        settings.is_breakable = true;
+        settings.flags |= ParseSettingFlags::BREAKABLE;
 
         let body = self.parse_block(input, state, lib, settings.level_up())?;
 
@@ -2749,7 +2769,7 @@ impl Engine {
         settings.pos = eat_token(input, Token::Do);
 
         // do { body } [while|until] guard
-        settings.is_breakable = true;
+        settings.flags |= ParseSettingFlags::BREAKABLE;
         let body = self.parse_block(input, state, lib, settings.level_up())?;
 
         let negated = match input.next().expect(NEVER_ENDS) {
@@ -2763,7 +2783,7 @@ impl Engine {
             }
         };
 
-        settings.is_breakable = false;
+        settings.flags &= !ParseSettingFlags::BREAKABLE;
 
         ensure_not_statement_expr(input, "a boolean")?;
         let guard = self
@@ -2859,7 +2879,7 @@ impl Engine {
             pos: name_pos,
         };
 
-        settings.is_breakable = true;
+        settings.flags |= ParseSettingFlags::BREAKABLE;
         let body = self.parse_block(input, state, lib, settings.level_up())?;
 
         state.stack.rewind(prev_stack_len);
@@ -3089,7 +3109,7 @@ impl Engine {
 
         let mut statements = StaticVec::new_const();
 
-        if !settings.allow_statements {
+        if settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
             let stmt = self.parse_expr_stmt(input, state, lib, settings.level_up())?;
             statements.push(stmt);
 
@@ -3126,7 +3146,7 @@ impl Engine {
             }
 
             // Parse statements inside the block
-            settings.at_global_level = false;
+            settings.flags &= !ParseSettingFlags::GLOBAL_LEVEL;
 
             let stmt = self.parse_stmt(input, state, lib, settings.level_up())?;
 
@@ -3222,7 +3242,7 @@ impl Engine {
                     unreachable!("doc-comment expected but gets {:?}", comment);
                 }
 
-                if !settings.at_global_level {
+                if !settings.has_flag(ParseSettingFlags::GLOBAL_LEVEL) {
                     return Err(PERR::WrongDocComment.into_err(comments_pos));
                 }
 
@@ -3264,7 +3284,7 @@ impl Engine {
 
             // fn ...
             #[cfg(not(feature = "no_function"))]
-            Token::Fn if !settings.at_global_level => {
+            Token::Fn if !settings.has_flag(ParseSettingFlags::GLOBAL_LEVEL) => {
                 Err(PERR::WrongFnDefinition.into_err(token_pos))
             }
 
@@ -3307,20 +3327,14 @@ impl Engine {
                             new_state.max_expr_depth = self.max_function_expr_depth();
                         }
 
-                        let mut options = self.options;
-                        options.set(
-                            LangOptions::STRICT_VAR,
-                            settings.options.contains(LangOptions::STRICT_VAR),
-                        );
+                        let options = self.options | (settings.options & LangOptions::STRICT_VAR);
+
+                        let flags = ParseSettingFlags::FN_SCOPE
+                            | (settings.flags
+                                & ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES);
 
                         let new_settings = ParseSettings {
-                            at_global_level: false,
-                            in_fn_scope: true,
-                            #[cfg(not(feature = "no_closure"))]
-                            in_closure: false,
-                            is_breakable: false,
-                            allow_statements: true,
-                            allow_unquoted_map_properties: settings.allow_unquoted_map_properties,
+                            flags,
                             level: 0,
                             options,
                             pos,
@@ -3377,11 +3391,15 @@ impl Engine {
                 self.parse_for(input, state, lib, settings.level_up())
             }
 
-            Token::Continue if self.allow_looping() && settings.is_breakable => {
+            Token::Continue
+                if self.allow_looping() && settings.has_flag(ParseSettingFlags::BREAKABLE) =>
+            {
                 let pos = eat_token(input, Token::Continue);
                 Ok(Stmt::BreakLoop(None, ASTFlags::NONE, pos))
             }
-            Token::Break if self.allow_looping() && settings.is_breakable => {
+            Token::Break
+                if self.allow_looping() && settings.has_flag(ParseSettingFlags::BREAKABLE) =>
+            {
                 let pos = eat_token(input, Token::Break);
 
                 let expr = match input.peek().expect(NEVER_ENDS) {
@@ -3424,7 +3442,9 @@ impl Engine {
                     // `return`/`throw` at <EOF>
                     (Token::EOF, ..) => Ok(Stmt::Return(None, return_type, token_pos)),
                     // `return`/`throw` at end of block
-                    (Token::RightBrace, ..) if !settings.at_global_level => {
+                    (Token::RightBrace, ..)
+                        if !settings.has_flag(ParseSettingFlags::GLOBAL_LEVEL) =>
+                    {
                         Ok(Stmt::Return(None, return_type, token_pos))
                     }
                     // `return;` or `throw;`
@@ -3446,7 +3466,7 @@ impl Engine {
             Token::Import => self.parse_import(input, state, lib, settings.level_up()),
 
             #[cfg(not(feature = "no_module"))]
-            Token::Export if !settings.at_global_level => {
+            Token::Export if !settings.has_flag(ParseSettingFlags::GLOBAL_LEVEL) => {
                 Err(PERR::WrongExport.into_err(token_pos))
             }
 
@@ -3607,7 +3627,7 @@ impl Engine {
         // Parse function body
         let body = match input.peek().expect(NEVER_ENDS) {
             (Token::LeftBrace, ..) => {
-                settings.is_breakable = false;
+                settings.flags &= !ParseSettingFlags::BREAKABLE;
                 self.parse_block(input, state, lib, settings.level_up())?
             }
             (.., pos) => return Err(PERR::FnMissingBody(name.into()).into_err(*pos)),
@@ -3759,7 +3779,7 @@ impl Engine {
         }
 
         // Parse function body
-        settings.is_breakable = false;
+        settings.flags &= !ParseSettingFlags::BREAKABLE;
         let body = self.parse_stmt(input, state, lib, settings.level_up())?;
 
         // External variables may need to be processed in a consistent order,
@@ -3822,22 +3842,16 @@ impl Engine {
     ) -> ParseResult<AST> {
         let mut functions = StraightHashMap::default();
 
-        let mut options = self.options;
-        options.remove(LangOptions::STMT_EXPR | LangOptions::LOOP_EXPR);
+        let mut options = self.options & !LangOptions::STMT_EXPR & !LangOptions::LOOP_EXPR;
         #[cfg(not(feature = "no_function"))]
-        options.remove(LangOptions::ANON_FN);
+        {
+            options &= !LangOptions::ANON_FN;
+        }
 
         let mut settings = ParseSettings {
-            at_global_level: true,
-            #[cfg(not(feature = "no_function"))]
-            in_fn_scope: false,
-            #[cfg(not(feature = "no_function"))]
-            #[cfg(not(feature = "no_closure"))]
-            in_closure: false,
-            is_breakable: false,
-            allow_statements: false,
-            allow_unquoted_map_properties: true,
             level: 0,
+            flags: ParseSettingFlags::GLOBAL_LEVEL
+                | ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS,
             options,
             pos: Position::START,
         };
@@ -3883,18 +3897,11 @@ impl Engine {
     ) -> ParseResult<(StmtBlockContainer, StaticVec<Shared<ScriptFnDef>>)> {
         let mut statements = StmtBlockContainer::new_const();
         let mut functions = StraightHashMap::default();
+
         let mut settings = ParseSettings {
-            at_global_level: true,
-            #[cfg(not(feature = "no_function"))]
-            in_fn_scope: false,
-            #[cfg(not(feature = "no_function"))]
-            #[cfg(not(feature = "no_closure"))]
-            in_closure: false,
-            is_breakable: false,
-            allow_statements: true,
-            allow_unquoted_map_properties: true,
-            options: self.options,
             level: 0,
+            flags: ParseSettingFlags::GLOBAL_LEVEL,
+            options: self.options,
             pos: Position::START,
         };
         process_settings(&mut settings);

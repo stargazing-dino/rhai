@@ -966,18 +966,16 @@ impl Token {
         use Token::*;
 
         match self {
-            LexError(..)     |
             SemiColon        | // ; - is unary
             Colon            | // #{ foo: - is unary
             Comma            | // ( ... , -expr ) - is unary
-            //Period           |
-            //Elvis            |
-            //DoubleQuestion   |
-            //QuestionBracket  |
-            ExclusiveRange            | // .. - is unary
+            //Period         |
+            //Elvis          |
+            DoubleQuestion   | // ?? - is unary
+            ExclusiveRange   | // .. - is unary
             InclusiveRange   | // ..= - is unary
             LeftBrace        | // { -expr } - is unary
-            // RightBrace    | { expr } - expr not unary & is closing
+            // RightBrace    | // { expr } - expr not unary & is closing
             LeftParen        | // ( -expr ) - is unary
             // RightParen    | // ( expr ) - expr not unary & is closing
             LeftBracket      | // [ -expr ] - is unary
@@ -1011,7 +1009,7 @@ impl Token {
             Pipe             |
             Ampersand        |
             If               |
-            //Do               |
+            //Do             |
             While            |
             Until            |
             In               |
@@ -1022,9 +1020,14 @@ impl Token {
             XOr              |
             XOrAssign        |
             Return           |
-            Throw                           => true,
+            Throw               => true,
 
-            _ => false,
+            #[cfg(not(feature = "no_index"))]
+            QuestionBracket     => true,    // ?[ - is unary
+
+            LexError(..)        => true,
+
+            _                   => false,
         }
     }
 

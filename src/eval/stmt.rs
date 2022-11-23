@@ -764,6 +764,8 @@ impl Engine {
             // Import statement
             #[cfg(not(feature = "no_module"))]
             Stmt::Import(x, _pos) => {
+                use crate::ModuleResolver;
+
                 let (expr, export) = &**x;
 
                 // Guard against too many modules
@@ -776,8 +778,6 @@ impl Engine {
                 let path = v.try_cast::<crate::ImmutableString>().ok_or_else(|| {
                     self.make_type_mismatch_err::<crate::ImmutableString>(typ, expr.position())
                 })?;
-
-                use crate::ModuleResolver;
 
                 let path_pos = expr.start_position();
 
