@@ -1012,7 +1012,20 @@ impl PartialEq for ASTNode<'_> {
 impl Eq for ASTNode<'_> {}
 
 impl ASTNode<'_> {
+    /// Is this [`ASTNode`] a [`Stmt`]?
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_stmt(&self) -> bool {
+        matches!(self, Self::Stmt(..))
+    }
+    /// Is this [`ASTNode`] an [`Expr`]?
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_expr(&self) -> bool {
+        matches!(self, Self::Expr(..))
+    }
     /// Get the [`Position`] of this [`ASTNode`].
+    #[inline]
     #[must_use]
     pub fn position(&self) -> Position {
         match self {

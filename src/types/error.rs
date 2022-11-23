@@ -299,10 +299,7 @@ impl EvalAltResult {
     #[inline(never)]
     #[must_use]
     pub const fn is_pseudo_error(&self) -> bool {
-        match self {
-            Self::LoopBreak(..) | Self::Return(..) => true,
-            _ => false,
-        }
+        matches!(self, Self::LoopBreak(..) | Self::Return(..))
     }
     /// Can this error be caught?
     #[cold]
@@ -357,20 +354,17 @@ impl EvalAltResult {
     #[inline(never)]
     #[must_use]
     pub const fn is_system_exception(&self) -> bool {
-        match self {
-            Self::ErrorSystem(..) => true,
-            Self::ErrorParsing(..) => true,
-
-            Self::ErrorCustomSyntax(..)
-            | Self::ErrorTooManyOperations(..)
-            | Self::ErrorTooManyModules(..)
-            | Self::ErrorStackOverflow(..)
-            | Self::ErrorDataTooLarge(..) => true,
-
-            Self::ErrorTerminated(..) => true,
-
-            _ => false,
-        }
+        matches!(
+            self,
+            Self::ErrorSystem(..)
+                | Self::ErrorParsing(..)
+                | Self::ErrorCustomSyntax(..)
+                | Self::ErrorTooManyOperations(..)
+                | Self::ErrorTooManyModules(..)
+                | Self::ErrorStackOverflow(..)
+                | Self::ErrorDataTooLarge(..)
+                | Self::ErrorTerminated(..)
+        )
     }
     /// Get the [position][Position] of this error.
     #[cfg(not(feature = "no_object"))]
@@ -459,7 +453,6 @@ impl EvalAltResult {
     /// Unwrap this error and get the very base error.
     #[cold]
     #[inline(never)]
-    #[must_use]
     pub fn unwrap_inner(&self) -> &Self {
         match self {
             Self::ErrorInFunctionCall(.., err, _) | Self::ErrorInModule(.., err, _) => {

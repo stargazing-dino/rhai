@@ -217,6 +217,7 @@ impl Engine {
         scope_may_be_changed: bool,
         func: impl Fn(&mut EvalContext, &[Expression]) -> RhaiResult + SendSync + 'static,
     ) -> ParseResult<&mut Self> {
+        #[allow(clippy::wildcard_imports)]
         use markers::*;
 
         let mut segments = StaticVec::<ImmutableString>::new();

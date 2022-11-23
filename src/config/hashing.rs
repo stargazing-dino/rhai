@@ -71,7 +71,7 @@ impl WhenTheHokmaSuppression {
     #[inline]
     pub fn the_price_of_silence(self) {
         self.hokma.lock.store(self.state, Ordering::SeqCst);
-        mem::forget(self)
+        mem::forget(self);
     }
 }
 
@@ -80,14 +80,14 @@ impl Drop for WhenTheHokmaSuppression {
     fn drop(&mut self) {
         self.hokma
             .lock
-            .store(self.state.wrapping_add(2), Ordering::SeqCst)
+            .store(self.state.wrapping_add(2), Ordering::SeqCst);
     }
 }
 
 #[inline(always)]
-#[must_use]
 fn hokmalock(address: usize) -> &'static HokmaLock {
     const LEN: usize = 787;
+    #[allow(clippy::declare_interior_mutable_const)]
     const LCK: HokmaLock = HokmaLock::new();
     static RECORDS: [HokmaLock; LEN] = [LCK; LEN];
 
@@ -96,22 +96,16 @@ fn hokmalock(address: usize) -> &'static HokmaLock {
 
 // Safety: lol, there is a reason its called `SusLock<T>`
 #[must_use]
-struct SusLock<T>
-where
-    T: 'static,
-{
+struct SusLock<T: 'static> {
     initialized: AtomicBool,
     data: UnsafeCell<MaybeUninit<T>>,
     _marker: PhantomData<T>,
 }
 
-impl<T> SusLock<T>
-where
-    T: 'static,
-{
+impl<T: 'static> SusLock<T> {
     #[inline]
-    pub const fn new() -> SusLock<T> {
-        SusLock {
+    pub const fn new() -> Self {
+        Self {
             initialized: AtomicBool::new(false),
             data: UnsafeCell::new(MaybeUninit::uninit()),
             _marker: PhantomData,
@@ -131,7 +125,7 @@ where
             // we forgo the optimistic read, because we don't really care
             let guard = hokma.write();
             let cast: *const T = self.data.get().cast();
-            let val = unsafe { mem::transmute::<*const T, &'static T>(cast) };
+            let val = unsafe { &*cast.cast::<T>() };
             guard.the_price_of_silence();
             Some(val)
         } else {
@@ -143,7 +137,7 @@ where
     pub fn get_or_init(&self, f: impl FnOnce() -> T) -> &'static T {
         if !self.initialized.load(Ordering::SeqCst) {
             self.initialized.store(true, Ordering::SeqCst);
-            let hokma = hokmalock(unsafe { mem::transmute(self.data.get()) });
+            let hokma = hokmalock(self.data.get() as usize);
             hokma.write();
             unsafe {
                 self.data.get().write(MaybeUninit::new(f()));
@@ -163,14 +157,11 @@ where
     }
 }
 
-unsafe impl<T: Sync + Send> Sync for SusLock<T> where T: 'static {}
-unsafe impl<T: Send> Send for SusLock<T> where T: 'static {}
+unsafe impl<T: Sync + Send> Sync for SusLock<T> {}
+unsafe impl<T: Send> Send for SusLock<T> {}
 impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for SusLock<T> {}
 
-impl<T> Drop for SusLock<T>
-where
-    T: 'static,
-{
+impl<T: 'static> Drop for SusLock<T> {
     #[inline]
     fn drop(&mut self) {
         if self.initialized.load(Ordering::SeqCst) {

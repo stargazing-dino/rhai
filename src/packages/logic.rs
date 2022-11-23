@@ -93,6 +93,7 @@ mod logic_functions {
 }
 
 #[cfg(not(feature = "no_float"))]
+#[allow(clippy::cast_precision_loss)]
 #[export_module]
 mod f32_functions {
     use crate::INT;
@@ -148,6 +149,7 @@ mod f32_functions {
 }
 
 #[cfg(not(feature = "no_float"))]
+#[allow(clippy::cast_precision_loss)]
 #[export_module]
 mod f64_functions {
     use crate::INT;

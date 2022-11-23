@@ -471,14 +471,11 @@ impl Engine {
 
         let event = match global.debugger.status {
             DebuggerStatus::Init => Some(DebuggerEvent::Start),
-            DebuggerStatus::CONTINUE => None,
-            DebuggerStatus::NEXT if matches!(node, ASTNode::Stmt(..)) => Some(DebuggerEvent::Step),
-            DebuggerStatus::NEXT => None,
-            DebuggerStatus::INTO if matches!(node, ASTNode::Expr(..)) => Some(DebuggerEvent::Step),
-            DebuggerStatus::INTO => None,
+            DebuggerStatus::NEXT if node.is_stmt() => Some(DebuggerEvent::Step),
+            DebuggerStatus::INTO if node.is_expr() => Some(DebuggerEvent::Step),
             DebuggerStatus::STEP => Some(DebuggerEvent::Step),
-            DebuggerStatus::FunctionExit(..) => None,
             DebuggerStatus::Terminate => Some(DebuggerEvent::End),
+            _ => None,
         };
 
         let event = match event {

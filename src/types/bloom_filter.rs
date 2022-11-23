@@ -105,7 +105,7 @@ impl Add<BloomFilterU64> for &BloomFilterU64 {
 impl AddAssign<Self> for BloomFilterU64 {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
-        *self += &rhs
+        *self += &rhs;
     }
 }
 

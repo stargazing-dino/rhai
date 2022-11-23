@@ -63,7 +63,7 @@ pub struct ParseState<'e> {
     pub block_stack_len: usize,
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
     #[cfg(not(feature = "no_closure"))]
-    pub external_vars: Vec<crate::ast::Ident>,
+    pub external_vars: Vec<Ident>,
     /// An indicator that disables variable capturing into externals one single time
     /// up until the nearest consumed Identifier token.
     /// If set to false the next call to [`access_var`][ParseState::access_var] will not capture the variable.
@@ -201,7 +201,7 @@ impl<'e> ParseState<'e> {
         if self.allow_capture {
             if !is_func_name && index == 0 && !self.external_vars.iter().any(|v| v.as_str() == name)
             {
-                self.external_vars.push(crate::ast::Ident {
+                self.external_vars.push(Ident {
                     name: name.into(),
                     pos: _pos,
                 });
@@ -1479,8 +1479,10 @@ impl Engine {
                 let (expr, func) = result?;
 
                 #[cfg(not(feature = "no_closure"))]
-                new_state.external_vars.iter().try_for_each(
-                    |crate::ast::Ident { name, pos }| {
+                new_state
+                    .external_vars
+                    .iter()
+                    .try_for_each(|Ident { name, pos }| {
                         let (index, is_func) = state.access_var(name, lib, *pos);
 
                         if !is_func
@@ -1496,8 +1498,7 @@ impl Engine {
                         } else {
                             Ok(())
                         }
-                    },
-                )?;
+                    })?;
 
                 let hash_script = calc_fn_hash(None, &func.name, func.params.len());
                 lib.insert(hash_script, func.into());
@@ -3662,9 +3663,11 @@ impl Engine {
         parent: &mut ParseState,
         lib: &FnLib,
         fn_expr: Expr,
-        externals: StaticVec<crate::ast::Ident>,
+        externals: StaticVec<Ident>,
         pos: Position,
     ) -> Expr {
+        use crate::{ast::Namespace, FnArgsVec};
+
         // If there are no captured variables, no need to curry
         if externals.is_empty() {
             return fn_expr;
@@ -3675,25 +3678,18 @@ impl Engine {
 
         args.push(fn_expr);
 
-        args.extend(
-            externals
-                .iter()
-                .cloned()
-                .map(|crate::ast::Ident { name, pos }| {
-                    let (index, is_func) = parent.access_var(&name, lib, pos);
-                    let idx = match index {
-                        Some(n) if !is_func && n.get() <= u8::MAX as usize => {
-                            NonZeroU8::new(n.get() as u8)
-                        }
-                        _ => None,
-                    };
-                    Expr::Variable((index, Default::default(), 0, name).into(), idx, pos)
-                }),
-        );
+        args.extend(externals.iter().cloned().map(|Ident { name, pos }| {
+            let (index, is_func) = parent.access_var(&name, lib, pos);
+            let idx = match index {
+                Some(n) if !is_func && n.get() <= u8::MAX as usize => NonZeroU8::new(n.get() as u8),
+                _ => None,
+            };
+            Expr::Variable((index, Namespace::default(), 0, name).into(), idx, pos)
+        }));
 
         let expr = FnCallExpr {
             #[cfg(not(feature = "no_module"))]
-            namespace: Default::default(),
+            namespace: Namespace::default(),
             name: state.get_interned_string(crate::engine::KEYWORD_FN_PTR_CURRY),
             hashes: FnCallHashes::from_native(calc_fn_hash(
                 None,
@@ -3712,15 +3708,15 @@ impl Engine {
         statements.push(Stmt::Share(
             externals
                 .into_iter()
-                .map(|crate::ast::Ident { name, pos }| {
+                .map(|Ident { name, pos }| {
                     let (index, _) = parent.access_var(&name, lib, pos);
                     (name, index, pos)
                 })
-                .collect::<crate::FnArgsVec<_>>()
+                .collect::<FnArgsVec<_>>()
                 .into(),
         ));
         statements.push(Stmt::Expr(expr.into()));
-        Expr::Stmt(crate::ast::StmtBlock::new(statements, pos, Position::NONE).into())
+        Expr::Stmt(StmtBlock::new(statements, pos, Position::NONE).into())
     }
 
     /// Parse an anonymous function definition.
@@ -3744,7 +3740,7 @@ impl Engine {
                 match input.next().expect(NEVER_ENDS) {
                     (Token::Pipe, ..) => break,
                     (Token::Identifier(s), pos) => {
-                        if params_list.iter().any(|p| p.as_str() == &*s) {
+                        if params_list.iter().any(|p| p.as_str() == *s) {
                             return Err(
                                 PERR::FnDuplicatedParam(String::new(), s.to_string()).into_err(pos)
                             );
@@ -3789,11 +3785,7 @@ impl Engine {
             let externals: StaticVec<_> = state.external_vars.iter().cloned().collect();
 
             let mut params = StaticVec::with_capacity(params_list.len() + externals.len());
-            params.extend(
-                externals
-                    .iter()
-                    .map(|crate::ast::Ident { name, .. }| name.clone()),
-            );
+            params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));
 
             (params, externals)
         };

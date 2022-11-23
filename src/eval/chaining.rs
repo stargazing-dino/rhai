@@ -259,7 +259,7 @@ impl Engine {
                         );
                     }
 
-                    #[allow(clippy::cast_sign_loss)]
+                    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                     let offset = index as usize;
                     (
                         s.chars().nth(offset).ok_or_else(|| {

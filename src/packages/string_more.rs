@@ -247,9 +247,10 @@ mod string_functions {
     /// Clear the string, making it empty.
     pub fn clear(string: &mut ImmutableString) {
         if !string.is_empty() {
-            match string.get_mut() {
-                Some(s) => s.clear(),
-                _ => *string = ImmutableString::new(),
+            if let Some(s) = string.get_mut() {
+                s.clear()
+            } else {
+                *string = ImmutableString::new()
             }
         }
     }
@@ -273,6 +274,7 @@ mod string_functions {
     /// ```
     pub fn truncate(string: &mut ImmutableString, len: INT) {
         if len > 0 {
+            #[allow(clippy::cast_sign_loss)]
             let len = len.min(MAX_USIZE_INT) as usize;
             let chars: StaticVec<_> = string.chars().collect();
             let copy = string.make_mut();
@@ -294,20 +296,17 @@ mod string_functions {
     /// print(text);    // prints "hello"
     /// ```
     pub fn trim(string: &mut ImmutableString) {
-        match string.get_mut() {
-            Some(s) => {
-                let trimmed = s.trim();
+        if let Some(s) = string.get_mut() {
+            let trimmed = s.trim();
 
-                if trimmed != s {
-                    *s = trimmed.into();
-                }
+            if trimmed != s {
+                *s = trimmed.into();
             }
-            None => {
-                let trimmed = string.trim();
+        } else {
+            let trimmed = string.trim();
 
-                if trimmed != string {
-                    *string = trimmed.into();
-                }
+            if trimmed != string {
+                *string = trimmed.into();
             }
         }
     }

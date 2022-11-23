@@ -590,6 +590,7 @@ pub enum Token {
 impl fmt::Display for Token {
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
@@ -619,6 +620,7 @@ impl Token {
     /// Is the token a literal symbol?
     #[must_use]
     pub const fn is_literal(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
@@ -648,6 +650,7 @@ impl Token {
     /// Panics if the token is not a literal symbol.
     #[must_use]
     pub const fn literal_syntax(&self) -> &'static str {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
@@ -824,6 +827,7 @@ impl Token {
     /// Reverse lookup a symbol token from a piece of syntax.
     #[must_use]
     pub fn lookup_symbol_from_syntax(syntax: &str) -> Option<Self> {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         Some(match syntax {
@@ -963,6 +967,7 @@ impl Token {
     /// (not sure about `fn` name).
     #[must_use]
     pub const fn is_next_unary(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
@@ -1034,6 +1039,7 @@ impl Token {
     /// Get the precedence number of the token.
     #[must_use]
     pub const fn precedence(&self) -> Option<Precedence> {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         Precedence::new(match self {
@@ -1066,6 +1072,7 @@ impl Token {
     /// Does an expression bind to the right (instead of left)?
     #[must_use]
     pub const fn is_bind_right(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
@@ -1079,6 +1086,7 @@ impl Token {
     /// Is this token a standard symbol used in the language?
     #[must_use]
     pub const fn is_standard_symbol(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
@@ -1105,6 +1113,7 @@ impl Token {
     #[inline]
     #[must_use]
     pub const fn is_standard_keyword(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
@@ -1501,13 +1510,13 @@ pub fn get_next_token(
 
 /// Test if the given character is a hex character.
 #[inline(always)]
-fn is_hex_digit(c: char) -> bool {
+const fn is_hex_digit(c: char) -> bool {
     matches!(c, 'a'..='f' | 'A'..='F' | '0'..='9')
 }
 
 /// Test if the given character is a numeric digit.
 #[inline(always)]
-fn is_numeric_digit(c: char) -> bool {
+const fn is_numeric_digit(c: char) -> bool {
     matches!(c, '0'..='9')
 }
 
@@ -1687,21 +1696,8 @@ fn get_next_token_inner(
                 });
 
                 // Parse number
-                return Some((
-                    if let Some(radix) = radix_base {
-                        let result = &result[2..];
-
-                        UNSIGNED_INT::from_str_radix(&result, radix)
-                            .map(|v| v as INT)
-                            .map_or_else(
-                                |_| {
-                                    Token::LexError(
-                                        LERR::MalformedNumber(result.to_string()).into(),
-                                    )
-                                },
-                                Token::IntegerConstant,
-                            )
-                    } else {
+                let token = radix_base.map_or_else(
+                    || {
                         let num = INT::from_str(&result).map(Token::IntegerConstant);
 
                         // If integer parsing is unnecessary, try float instead
@@ -1730,8 +1726,23 @@ fn get_next_token_inner(
                             Token::LexError(LERR::MalformedNumber(result.to_string()).into())
                         })
                     },
-                    num_pos,
-                ));
+                    |radix| {
+                        let result = &result[2..];
+
+                        UNSIGNED_INT::from_str_radix(result, radix)
+                            .map(|v| v as INT)
+                            .map_or_else(
+                                |_| {
+                                    Token::LexError(
+                                        LERR::MalformedNumber(result.to_string()).into(),
+                                    )
+                                },
+                                Token::IntegerConstant,
+                            )
+                    },
+                );
+
+                return Some((token, num_pos));
             }
 
             // letter or underscore ...
@@ -1760,7 +1771,7 @@ fn get_next_token_inner(
                     Some('\r') => {
                         eat_next(stream, pos);
                         // `\r\n
-                        if let Some('\n') = stream.peek_next() {
+                        if stream.peek_next() == Some('\n') {
                             eat_next(stream, pos);
                         }
                         pos.new_line();
@@ -1788,7 +1799,7 @@ fn get_next_token_inner(
             // ' - character literal
             ('\'', '\'') => {
                 return Some((
-                    Token::LexError(LERR::MalformedChar("".to_string()).into()),
+                    Token::LexError(LERR::MalformedChar(String::new()).into()),
                     start_pos,
                 ))
             }
@@ -1941,7 +1952,7 @@ fn get_next_token_inner(
                 while let Some(c) = stream.get_next() {
                     if c == '\r' {
                         // \r\n
-                        if let Some('\n') = stream.peek_next() {
+                        if stream.peek_next() == Some('\n') {
                             eat_next(stream, pos);
                         }
                         pos.new_line();

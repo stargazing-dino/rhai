@@ -158,7 +158,7 @@ impl<'d, T: Any + Clone> Deref for DynamicWriteLock<'d, T> {
     #[inline]
     fn deref(&self) -> &Self::Target {
         match self.0 {
-            DynamicWriteLockInner::Reference(ref reference) => *reference,
+            DynamicWriteLockInner::Reference(ref reference) => reference,
             #[cfg(not(feature = "no_closure"))]
             DynamicWriteLockInner::Guard(ref guard) => guard.downcast_ref().expect(CHECKED),
         }
@@ -169,7 +169,7 @@ impl<'d, T: Any + Clone> DerefMut for DynamicWriteLock<'d, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self.0 {
-            DynamicWriteLockInner::Reference(ref mut reference) => *reference,
+            DynamicWriteLockInner::Reference(ref mut reference) => reference,
             #[cfg(not(feature = "no_closure"))]
             DynamicWriteLockInner::Guard(ref mut guard) => guard.downcast_mut().expect(CHECKED),
         }
@@ -640,6 +640,7 @@ impl fmt::Debug for Dynamic {
     }
 }
 
+#[allow(clippy::enum_glob_use)]
 use AccessMode::*;
 
 impl Clone for Dynamic {
@@ -1088,7 +1089,7 @@ impl Dynamic {
     pub fn from<T: Variant + Clone>(value: T) -> Self {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
 
-        reify!(value, |v: Dynamic| return v);
+        reify!(value, |v: Self| return v);
         reify!(value, |v: INT| return v.into());
 
         #[cfg(not(feature = "no_float"))]
@@ -1187,7 +1188,7 @@ impl Dynamic {
         #[cfg(not(feature = "no_closure"))]
         self.flatten_in_place();
 
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+        if TypeId::of::<T>() == TypeId::of::<Self>() {
             return Some(reify!(self => T));
         }
         if TypeId::of::<T>() == TypeId::of::<()>() {
@@ -1309,7 +1310,7 @@ impl Dynamic {
     #[must_use]
     pub fn cast<T: Any + Clone>(self) -> T {
         // Bail out early if the return type needs no cast
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+        if TypeId::of::<T>() == TypeId::of::<Self>() {
             return reify!(self => T);
         }
 
@@ -1408,9 +1409,9 @@ impl Dynamic {
                 *self = crate::func::shared_try_take(cell).map_or_else(
                     |ref cell| crate::func::locked_read(cell).clone(),
                     #[cfg(not(feature = "sync"))]
-                    |value| value.into_inner(),
+                    crate::Locked::into_inner,
                     #[cfg(feature = "sync")]
-                    |value| value.into_inner().unwrap(),
+                    crate::Locked::into_inner().unwrap(),
                 );
             }
             _ => (),

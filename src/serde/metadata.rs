@@ -174,10 +174,10 @@ pub fn gen_metadata_to_json(
         global.modules.insert(name, m.as_ref().into());
     }
 
-    let exclude_flags = if !include_standard_packages {
-        ModuleFlags::STANDARD_LIB
-    } else {
+    let exclude_flags = if include_standard_packages {
         ModuleFlags::empty()
+    } else {
+        ModuleFlags::STANDARD_LIB
     };
 
     engine
