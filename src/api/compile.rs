@@ -1,7 +1,8 @@
 //! Module that defines the public compilation API of [`Engine`].
 
 use crate::parser::{ParseResult, ParseState};
-use crate::{Engine, OptimizationLevel, Scope, StringsInterner, AST};
+use crate::types::StringsInterner;
+use crate::{Engine, OptimizationLevel, Scope, AST};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 

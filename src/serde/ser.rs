@@ -1,7 +1,6 @@
 //! Implement serialization support of [`Dynamic`][crate::Dynamic] for [`serde`].
 
 use crate::{Dynamic, Identifier, Position, RhaiError, RhaiResult, RhaiResultOf, ERR, INT};
-use num_traits::FromPrimitive;
 use serde::ser::{
     Error, SerializeMap, SerializeSeq, SerializeStruct, SerializeTuple, SerializeTupleStruct,
 };
@@ -9,6 +8,9 @@ use serde::{Serialize, Serializer};
 use std::fmt;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+
+#[cfg(feature = "decimal")]
+use num_traits::FromPrimitive;
 
 /// Serializer for [`Dynamic`][crate::Dynamic].
 pub struct DynamicSerializer {
@@ -146,7 +148,7 @@ impl Serializer for &mut DynamicSerializer {
             #[cfg(not(feature = "no_float"))]
             return Ok(Dynamic::from_float(v as crate::FLOAT));
 
-            Err(Error::custom(format!("integer number too large: {}", v)))
+            Err(Error::custom(format!("integer number too large: {v}")))
         }
     }
 
@@ -166,7 +168,7 @@ impl Serializer for &mut DynamicSerializer {
             #[cfg(not(feature = "no_float"))]
             return Ok(Dynamic::from_float(v as crate::FLOAT));
 
-            Err(Error::custom(format!("integer number too large: {}", v)))
+            Err(Error::custom(format!("integer number too large: {v}")))
         }
     }
 
@@ -200,7 +202,7 @@ impl Serializer for &mut DynamicSerializer {
             #[cfg(not(feature = "no_float"))]
             return Ok(Dynamic::from_float(v as crate::FLOAT));
 
-            Err(Error::custom(format!("integer number too large: {}", v)))
+            Err(Error::custom(format!("integer number too large: {v}")))
         }
     }
 
@@ -219,7 +221,7 @@ impl Serializer for &mut DynamicSerializer {
         return Ok(Dynamic::from_float(v as crate::FLOAT));
 
         #[allow(unreachable_code)]
-        Err(Error::custom(format!("integer number too large: {}", v)))
+        Err(Error::custom(format!("integer number too large: {v}")))
     }
 
     #[inline]
@@ -237,40 +239,43 @@ impl Serializer for &mut DynamicSerializer {
         return Ok(Dynamic::from_float(v as crate::FLOAT));
 
         #[allow(unreachable_code)]
-        Err(Error::custom(format!("integer number too large: {}", v)))
+        Err(Error::custom(format!("integer number too large: {v}")))
     }
 
-    #[cfg(not(feature = "no_float"))]
     #[inline(always)]
     fn serialize_f32(self, v: f32) -> RhaiResultOf<Self::Ok> {
-        Ok(crate::FLOAT::from(v).into())
+        #[cfg(not(feature = "no_float"))]
+        return Ok((v as crate::FLOAT).into());
+
+        #[allow(unreachable_code)]
+        {
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_f32(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
+
+            Err(Error::custom(format!(
+                "floating-point number is not supported: {v}"
+            )))
+        }
     }
 
-    #[cfg(not(feature = "no_float"))]
     #[inline(always)]
     fn serialize_f64(self, v: f64) -> RhaiResultOf<Self::Ok> {
-        Ok(crate::FLOAT::from(v).into())
-    }
+        #[cfg(not(feature = "no_float"))]
+        return Ok((v as crate::FLOAT).into());
 
-    #[cfg(feature = "no_float")]
-    #[cfg(feature = "decimal")]
-    #[inline]
-    fn serialize_f32(self, v: f32) -> RhaiResultOf<Self::Ok> {
-        use std::convert::TryFrom;
+        #[allow(unreachable_code)]
+        {
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_f64(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
 
-        rust_decimal::Decimal::try_from(v)
-            .map(|v| v.into())
-            .map_err(Error::custom)
-    }
-    #[cfg(feature = "no_float")]
-    #[cfg(feature = "decimal")]
-    #[inline]
-    fn serialize_f64(self, v: f64) -> RhaiResultOf<Self::Ok> {
-        use std::convert::TryFrom;
-
-        rust_decimal::Decimal::try_from(v)
-            .map(|v| v.into())
-            .map_err(Error::custom)
+            Err(Error::custom(format!(
+                "floating-point number is not supported: {v}"
+            )))
+        }
     }
 
     #[inline(always)]

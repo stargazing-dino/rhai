@@ -266,16 +266,18 @@ fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
                 *state = Dynamic::FALSE;
                 Ok(Some("$ident$".into()))
             }
-            2 => match stream[1].as_str() {
-                "world" if state.as_bool().unwrap_or(false) => Ok(Some("$$world".into())),
-                "world" => Ok(Some("$$hello".into())),
-                "kitty" => {
-                    *state = (42 as INT).into();
-                    Ok(None)
+            2 => {
+                match stream[1].as_str() {
+                    "world" if state.as_bool().unwrap_or(false) => Ok(Some("$$world".into())),
+                    "world" => Ok(Some("$$hello".into())),
+                    "kitty" => {
+                        *state = (42 as INT).into();
+                        Ok(None)
+                    }
+                    s => Err(LexError::ImproperSymbol(s.to_string(), String::new())
+                        .into_err(Position::NONE)),
                 }
-                s => Err(LexError::ImproperSymbol(s.to_string(), String::new())
-                    .into_err(Position::NONE)),
-            },
+            }
             _ => unreachable!(),
         },
         true,

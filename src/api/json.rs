@@ -3,7 +3,8 @@
 
 use crate::parser::{ParseSettingFlags, ParseState};
 use crate::tokenizer::Token;
-use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf, Scope, StringsInterner};
+use crate::types::StringsInterner;
+use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf, Scope};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 

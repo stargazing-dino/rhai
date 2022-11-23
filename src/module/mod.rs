@@ -311,7 +311,7 @@ impl Module {
             dynamic_functions_filter: BloomFilterU64::new(),
             type_iterators: None,
             all_type_iterators: None,
-            flags: ModuleFlags::empty(),
+            flags: ModuleFlags::INDEXED,
         }
     }
 

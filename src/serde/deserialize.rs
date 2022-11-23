@@ -1,7 +1,6 @@
 //! Implementations of [`serde::Deserialize`].
 
 use crate::{Dynamic, Identifier, ImmutableString, Scope, INT};
-use num_traits::FromPrimitive;
 use serde::{
     de::{Error, SeqAccess, Visitor},
     Deserialize, Deserializer,
@@ -9,6 +8,9 @@ use serde::{
 use std::fmt;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+
+#[cfg(feature = "decimal")]
+use num_traits::FromPrimitive;
 
 struct DynamicVisitor;
 
@@ -56,7 +58,7 @@ impl<'de> Visitor<'de> for DynamicVisitor {
             #[cfg(not(feature = "no_float"))]
             return Ok(Dynamic::from_float(v as crate::FLOAT));
 
-            Err(Error::custom(format!("integer number too large: {}", v)))
+            Err(Error::custom(format!("integer number too large: {v}")))
         }
     }
     #[inline]
@@ -75,7 +77,7 @@ impl<'de> Visitor<'de> for DynamicVisitor {
             #[cfg(not(feature = "no_float"))]
             return Ok(Dynamic::from_float(v as crate::FLOAT));
 
-            Err(Error::custom(format!("integer number too large: {}", v)))
+            Err(Error::custom(format!("integer number too large: {v}")))
         }
     }
     #[inline(always)]
@@ -106,7 +108,7 @@ impl<'de> Visitor<'de> for DynamicVisitor {
             #[cfg(not(feature = "no_float"))]
             return Ok(Dynamic::from_float(v as crate::FLOAT));
 
-            Err(Error::custom(format!("integer number too large: {}", v)))
+            Err(Error::custom(format!("integer number too large: {v}")))
         }
     }
     #[inline]
@@ -124,7 +126,7 @@ impl<'de> Visitor<'de> for DynamicVisitor {
         return Ok(Dynamic::from_float(v as crate::FLOAT));
 
         #[allow(unreachable_code)]
-        Err(Error::custom(format!("integer number too large: {}", v)))
+        Err(Error::custom(format!("integer number too large: {v}")))
     }
     #[inline]
     fn visit_u128<E: Error>(self, v: u128) -> Result<Self::Value, E> {
@@ -141,18 +143,44 @@ impl<'de> Visitor<'de> for DynamicVisitor {
         return Ok(Dynamic::from_float(v as crate::FLOAT));
 
         #[allow(unreachable_code)]
-        Err(Error::custom(format!("integer number too large: {}", v)))
+        Err(Error::custom(format!("integer number too large: {v}")))
     }
 
     #[cfg(not(feature = "no_float"))]
     #[inline(always)]
     fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
-        Ok(crate::FLOAT::from(v).into())
+        #[cfg(not(feature = "no_float"))]
+        return Ok((v as crate::FLOAT).into());
+
+        #[allow(unreachable_code)]
+        {
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_f32(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
+
+            Err(Error::custom(format!(
+                "floating-point number is not supported: {v}"
+            )))
+        }
     }
     #[cfg(not(feature = "no_float"))]
     #[inline(always)]
     fn visit_f64<E: Error>(self, v: f64) -> Result<Self::Value, E> {
-        Ok(crate::FLOAT::from(v).into())
+        #[cfg(not(feature = "no_float"))]
+        return Ok((v as crate::FLOAT).into());
+
+        #[allow(unreachable_code)]
+        {
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_f64(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
+
+            Err(Error::custom(format!(
+                "floating-point number is not supported: {v}"
+            )))
+        }
     }
 
     #[cfg(feature = "no_float")]

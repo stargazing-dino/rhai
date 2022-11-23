@@ -2,7 +2,8 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
-use crate::{Engine, RhaiResultOf, Scope, StringsInterner, AST};
+use crate::types::StringsInterner;
+use crate::{Engine, RhaiResultOf, Scope, AST};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 

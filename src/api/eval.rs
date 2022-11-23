@@ -2,10 +2,9 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
-use crate::types::dynamic::Variant;
+use crate::types::{dynamic::Variant, StringsInterner};
 use crate::{
-    reify, Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope,
-    StringsInterner, AST, ERR,
+    reify, Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
