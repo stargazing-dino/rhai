@@ -94,7 +94,7 @@ impl<'de> Visitor<'de> for DynamicVisitor {
         return Ok(Dynamic::from(v as INT));
 
         #[cfg(feature = "only_i32")]
-        if v <= INT::MAX as i32 {
+        if v <= INT::MAX as u32 {
             return Ok(Dynamic::from(v as INT));
         }
 
