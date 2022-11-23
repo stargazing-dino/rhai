@@ -90,11 +90,7 @@ impl<'a> ArgBackup<'a> {
     /// exiting the current scope.  Otherwise it is undefined behavior as the shorter lifetime will leak.
     #[inline(always)]
     pub fn restore_first_arg(&mut self, args: &mut FnCallArgs<'a>) {
-        if let Some(p) = self.orig_mut.take() {
-            args[0] = p;
-        } else {
-            unreachable!("`Some`");
-        }
+        args[0] = self.orig_mut.take().expect("`Some`");
     }
 }
 
@@ -116,7 +112,7 @@ pub fn ensure_no_data_race(fn_name: &str, args: &FnCallArgs, is_ref_mut: bool) -
     if let Some((n, ..)) = args
         .iter()
         .enumerate()
-        .skip(if is_ref_mut { 1 } else { 0 })
+        .skip(usize::from(is_ref_mut))
         .find(|(.., a)| a.is_locked())
     {
         return Err(ERR::ErrorDataRace(
@@ -277,7 +273,7 @@ impl Engine {
                                 Some(token) if token.is_op_assignment() => {
                                     let (first_arg, rest_args) = args.split_first().unwrap();
 
-                                    get_builtin_op_assignment_fn(token, *first_arg, rest_args[0])
+                                    get_builtin_op_assignment_fn(token, first_arg, rest_args[0])
                                         .map(|f| FnResolutionCacheEntry {
                                             func: CallableFunction::Method(Shared::new(f)),
                                             source: None,
@@ -344,7 +340,7 @@ impl Engine {
         name: &str,
         op_token: Option<&Token>,
         hash: u64,
-        mut args: &mut FnCallArgs,
+        args: &mut FnCallArgs,
         is_ref_mut: bool,
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
@@ -381,7 +377,7 @@ impl Engine {
             }
 
             let args =
-                &mut *RestoreOnDrop::lock_if(swap, &mut args, move |a| backup.restore_first_arg(a));
+                &mut *RestoreOnDrop::lock_if(swap, args, move |a| backup.restore_first_arg(a));
 
             #[cfg(feature = "debugging")]
             if self.debugger.is_some() {
@@ -423,7 +419,7 @@ impl Engine {
                     _ => false,
                 };
                 if trigger {
-                    let scope = &mut &mut Scope::new();
+                    let scope = &mut Scope::new();
                     let mut this = Dynamic::NULL;
                     let node = crate::ast::Stmt::Noop(pos);
                     let node = (&node).into();
@@ -597,12 +593,13 @@ impl Engine {
                     let num_params = _args[1].as_int().expect("`INT`");
 
                     return Ok((
-                        if num_params < 0 || num_params > crate::MAX_USIZE_INT {
-                            false
-                        } else {
+                        if (0..=crate::MAX_USIZE_INT).contains(&num_params) {
+                            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                             let hash_script =
                                 calc_fn_hash(None, fn_name.as_str(), num_params as usize);
                             self.has_script_fn(global, caches, hash_script)
+                        } else {
+                            false
                         }
                         .into(),
                         false,
@@ -647,12 +644,11 @@ impl Engine {
                 }
 
                 let mut empty_scope;
-                let scope = match _scope {
-                    Some(scope) => scope,
-                    None => {
-                        empty_scope = Scope::new();
-                        &mut empty_scope
-                    }
+                let scope = if let Some(scope) = _scope {
+                    scope
+                } else {
+                    empty_scope = Scope::new();
+                    &mut empty_scope
                 };
 
                 let orig_source = mem::replace(&mut global.source, source.clone());
@@ -676,7 +672,7 @@ impl Engine {
                         backup.change_first_arg_to_copy(_args);
                     }
 
-                    let args = &mut *RestoreOnDrop::lock_if(swap, &mut _args, move |a| {
+                    let args = &mut *RestoreOnDrop::lock_if(swap, _args, move |a| {
                         backup.restore_first_arg(a)
                     });
 
@@ -901,7 +897,7 @@ impl Engine {
                                 call_args = &mut _arg_values;
                             }
                             // Recalculate the hash based on the new function name and new arguments
-                            hash = if !is_anon && !is_valid_function_name(&fn_name) {
+                            hash = if !is_anon && !is_valid_function_name(fn_name) {
                                 FnCallHashes::from_native(calc_fn_hash(
                                     None,
                                     fn_name,
@@ -963,7 +959,7 @@ impl Engine {
     ) -> RhaiResult {
         let mut first_arg = first_arg;
         let mut a_expr = args_expr;
-        let mut total_args = if first_arg.is_some() { 1 } else { 0 } + a_expr.len();
+        let mut total_args = usize::from(first_arg.is_some()) + a_expr.len();
         let mut curry = FnArgsVec::new_const();
         let mut name = fn_name;
         let mut hashes = hashes;
@@ -1077,9 +1073,10 @@ impl Engine {
                     .as_int()
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
 
-                return Ok(if num_params < 0 || num_params > crate::MAX_USIZE_INT {
+                return Ok(if !(0..=crate::MAX_USIZE_INT).contains(&num_params) {
                     false
                 } else {
+                    #[allow(clippy::cast_sign_loss)]
                     let hash_script = calc_fn_hash(None, &fn_name, num_params as usize);
                     self.has_script_fn(global, caches, hash_script)
                 }
@@ -1437,7 +1434,7 @@ impl Engine {
         // No optimizations because we only run it once
         let ast = self.compile_with_scope_and_optimization_level(
             &Scope::new(),
-            &[script],
+            [script],
             #[cfg(not(feature = "no_optimize"))]
             OptimizationLevel::None,
             #[cfg(feature = "no_optimize")]

@@ -80,7 +80,6 @@ pub trait Func<ARGS, RET> {
     /// # Ok(())
     /// # }
     /// ```
-    #[must_use]
     fn create_from_script(self, script: &str, entry_point: &str) -> ParseResult<Self::Output>;
 }
 

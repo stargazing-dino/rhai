@@ -168,6 +168,7 @@ impl Engine {
                         ERR::ErrorBitFieldBounds(crate::INT_BITS, end, idx_pos).into()
                     })?;
 
+                    #[allow(clippy::cast_possible_truncation)]
                     if end <= start {
                         (0, 0)
                     } else if end == crate::INT_BITS && start == 0 {
@@ -193,6 +194,7 @@ impl Engine {
                         ERR::ErrorBitFieldBounds(crate::INT_BITS, end, idx_pos).into()
                     })?;
 
+                    #[allow(clippy::cast_possible_truncation)]
                     if end < start {
                         (0, 0)
                     } else if end == crate::INT_BITS - 1 && start == 0 {
@@ -237,6 +239,7 @@ impl Engine {
                 Ok(Target::Bit {
                     source: target,
                     value: bit_value.into(),
+                    #[allow(clippy::cast_possible_truncation)]
                     bit: bit as u8,
                 })
             }
@@ -249,12 +252,14 @@ impl Engine {
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
 
                 let (ch, offset) = if index >= 0 {
+                    #[allow(clippy::absurd_extreme_comparisons)]
                     if index >= crate::MAX_USIZE_INT {
                         return Err(
                             ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
                         );
                     }
 
+                    #[allow(clippy::cast_sign_loss)]
                     let offset = index as usize;
                     (
                         s.chars().nth(offset).ok_or_else(|| {
@@ -265,12 +270,13 @@ impl Engine {
                 } else {
                     let abs_index = index.unsigned_abs();
 
-                    if abs_index as u64 > usize::MAX as u64 {
+                    if abs_index > usize::MAX as u64 {
                         return Err(
                             ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
                         );
                     }
 
+                    #[allow(clippy::cast_possible_truncation)]
                     let offset = abs_index as usize;
                     (
                         // Count from end if negative

@@ -3,7 +3,7 @@
 
 use crate::parser::{ParseSettingFlags, ParseState};
 use crate::tokenizer::Token;
-use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf, Scope};
+use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf, Scope, StringsInterner};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -117,7 +117,8 @@ impl Engine {
         );
 
         let scope = Scope::new();
-        let mut state = ParseState::new(self, &scope, Default::default(), tokenizer_control);
+        let mut state =
+            ParseState::new(self, &scope, StringsInterner::default(), tokenizer_control);
 
         let ast = self.parse_global_expr(
             &mut stream.peekable(),
@@ -165,7 +166,7 @@ pub fn format_map_as_json(map: &Map) -> String {
         result.push(':');
 
         if let Some(val) = value.read_lock::<Map>() {
-            result.push_str(&format_map_as_json(&*val));
+            result.push_str(&format_map_as_json(&val));
         } else if value.is_unit() {
             result.push_str("null");
         } else {

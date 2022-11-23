@@ -65,6 +65,7 @@
 #![warn(clippy::undocumented_unsafe_blocks)]
 #![allow(clippy::unit_arg)]
 #![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::inline_always)]
 #![allow(clippy::module_name_repetitions)]

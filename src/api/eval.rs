@@ -4,7 +4,8 @@ use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
 use crate::{
-    reify, Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
+    reify, Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope,
+    StringsInterner, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -69,7 +70,7 @@ impl Engine {
     ) -> RhaiResultOf<T> {
         let ast = self.compile_with_scope_and_optimization_level(
             scope,
-            &[script],
+            [script],
             self.optimization_level,
         )?;
         self.eval_ast_with_scope(scope, &ast)
@@ -119,7 +120,7 @@ impl Engine {
         let scripts = [script];
         let (stream, tokenizer_control) =
             self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
-        let mut state = ParseState::new(self, scope, Default::default(), tokenizer_control);
+        let mut state = ParseState::new(self, scope, StringsInterner::default(), tokenizer_control);
 
         // No need to optimize a lone expression
         let ast = self.parse_global_expr(

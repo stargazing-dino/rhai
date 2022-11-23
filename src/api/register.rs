@@ -742,10 +742,10 @@ impl Engine {
             signatures.extend(m.gen_fn_signatures().map(|f| format!("{name}::{f}")));
         }
 
-        let exclude_flags = if !include_packages {
-            ModuleFlags::INTERNAL | ModuleFlags::STANDARD_LIB
-        } else {
+        let exclude_flags = if include_packages {
             ModuleFlags::INTERNAL
+        } else {
+            ModuleFlags::INTERNAL | ModuleFlags::STANDARD_LIB
         };
 
         signatures.extend(

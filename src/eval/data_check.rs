@@ -59,7 +59,7 @@ impl Dynamic {
             }
             Union::Str(ref s, ..) => (0, 0, s.len()),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) if _top => self.read_lock::<Dynamic>().unwrap().calc_data_sizes(true),
+            Union::Shared(..) if _top => self.read_lock::<Self>().unwrap().calc_data_sizes(true),
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => {
                 unreachable!("shared values discovered within data: {}", self)

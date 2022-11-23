@@ -533,6 +533,7 @@ impl Engine {
                         let index_value = x as INT;
 
                         #[cfg(not(feature = "unchecked"))]
+                        #[allow(clippy::absurd_extreme_comparisons)]
                         if index_value > crate::MAX_USIZE_INT {
                             return Err(ERR::ErrorArithmetic(
                                 format!("for-loop counter overflow: {x}"),
@@ -799,10 +800,10 @@ impl Engine {
                         Err(ERR::ErrorModuleNotFound(path.to_string(), path_pos).into())
                     })?;
 
-                let (export, must_be_indexed) = if !export.is_empty() {
-                    (export.name.clone(), true)
-                } else {
+                let (export, must_be_indexed) = if export.is_empty() {
                     (self.const_empty_string(), false)
+                } else {
+                    (export.name.clone(), true)
                 };
 
                 if !must_be_indexed || module.is_indexed() {
@@ -824,13 +825,14 @@ impl Engine {
             Stmt::Export(x, ..) => {
                 let (Ident { name, pos, .. }, Ident { name: alias, .. }) = &**x;
                 // Mark scope variables as public
-                if let Some(index) = scope.search(name) {
-                    let alias = if alias.is_empty() { name } else { alias }.clone();
-                    scope.add_alias_by_index(index, alias.into());
-                    Ok(Dynamic::UNIT)
-                } else {
-                    Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into())
-                }
+                scope.search(name).map_or_else(
+                    || Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into()),
+                    |index| {
+                        let alias = if alias.is_empty() { name } else { alias }.clone();
+                        scope.add_alias_by_index(index, alias);
+                        Ok(Dynamic::UNIT)
+                    },
+                )
             }
 
             // Share statement
@@ -838,20 +840,21 @@ impl Engine {
             Stmt::Share(x) => {
                 x.iter()
                     .try_for_each(|(name, index, pos)| {
-                        if let Some(index) = index
+                        index
                             .map(|n| scope.len() - n.get())
                             .or_else(|| scope.search(name))
-                        {
-                            let val = scope.get_mut_by_index(index);
+                            .map_or_else(
+                                || Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into()),
+                                |index| {
+                                    let val = scope.get_mut_by_index(index);
 
-                            if !val.is_shared() {
-                                // Replace the variable with a shared value.
-                                *val = std::mem::take(val).into_shared();
-                            }
-                            Ok(())
-                        } else {
-                            Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into())
-                        }
+                                    if !val.is_shared() {
+                                        // Replace the variable with a shared value.
+                                        *val = std::mem::take(val).into_shared();
+                                    }
+                                    Ok(())
+                                },
+                            )
                     })
                     .map(|_| Dynamic::UNIT)
             }

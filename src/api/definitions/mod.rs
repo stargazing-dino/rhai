@@ -77,7 +77,6 @@ pub struct DefinitionsConfig {
 
 impl Default for DefinitionsConfig {
     #[inline(always)]
-    #[must_use]
     fn default() -> Self {
         Self {
             write_headers: false,
@@ -105,13 +104,13 @@ impl Definitions<'_> {
     /// Headers are always present in content that is expected to be written to a file
     /// (i.e. `write_to*` and `*_file` methods).
     #[inline(always)]
-    pub fn with_headers(mut self, headers: bool) -> Self {
+    pub const fn with_headers(mut self, headers: bool) -> Self {
         self.config.write_headers = headers;
         self
     }
     /// Include standard packages when writing definition files.
     #[inline(always)]
-    pub fn include_standard_packages(mut self, include_standard_packages: bool) -> Self {
+    pub const fn include_standard_packages(mut self, include_standard_packages: bool) -> Self {
         self.config.include_standard_packages = include_standard_packages;
         self
     }
@@ -129,7 +128,6 @@ impl Definitions<'_> {
     }
     /// Get the configuration.
     #[inline(always)]
-    #[must_use]
     pub(crate) const fn config(&self) -> &DefinitionsConfig {
         &self.config
     }
@@ -177,19 +175,19 @@ impl Definitions<'_> {
         let mut def_file = String::from("module static;\n\n");
 
         if config.include_standard_packages {
-            def_file += &self.builtin_functions_operators_impl(&config);
+            def_file += &Self::builtin_functions_operators_impl(config);
             def_file += "\n";
-            def_file += &self.builtin_functions_impl(&config);
+            def_file += &Self::builtin_functions_impl(config);
             def_file += "\n";
         }
-        def_file += &self.static_module_impl(&config);
+        def_file += &self.static_module_impl(config);
         def_file += "\n";
 
         #[cfg(not(feature = "no_module"))]
         {
             use std::fmt::Write;
 
-            for (module_name, module_def) in self.modules_impl(&config) {
+            for (module_name, module_def) in self.modules_impl(config) {
                 write!(
                     &mut def_file,
                     "\nmodule {module_name} {{\n{module_def}\n}}\n"
@@ -199,7 +197,7 @@ impl Definitions<'_> {
             def_file += "\n";
         }
 
-        def_file += &self.scope_items_impl(&config);
+        def_file += &self.scope_items_impl(config);
 
         def_file += "\n";
 
@@ -220,11 +218,11 @@ impl Definitions<'_> {
             vec![
                 (
                     "__builtin__.d.rhai".to_string(),
-                    self.builtin_functions_impl(&config),
+                    Self::builtin_functions_impl(config),
                 ),
                 (
                     "__builtin-operators__.d.rhai".to_string(),
-                    self.builtin_functions_operators_impl(&config),
+                    Self::builtin_functions_operators_impl(config),
                 ),
             ]
         } else {
@@ -233,18 +231,18 @@ impl Definitions<'_> {
         .into_iter()
         .chain(std::iter::once((
             "__static__.d.rhai".to_string(),
-            self.static_module_impl(&config),
+            self.static_module_impl(config),
         )))
         .chain(self.scope.iter().map(move |_| {
             (
                 "__scope__.d.rhai".to_string(),
-                self.scope_items_impl(&config),
+                self.scope_items_impl(config),
             )
         }))
         .chain(
             #[cfg(not(feature = "no_module"))]
             {
-                self.modules_impl(&config)
+                self.modules_impl(config)
                     .map(|(name, def)| (format!("{name}.d.rhai"), def))
             },
             #[cfg(feature = "no_module")]
@@ -258,12 +256,12 @@ impl Definitions<'_> {
     #[inline(always)]
     #[must_use]
     pub fn builtin_functions(&self) -> String {
-        self.builtin_functions_impl(&self.config)
+        Self::builtin_functions_impl(self.config)
     }
 
     /// Return definitions for all builtin functions.
     #[must_use]
-    fn builtin_functions_impl(&self, config: &DefinitionsConfig) -> String {
+    fn builtin_functions_impl(config: DefinitionsConfig) -> String {
         let def = include_str!("builtin-functions.d.rhai");
 
         if config.write_headers {
@@ -277,12 +275,12 @@ impl Definitions<'_> {
     #[inline(always)]
     #[must_use]
     pub fn builtin_functions_operators(&self) -> String {
-        self.builtin_functions_operators_impl(&self.config)
+        Self::builtin_functions_operators_impl(self.config)
     }
 
     /// Return definitions for all builtin operators.
     #[must_use]
-    fn builtin_functions_operators_impl(&self, config: &DefinitionsConfig) -> String {
+    fn builtin_functions_operators_impl(config: DefinitionsConfig) -> String {
         let def = include_str!("builtin-operators.d.rhai");
 
         if config.write_headers {
@@ -296,22 +294,22 @@ impl Definitions<'_> {
     #[inline(always)]
     #[must_use]
     pub fn static_module(&self) -> String {
-        self.static_module_impl(&self.config)
+        self.static_module_impl(self.config)
     }
 
     /// Return definitions for all globally available functions and constants.
     #[must_use]
-    fn static_module_impl(&self, config: &DefinitionsConfig) -> String {
+    fn static_module_impl(&self, config: DefinitionsConfig) -> String {
         let mut s = if config.write_headers {
             String::from("module static;\n\n")
         } else {
             String::new()
         };
 
-        let exclude_flags = if !self.config.include_standard_packages {
-            ModuleFlags::STANDARD_LIB
-        } else {
+        let exclude_flags = if self.config.include_standard_packages {
             ModuleFlags::empty()
+        } else {
+            ModuleFlags::STANDARD_LIB
         };
 
         self.engine
@@ -333,12 +331,12 @@ impl Definitions<'_> {
     #[inline(always)]
     #[must_use]
     pub fn scope_items(&self) -> String {
-        self.scope_items_impl(&self.config)
+        self.scope_items_impl(self.config)
     }
 
     /// Return definitions for all items inside the [`Scope`], if any.
     #[must_use]
-    fn scope_items_impl(&self, config: &DefinitionsConfig) -> String {
+    fn scope_items_impl(&self, config: DefinitionsConfig) -> String {
         let mut s = if config.write_headers {
             String::from("module static;\n\n")
         } else {
@@ -358,14 +356,14 @@ impl Definitions<'_> {
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     pub fn modules(&self) -> impl Iterator<Item = (String, String)> + '_ {
-        self.modules_impl(&self.config)
+        self.modules_impl(self.config)
     }
 
     /// Return a (module name, definitions) pair for each registered static [module][Module].
     #[cfg(not(feature = "no_module"))]
     fn modules_impl(
         &self,
-        config: &DefinitionsConfig,
+        config: DefinitionsConfig,
     ) -> impl Iterator<Item = (String, String)> + '_ {
         let mut m = self
             .engine

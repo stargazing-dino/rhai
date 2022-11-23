@@ -151,7 +151,7 @@ impl<'a> NativeCallContext<'a> {
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     #[must_use]
-    pub fn new_with_all_fields(
+    pub const fn new_with_all_fields(
         engine: &'a Engine,
         fn_name: &'a str,
         source: Option<&'a str>,
@@ -240,7 +240,7 @@ impl<'a> NativeCallContext<'a> {
     /// Custom state kept in a [`Dynamic`].
     #[inline(always)]
     #[must_use]
-    pub fn tag(&self) -> Option<&Dynamic> {
+    pub const fn tag(&self) -> Option<&Dynamic> {
         Some(&self.global.tag)
     }
     /// Get an iterator over the current set of modules imported via `import` statements
@@ -278,7 +278,7 @@ impl<'a> NativeCallContext<'a> {
     #[cfg(not(feature = "no_function"))]
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &crate::Module> {
-        self.global.lib.iter().map(|m| m.as_ref())
+        self.global.lib.iter().map(AsRef::as_ref)
     }
     /// _(internals)_ The current stack of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.

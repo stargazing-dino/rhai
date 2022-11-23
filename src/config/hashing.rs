@@ -165,7 +165,7 @@ where
 
 unsafe impl<T: Sync + Send> Sync for SusLock<T> where T: 'static {}
 unsafe impl<T: Send> Send for SusLock<T> where T: 'static {}
-impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for SusLock<T> where T: 'static {}
+impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for SusLock<T> {}
 
 impl<T> Drop for SusLock<T>
 where
@@ -174,7 +174,7 @@ where
     #[inline]
     fn drop(&mut self) {
         if self.initialized.load(Ordering::SeqCst) {
-            unsafe { (&mut *self.data.get()).assume_init_drop() };
+            unsafe { (*self.data.get()).assume_init_drop() };
         }
     }
 }

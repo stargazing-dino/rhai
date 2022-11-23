@@ -772,7 +772,7 @@ impl AST {
     /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     #[inline]
-    pub fn iter_functions<'a>(&'a self) -> impl Iterator<Item = super::ScriptFnMetadata> + 'a {
+    pub fn iter_functions(&self) -> impl Iterator<Item = super::ScriptFnMetadata> {
         self.lib
             .iter_script_fn()
             .map(|(.., fn_def)| fn_def.as_ref().into())
@@ -942,7 +942,7 @@ impl Borrow<crate::Module> for AST {
     #[inline(always)]
     #[must_use]
     fn borrow(&self) -> &crate::Module {
-        &self.shared_lib()
+        self.shared_lib()
     }
 }
 

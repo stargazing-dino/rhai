@@ -1,7 +1,10 @@
 //! Built-in implementations for common operators.
 
+#![allow(clippy::float_cmp)]
+
 use super::call::FnCallArgs;
 use super::native::FnBuiltin;
+#[allow(clippy::enum_glob_use)]
 use crate::tokenizer::{Token, Token::*};
 use crate::{
     Dynamic, ExclusiveRange, ImmutableString, InclusiveRange, NativeCallContext, RhaiResult,
@@ -68,13 +71,11 @@ fn is_numeric(type_id: TypeId) -> bool {
 
 /// A function that returns `true`.
 #[inline(always)]
-#[must_use]
 fn const_true_fn(_: NativeCallContext, _: &mut [&mut Dynamic]) -> RhaiResult {
     Ok(Dynamic::TRUE)
 }
 /// A function that returns `false`.
 #[inline(always)]
-#[must_use]
 fn const_false_fn(_: NativeCallContext, _: &mut [&mut Dynamic]) -> RhaiResult {
     Ok(Dynamic::FALSE)
 }
@@ -143,6 +144,7 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
     if type1 == type2 {
         if type1 == TypeId::of::<INT>() {
             #[cfg(not(feature = "unchecked"))]
+            #[allow(clippy::wildcard_imports)]
             use crate::packages::arithmetic::arith_basic::INT::functions::*;
 
             #[cfg(not(feature = "unchecked"))]
@@ -340,6 +342,7 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
         ($x:ty, $xx:ident, $y:ty, $yy:ident) => {
             if (type1, type2) == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
                 #[cfg(not(feature = "unchecked"))]
+                #[allow(clippy::wildcard_imports)]
                 use crate::packages::arithmetic::decimal_functions::builtin::*;
 
                 #[cfg(not(feature = "unchecked"))]
@@ -632,6 +635,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
     if type1 == type2 {
         if type1 == TypeId::of::<INT>() {
             #[cfg(not(feature = "unchecked"))]
+            #[allow(clippy::wildcard_imports)]
             use crate::packages::arithmetic::arith_basic::INT::functions::*;
 
             #[cfg(not(feature = "unchecked"))]
@@ -720,6 +724,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
 
         #[cfg(not(feature = "no_index"))]
         if type1 == TypeId::of::<crate::Array>() {
+            #[allow(clippy::wildcard_imports)]
             use crate::packages::array_basic::array_functions::*;
             use crate::Array;
 
@@ -751,6 +756,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
 
         #[cfg(not(feature = "no_index"))]
         if type1 == TypeId::of::<crate::Blob>() {
+            #[allow(clippy::wildcard_imports)]
             use crate::packages::blob_basic::blob_functions::*;
             use crate::Blob;
 
@@ -801,6 +807,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
         ($x:ident, $xx:ident, $y:ty, $yy:ident) => {
             if (type1, type2) == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
                 #[cfg(not(feature = "unchecked"))]
+                #[allow(clippy::wildcard_imports)]
                 use crate::packages::arithmetic::decimal_functions::builtin::*;
 
                 #[cfg(not(feature = "unchecked"))]
@@ -887,6 +894,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
     // array op= any
     #[cfg(not(feature = "no_index"))]
     if type1 == TypeId::of::<crate::Array>() {
+        #[allow(clippy::wildcard_imports)]
         use crate::packages::array_basic::array_functions::*;
         use crate::Array;
 
@@ -916,6 +924,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
 
         // blob op= int
         if (type1, type2) == (TypeId::of::<Blob>(), TypeId::of::<INT>()) {
+            #[allow(clippy::wildcard_imports)]
             use crate::packages::blob_basic::blob_functions::*;
 
             return match op {
@@ -935,6 +944,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
 
         // blob op= char
         if (type1, type2) == (TypeId::of::<Blob>(), TypeId::of::<char>()) {
+            #[allow(clippy::wildcard_imports)]
             use crate::packages::blob_basic::blob_functions::*;
 
             return match op {
@@ -954,6 +964,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
 
         // blob op= string
         if (type1, type2) == (TypeId::of::<Blob>(), TypeId::of::<ImmutableString>()) {
+            #[allow(clippy::wildcard_imports)]
             use crate::packages::blob_basic::blob_functions::*;
 
             return match op {

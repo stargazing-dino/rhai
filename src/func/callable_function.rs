@@ -132,9 +132,7 @@ impl CallableFunction {
 
         #[cfg(not(feature = "no_function"))]
         match self {
-            Self::Pure(..) | Self::Method(..) => true,
-            Self::Plugin(..) => true,
-            Self::Iterator(..) => true,
+            Self::Pure(..) | Self::Method(..) | Self::Plugin(..) | Self::Iterator(..) => true,
             Self::Script(..) => false,
         }
     }
@@ -147,8 +145,9 @@ impl CallableFunction {
 
         #[cfg(not(feature = "no_function"))]
         match self {
-            Self::Plugin(..) => FnAccess::Public,
-            Self::Pure(..) | Self::Method(..) | Self::Iterator(..) => FnAccess::Public,
+            Self::Plugin(..) | Self::Pure(..) | Self::Method(..) | Self::Iterator(..) => {
+                FnAccess::Public
+            }
             Self::Script(f) => f.access,
         }
     }

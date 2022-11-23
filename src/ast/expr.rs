@@ -173,7 +173,7 @@ impl FnCallHashes {
     /// The hash returned is never zero.
     #[inline(always)]
     #[must_use]
-    pub fn native(&self) -> u64 {
+    pub const fn native(&self) -> u64 {
         self.native.get()
     }
     /// Get the script hash.
@@ -837,18 +837,12 @@ impl Expr {
             #[cfg(not(feature = "no_custom_syntax"))]
             Self::Custom(..) => false,
 
-            Self::Variable(..) => match token {
-                Token::LeftParen => true,
-                Token::Unit => true,
-                Token::Bang => true,
-                Token::DoubleColon => true,
-                _ => false,
-            },
+            Self::Variable(..) => matches!(
+                token,
+                Token::LeftParen | Token::Unit | Token::Bang | Token::DoubleColon
+            ),
 
-            Self::Property(..) => match token {
-                Token::LeftParen => true,
-                _ => false,
-            },
+            Self::Property(..) => matches!(token, Token::LeftParen),
         }
     }
     /// Recursively walk this expression.

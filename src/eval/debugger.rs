@@ -193,7 +193,7 @@ impl BreakPoint {
     /// Is this [`BreakPoint`] enabled?
     #[inline(always)]
     #[must_use]
-    pub fn is_enabled(&self) -> bool {
+    pub const fn is_enabled(&self) -> bool {
         match self {
             #[cfg(not(feature = "no_position"))]
             Self::AtPosition { enabled, .. } => *enabled,
@@ -268,7 +268,7 @@ impl Debugger {
     /// Create a new [`Debugger`].
     #[inline(always)]
     #[must_use]
-    pub fn new(status: DebuggerStatus, state: Dynamic) -> Self {
+    pub const fn new(status: DebuggerStatus, state: Dynamic) -> Self {
         Self {
             status,
             break_points: Vec::new(),
@@ -297,7 +297,7 @@ impl Debugger {
         pos: Position,
     ) {
         self.call_stack.push(CallStackFrame {
-            fn_name: fn_name.into(),
+            fn_name,
             args,
             source,
             pos,

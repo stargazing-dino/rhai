@@ -156,7 +156,7 @@ impl Engine {
                     .any(|(_, _, f, ..)| f == v.3.as_str()) =>
             {
                 let val: Dynamic =
-                    crate::FnPtr::new_unchecked(v.3.as_str(), Default::default()).into();
+                    crate::FnPtr::new_unchecked(v.3.as_str(), crate::StaticVec::default()).into();
                 return Ok(val.into());
             }
             Expr::Variable(v, None, ..) => v.0.map_or(0, NonZeroUsize::get),
@@ -186,14 +186,20 @@ impl Engine {
             match scope.search(var_name) {
                 Some(index) => index,
                 None => {
-                    return match self.global_modules.iter().find_map(|m| m.get_var(var_name)) {
-                        Some(val) => Ok(val.into()),
-                        None => Err(ERR::ErrorVariableNotFound(
-                            var_name.to_string(),
-                            expr.position(),
+                    return self
+                        .global_modules
+                        .iter()
+                        .find_map(|m| m.get_var(var_name))
+                        .map_or_else(
+                            || {
+                                Err(ERR::ErrorVariableNotFound(
+                                    var_name.to_string(),
+                                    expr.position(),
+                                )
+                                .into())
+                            },
+                            |val| Ok(val.into()),
                         )
-                        .into()),
-                    }
                 }
             }
         };

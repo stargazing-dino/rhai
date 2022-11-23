@@ -72,7 +72,7 @@ impl Caches {
     /// Push an empty function resolution cache onto the stack and make it current.
     #[inline(always)]
     pub fn push_fn_resolution_cache(&mut self) {
-        self.0.push(Default::default());
+        self.0.push(FnResolutionCache::default());
     }
     /// Rewind the function resolution caches stack to a particular size.
     #[inline(always)]
