@@ -1,6 +1,7 @@
 //! Implementations of [`serde::Deserialize`].
 
 use crate::{Dynamic, Identifier, ImmutableString, Scope, INT};
+use num_traits::FromPrimitive;
 use serde::{
     de::{Error, SeqAccess, Visitor},
     Deserialize, Deserializer,
@@ -38,14 +39,43 @@ impl<'de> Visitor<'de> for DynamicVisitor {
     #[inline]
     fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> {
         #[cfg(not(feature = "only_i32"))]
-        {
-            Ok(v.into())
-        }
+        return Ok(v.into());
+
         #[cfg(feature = "only_i32")]
-        if v > i32::MAX as i64 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.visit_i32(v as i32)
+        if v <= INT::MAX as i64 {
+            return Ok(Dynamic::from(v as INT));
+        }
+
+        #[allow(unreachable_code)]
+        {
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_i64(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
+
+            #[cfg(not(feature = "no_float"))]
+            return Ok(Dynamic::from_float(v as crate::FLOAT));
+
+            Err(Error::custom(format!("integer number too large: {}", v)))
+        }
+    }
+    #[inline]
+    fn visit_i128<E: Error>(self, v: i128) -> Result<Self::Value, E> {
+        if v <= i128::from(INT::MAX) {
+            return Ok(Dynamic::from(v as INT));
+        }
+
+        #[allow(unreachable_code)]
+        {
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_i128(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
+
+            #[cfg(not(feature = "no_float"))]
+            return Ok(Dynamic::from_float(v as crate::FLOAT));
+
+            Err(Error::custom(format!("integer number too large: {}", v)))
         }
     }
     #[inline(always)]
@@ -59,57 +89,79 @@ impl<'de> Visitor<'de> for DynamicVisitor {
     #[inline]
     fn visit_u32<E: Error>(self, v: u32) -> Result<Self::Value, E> {
         #[cfg(not(feature = "only_i32"))]
-        {
-            Ok(INT::from(v).into())
-        }
+        return Ok(Dynamic::from(v as INT));
+
         #[cfg(feature = "only_i32")]
-        if v > i32::MAX as u32 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.visit_i32(v as i32)
+        if v <= INT::MAX as i32 {
+            return Ok(Dynamic::from(v as INT));
+        }
+
+        #[allow(unreachable_code)]
+        {
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_u32(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
+
+            #[cfg(not(feature = "no_float"))]
+            return Ok(Dynamic::from_float(v as crate::FLOAT));
+
+            Err(Error::custom(format!("integer number too large: {}", v)))
         }
     }
     #[inline]
     fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
-        #[cfg(not(feature = "only_i32"))]
-        if v > i64::MAX as u64 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.visit_i64(v as i64)
+        if v <= INT::MAX as u64 {
+            return Ok(Dynamic::from(v as INT));
         }
-        #[cfg(feature = "only_i32")]
-        if v > i32::MAX as u64 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.visit_i32(v as i32)
+
+        #[cfg(feature = "decimal")]
+        if let Some(n) = rust_decimal::Decimal::from_u64(v) {
+            return Ok(Dynamic::from_decimal(n));
         }
+
+        #[cfg(not(feature = "no_float"))]
+        return Ok(Dynamic::from_float(v as crate::FLOAT));
+
+        #[allow(unreachable_code)]
+        Err(Error::custom(format!("integer number too large: {}", v)))
+    }
+    #[inline]
+    fn visit_u128<E: Error>(self, v: u128) -> Result<Self::Value, E> {
+        if v <= INT::MAX as u128 {
+            return Ok(Dynamic::from(v as INT));
+        }
+
+        #[cfg(feature = "decimal")]
+        if let Some(n) = rust_decimal::Decimal::from_u128(v) {
+            return Ok(Dynamic::from_decimal(n));
+        }
+
+        #[cfg(not(feature = "no_float"))]
+        return Ok(Dynamic::from_float(v as crate::FLOAT));
+
+        #[allow(unreachable_code)]
+        Err(Error::custom(format!("integer number too large: {}", v)))
     }
 
     #[cfg(not(feature = "no_float"))]
     #[inline(always)]
     fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
-        #[cfg(not(feature = "f32_float"))]
-        return self.visit_f64(v as f64);
-        #[cfg(feature = "f32_float")]
-        return Ok(v.into());
+        Ok(crate::FLOAT::from(v).into())
     }
     #[cfg(not(feature = "no_float"))]
     #[inline(always)]
     fn visit_f64<E: Error>(self, v: f64) -> Result<Self::Value, E> {
-        #[cfg(not(feature = "f32_float"))]
-        return Ok(v.into());
-        #[cfg(feature = "f32_float")]
-        return self.visit_f32(v as f32);
+        Ok(crate::FLOAT::from(v).into())
     }
 
     #[cfg(feature = "no_float")]
     #[cfg(feature = "decimal")]
     #[inline]
     fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
-        use rust_decimal::Decimal;
         use std::convert::TryFrom;
 
-        Decimal::try_from(v)
+        rust_decimal::Decimal::try_from(v)
             .map(|v| v.into())
             .map_err(Error::custom)
     }
@@ -117,10 +169,9 @@ impl<'de> Visitor<'de> for DynamicVisitor {
     #[cfg(feature = "decimal")]
     #[inline]
     fn visit_f64<E: Error>(self, v: f64) -> Result<Self::Value, E> {
-        use rust_decimal::Decimal;
         use std::convert::TryFrom;
 
-        Decimal::try_from(v)
+        rust_decimal::Decimal::try_from(v)
             .map(|v| v.into())
             .map_err(Error::custom)
     }
@@ -216,10 +267,9 @@ impl<'de> Deserialize<'de> for Scope<'de> {
             where
                 A: SeqAccess<'de>,
             {
-                let mut scope = match access.size_hint() {
-                    Some(size) => Scope::with_capacity(size),
-                    None => Scope::new(),
-                };
+                let mut scope = access
+                    .size_hint()
+                    .map_or_else(Scope::new, Scope::with_capacity);
 
                 while let Some(ScopeEntry {
                     name,

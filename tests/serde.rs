@@ -13,22 +13,20 @@ use rhai::Array;
 use rhai::Map;
 #[cfg(not(feature = "no_float"))]
 use rhai::FLOAT;
-#[cfg(feature = "no_float")]
 #[cfg(feature = "decimal")]
 use rust_decimal::Decimal;
 
 #[test]
 fn test_serde_ser_primary_types() -> Result<(), Box<EvalAltResult>> {
     assert!(to_dynamic(42_u64)?.is_int());
-    assert!(to_dynamic(u64::MAX)?.is::<u64>());
     assert!(to_dynamic(42 as INT)?.is_int());
     assert!(to_dynamic(true)?.is_bool());
     assert!(to_dynamic(())?.is_unit());
 
     #[cfg(not(feature = "no_float"))]
     {
-        assert!(to_dynamic(123.456_f64)?.is::<f64>());
-        assert!(to_dynamic(123.456_f32)?.is::<f32>());
+        assert!(to_dynamic(123.456_f64)?.is::<FLOAT>());
+        assert!(to_dynamic(123.456_f32)?.is::<FLOAT>());
     }
 
     #[cfg(feature = "no_float")]
@@ -745,6 +743,31 @@ fn test_serde_json() -> serde_json::Result<()> {
 
     assert_eq!(a.len(), 3);
     assert_eq!(format!("{a:?}"), "[1, 2, 3]");
+
+    Ok(())
+}
+
+#[test]
+#[cfg(feature = "metadata")]
+#[cfg(feature = "decimal")]
+#[cfg(not(feature = "no_float"))]
+fn test_serde_json_numbers() -> serde_json::Result<()> {
+    use std::str::FromStr;
+
+    let d: Dynamic = serde_json::from_str("100000000000")?;
+    assert!(d.is::<INT>());
+    assert_eq!(d.as_int().unwrap(), 100000000000);
+
+    let d: Dynamic = serde_json::from_str("10000000000000000000")?;
+    assert!(d.is::<Decimal>());
+    assert_eq!(
+        d.as_decimal().unwrap(),
+        Decimal::from_str("10000000000000000000").unwrap()
+    );
+
+    let d: Dynamic = serde_json::from_str("10000000000000000000000000")?;
+    assert!(d.is::<FLOAT>());
+    assert_eq!(d.as_float().unwrap(), 10000000000000000000000000.0);
 
     Ok(())
 }

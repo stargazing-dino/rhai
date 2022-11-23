@@ -4,6 +4,11 @@ Rhai Release Notes
 Version 1.12.0
 ==============
 
+Buf fixes
+---------
+
+* Integer numbers that are too large to deserialize into `INT` now fall back to `Decimal` or `FLOAT` instead of silently truncating.
+
 Net features
 ------------
 
