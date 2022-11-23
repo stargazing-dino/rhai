@@ -61,8 +61,8 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// Get a mutable reference to the current [`Scope`].
     #[inline(always)]
     #[must_use]
-    pub fn scope_mut(&mut self) -> &mut &'s mut Scope<'ps> {
-        &mut self.scope
+    pub fn scope_mut(&mut self) -> &mut Scope<'ps> {
+        self.scope
     }
     /// Get an iterator over the current set of modules imported via `import` statements,
     /// in reverse order (i.e. modules imported last come first).
@@ -105,7 +105,7 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     #[cfg(not(feature = "no_function"))]
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &crate::Module> {
-        self.global.lib.iter().map(|m| m.as_ref())
+        self.global.lib.iter().map(AsRef::as_ref)
     }
     /// _(internals)_ The current set of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.

@@ -20,6 +20,7 @@ Enhancements
 * The `TypeBuilder` type and `CustomType` trait are no longer marked as volatile.
 * `FuncArgs` is also implemented for arrays.
 * `Engine::set_XXX` API can now be chained.
+* `EvalContext::scope_mut` now returns `&mut Scope` instead of `&mut &mut Scope`.
 
 
 Version 1.11.0
