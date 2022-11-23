@@ -2482,7 +2482,9 @@ impl Engine {
         syntax: &crate::api::custom_syntax::CustomSyntax,
         pos: Position,
     ) -> ParseResult<Expr> {
+        #[allow(clippy::wildcard_imports)]
         use crate::api::custom_syntax::markers::*;
+
         const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
         const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
 
@@ -2534,7 +2536,7 @@ impl Engine {
                     #[cfg(feature = "no_module")]
                     let ns = ();
 
-                    segments.push(name.clone().into());
+                    segments.push(name.clone());
                     tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_IDENT));
                     inputs.push(Expr::Variable((None, ns, 0, name).into(), None, pos));
                 }
@@ -2548,7 +2550,7 @@ impl Engine {
                 CUSTOM_SYNTAX_MARKER_EXPR => {
                     inputs.push(self.parse_expr(input, state, lib, settings)?);
                     let keyword = state.get_interned_string(CUSTOM_SYNTAX_MARKER_EXPR);
-                    segments.push(keyword.clone().into());
+                    segments.push(keyword.clone());
                     tokens.push(keyword);
                 }
                 CUSTOM_SYNTAX_MARKER_BLOCK => {
@@ -2556,7 +2558,7 @@ impl Engine {
                         block @ Stmt::Block(..) => {
                             inputs.push(Expr::Stmt(Box::new(block.into())));
                             let keyword = state.get_interned_string(CUSTOM_SYNTAX_MARKER_BLOCK);
-                            segments.push(keyword.clone().into());
+                            segments.push(keyword.clone());
                             tokens.push(keyword);
                         }
                         stmt => unreachable!("Stmt::Block expected but gets {:?}", stmt),
@@ -2617,11 +2619,11 @@ impl Engine {
                         if *t == s =>
                     {
                         segments.push(required_token.clone());
-                        tokens.push(required_token.clone().into());
+                        tokens.push(required_token.clone());
                     }
                     (t, ..) if t.is_literal() && t.literal_syntax() == s => {
                         segments.push(required_token.clone());
-                        tokens.push(required_token.clone().into());
+                        tokens.push(required_token.clone());
                     }
                     (.., pos) => {
                         return Err(PERR::MissingToken(
@@ -3007,18 +3009,18 @@ impl Engine {
         // import expr ...
         let expr = self.parse_expr(input, state, lib, settings.level_up())?;
 
-        let export = if !match_token(input, Token::As).0 {
-            // import expr;
-            Ident {
-                name: state.get_interned_string(""),
-                pos: Position::NONE,
-            }
-        } else {
+        let export = if match_token(input, Token::As).0 {
             // import expr as name ...
             let (name, pos) = parse_var_name(input)?;
             Ident {
                 name: state.get_interned_string(name),
                 pos,
+            }
+        } else {
+            // import expr;
+            Ident {
+                name: state.get_interned_string(""),
+                pos: Position::NONE,
             }
         };
 
@@ -3595,7 +3597,7 @@ impl Engine {
                 match input.next().expect(NEVER_ENDS) {
                     (Token::RightParen, ..) => break,
                     (Token::Identifier(s), pos) => {
-                        if params.iter().any(|(p, _)| p.as_str() == &*s) {
+                        if params.iter().any(|(p, _)| p.as_str() == *s) {
                             return Err(
                                 PERR::FnDuplicatedParam(name.into(), s.to_string()).into_err(pos)
                             );
@@ -3666,7 +3668,7 @@ impl Engine {
         externals: StaticVec<Ident>,
         pos: Position,
     ) -> Expr {
-        use crate::{ast::Namespace, FnArgsVec};
+        use crate::FnArgsVec;
 
         // If there are no captured variables, no need to curry
         if externals.is_empty() {
@@ -3681,15 +3683,16 @@ impl Engine {
         args.extend(externals.iter().cloned().map(|Ident { name, pos }| {
             let (index, is_func) = parent.access_var(&name, lib, pos);
             let idx = match index {
+                #[allow(clippy::cast_possible_truncation)]
                 Some(n) if !is_func && n.get() <= u8::MAX as usize => NonZeroU8::new(n.get() as u8),
                 _ => None,
             };
-            Expr::Variable((index, Namespace::default(), 0, name).into(), idx, pos)
+            Expr::Variable((index, Default::default(), 0, name).into(), idx, pos)
         }));
 
         let expr = FnCallExpr {
             #[cfg(not(feature = "no_module"))]
-            namespace: Namespace::default(),
+            namespace: Default::default(),
             name: state.get_interned_string(crate::engine::KEYWORD_FN_PTR_CURRY),
             hashes: FnCallHashes::from_native(calc_fn_hash(
                 None,

@@ -1409,9 +1409,9 @@ impl Dynamic {
                 *self = crate::func::shared_try_take(cell).map_or_else(
                     |ref cell| crate::func::locked_read(cell).clone(),
                     #[cfg(not(feature = "sync"))]
-                    crate::Locked::into_inner,
+                    |value| value.into_inner(),
                     #[cfg(feature = "sync")]
-                    crate::Locked::into_inner().unwrap(),
+                    |value| value.into_inner().unwrap(),
                 );
             }
             _ => (),

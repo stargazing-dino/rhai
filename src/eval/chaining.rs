@@ -270,7 +270,7 @@ impl Engine {
                 } else {
                     let abs_index = index.unsigned_abs();
 
-                    if abs_index > usize::MAX as u64 {
+                    if abs_index as u64 > usize::MAX as u64 {
                         return Err(
                             ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
                         );

@@ -40,8 +40,9 @@ impl DynamicSerializer {
 /// # #[cfg(not(feature = "no_index"))]
 /// # #[cfg(not(feature = "no_object"))]
 /// # #[cfg(not(feature = "no_float"))]
+/// # #[cfg(not(feature = "f32_float"))]
 /// # {
-/// use rhai::{Dynamic, Array, Map, INT};
+/// use rhai::{Dynamic, Array, Map};
 /// use rhai::serde::to_dynamic;
 /// use serde::Serialize;
 ///
