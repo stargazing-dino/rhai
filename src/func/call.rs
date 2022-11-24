@@ -212,7 +212,8 @@ impl Engine {
                     } else {
                         func.or_else(|| _global.get_qualified_fn(hash)).or_else(|| {
                             self.global_sub_modules
-                                .values()
+                                .iter()
+                                .flat_map(|m| m.values())
                                 .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id_raw())))
                         })
                     };
@@ -252,7 +253,8 @@ impl Engine {
                             || _global.may_contain_dynamic_fn(hash_base)
                             || self
                                 .global_sub_modules
-                                .values()
+                                .iter()
+                                .flat_map(|m| m.values())
                                 .any(|m| m.may_contain_dynamic_fn(hash_base));
 
                         // Set maximum bitmask when there are dynamic versions of the function

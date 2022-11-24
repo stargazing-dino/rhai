@@ -369,6 +369,7 @@ impl Definitions<'_> {
             .engine
             .global_sub_modules
             .iter()
+            .flat_map(|m| m.iter())
             .map(move |(name, module)| {
                 (
                     name.to_string(),
@@ -445,12 +446,15 @@ impl Module {
             first = false;
 
             if f.access != FnAccess::Private {
-                #[cfg(not(feature = "no_custom_syntax"))]
-                let operator = def.engine.custom_keywords.contains_key(f.name.as_str())
-                    || (!f.name.contains('$') && !is_valid_function_name(f.name.as_str()));
-
-                #[cfg(feature = "no_custom_syntax")]
                 let operator = !f.name.contains('$') && !is_valid_function_name(&f.name);
+
+                #[cfg(not(feature = "no_custom_syntax"))]
+                let operator = operator
+                    || def
+                        .engine
+                        .custom_keywords
+                        .as_ref()
+                        .map_or(false, |m| m.contains_key(f.name.as_str()));
 
                 f.write_definition(writer, def, operator)?;
             }

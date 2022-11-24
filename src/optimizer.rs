@@ -179,7 +179,8 @@ fn has_native_fn_override(
     #[cfg(not(feature = "no_module"))]
     if engine
         .global_sub_modules
-        .values()
+        .iter()
+        .flat_map(|m| m.values())
         .any(|m| m.contains_qualified_fn(hash))
     {
         return true;

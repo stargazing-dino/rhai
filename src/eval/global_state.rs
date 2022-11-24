@@ -111,8 +111,8 @@ impl GlobalRuntimeState {
             tag: engine.default_tag().clone(),
 
             #[cfg(feature = "debugging")]
-            debugger: engine.debugger.as_ref().map(|(init, ..)| {
-                crate::eval::Debugger::new(crate::eval::DebuggerStatus::Init, init(engine))
+            debugger: engine.debugger.as_ref().map(|x| {
+                crate::eval::Debugger::new(crate::eval::DebuggerStatus::Init, (x.0)(engine))
             }),
         }
     }

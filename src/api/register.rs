@@ -683,8 +683,10 @@ impl Engine {
         name: impl AsRef<str>,
         module: SharedModule,
     ) -> &mut Self {
+        use std::collections::BTreeMap;
+
         fn register_static_module_raw(
-            root: &mut std::collections::BTreeMap<Identifier, SharedModule>,
+            root: &mut BTreeMap<Identifier, SharedModule>,
             name: &str,
             module: SharedModule,
         ) {
@@ -717,7 +719,12 @@ impl Engine {
             }
         }
 
-        register_static_module_raw(&mut self.global_sub_modules, name.as_ref(), module);
+        register_static_module_raw(
+            self.global_sub_modules
+                .get_or_insert_with(|| BTreeMap::new().into()),
+            name.as_ref(),
+            module,
+        );
         self
     }
     /// _(metadata)_ Generate a list of all registered functions.
@@ -737,7 +744,7 @@ impl Engine {
         signatures.extend(self.global_namespace().gen_fn_signatures());
 
         #[cfg(not(feature = "no_module"))]
-        for (name, m) in &self.global_sub_modules {
+        for (name, m) in self.global_sub_modules.iter().flat_map(|m| m.iter()) {
             signatures.extend(m.gen_fn_signatures().map(|f| format!("{name}::{f}")));
         }
 

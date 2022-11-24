@@ -36,7 +36,12 @@ impl Engine {
 
         // Do a text-match search if the index doesn't work
         global.find_import(root).map_or_else(
-            || self.global_sub_modules.get(root).cloned(),
+            || {
+                self.global_sub_modules
+                    .as_ref()
+                    .and_then(|m| m.get(root))
+                    .cloned()
+            },
             |offset| global.get_shared_import(offset),
         )
     }
@@ -401,13 +406,17 @@ impl Engine {
                 // The first token acts as the custom syntax's key
                 let key_token = custom.tokens.first().unwrap();
                 // The key should exist, unless the AST is compiled in a different Engine
-                let custom_def = self.custom_syntax.get(key_token.as_str()).ok_or_else(|| {
-                    Box::new(ERR::ErrorCustomSyntax(
-                        format!("Invalid custom syntax prefix: {key_token}"),
-                        custom.tokens.iter().map(<_>::to_string).collect(),
-                        *pos,
-                    ))
-                })?;
+                let custom_def = self
+                    .custom_syntax
+                    .as_ref()
+                    .and_then(|m| m.get(key_token.as_str()))
+                    .ok_or_else(|| {
+                        Box::new(ERR::ErrorCustomSyntax(
+                            format!("Invalid custom syntax prefix: {key_token}"),
+                            custom.tokens.iter().map(<_>::to_string).collect(),
+                            *pos,
+                        ))
+                    })?;
                 let mut context = EvalContext::new(self, global, caches, scope, this_ptr);
 
                 (custom_def.func)(&mut context, &expressions, &custom.state)

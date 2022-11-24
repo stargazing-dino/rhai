@@ -600,7 +600,10 @@ impl Engine {
                         && index.is_none()
                         && !is_global
                         && !state.global_imports.iter().any(|m| m.as_str() == root)
-                        && !self.global_sub_modules.contains_key(root)
+                        && !self
+                            .global_sub_modules
+                            .as_ref()
+                            .map_or(false, |m| m.contains_key(root))
                     {
                         return Err(
                             PERR::ModuleUndefined(root.into()).into_err(namespace.position())
@@ -668,7 +671,10 @@ impl Engine {
                             && index.is_none()
                             && !is_global
                             && !state.global_imports.iter().any(|m| m.as_str() == root)
-                            && !self.global_sub_modules.contains_key(root)
+                            && !self
+                                .global_sub_modules
+                                .as_ref()
+                                .map_or(false, |m| m.contains_key(root))
                         {
                             return Err(
                                 PERR::ModuleUndefined(root.into()).into_err(namespace.position())
@@ -1550,9 +1556,16 @@ impl Engine {
             // Custom syntax.
             #[cfg(not(feature = "no_custom_syntax"))]
             Token::Custom(key) | Token::Reserved(key) | Token::Identifier(key)
-                if !self.custom_syntax.is_empty() && self.custom_syntax.contains_key(&**key) =>
+                if self
+                    .custom_syntax
+                    .as_ref()
+                    .map_or(false, |m| m.contains_key(&**key)) =>
             {
-                let (key, syntax) = self.custom_syntax.get_key_value(&**key).unwrap();
+                let (key, syntax) = self
+                    .custom_syntax
+                    .as_ref()
+                    .and_then(|m| m.get_key_value(&**key))
+                    .unwrap();
                 let (.., pos) = input.next().expect(NEVER_ENDS);
                 let settings2 = settings.level_up()?;
                 self.parse_custom_syntax(input, state, lib, settings2, key, syntax, pos)?
@@ -1856,7 +1869,10 @@ impl Engine {
                         && index.is_none()
                         && !is_global
                         && !state.global_imports.iter().any(|m| m.as_str() == root)
-                        && !self.global_sub_modules.contains_key(root)
+                        && !self
+                            .global_sub_modules
+                            .as_ref()
+                            .map_or(false, |m| m.contains_key(root))
                     {
                         return Err(
                             PERR::ModuleUndefined(root.into()).into_err(namespace.position())
@@ -2297,7 +2313,8 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .get(&**c)
+                    .as_ref()
+                    .and_then(|m| m.get(&**c))
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*current_pos))?,
                 Token::Reserved(c) if !is_valid_identifier(c) => {
@@ -2322,7 +2339,8 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .get(&**c)
+                    .as_ref()
+                    .and_then(|m| m.get(&**c))
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*next_pos))?,
                 Token::Reserved(c) if !is_valid_identifier(c) => {
@@ -2414,7 +2432,8 @@ impl Engine {
                 Token::Custom(s)
                     if self
                         .custom_keywords
-                        .get(s.as_str())
+                        .as_ref()
+                        .and_then(|m| m.get(s.as_str()))
                         .map_or(false, Option::is_some) =>
                 {
                     op_base.hashes = if is_valid_script_function {

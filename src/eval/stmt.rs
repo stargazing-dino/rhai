@@ -502,7 +502,8 @@ impl Engine {
                 #[cfg(not(feature = "no_module"))]
                 let func = func.or_else(|| global.get_iter(iter_type)).or_else(|| {
                     self.global_sub_modules
-                        .values()
+                        .iter()
+                        .flat_map(|m| m.values())
                         .find_map(|m| m.get_qualified_iter(iter_type))
                 });
 
