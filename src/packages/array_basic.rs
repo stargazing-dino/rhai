@@ -230,6 +230,8 @@ pub mod array_functions {
         // Check if array will be over max size limit
         #[cfg(not(feature = "unchecked"))]
         {
+            use crate::types::dynamic::Union;
+
             if _ctx.engine().max_array_size() > 0 && len > _ctx.engine().max_array_size() {
                 return Err(
                     ERR::ErrorDataTooLarge("Size of array".to_string(), Position::NONE).into(),
@@ -237,10 +239,10 @@ pub mod array_functions {
             }
 
             let check_sizes = match item.0 {
-                crate::types::dynamic::Union::Str(..) => true,
-                crate::types::dynamic::Union::Array(..) => true,
+                Union::Str(..) => true,
+                Union::Array(..) => true,
                 #[cfg(not(feature = "no_object"))]
-                crate::types::dynamic::Union::Map(..) => true,
+                Union::Map(..) => true,
                 _ => false,
             };
 

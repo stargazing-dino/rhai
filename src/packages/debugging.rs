@@ -34,16 +34,18 @@ mod debugging_functions {
     #[cfg(not(feature = "no_function"))]
     #[cfg(not(feature = "no_index"))]
     pub fn back_trace(ctx: NativeCallContext) -> Array {
+        use crate::debugger::CallStackFrame;
+
         ctx.global_runtime_state()
             .debugger
             .call_stack()
             .iter()
             .rev()
-            .filter(|crate::debugger::CallStackFrame { fn_name, args, .. }| {
+            .filter(|CallStackFrame { fn_name, args, .. }| {
                 fn_name.as_str() != "back_trace" || !args.is_empty()
             })
             .map(
-                |frame @ crate::debugger::CallStackFrame {
+                |frame @ CallStackFrame {
                      fn_name: _fn_name,
                      args: _args,
                      source: _source,
@@ -53,6 +55,8 @@ mod debugging_functions {
 
                     #[cfg(not(feature = "no_object"))]
                     {
+                        use crate::INT;
+
                         let mut map = Map::new();
                         map.insert("display".into(), display.into());
                         map.insert("fn_name".into(), _fn_name.into());
@@ -63,10 +67,10 @@ mod debugging_functions {
                             map.insert("source".into(), source.into());
                         }
                         if !_pos.is_none() {
-                            map.insert("line".into(), (_pos.line().unwrap() as crate::INT).into());
+                            map.insert("line".into(), (_pos.line().unwrap() as INT).into());
                             map.insert(
                                 "position".into(),
-                                (_pos.position().unwrap_or(0) as crate::INT).into(),
+                                (_pos.position().unwrap_or(0) as INT).into(),
                             );
                         }
                         Dynamic::from_map(map)

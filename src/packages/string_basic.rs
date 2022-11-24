@@ -1,6 +1,6 @@
 use crate::module::ModuleFlags;
 use crate::plugin::*;
-use crate::{def_package, FnPtr, SmartString, INT};
+use crate::{def_package, FnPtr, ImmutableString, SmartString, INT};
 use std::any::TypeId;
 use std::fmt::{Binary, LowerHex, Octal, Write};
 #[cfg(feature = "no_std")]
@@ -26,7 +26,7 @@ def_package! {
         // Register characters iterator
         #[cfg(not(feature = "no_index"))]
         lib.set_iter(TypeId::of::<ImmutableString>(), |value| Box::new(
-            value.cast::<ImmutableString>().chars().map(Into::into).collect::<crate::Array>().into_iter()
+            value.cast::<ImmutableString>().chars().map(Into::into).collect::<Array>().into_iter()
         ));
     }
 }
@@ -38,7 +38,7 @@ pub fn print_with_func(
     fn_name: &str,
     ctx: &NativeCallContext,
     value: &mut Dynamic,
-) -> crate::ImmutableString {
+) -> ImmutableString {
     match ctx.call_native_fn_raw(fn_name, true, &mut [value]) {
         Ok(result) if result.is_string() => {
             result.into_immutable_string().expect("`ImmutableString`")
@@ -50,8 +50,6 @@ pub fn print_with_func(
 
 #[export_module]
 mod print_debug_functions {
-    use crate::ImmutableString;
-
     /// Convert the value of the `item` into a string.
     #[rhai_fn(name = "print", pure)]
     pub fn print_generic(ctx: NativeCallContext, item: &mut Dynamic) -> ImmutableString {

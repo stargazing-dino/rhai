@@ -1454,15 +1454,13 @@ impl Engine {
                 #[cfg(feature = "no_closure")]
                 let options = self.options | (settings.options & LangOptions::STRICT_VAR);
 
-                let mut flags = (settings.flags
+                let flags = (settings.flags
                     & !ParseSettingFlags::GLOBAL_LEVEL
                     & ParseSettingFlags::BREAKABLE)
                     | ParseSettingFlags::FN_SCOPE;
 
                 #[cfg(not(feature = "no_closure"))]
-                {
-                    flags |= ParseSettingFlags::CLOSURE_SCOPE;
-                }
+                let flags = flags | ParseSettingFlags::CLOSURE_SCOPE;
 
                 let new_settings = ParseSettings {
                     level: 0,
@@ -3728,7 +3726,7 @@ impl Engine {
         &self,
         input: &mut TokenStream,
         state: &mut ParseState,
-        parent: &mut ParseState,
+        _parent: &mut ParseState,
         lib: &mut FnLib,
         settings: ParseSettings,
     ) -> ParseResult<(Expr, ScriptFnDef)> {
@@ -3822,7 +3820,7 @@ impl Engine {
 
         #[cfg(not(feature = "no_closure"))]
         let expr =
-            Self::make_curry_from_externals(state, parent, lib, expr, externals, settings.pos);
+            Self::make_curry_from_externals(state, _parent, lib, expr, externals, settings.pos);
 
         Ok((expr, script))
     }
@@ -3837,11 +3835,9 @@ impl Engine {
     ) -> ParseResult<AST> {
         let mut functions = StraightHashMap::default();
 
-        let mut options = self.options & !LangOptions::STMT_EXPR & !LangOptions::LOOP_EXPR;
+        let options = self.options & !LangOptions::STMT_EXPR & !LangOptions::LOOP_EXPR;
         #[cfg(not(feature = "no_function"))]
-        {
-            options &= !LangOptions::ANON_FN;
-        }
+        let options = options & !LangOptions::ANON_FN;
 
         let mut settings = ParseSettings {
             level: 0,

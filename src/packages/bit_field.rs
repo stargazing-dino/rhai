@@ -143,7 +143,7 @@ mod bit_field_functions {
         }
 
         // 2^bits - 1
-        let mask = ((2 as UNSIGNED_INT).pow(bits as u32) - 1) as crate::INT;
+        let mask = ((2 as UNSIGNED_INT).pow(bits as u32) - 1) as INT;
 
         Ok(((value & (mask << bit)) >> bit) & mask)
     }
@@ -230,7 +230,7 @@ mod bit_field_functions {
         }
 
         // 2^bits - 1
-        let mask = ((2 as UNSIGNED_INT).pow(bits as u32) - 1) as crate::INT;
+        let mask = ((2 as UNSIGNED_INT).pow(bits as u32) - 1) as INT;
 
         *value &= !(mask << bit);
         *value |= (new_value & mask) << bit;

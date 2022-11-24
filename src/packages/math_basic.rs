@@ -159,8 +159,6 @@ mod int_functions {
 #[cfg(not(feature = "no_float"))]
 #[export_module]
 mod trig_functions {
-    use crate::FLOAT;
-
     /// Return the sine of the floating-point number in radians.
     pub fn sin(x: FLOAT) -> FLOAT {
         x.sin()
@@ -223,8 +221,6 @@ mod trig_functions {
 #[cfg(not(feature = "no_float"))]
 #[export_module]
 mod float_functions {
-    use crate::FLOAT;
-
     /// Return the natural number _e_.
     #[rhai_fn(name = "E")]
     pub fn e() -> FLOAT {
