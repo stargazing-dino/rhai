@@ -3,7 +3,6 @@
 
 use crate::parser::{ParseSettingFlags, ParseState};
 use crate::tokenizer::Token;
-use crate::types::StringsInterner;
 use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf, Scope};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -117,19 +116,21 @@ impl Engine {
             },
         );
 
-        let scope = Scope::new();
-        let mut state =
-            ParseState::new(self, &scope, StringsInterner::default(), tokenizer_control);
+        let ast = {
+            let scope = Scope::new();
+            let interned_strings = &mut *self.interned_strings.borrow_mut();
+            let mut state = ParseState::new(self, &scope, interned_strings, tokenizer_control);
 
-        let ast = self.parse_global_expr(
-            &mut stream.peekable(),
-            &mut state,
-            |s| s.flags |= ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES,
-            #[cfg(not(feature = "no_optimize"))]
-            OptimizationLevel::None,
-            #[cfg(feature = "no_optimize")]
-            OptimizationLevel::default(),
-        )?;
+            self.parse_global_expr(
+                &mut stream.peekable(),
+                &mut state,
+                |s| s.flags |= ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES,
+                #[cfg(not(feature = "no_optimize"))]
+                OptimizationLevel::None,
+                #[cfg(feature = "no_optimize")]
+                OptimizationLevel::default(),
+            )?
+        };
 
         self.eval_ast(&ast)
     }

@@ -12,7 +12,6 @@ use std::prelude::v1::*;
 use std::{
     fmt,
     hash::{Hash, Hasher},
-    marker::PhantomData,
     ops::AddAssign,
 };
 
@@ -24,7 +23,9 @@ pub const MAX_STRING_LEN: usize = 24;
 
 /// _(internals)_ A cache for interned strings.
 /// Exported under the `internals` feature only.
-pub struct StringsInterner<'a> {
+#[derive(Clone)]
+#[must_use]
+pub struct StringsInterner {
     /// Maximum number of strings interned.
     pub capacity: usize,
     /// Maximum string length.
@@ -33,19 +34,16 @@ pub struct StringsInterner<'a> {
     cache: StraightHashMap<ImmutableString>,
     /// Bloom filter to avoid caching "one-hit wonders".
     filter: BloomFilterU64,
-    /// Take care of the lifetime parameter.
-    dummy: PhantomData<&'a ()>,
 }
 
-impl Default for StringsInterner<'_> {
+impl Default for StringsInterner {
     #[inline(always)]
-    #[must_use]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl fmt::Debug for StringsInterner<'_> {
+impl fmt::Debug for StringsInterner {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -53,17 +51,15 @@ impl fmt::Debug for StringsInterner<'_> {
     }
 }
 
-impl StringsInterner<'_> {
+impl StringsInterner {
     /// Create a new [`StringsInterner`].
     #[inline(always)]
-    #[must_use]
     pub fn new() -> Self {
         Self {
             capacity: MAX_INTERNED_STRINGS,
             max_string_len: MAX_STRING_LEN,
             cache: StraightHashMap::default(),
             filter: BloomFilterU64::new(),
-            dummy: PhantomData,
         }
     }
 
@@ -169,14 +165,14 @@ impl StringsInterner<'_> {
     }
 }
 
-impl AddAssign<Self> for StringsInterner<'_> {
+impl AddAssign<Self> for StringsInterner {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
         self.cache.extend(rhs.cache.into_iter());
     }
 }
 
-impl AddAssign<&Self> for StringsInterner<'_> {
+impl AddAssign<&Self> for StringsInterner {
     #[inline(always)]
     fn add_assign(&mut self, rhs: &Self) {
         self.cache

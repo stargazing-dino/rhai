@@ -103,7 +103,7 @@ pub struct Engine {
     pub(crate) module_resolver: Box<dyn crate::ModuleResolver>,
 
     /// An empty [`ImmutableString`] for cloning purposes.
-    pub(crate) interned_strings: Locked<StringsInterner<'static>>,
+    pub(crate) interned_strings: Locked<StringsInterner>,
 
     /// A set of symbols to disable.
     pub(crate) disabled_symbols: BTreeSet<Identifier>,

@@ -6,6 +6,9 @@ use crate::{Dynamic, RhaiResultOf, ERR, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
+#[cfg(not(feature = "no_float"))]
+use crate::FLOAT;
+
 def_package! {
     /// Package of core language features.
     pub LanguageCorePackage(lib) {
@@ -76,10 +79,17 @@ mod core_functions {
     }
 
     /// Block the current thread for a particular number of `seconds`.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// // Do nothing for 10 seconds!
+    /// sleep(10.0);
+    /// ```
     #[cfg(not(feature = "no_float"))]
     #[cfg(not(feature = "no_std"))]
     #[rhai_fn(name = "sleep")]
-    pub fn sleep_float(seconds: crate::FLOAT) {
+    pub fn sleep_float(seconds: FLOAT) {
         if seconds <= 0.0 {
             return;
         }
@@ -90,6 +100,13 @@ mod core_functions {
         std::thread::sleep(std::time::Duration::from_secs_f32(seconds));
     }
     /// Block the current thread for a particular number of `seconds`.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// // Do nothing for 10 seconds!
+    /// sleep(10);
+    /// ```
     #[cfg(not(feature = "no_std"))]
     pub fn sleep(seconds: INT) {
         if seconds <= 0 {
@@ -121,17 +138,24 @@ mod core_functions {
 #[cfg(not(feature = "no_object"))]
 #[export_module]
 mod reflection_functions {
-    pub fn get_fn_metadata_list(ctx: NativeCallContext) -> crate::Array {
+    use crate::Array;
+
+    /// Return an array of object maps containing metadata of all script-defined functions.
+    pub fn get_fn_metadata_list(ctx: NativeCallContext) -> Array {
         collect_fn_metadata(ctx, |_, _, _, _, _| true)
     }
+    /// Return an array of object maps containing metadata of all script-defined functions
+    /// matching the specified name.
     #[rhai_fn(name = "get_fn_metadata_list")]
-    pub fn get_fn_metadata(ctx: NativeCallContext, name: &str) -> crate::Array {
+    pub fn get_fn_metadata(ctx: NativeCallContext, name: &str) -> Array {
         collect_fn_metadata(ctx, |_, _, n, _, _| n == name)
     }
+    /// Return an array of object maps containing metadata of all script-defined functions
+    /// matching the specified name and arity (number of parameters).
     #[rhai_fn(name = "get_fn_metadata_list")]
-    pub fn get_fn_metadata2(ctx: NativeCallContext, name: &str, params: INT) -> crate::Array {
+    pub fn get_fn_metadata2(ctx: NativeCallContext, name: &str, params: INT) -> Array {
         if params < 0 || params > crate::MAX_USIZE_INT {
-            crate::Array::new()
+            Array::new()
         } else {
             collect_fn_metadata(ctx, |_, _, n, p, _| p == (params as usize) && n == name)
         }
@@ -146,38 +170,47 @@ fn collect_fn_metadata(
     filter: impl Fn(FnNamespace, FnAccess, &str, usize, &crate::Shared<crate::ast::ScriptFnDef>) -> bool
         + Copy,
 ) -> crate::Array {
-    use crate::{ast::ScriptFnDef, Array, Map};
+    #[cfg(not(feature = "no_module"))]
+    use crate::Identifier;
+    use crate::{ast::ScriptFnDef, engine::FN_ANONYMOUS, Array, Map};
 
     // Create a metadata record for a function.
     fn make_metadata(
-        dict: &mut crate::types::StringsInterner,
-        #[cfg(not(feature = "no_module"))] namespace: crate::Identifier,
+        engine: &Engine,
+        #[cfg(not(feature = "no_module"))] namespace: Identifier,
         func: &ScriptFnDef,
     ) -> Map {
         let mut map = Map::new();
 
         #[cfg(not(feature = "no_module"))]
         if !namespace.is_empty() {
-            map.insert("namespace".into(), dict.get(namespace).into());
+            map.insert(
+                "namespace".into(),
+                engine.get_interned_string(namespace).into(),
+            );
         }
-        map.insert("name".into(), dict.get(func.name.as_str()).into());
+        map.insert(
+            "name".into(),
+            engine.get_interned_string(func.name.clone()).into(),
+        );
         map.insert(
             "access".into(),
-            dict.get(match func.access {
-                FnAccess::Public => "public",
-                FnAccess::Private => "private",
-            })
-            .into(),
+            engine
+                .get_interned_string(match func.access {
+                    FnAccess::Public => "public",
+                    FnAccess::Private => "private",
+                })
+                .into(),
         );
         map.insert(
             "is_anonymous".into(),
-            func.name.starts_with(crate::engine::FN_ANONYMOUS).into(),
+            func.name.starts_with(FN_ANONYMOUS).into(),
         );
         map.insert(
             "params".into(),
             func.params
                 .iter()
-                .map(|p| dict.get(p.as_str()).into())
+                .map(|p| engine.get_interned_string(p.clone()).into())
                 .collect::<Array>()
                 .into(),
         );
@@ -187,7 +220,7 @@ fn collect_fn_metadata(
                 "comments".into(),
                 func.comments
                     .iter()
-                    .map(|s| dict.get(s.as_ref()).into())
+                    .map(|s| engine.get_interned_string(s.as_ref()).into())
                     .collect::<Array>()
                     .into(),
             );
@@ -196,7 +229,7 @@ fn collect_fn_metadata(
         map
     }
 
-    let dict = &mut crate::types::StringsInterner::new();
+    let engine = ctx.engine();
     let mut list = Array::new();
 
     ctx.iter_namespaces()
@@ -205,9 +238,9 @@ fn collect_fn_metadata(
         .for_each(|(.., f)| {
             list.push(
                 make_metadata(
-                    dict,
+                    engine,
                     #[cfg(not(feature = "no_module"))]
-                    crate::Identifier::new_const(),
+                    Identifier::new_const(),
                     f,
                 )
                 .into(),
@@ -222,9 +255,9 @@ fn collect_fn_metadata(
         .for_each(|(.., f)| {
             list.push(
                 make_metadata(
-                    dict,
+                    engine,
                     #[cfg(not(feature = "no_module"))]
-                    crate::Identifier::new_const(),
+                    Identifier::new_const(),
                     f,
                 )
                 .into(),
@@ -240,9 +273,9 @@ fn collect_fn_metadata(
         .for_each(|(.., f)| {
             list.push(
                 make_metadata(
-                    dict,
+                    engine,
                     #[cfg(not(feature = "no_module"))]
-                    crate::Identifier::new_const(),
+                    Identifier::new_const(),
                     f,
                 )
                 .into(),
@@ -251,41 +284,31 @@ fn collect_fn_metadata(
 
     #[cfg(not(feature = "no_module"))]
     {
+        use crate::{tokenizer::Token::DoubleColon, Shared, SmartString};
+
         // Recursively scan modules for script-defined functions.
         fn scan_module(
-            dict: &mut crate::types::StringsInterner,
+            engine: &Engine,
             list: &mut Array,
             namespace: &str,
             module: &Module,
-            filter: impl Fn(
-                    FnNamespace,
-                    FnAccess,
-                    &str,
-                    usize,
-                    &crate::Shared<crate::ast::ScriptFnDef>,
-                ) -> bool
-                + Copy,
+            filter: impl Fn(FnNamespace, FnAccess, &str, usize, &Shared<ScriptFnDef>) -> bool + Copy,
         ) {
             module
                 .iter_script_fn()
                 .filter(|(s, a, n, p, f)| filter(*s, *a, n, *p, f))
-                .for_each(|(.., f)| list.push(make_metadata(dict, namespace.into(), f).into()));
+                .for_each(|(.., f)| list.push(make_metadata(engine, namespace.into(), f).into()));
             for (name, m) in module.iter_sub_modules() {
                 use std::fmt::Write;
 
-                let mut ns = crate::SmartString::new_const();
-                write!(
-                    &mut ns,
-                    "{namespace}{}{name}",
-                    crate::tokenizer::Token::DoubleColon.literal_syntax()
-                )
-                .unwrap();
-                scan_module(dict, list, &ns, &**m, filter);
+                let mut ns = SmartString::new_const();
+                write!(&mut ns, "{namespace}{}{name}", DoubleColon.literal_syntax()).unwrap();
+                scan_module(engine, list, &ns, &**m, filter);
             }
         }
 
         for (ns, m) in ctx.iter_imports_raw() {
-            scan_module(dict, &mut list, ns, &**m, filter);
+            scan_module(engine, &mut list, ns, &**m, filter);
         }
     }
 

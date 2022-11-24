@@ -2,7 +2,7 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
-use crate::types::{dynamic::Variant, StringsInterner};
+use crate::types::dynamic::Variant;
 use crate::{
     reify, Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
 };
@@ -117,20 +117,25 @@ impl Engine {
         script: &str,
     ) -> RhaiResultOf<T> {
         let scripts = [script];
-        let (stream, tokenizer_control) =
-            self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
-        let mut state = ParseState::new(self, scope, StringsInterner::default(), tokenizer_control);
+        let ast = {
+            let interned_strings = &mut *self.interned_strings.borrow_mut();
 
-        // No need to optimize a lone expression
-        let ast = self.parse_global_expr(
-            &mut stream.peekable(),
-            &mut state,
-            |_| {},
-            #[cfg(not(feature = "no_optimize"))]
-            OptimizationLevel::None,
-            #[cfg(feature = "no_optimize")]
-            OptimizationLevel::default(),
-        )?;
+            let (stream, tokenizer_control) =
+                self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
+
+            let mut state = ParseState::new(self, scope, interned_strings, tokenizer_control);
+
+            // No need to optimize a lone expression
+            self.parse_global_expr(
+                &mut stream.peekable(),
+                &mut state,
+                |_| {},
+                #[cfg(not(feature = "no_optimize"))]
+                OptimizationLevel::None,
+                #[cfg(feature = "no_optimize")]
+                OptimizationLevel::default(),
+            )?
+        };
 
         self.eval_ast_with_scope(scope, &ast)
     }

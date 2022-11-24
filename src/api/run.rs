@@ -2,7 +2,6 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::parser::ParseState;
-use crate::types::StringsInterner;
 use crate::{Engine, RhaiResultOf, Scope, AST};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -57,10 +56,16 @@ impl Engine {
     #[inline]
     pub fn run_with_scope(&self, scope: &mut Scope, script: &str) -> RhaiResultOf<()> {
         let scripts = [script];
-        let (stream, tokenizer_control) =
-            self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
-        let mut state = ParseState::new(self, scope, StringsInterner::default(), tokenizer_control);
-        let ast = self.parse(&mut stream.peekable(), &mut state, self.optimization_level)?;
+        let ast = {
+            let interned_strings = &mut *self.interned_strings.borrow_mut();
+
+            let (stream, tokenizer_control) =
+                self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
+
+            let mut state = ParseState::new(self, scope, interned_strings, tokenizer_control);
+
+            self.parse(&mut stream.peekable(), &mut state, self.optimization_level)?
+        };
         self.run_ast_with_scope(scope, &ast)
     }
     /// Evaluate an [`AST`].

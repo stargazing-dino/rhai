@@ -46,13 +46,13 @@ const SMALL_SWITCH_RANGE: INT = 16;
 
 /// _(internals)_ A type that encapsulates the current state of the parser.
 /// Exported under the `internals` feature only.
-pub struct ParseState<'e> {
+pub struct ParseState<'e, 's> {
     /// Input stream buffer containing the next character to read.
     pub tokenizer_control: TokenizerControl,
     /// Controls whether parsing of an expression should stop given the next token.
     pub expr_filter: fn(&Token) -> bool,
     /// String interners.
-    interned_strings: StringsInterner<'e>,
+    interned_strings: &'s mut StringsInterner,
     /// External [scope][Scope] with constants.
     pub scope: &'e Scope<'e>,
     /// Global runtime state.
@@ -81,7 +81,7 @@ pub struct ParseState<'e> {
     pub max_expr_depth: usize,
 }
 
-impl fmt::Debug for ParseState<'_> {
+impl fmt::Debug for ParseState<'_, '_> {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -105,14 +105,14 @@ impl fmt::Debug for ParseState<'_> {
     }
 }
 
-impl<'e> ParseState<'e> {
+impl<'e, 's> ParseState<'e, 's> {
     /// Create a new [`ParseState`].
     #[inline]
     #[must_use]
     pub fn new(
         engine: &Engine,
         scope: &'e Scope,
-        interned_strings: StringsInterner<'e>,
+        interned_strings: &'s mut StringsInterner,
         tokenizer_control: TokenizerControl,
     ) -> Self {
         Self {
@@ -1422,14 +1422,16 @@ impl Engine {
             #[cfg(not(feature = "no_function"))]
             Token::Pipe | Token::Or if settings.has_option(LangOptions::ANON_FN) => {
                 // Build new parse state
-                let interned_strings = std::mem::take(&mut state.interned_strings);
-
+                let new_interner = &mut StringsInterner::new();
                 let mut new_state = ParseState::new(
                     self,
                     state.scope,
-                    interned_strings,
+                    new_interner,
                     state.tokenizer_control.clone(),
                 );
+
+                // We move the strings interner to the new parse state object by swapping it...
+                std::mem::swap(state.interned_strings, new_state.interned_strings);
 
                 #[cfg(not(feature = "no_module"))]
                 {
@@ -1471,8 +1473,8 @@ impl Engine {
 
                 let result = self.parse_anon_fn(input, &mut new_state, state, lib, new_settings);
 
-                // Restore parse state
-                state.interned_strings = new_state.interned_strings;
+                // Restore the strings interner by swapping it back
+                std::mem::swap(state.interned_strings, new_state.interned_strings);
 
                 let (expr, func) = result?;
 
@@ -3301,12 +3303,10 @@ impl Engine {
                 match input.next().expect(NEVER_ENDS) {
                     (Token::Fn, pos) => {
                         // Build new parse state
-                        let interned_strings = std::mem::take(&mut state.interned_strings);
-
                         let mut new_state = ParseState::new(
                             self,
                             state.scope,
-                            interned_strings,
+                            state.interned_strings,
                             state.tokenizer_control.clone(),
                         );
 
@@ -3353,8 +3353,6 @@ impl Engine {
                         );
 
                         // Restore parse state
-                        state.interned_strings = new_state.interned_strings;
-
                         let func = func?;
 
                         let hash = calc_fn_hash(None, &func.name, func.params.len());
