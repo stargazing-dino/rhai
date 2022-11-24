@@ -1,6 +1,7 @@
 //! Module that defines JSON manipulation functions for [`Engine`].
 #![cfg(not(feature = "no_object"))]
 
+use crate::func::native::locked_write;
 use crate::parser::{ParseSettingFlags, ParseState};
 use crate::tokenizer::Token;
 use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf, Scope};
@@ -118,7 +119,7 @@ impl Engine {
 
         let ast = {
             let scope = Scope::new();
-            let interned_strings = &mut *self.interned_strings.borrow_mut();
+            let interned_strings = &mut *locked_write(&self.interned_strings);
             let mut state = ParseState::new(self, &scope, interned_strings, tokenizer_control);
 
             self.parse_global_expr(

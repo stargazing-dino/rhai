@@ -3,6 +3,7 @@
 use super::BloomFilterU64;
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::ImmutableString;
+use ahash::HashMapExt;
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
 #[cfg(not(feature = "no_std"))]
@@ -26,14 +27,10 @@ pub const MAX_STRING_LEN: usize = 24;
 #[derive(Clone)]
 #[must_use]
 pub struct StringsInterner {
-    /// Maximum number of strings interned.
-    pub capacity: usize,
-    /// Maximum string length.
-    pub max_string_len: usize,
     /// Cached strings.
     cache: StraightHashMap<ImmutableString>,
     /// Bloom filter to avoid caching "one-hit wonders".
-    filter: BloomFilterU64,
+    bloom_filter: BloomFilterU64,
 }
 
 impl Default for StringsInterner {
@@ -56,10 +53,8 @@ impl StringsInterner {
     #[inline(always)]
     pub fn new() -> Self {
         Self {
-            capacity: MAX_INTERNED_STRINGS,
-            max_string_len: MAX_STRING_LEN,
-            cache: StraightHashMap::default(),
-            filter: BloomFilterU64::new(),
+            cache: StraightHashMap::new(),
+            bloom_filter: BloomFilterU64::new(),
         }
     }
 
@@ -87,8 +82,12 @@ impl StringsInterner {
         let hash = hasher.finish();
 
         // Cache long strings only on the second try to avoid caching "one-hit wonders".
-        if key.len() > MAX_STRING_LEN && self.filter.is_absent_and_set(hash) {
+        if key.len() > MAX_STRING_LEN && self.bloom_filter.is_absent_and_set(hash) {
             return mapper(text);
+        }
+
+        if self.cache.is_empty() {
+            self.cache.reserve(MAX_INTERNED_STRINGS);
         }
 
         let result = match self.cache.entry(hash) {
@@ -110,26 +109,22 @@ impl StringsInterner {
     }
 
     /// If the interner is over capacity, remove the longest entry that has the lowest count
-    fn throttle_cache(&mut self, hash: u64) {
-        if self.cache.len() <= self.capacity {
+    #[inline]
+    fn throttle_cache(&mut self, skip_hash: u64) {
+        if self.cache.len() <= MAX_INTERNED_STRINGS {
             return;
         }
 
         // Leave some buffer to grow when shrinking the cache.
         // We leave at least two entries, one for the empty string, and one for the string
         // that has just been inserted.
-        let max = if self.capacity < 5 {
-            2
-        } else {
-            self.capacity - 3
-        };
-
-        while self.cache.len() > max {
+        while self.cache.len() > MAX_INTERNED_STRINGS - 3 {
             let (_, _, n) = self
                 .cache
                 .iter()
                 .fold((0, usize::MAX, 0), |(x, c, n), (&k, v)| {
-                    if k != hash && (v.strong_count() < c || (v.strong_count() == c && v.len() > x))
+                    if k != skip_hash
+                        && (v.strong_count() < c || (v.strong_count() == c && v.len() > x))
                     {
                         (v.len(), v.strong_count(), k)
                     } else {

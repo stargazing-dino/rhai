@@ -51,7 +51,7 @@ pub struct ParseState<'e, 's> {
     pub tokenizer_control: TokenizerControl,
     /// Controls whether parsing of an expression should stop given the next token.
     pub expr_filter: fn(&Token) -> bool,
-    /// String interners.
+    /// Strings interner.
     interned_strings: &'s mut StringsInterner,
     /// External [scope][Scope] with constants.
     pub scope: &'e Scope<'e>,

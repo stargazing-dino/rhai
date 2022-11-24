@@ -1,6 +1,7 @@
 //! Module that defines the public evaluation API of [`Engine`].
 
 use crate::eval::{Caches, GlobalRuntimeState};
+use crate::func::native::locked_write;
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
 use crate::{
@@ -118,7 +119,7 @@ impl Engine {
     ) -> RhaiResultOf<T> {
         let scripts = [script];
         let ast = {
-            let interned_strings = &mut *self.interned_strings.borrow_mut();
+            let interned_strings = &mut *locked_write(&self.interned_strings);
 
             let (stream, tokenizer_control) =
                 self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));

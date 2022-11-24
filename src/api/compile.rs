@@ -1,5 +1,6 @@
 //! Module that defines the public compilation API of [`Engine`].
 
+use crate::func::native::locked_write;
 use crate::parser::{ParseResult, ParseState};
 use crate::{Engine, OptimizationLevel, Scope, AST};
 #[cfg(feature = "no_std")]
@@ -221,7 +222,7 @@ impl Engine {
             scripts.as_ref(),
             self.token_mapper.as_ref().map(<_>::as_ref),
         );
-        let interned_strings = &mut *self.interned_strings.borrow_mut();
+        let interned_strings = &mut *locked_write(&self.interned_strings);
         let mut state = ParseState::new(self, scope, interned_strings, tokenizer_control);
         let mut _ast = self.parse(&mut stream.peekable(), &mut state, optimization_level)?;
         #[cfg(feature = "metadata")]
@@ -295,7 +296,7 @@ impl Engine {
             self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
 
         let mut peekable = stream.peekable();
-        let interned_strings = &mut *self.interned_strings.borrow_mut();
+        let interned_strings = &mut *locked_write(&self.interned_strings);
         let mut state = ParseState::new(self, scope, interned_strings, tokenizer_control);
         self.parse_global_expr(&mut peekable, &mut state, |_| {}, self.optimization_level)
     }
