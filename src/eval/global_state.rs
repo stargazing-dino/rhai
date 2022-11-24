@@ -173,12 +173,13 @@ impl GlobalRuntimeState {
         name: impl Into<ImmutableString>,
         module: impl Into<crate::SharedModule>,
     ) {
-        if self.imports.is_none() {
-            self.imports = Some(crate::StaticVec::new_const().into());
-            self.modules = Some(crate::StaticVec::new_const().into());
-        }
-        self.imports.as_mut().unwrap().push(name.into());
-        self.modules.as_mut().unwrap().push(module.into());
+        self.imports
+            .get_or_insert_with(|| crate::StaticVec::new_const().into())
+            .push(name.into());
+
+        self.modules
+            .get_or_insert_with(|| crate::StaticVec::new_const().into())
+            .push(module.into());
     }
     /// Truncate the stack of globally-imported [modules][crate::Module] to a particular length.
     ///
@@ -352,13 +353,12 @@ impl GlobalRuntimeState {
 impl<K: Into<ImmutableString>, M: Into<crate::SharedModule>> Extend<(K, M)> for GlobalRuntimeState {
     #[inline]
     fn extend<T: IntoIterator<Item = (K, M)>>(&mut self, iter: T) {
-        if self.imports.is_none() {
-            self.imports = Some(crate::StaticVec::new_const().into());
-            self.modules = Some(crate::StaticVec::new_const().into());
-        }
-
-        let imports = self.imports.as_mut().unwrap();
-        let modules = self.modules.as_mut().unwrap();
+        let imports = self
+            .imports
+            .get_or_insert_with(|| crate::StaticVec::new_const().into());
+        let modules = self
+            .modules
+            .get_or_insert_with(|| crate::StaticVec::new_const().into());
 
         for (k, m) in iter {
             imports.push(k.into());

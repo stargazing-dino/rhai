@@ -303,7 +303,7 @@ impl Engine {
         };
 
         // Add the global namespace module
-        let mut global_namespace = Module::with_capacity(0);
+        let mut global_namespace = Module::new();
         global_namespace.flags |= ModuleFlags::INTERNAL;
         engine.global_modules.push(global_namespace.into());
 

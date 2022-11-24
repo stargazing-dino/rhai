@@ -200,13 +200,12 @@ impl<'e, 's> ParseState<'e, 's> {
                     .flat_map(|v| v.iter())
                     .any(|v| v.as_str() == name)
             {
-                if self.external_vars.is_none() {
-                    self.external_vars = Some(FnArgsVec::new().into());
-                }
-                self.external_vars.as_mut().unwrap().push(Ident {
-                    name: name.into(),
-                    pos: _pos,
-                });
+                self.external_vars
+                    .get_or_insert_with(|| FnArgsVec::new().into())
+                    .push(Ident {
+                        name: name.into(),
+                        pos: _pos,
+                    });
             }
         } else {
             self.allow_capture = true;
@@ -2040,7 +2039,7 @@ impl Engine {
             }
             // var (indexed) = rhs
             Expr::Variable(ref x, i, var_pos) => {
-                let stack = state.stack.as_mut().unwrap();
+                let stack = state.stack.get_or_insert_with(|| Scope::new().into());
                 let (index, .., name) = &**x;
                 let index = i.map_or_else(
                     || index.expect("either long or short index is `None`").get(),
@@ -2462,10 +2461,10 @@ impl Engine {
             // Add a barrier variable to the stack so earlier variables will not be matched.
             // Variable searches stop at the first barrier.
             let marker = state.get_interned_string(SCOPE_SEARCH_BARRIER_MARKER);
-            if state.stack.is_none() {
-                state.stack = Some(Scope::new().into());
-            }
-            state.stack.as_mut().unwrap().push(marker, ());
+            state
+                .stack
+                .get_or_insert_with(|| Scope::new().into())
+                .push(marker, ());
         }
 
         let mut user_state = Dynamic::UNIT;
@@ -2817,24 +2816,27 @@ impl Engine {
             .parse_expr(input, state, lib, settings.level_up()?)?
             .ensure_iterable()?;
 
-        if state.stack.is_none() {
-            state.stack = Some(Scope::new().into());
-        }
-        let prev_stack_len = state.stack.as_mut().unwrap().len();
-
-        if !counter_name.is_empty() {
-            state.stack.as_mut().unwrap().push(name.clone(), ());
-        }
         let counter_var = Ident {
             name: state.get_interned_string(counter_name),
             pos: counter_pos,
         };
 
-        let loop_var = state.get_interned_string(name);
-        state.stack.as_mut().unwrap().push(loop_var.clone(), ());
         let loop_var = Ident {
-            name: loop_var,
+            name: state.get_interned_string(name),
             pos: name_pos,
+        };
+
+        let prev_stack_len = {
+            let stack = state.stack.get_or_insert_with(|| Scope::new().into());
+
+            let prev_stack_len = stack.len();
+
+            if !counter_var.name.is_empty() {
+                stack.push(counter_var.name.clone(), ());
+            }
+            stack.push(&loop_var.name, ());
+
+            prev_stack_len
         };
 
         settings.flags |= ParseSettingFlags::BREAKABLE;
@@ -2865,49 +2867,41 @@ impl Engine {
         // let name ...
         let (name, pos) = parse_var_name(input)?;
 
-        if state.stack.is_none() {
-            state.stack = Some(Scope::new().into());
-        }
-        if !self.allow_shadowing()
-            && state
-                .stack
-                .as_ref()
-                .unwrap()
-                .iter()
-                .any(|(v, ..)| v == name)
         {
-            return Err(PERR::VariableExists(name.into()).into_err(pos));
-        }
+            let stack = state.stack.get_or_insert_with(|| Scope::new().into());
 
-        if let Some(ref filter) = self.def_var_filter {
-            let stack = state.stack.as_mut().unwrap();
-            let will_shadow = stack.iter().any(|(v, ..)| v == name);
-
-            if state.global.is_none() {
-                state.global = Some(GlobalRuntimeState::new(self).into());
+            if !self.allow_shadowing() && stack.iter().any(|(v, ..)| v == name) {
+                return Err(PERR::VariableExists(name.into()).into_err(pos));
             }
-            let global = state.global.as_mut().unwrap();
 
-            global.level = settings.level;
-            let is_const = access == AccessMode::ReadOnly;
-            let info = VarDefInfo {
-                name: &name,
-                is_const,
-                nesting_level: settings.level,
-                will_shadow,
-            };
-            let caches = &mut Caches::new();
-            let mut this = Dynamic::NULL;
+            if let Some(ref filter) = self.def_var_filter {
+                let will_shadow = stack.iter().any(|(v, ..)| v == name);
 
-            let context = EvalContext::new(self, global, caches, stack, &mut this);
+                let global = state
+                    .global
+                    .get_or_insert_with(|| GlobalRuntimeState::new(self).into());
 
-            match filter(false, info, context) {
-                Ok(true) => (),
-                Ok(false) => return Err(PERR::ForbiddenVariable(name.into()).into_err(pos)),
-                Err(err) => match *err {
-                    EvalAltResult::ErrorParsing(e, pos) => return Err(e.into_err(pos)),
-                    _ => return Err(PERR::ForbiddenVariable(name.into()).into_err(pos)),
-                },
+                global.level = settings.level;
+                let is_const = access == AccessMode::ReadOnly;
+                let info = VarDefInfo {
+                    name: &name,
+                    is_const,
+                    nesting_level: settings.level,
+                    will_shadow,
+                };
+                let caches = &mut Caches::new();
+                let mut this = Dynamic::NULL;
+
+                let context = EvalContext::new(self, global, caches, stack, &mut this);
+
+                match filter(false, info, context) {
+                    Ok(true) => (),
+                    Ok(false) => return Err(PERR::ForbiddenVariable(name.into()).into_err(pos)),
+                    Err(err) => match *err {
+                        EvalAltResult::ErrorParsing(e, pos) => return Err(e.into_err(pos)),
+                        _ => return Err(PERR::ForbiddenVariable(name.into()).into_err(pos)),
+                    },
+                }
             }
         }
 
@@ -2945,7 +2939,7 @@ impl Engine {
 
         let idx = if let Some(n) = existing {
             stack.get_mut_by_index(n).set_access_mode(access);
-            Some(NonZeroUsize::new(state.stack.as_mut().unwrap().len() - n).unwrap())
+            Some(NonZeroUsize::new(stack.len() - n).unwrap())
         } else {
             stack.push_entry(name.as_str(), access, Dynamic::UNIT);
             None
@@ -3470,12 +3464,11 @@ impl Engine {
                 .into_err(err_pos));
             }
 
-            if state.stack.is_none() {
-                state.stack = Some(Scope::new().into());
-            }
-
             let name = state.get_interned_string(name);
-            state.stack.as_mut().unwrap().push(name.clone(), ());
+            state
+                .stack
+                .get_or_insert_with(|| Scope::new().into())
+                .push(name.clone(), ());
             Ident { name, pos }
         } else {
             Ident {
@@ -3489,8 +3482,7 @@ impl Engine {
 
         if !catch_var.is_empty() {
             // Remove the error variable from the stack
-            let stack = state.stack.as_mut().unwrap();
-            stack.rewind(stack.len() - 1);
+            state.stack.as_mut().unwrap().pop();
         }
 
         Ok(Stmt::TryCatch(
@@ -3554,12 +3546,11 @@ impl Engine {
                             );
                         }
 
-                        if state.stack.is_none() {
-                            state.stack = Some(Scope::new().into());
-                        }
-
                         let s = state.get_interned_string(*s);
-                        state.stack.as_mut().unwrap().push(s.clone(), ());
+                        state
+                            .stack
+                            .get_or_insert_with(|| Scope::new().into())
+                            .push(s.clone(), ());
                         params.push((s, pos));
                     }
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -3700,12 +3691,11 @@ impl Engine {
                             );
                         }
 
-                        if state.stack.is_none() {
-                            state.stack = Some(Scope::new().into());
-                        }
-
                         let s = state.get_interned_string(*s);
-                        state.stack.as_mut().unwrap().push(s.clone(), ());
+                        state
+                            .stack
+                            .get_or_insert_with(|| Scope::new().into())
+                            .push(s.clone(), ());
                         params_list.push(s);
                     }
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),

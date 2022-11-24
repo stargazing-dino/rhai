@@ -177,26 +177,26 @@ pub struct Module {
     id: Option<ImmutableString>,
     /// Module documentation.
     #[cfg(feature = "metadata")]
-    doc: crate::SmartString,
+    doc: Option<crate::SmartString>,
     /// Custom types.
-    custom_types: Option<CustomTypesCollection>,
+    custom_types: Option<Box<CustomTypesCollection>>,
     /// Sub-modules.
-    modules: Option<BTreeMap<Identifier, SharedModule>>,
+    modules: Option<Box<BTreeMap<Identifier, SharedModule>>>,
     /// [`Module`] variables.
-    variables: Option<BTreeMap<Identifier, Dynamic>>,
+    variables: Option<Box<BTreeMap<Identifier, Dynamic>>>,
     /// Flattened collection of all [`Module`] variables, including those in sub-modules.
-    all_variables: Option<StraightHashMap<Dynamic>>,
+    all_variables: Option<Box<StraightHashMap<Dynamic>>>,
     /// Functions (both native Rust and scripted).
-    functions: StraightHashMap<FuncInfo>,
+    functions: Option<Box<StraightHashMap<FuncInfo>>>,
     /// Flattened collection of all functions, native Rust and scripted.
     /// including those in sub-modules.
-    all_functions: Option<StraightHashMap<CallableFunction>>,
+    all_functions: Option<Box<StraightHashMap<CallableFunction>>>,
     /// Bloom filter on native Rust functions (in scripted hash format) that contain [`Dynamic`] parameters.
     dynamic_functions_filter: BloomFilterU64,
     /// Iterator functions, keyed by the type producing the iterator.
-    type_iterators: Option<BTreeMap<TypeId, Shared<IteratorFn>>>,
+    type_iterators: Option<Box<BTreeMap<TypeId, Shared<IteratorFn>>>>,
     /// Flattened collection of iterator functions, including those in sub-modules.
-    all_type_iterators: Option<BTreeMap<TypeId, Shared<IteratorFn>>>,
+    all_type_iterators: Option<Box<BTreeMap<TypeId, Shared<IteratorFn>>>>,
     /// Flags.
     pub(crate) flags: ModuleFlags,
 }
@@ -282,31 +282,16 @@ impl Module {
     /// ```
     #[inline(always)]
     #[must_use]
-    pub fn new() -> Self {
-        Self::with_capacity(16)
-    }
-    /// Create a new [`Module`] with a pre-sized capacity for functions.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use rhai::Module;
-    /// let mut module = Module::with_capacity(10);
-    /// module.set_var("answer", 42_i64);
-    /// assert_eq!(module.get_var_value::<i64>("answer").expect("answer should exist"), 42);
-    /// ```
-    #[inline]
-    #[must_use]
-    pub fn with_capacity(capacity: usize) -> Self {
+    pub const fn new() -> Self {
         Self {
             id: None,
             #[cfg(feature = "metadata")]
-            doc: crate::SmartString::new_const(),
+            doc: None,
             custom_types: None,
             modules: None,
             variables: None,
             all_variables: None,
-            functions: StraightHashMap::with_capacity_and_hasher(capacity, Default::default()),
+            functions: None,
             all_functions: None,
             dynamic_functions_filter: BloomFilterU64::new(),
             type_iterators: None,
@@ -396,7 +381,7 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn doc(&self) -> &str {
-        &self.doc
+        self.doc.as_ref().map_or("", |s| s.as_str())
     }
 
     /// Set the documentation of the [`Module`].
@@ -415,7 +400,7 @@ impl Module {
     #[cfg(feature = "metadata")]
     #[inline(always)]
     pub fn set_doc(&mut self, doc: impl Into<crate::SmartString>) -> &mut Self {
-        self.doc = doc.into();
+        self.doc = Some(doc.into());
         self
     }
 
@@ -434,7 +419,7 @@ impl Module {
     #[cfg(feature = "metadata")]
     #[inline(always)]
     pub fn clear_doc(&mut self) -> &mut Self {
-        self.doc.clear();
+        self.doc = None;
         self
     }
 
@@ -442,12 +427,14 @@ impl Module {
     #[inline(always)]
     pub fn clear(&mut self) {
         #[cfg(feature = "metadata")]
-        self.doc.clear();
+        {
+            self.doc = None;
+        }
         self.custom_types = None;
         self.modules = None;
         self.variables = None;
         self.all_variables = None;
-        self.functions.clear();
+        self.functions = None;
         self.all_functions = None;
         self.dynamic_functions_filter.clear();
         self.type_iterators = None;
@@ -475,7 +462,7 @@ impl Module {
     #[inline(always)]
     pub fn set_custom_type<T>(&mut self, name: &str) -> &mut Self {
         self.custom_types
-            .get_or_insert_with(CustomTypesCollection::new)
+            .get_or_insert_with(|| CustomTypesCollection::new().into())
             .add_type::<T>(name);
         self
     }
@@ -501,7 +488,7 @@ impl Module {
         name: impl Into<Identifier>,
     ) -> &mut Self {
         self.custom_types
-            .get_or_insert_with(CustomTypesCollection::new)
+            .get_or_insert_with(|| CustomTypesCollection::new().into())
             .add(type_path, name);
         self
     }
@@ -544,7 +531,7 @@ impl Module {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.flags.contains(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS)
-            && self.functions.is_empty()
+            && self.functions.as_ref().map_or(true, |m| m.is_empty())
             && self.variables.as_ref().map_or(true, |m| m.is_empty())
             && self.modules.as_ref().map_or(true, |m| m.is_empty())
             && self.type_iterators.as_ref().map_or(true, |t| t.is_empty())
@@ -700,23 +687,25 @@ impl Module {
         let hash_script = crate::calc_fn_hash(None, &fn_def.name, num_params);
         #[cfg(feature = "metadata")]
         let params_info = fn_def.params.iter().map(Into::into).collect();
-        self.functions.insert(
-            hash_script,
-            FuncInfo {
-                name: fn_def.name.as_str().into(),
-                namespace: FnNamespace::Internal,
-                access: fn_def.access,
-                num_params,
-                param_types: StaticVec::new_const(),
-                #[cfg(feature = "metadata")]
-                params_info,
-                #[cfg(feature = "metadata")]
-                return_type: "".into(),
-                #[cfg(feature = "metadata")]
-                comments: Box::default(),
-                func: fn_def.into(),
-            },
-        );
+        self.functions
+            .get_or_insert_with(|| StraightHashMap::default().into())
+            .insert(
+                hash_script,
+                FuncInfo {
+                    name: fn_def.name.as_str().into(),
+                    namespace: FnNamespace::Internal,
+                    access: fn_def.access,
+                    num_params,
+                    param_types: StaticVec::new_const(),
+                    #[cfg(feature = "metadata")]
+                    params_info,
+                    #[cfg(feature = "metadata")]
+                    return_type: "".into(),
+                    #[cfg(feature = "metadata")]
+                    comments: Box::default(),
+                    func: fn_def.into(),
+                },
+            );
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
         hash_script
     }
@@ -731,15 +720,13 @@ impl Module {
         name: impl AsRef<str>,
         num_params: usize,
     ) -> Option<&Shared<crate::ast::ScriptFnDef>> {
-        if self.functions.is_empty() {
-            None
-        } else {
+        self.functions.as_ref().and_then(|lib| {
             let name = name.as_ref();
 
-            self.iter_fn()
-                .find(|f| f.num_params == num_params && f.name == name)
+            lib.values()
+                .find(|&f| f.num_params == num_params && f.name == name)
                 .and_then(|f| f.func.get_script_fn_def())
-        }
+        })
     }
 
     /// Get a mutable reference to the underlying [`BTreeMap`] of sub-modules,
@@ -840,14 +827,12 @@ impl Module {
     /// let hash = module.set_native_fn("calc", || Ok(42_i64));
     /// assert!(module.contains_fn(hash));
     /// ```
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn contains_fn(&self, hash_fn: u64) -> bool {
-        if self.functions.is_empty() {
-            false
-        } else {
-            self.functions.contains_key(&hash_fn)
-        }
+        self.functions
+            .as_ref()
+            .map_or(false, |m| m.contains_key(&hash_fn))
     }
 
     /// _(metadata)_ Update the metadata (parameter names/types and return type) of a registered function.
@@ -876,7 +861,7 @@ impl Module {
             .map(|s| s.as_ref().into())
             .collect();
 
-        if let Some(f) = self.functions.get_mut(&hash_fn) {
+        if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
             let (param_names, return_type_name) = if param_names.len() > f.num_params {
                 let return_type = param_names.pop().unwrap();
                 (param_names, return_type)
@@ -925,7 +910,11 @@ impl Module {
         let comments = comments.as_ref();
 
         if !comments.is_empty() {
-            let f = self.functions.get_mut(&hash_fn).unwrap();
+            let f = self
+                .functions
+                .as_mut()
+                .and_then(|m| m.get_mut(&hash_fn))
+                .unwrap();
             f.comments = comments.iter().map(|s| s.as_ref().into()).collect();
         }
 
@@ -937,7 +926,7 @@ impl Module {
     /// The [`u64`] hash is returned by the [`set_native_fn`][Module::set_native_fn] call.
     #[inline]
     pub fn update_fn_namespace(&mut self, hash_fn: u64, namespace: FnNamespace) -> &mut Self {
-        if let Some(f) = self.functions.get_mut(&hash_fn) {
+        if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
             f.namespace = namespace;
             self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
         }
@@ -1029,23 +1018,27 @@ impl Module {
             self.dynamic_functions_filter.mark(hash_script);
         }
 
-        self.functions.insert(
-            hash_fn,
-            FuncInfo {
-                func,
-                name: name.into(),
-                namespace,
-                access,
-                num_params: param_types.len(),
-                param_types,
-                #[cfg(feature = "metadata")]
-                params_info: param_names,
-                #[cfg(feature = "metadata")]
-                return_type: return_type_name,
-                #[cfg(feature = "metadata")]
-                comments: Box::default(),
-            },
-        );
+        self.functions
+            .get_or_insert_with(|| {
+                StraightHashMap::with_capacity_and_hasher(16, Default::default()).into()
+            })
+            .insert(
+                hash_fn,
+                FuncInfo {
+                    func,
+                    name: name.into(),
+                    namespace,
+                    access,
+                    num_params: param_types.len(),
+                    param_types,
+                    #[cfg(feature = "metadata")]
+                    params_info: param_names,
+                    #[cfg(feature = "metadata")]
+                    return_type: return_type_name,
+                    #[cfg(feature = "metadata")]
+                    comments: Box::default(),
+                },
+            );
 
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
@@ -1095,7 +1088,7 @@ impl Module {
         let comments = comments.as_ref();
 
         if !comments.is_empty() {
-            let f = self.functions.get_mut(&hash).unwrap();
+            let f = self.functions.as_mut().unwrap().get_mut(&hash).unwrap();
             f.comments = comments.iter().map(|s| s.as_ref().into()).collect();
         }
 
@@ -1533,11 +1526,10 @@ impl Module {
     #[inline]
     #[must_use]
     pub(crate) fn get_fn(&self, hash_native: u64) -> Option<&CallableFunction> {
-        if self.functions.is_empty() {
-            None
-        } else {
-            self.functions.get(&hash_native).map(|f| &f.func)
-        }
+        self.functions
+            .as_ref()
+            .and_then(|m| m.get(&hash_native))
+            .map(|f| &f.func)
     }
 
     /// Can the particular function with [`Dynamic`] parameter(s) exist in the [`Module`]?
@@ -1590,7 +1582,13 @@ impl Module {
             Some(_) => (),
             None => self.variables = other.variables,
         }
-        self.functions.extend(other.functions.into_iter());
+        match self.functions {
+            Some(ref mut m) if other.functions.is_some() => {
+                m.extend(other.functions.unwrap().into_iter())
+            }
+            Some(_) => (),
+            None => self.functions = other.functions,
+        }
         self.dynamic_functions_filter += &other.dynamic_functions_filter;
         match self.type_iterators {
             Some(ref mut m) if other.type_iterators.is_some() => {
@@ -1605,11 +1603,15 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.is_empty() {
-            if !self.doc.is_empty() {
-                self.doc.push('\n');
+        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
+            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+                self.doc
+                    .get_or_insert_with(|| SmartString::new_const())
+                    .push('\n');
             }
-            self.doc.push_str(&other.doc);
+            self.doc
+                .get_or_insert_with(|| SmartString::new_const())
+                .push_str(other.doc.as_ref().unwrap());
         }
 
         self
@@ -1632,7 +1634,13 @@ impl Module {
             Some(_) => (),
             None => self.variables = other.variables,
         }
-        self.functions.extend(other.functions.into_iter());
+        match self.functions {
+            Some(ref mut m) if other.functions.is_some() => {
+                m.extend(other.functions.unwrap().into_iter())
+            }
+            Some(_) => (),
+            None => self.functions = other.functions,
+        }
         self.dynamic_functions_filter += &other.dynamic_functions_filter;
         match self.type_iterators {
             Some(ref mut m) if other.type_iterators.is_some() => {
@@ -1647,11 +1655,15 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.is_empty() {
-            if !self.doc.is_empty() {
-                self.doc.push('\n');
+        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
+            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+                self.doc
+                    .get_or_insert_with(|| SmartString::new_const())
+                    .push('\n');
             }
-            self.doc.push_str(&other.doc);
+            self.doc
+                .get_or_insert_with(|| SmartString::new_const())
+                .push_str(other.doc.as_ref().unwrap());
         }
 
         self
@@ -1664,23 +1676,29 @@ impl Module {
         if let Some(ref modules) = other.modules {
             let m = self.modules.get_or_insert_with(|| Default::default());
 
-            for (k, v) in modules {
+            for (k, v) in modules.iter() {
                 if !m.contains_key(k) {
                     m.insert(k.clone(), v.clone());
                 }
             }
         }
         if let Some(ref variables) = other.variables {
-            for (k, v) in variables {
-                let m = self.variables.get_or_insert_with(|| Default::default());
+            for (k, v) in variables.iter() {
+                let map = self.variables.get_or_insert_with(|| Default::default());
 
-                if !m.contains_key(k) {
-                    m.insert(k.clone(), v.clone());
+                if !map.contains_key(k) {
+                    map.insert(k.clone(), v.clone());
                 }
             }
         }
-        for (&k, v) in &other.functions {
-            self.functions.entry(k).or_insert_with(|| v.clone());
+        if let Some(ref functions) = other.functions {
+            for (k, f) in functions.iter() {
+                let map = self.functions.get_or_insert_with(|| Default::default());
+
+                if !map.contains_key(k) {
+                    map.insert(*k, f.clone());
+                }
+            }
         }
         self.dynamic_functions_filter += &other.dynamic_functions_filter;
         if let Some(ref type_iterators) = other.type_iterators {
@@ -1688,7 +1706,7 @@ impl Module {
                 .type_iterators
                 .get_or_insert_with(|| Default::default());
 
-            for (&k, v) in type_iterators {
+            for (&k, v) in type_iterators.iter() {
                 t.entry(k).or_insert_with(|| v.clone());
             }
         }
@@ -1698,11 +1716,15 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.is_empty() {
-            if !self.doc.is_empty() {
-                self.doc.push('\n');
+        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
+            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+                self.doc
+                    .get_or_insert_with(|| SmartString::new_const())
+                    .push('\n');
             }
-            self.doc.push_str(&other.doc);
+            self.doc
+                .get_or_insert_with(|| SmartString::new_const())
+                .push_str(other.doc.as_ref().unwrap());
         }
 
         self
@@ -1721,7 +1743,7 @@ impl Module {
         _filter: impl Fn(FnNamespace, FnAccess, bool, &str, usize) -> bool + Copy,
     ) -> &mut Self {
         if let Some(ref modules) = other.modules {
-            for (k, v) in modules {
+            for (k, v) in modules.iter() {
                 let mut m = Self::new();
                 m.merge_filtered(v, _filter);
                 self.set_sub_module(k.clone(), m);
@@ -1740,22 +1762,25 @@ impl Module {
                 None => self.variables = other.variables.clone(),
             }
         }
-
-        self.functions.extend(
-            other
-                .functions
-                .iter()
-                .filter(|&(.., f)| {
-                    _filter(
-                        f.namespace,
-                        f.access,
-                        f.func.is_script(),
-                        f.name.as_str(),
-                        f.num_params,
-                    )
-                })
-                .map(|(&k, v)| (k, v.clone())),
-        );
+        if let Some(ref functions) = other.functions {
+            match self.functions {
+                Some(ref mut m) => m.extend(
+                    functions
+                        .iter()
+                        .filter(|&(.., f)| {
+                            _filter(
+                                f.namespace,
+                                f.access,
+                                f.func.is_script(),
+                                f.name.as_str(),
+                                f.num_params,
+                            )
+                        })
+                        .map(|(&k, f)| (k, f.clone())),
+                ),
+                None => self.functions = other.functions.clone(),
+            }
+        }
         self.dynamic_functions_filter += &other.dynamic_functions_filter;
 
         if let Some(ref type_iterators) = other.type_iterators {
@@ -1770,11 +1795,15 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.is_empty() {
-            if !self.doc.is_empty() {
-                self.doc.push('\n');
+        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
+            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+                self.doc
+                    .get_or_insert_with(|| SmartString::new_const())
+                    .push('\n');
             }
-            self.doc.push_str(&other.doc);
+            self.doc
+                .get_or_insert_with(|| SmartString::new_const())
+                .push_str(other.doc.as_ref().unwrap());
         }
 
         self
@@ -1787,16 +1816,19 @@ impl Module {
         &mut self,
         filter: impl Fn(FnNamespace, FnAccess, &str, usize) -> bool,
     ) -> &mut Self {
-        self.functions = std::mem::take(&mut self.functions)
-            .into_iter()
-            .filter(|(.., f)| {
-                if f.func.is_script() {
-                    filter(f.namespace, f.access, f.name.as_str(), f.num_params)
-                } else {
-                    false
-                }
-            })
-            .collect();
+        self.functions = std::mem::take(&mut self.functions).map(|m| {
+            Box::new(
+                m.into_iter()
+                    .filter(|(.., f)| {
+                        if f.func.is_script() {
+                            filter(f.namespace, f.access, f.name.as_str(), f.num_params)
+                        } else {
+                            false
+                        }
+                    })
+                    .collect(),
+            )
+        });
 
         self.dynamic_functions_filter.clear();
         self.all_functions = None;
@@ -1812,7 +1844,7 @@ impl Module {
     pub fn count(&self) -> (usize, usize, usize) {
         (
             self.variables.as_ref().map_or(0, |m| m.len()),
-            self.functions.len(),
+            self.functions.as_ref().map_or(0, |m| m.len()),
             self.type_iterators.as_ref().map_or(0, |t| t.len()),
         )
     }
@@ -1837,7 +1869,7 @@ impl Module {
     #[inline]
     #[allow(dead_code)]
     pub(crate) fn iter_fn(&self) -> impl Iterator<Item = &FuncInfo> {
-        self.functions.values()
+        self.functions.iter().flat_map(|m| m.values())
     }
 
     /// Get an iterator over all script-defined functions in the [`Module`].
@@ -2117,7 +2149,7 @@ impl Module {
             let mut contains_indexed_global_functions = false;
 
             if let Some(ref modules) = module.modules {
-                for (name, m) in modules {
+                for (name, m) in modules.iter() {
                     // Index all the sub-modules first.
                     path.push(name);
                     if index_module(m, path, variables, functions, type_iterators) {
@@ -2129,7 +2161,7 @@ impl Module {
 
             // Index all variables
             if let Some(ref v) = module.variables {
-                for (var_name, value) in v {
+                for (var_name, value) in v.iter() {
                     let hash_var = crate::calc_var_hash(path.iter().copied(), var_name);
                     variables.insert(hash_var, value.clone());
                 }
@@ -2137,13 +2169,13 @@ impl Module {
 
             // Index type iterators
             if let Some(ref t) = module.type_iterators {
-                for (&type_id, func) in t {
+                for (&type_id, func) in t.iter() {
                     type_iterators.insert(type_id, func.clone());
                 }
             }
 
             // Index all Rust functions
-            for (&hash, f) in &module.functions {
+            for (&hash, f) in module.functions.iter().flat_map(|m| m.iter()) {
                 match f.namespace {
                     FnNamespace::Global => {
                         // Flatten all functions with global namespace
@@ -2194,17 +2226,17 @@ impl Module {
             self.all_variables = if variables.is_empty() {
                 None
             } else {
-                Some(variables)
+                Some(variables.into())
             };
             self.all_functions = if functions.is_empty() {
                 None
             } else {
-                Some(functions)
+                Some(functions.into())
             };
             self.all_type_iterators = if type_iterators.is_empty() {
                 None
             } else {
-                Some(type_iterators)
+                Some(type_iterators.into())
             };
 
             self.flags |= ModuleFlags::INDEXED;
