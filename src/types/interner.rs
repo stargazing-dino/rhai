@@ -70,14 +70,14 @@ impl StringsInterner {
     #[must_use]
     pub fn get_with_mapper<S: AsRef<str>>(
         &mut self,
-        id: &str,
+        category: &str,
         mapper: impl FnOnce(S) -> ImmutableString,
         text: S,
     ) -> ImmutableString {
         let key = text.as_ref();
 
         let hasher = &mut get_hasher();
-        id.hash(hasher);
+        category.hash(hasher);
         key.hash(hasher);
         let hash = hasher.finish();
 

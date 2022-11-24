@@ -124,7 +124,7 @@ impl Engine {
             let (stream, tokenizer_control) =
                 self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
 
-            let mut state = ParseState::new(self, scope, interned_strings, tokenizer_control);
+            let mut state = ParseState::new(scope, interned_strings, tokenizer_control);
 
             // No need to optimize a lone expression
             self.parse_global_expr(

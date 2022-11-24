@@ -120,7 +120,7 @@ impl Engine {
         let ast = {
             let scope = Scope::new();
             let interned_strings = &mut *locked_write(&self.interned_strings);
-            let mut state = ParseState::new(self, &scope, interned_strings, tokenizer_control);
+            let mut state = ParseState::new(&scope, interned_strings, tokenizer_control);
 
             self.parse_global_expr(
                 &mut stream.peekable(),

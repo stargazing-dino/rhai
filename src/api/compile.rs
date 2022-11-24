@@ -223,7 +223,7 @@ impl Engine {
             self.token_mapper.as_ref().map(<_>::as_ref),
         );
         let interned_strings = &mut *locked_write(&self.interned_strings);
-        let mut state = ParseState::new(self, scope, interned_strings, tokenizer_control);
+        let mut state = ParseState::new(scope, interned_strings, tokenizer_control);
         let mut _ast = self.parse(&mut stream.peekable(), &mut state, optimization_level)?;
         #[cfg(feature = "metadata")]
         _ast.set_doc(state.tokenizer_control.borrow().global_comments.join("\n"));
@@ -297,7 +297,7 @@ impl Engine {
 
         let mut peekable = stream.peekable();
         let interned_strings = &mut *locked_write(&self.interned_strings);
-        let mut state = ParseState::new(self, scope, interned_strings, tokenizer_control);
+        let mut state = ParseState::new(scope, interned_strings, tokenizer_control);
         self.parse_global_expr(&mut peekable, &mut state, |_| {}, self.optimization_level)
     }
 }
