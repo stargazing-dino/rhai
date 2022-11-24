@@ -3,7 +3,6 @@
 use super::BloomFilterU64;
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::ImmutableString;
-use ahash::HashMapExt;
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
 #[cfg(not(feature = "no_std"))]
@@ -53,7 +52,7 @@ impl StringsInterner {
     #[inline(always)]
     pub fn new() -> Self {
         Self {
-            cache: StraightHashMap::new(),
+            cache: StraightHashMap::default(),
             bloom_filter: BloomFilterU64::new(),
         }
     }
