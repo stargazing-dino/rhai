@@ -663,9 +663,10 @@ impl Engine {
                         let reset =
                             self.run_debugger_with_reset(global, caches, scope, this_ptr, rhs)?;
                         #[cfg(feature = "debugging")]
-                        let global = &mut *RestoreOnDrop::lock(global, move |g| {
-                            g.debugger.reset_status(reset)
-                        });
+                        let global =
+                            &mut *RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
+                                g.debugger_mut().reset_status(reset)
+                            });
 
                         let crate::ast::FnCallExpr {
                             name, hashes, args, ..
@@ -832,9 +833,11 @@ impl Engine {
                                     global, caches, scope, this_ptr, _node,
                                 )?;
                                 #[cfg(feature = "debugging")]
-                                let global = &mut *RestoreOnDrop::lock(global, move |g| {
-                                    g.debugger.reset_status(reset)
-                                });
+                                let global = &mut *RestoreOnDrop::lock_if(
+                                    reset.is_some(),
+                                    global,
+                                    move |g| g.debugger_mut().reset_status(reset),
+                                );
 
                                 let crate::ast::FnCallExpr {
                                     name, hashes, args, ..
@@ -956,9 +959,11 @@ impl Engine {
                                         global, caches, scope, this_ptr, _node,
                                     )?;
                                     #[cfg(feature = "debugging")]
-                                    let global = &mut *RestoreOnDrop::lock(global, move |g| {
-                                        g.debugger.reset_status(reset)
-                                    });
+                                    let global = &mut *RestoreOnDrop::lock_if(
+                                        reset.is_some(),
+                                        global,
+                                        move |g| g.debugger_mut().reset_status(reset),
+                                    );
 
                                     let crate::ast::FnCallExpr {
                                         name, hashes, args, ..

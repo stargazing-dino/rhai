@@ -61,7 +61,7 @@ fn print_current_source(
 ) {
     let current_source = &mut *context
         .global_runtime_state_mut()
-        .debugger
+        .debugger_mut()
         .state_mut()
         .write_lock::<ImmutableString>()
         .unwrap();
@@ -241,7 +241,7 @@ fn debug_callback(
         DebuggerEvent::End => println!("\x1b[31m! Script end\x1b[39m"),
         DebuggerEvent::Step => (),
         DebuggerEvent::BreakPoint(n) => {
-            match context.global_runtime_state().debugger.break_points()[n] {
+            match context.global_runtime_state().debugger().break_points()[n] {
                 #[cfg(not(feature = "no_position"))]
                 BreakPoint::AtPosition { .. } => (),
                 BreakPoint::AtFunctionName { ref name, .. }
@@ -260,7 +260,7 @@ fn debug_callback(
                 "! Return from function call '{}' => {:?}",
                 context
                     .global_runtime_state()
-                    .debugger
+                    .debugger()
                     .call_stack()
                     .last()
                     .unwrap()
@@ -273,7 +273,7 @@ fn debug_callback(
                 "! Return from function call '{}' with error: {}",
                 context
                     .global_runtime_state()
-                    .debugger
+                    .debugger()
                     .call_stack()
                     .last()
                     .unwrap()
@@ -373,7 +373,7 @@ fn debug_callback(
                 ["backtrace" | "bt"] => {
                     for frame in context
                         .global_runtime_state()
-                        .debugger
+                        .debugger()
                         .call_stack()
                         .iter()
                         .rev()
@@ -384,7 +384,7 @@ fn debug_callback(
                 ["info" | "i", "break" | "b"] => Iterator::for_each(
                     context
                         .global_runtime_state()
-                        .debugger
+                        .debugger()
                         .break_points()
                         .iter()
                         .enumerate(),
@@ -402,13 +402,13 @@ fn debug_callback(
                     if let Ok(n) = n.parse::<usize>() {
                         let range = 1..=context
                             .global_runtime_state_mut()
-                            .debugger
+                            .debugger()
                             .break_points()
                             .len();
                         if range.contains(&n) {
                             context
                                 .global_runtime_state_mut()
-                                .debugger
+                                .debugger_mut()
                                 .break_points_mut()
                                 .get_mut(n - 1)
                                 .unwrap()
@@ -425,13 +425,13 @@ fn debug_callback(
                     if let Ok(n) = n.parse::<usize>() {
                         let range = 1..=context
                             .global_runtime_state_mut()
-                            .debugger
+                            .debugger()
                             .break_points()
                             .len();
                         if range.contains(&n) {
                             context
                                 .global_runtime_state_mut()
-                                .debugger
+                                .debugger_mut()
                                 .break_points_mut()
                                 .get_mut(n - 1)
                                 .unwrap()
@@ -448,13 +448,13 @@ fn debug_callback(
                     if let Ok(n) = n.parse::<usize>() {
                         let range = 1..=context
                             .global_runtime_state_mut()
-                            .debugger
+                            .debugger()
                             .break_points()
                             .len();
                         if range.contains(&n) {
                             context
                                 .global_runtime_state_mut()
-                                .debugger
+                                .debugger_mut()
                                 .break_points_mut()
                                 .remove(n - 1);
                             println!("Break-point #{n} deleted.")
@@ -468,7 +468,7 @@ fn debug_callback(
                 ["delete" | "d"] => {
                     context
                         .global_runtime_state_mut()
-                        .debugger
+                        .debugger_mut()
                         .break_points_mut()
                         .clear();
                     println!("All break-points deleted.");
@@ -483,7 +483,7 @@ fn debug_callback(
                         println!("Break-point added for {bp}");
                         context
                             .global_runtime_state_mut()
-                            .debugger
+                            .debugger_mut()
                             .break_points_mut()
                             .push(bp);
                     } else {
@@ -500,7 +500,7 @@ fn debug_callback(
                     println!("Break-point added for {bp}");
                     context
                         .global_runtime_state_mut()
-                        .debugger
+                        .debugger_mut()
                         .break_points_mut()
                         .push(bp);
                 }
@@ -523,7 +523,7 @@ fn debug_callback(
                         println!("Break-point added {bp}");
                         context
                             .global_runtime_state_mut()
-                            .debugger
+                            .debugger_mut()
                             .break_points_mut()
                             .push(bp);
                     } else {
@@ -539,7 +539,7 @@ fn debug_callback(
                     println!("Break-point added for {bp}");
                     context
                         .global_runtime_state_mut()
-                        .debugger
+                        .debugger_mut()
                         .break_points_mut()
                         .push(bp);
                 }
@@ -553,7 +553,7 @@ fn debug_callback(
                     println!("Break-point added {bp}");
                     context
                         .global_runtime_state_mut()
-                        .debugger
+                        .debugger_mut()
                         .break_points_mut()
                         .push(bp);
                 }

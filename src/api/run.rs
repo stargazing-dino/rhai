@@ -137,7 +137,7 @@ impl Engine {
 
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {
-            global.debugger.status = crate::eval::DebuggerStatus::Terminate;
+            global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
             let mut this = crate::Dynamic::NULL;
             let node = &crate::ast::Stmt::Noop(crate::Position::NONE);
             self.run_debugger(global, caches, scope, &mut this, node)?;

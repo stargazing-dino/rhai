@@ -419,7 +419,7 @@ impl Engine {
             if let Some(cmd) =
                 self.run_debugger_with_reset_raw(global, caches, scope, this_ptr, node)?
             {
-                global.debugger.status = cmd;
+                global.debugger_mut().status = cmd;
             }
         }
 
@@ -469,24 +469,28 @@ impl Engine {
             _ => (),
         }
 
-        let event = match global.debugger.status {
-            DebuggerStatus::Init => Some(DebuggerEvent::Start),
-            DebuggerStatus::NEXT if node.is_stmt() => Some(DebuggerEvent::Step),
-            DebuggerStatus::INTO if node.is_expr() => Some(DebuggerEvent::Step),
-            DebuggerStatus::STEP => Some(DebuggerEvent::Step),
-            DebuggerStatus::Terminate => Some(DebuggerEvent::End),
-            _ => None,
-        };
+        if let Some(ref dbg) = global.debugger {
+            let event = match dbg.status {
+                DebuggerStatus::Init => Some(DebuggerEvent::Start),
+                DebuggerStatus::NEXT if node.is_stmt() => Some(DebuggerEvent::Step),
+                DebuggerStatus::INTO if node.is_expr() => Some(DebuggerEvent::Step),
+                DebuggerStatus::STEP => Some(DebuggerEvent::Step),
+                DebuggerStatus::Terminate => Some(DebuggerEvent::End),
+                _ => None,
+            };
 
-        let event = match event {
-            Some(e) => e,
-            None => match global.debugger.is_break_point(global.source(), node) {
-                Some(bp) => DebuggerEvent::BreakPoint(bp),
-                None => return Ok(None),
-            },
-        };
+            let event = match event {
+                Some(e) => e,
+                None => match dbg.is_break_point(global.source(), node) {
+                    Some(bp) => DebuggerEvent::BreakPoint(bp),
+                    None => return Ok(None),
+                },
+            };
 
-        self.run_debugger_raw(global, caches, scope, this_ptr, node, event)
+            self.run_debugger_raw(global, caches, scope, this_ptr, node, event)
+        } else {
+            Ok(None)
+        }
     }
     /// Run the debugger callback unconditionally.
     ///
@@ -513,19 +517,19 @@ impl Engine {
 
             match command {
                 DebuggerCommand::Continue => {
-                    global.debugger.status = DebuggerStatus::CONTINUE;
+                    global.debugger_mut().status = DebuggerStatus::CONTINUE;
                     Ok(None)
                 }
                 DebuggerCommand::Next => {
-                    global.debugger.status = DebuggerStatus::CONTINUE;
+                    global.debugger_mut().status = DebuggerStatus::CONTINUE;
                     Ok(Some(DebuggerStatus::NEXT))
                 }
                 DebuggerCommand::StepOver => {
-                    global.debugger.status = DebuggerStatus::CONTINUE;
+                    global.debugger_mut().status = DebuggerStatus::CONTINUE;
                     Ok(Some(DebuggerStatus::STEP))
                 }
                 DebuggerCommand::StepInto => {
-                    global.debugger.status = DebuggerStatus::STEP;
+                    global.debugger_mut().status = DebuggerStatus::STEP;
                     Ok(None)
                 }
                 DebuggerCommand::FunctionExit => {
@@ -539,7 +543,7 @@ impl Engine {
                         }
                         _ => global.level,
                     };
-                    global.debugger.status = DebuggerStatus::FunctionExit(level);
+                    global.debugger_mut().status = DebuggerStatus::FunctionExit(level);
                     Ok(None)
                 }
             }

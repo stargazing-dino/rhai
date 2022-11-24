@@ -364,7 +364,10 @@ impl Engine {
 
             // Push a new call stack frame
             #[cfg(feature = "debugging")]
-            let orig_call_stack_len = global.debugger.call_stack().len();
+            let orig_call_stack_len = global
+                .debugger
+                .as_ref()
+                .map_or(0, |dbg| dbg.call_stack().len());
 
             let backup = &mut ArgBackup::new();
 
@@ -381,10 +384,12 @@ impl Engine {
 
             #[cfg(feature = "debugging")]
             if self.debugger.is_some() {
-                global.debugger.push_call_stack_frame(
+                let source = source.clone().or_else(|| global.source.clone());
+
+                global.debugger_mut().push_call_stack_frame(
                     self.get_interned_string(name),
                     args.iter().map(|v| (*v).clone()).collect(),
-                    source.clone().or_else(|| global.source.clone()),
+                    source,
                     pos,
                 );
             }
@@ -410,10 +415,10 @@ impl Engine {
             };
 
             #[cfg(feature = "debugging")]
-            {
+            if self.debugger.is_some() {
                 use crate::eval::{DebuggerEvent, DebuggerStatus};
 
-                let trigger = match global.debugger.status {
+                let trigger = match global.debugger().status {
                     DebuggerStatus::FunctionExit(n) => n >= global.level,
                     DebuggerStatus::Next(.., true) => true,
                     _ => false,
@@ -436,7 +441,7 @@ impl Engine {
                 }
 
                 // Pop the call stack
-                global.debugger.rewind_call_stack(orig_call_stack_len);
+                global.debugger_mut().rewind_call_stack(orig_call_stack_len);
             }
 
             let result = _result?;
@@ -714,11 +719,15 @@ impl Engine {
 
         // Do not match function exit for arguments
         #[cfg(feature = "debugging")]
-        let reset = global.debugger.clear_status_if(|status| {
-            matches!(status, crate::eval::DebuggerStatus::FunctionExit(..))
+        let reset = global.debugger.as_mut().and_then(|dbg| {
+            dbg.clear_status_if(|status| {
+                matches!(status, crate::eval::DebuggerStatus::FunctionExit(..))
+            })
         });
         #[cfg(feature = "debugging")]
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.debugger.reset_status(reset));
+        let global = &mut *RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
+            g.debugger_mut().reset_status(reset)
+        });
 
         self.eval_expr(global, caches, scope, this_ptr, arg_expr)
             .map(|r| (r, arg_expr.start_position()))

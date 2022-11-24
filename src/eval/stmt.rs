@@ -194,7 +194,9 @@ impl Engine {
         #[cfg(feature = "debugging")]
         let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, stmt)?;
         #[cfg(feature = "debugging")]
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.debugger.reset_status(reset));
+        let global = &mut *RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
+            g.debugger_mut().reset_status(reset)
+        });
 
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
