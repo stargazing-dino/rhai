@@ -9,7 +9,6 @@ use crate::{Engine, Identifier, LexError, SmartString, StaticVec, INT, UNSIGNED_
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
-    borrow::Cow,
     cell::RefCell,
     char, fmt,
     iter::{FusedIterator, Peekable},
@@ -591,14 +590,67 @@ pub enum Token {
 impl fmt::Display for Token {
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.syntax())
+        #[allow(clippy::enum_glob_use)]
+        use Token::*;
+
+        match self {
+            IntegerConstant(i) => write!(f, "{i}"),
+            #[cfg(not(feature = "no_float"))]
+            FloatConstant(v) => write!(f, "{v}"),
+            #[cfg(feature = "decimal")]
+            DecimalConstant(d) => write!(f, "{d}"),
+            StringConstant(s) => write!(f, r#""{s}""#),
+            InterpolatedString(..) => f.write_str("string"),
+            CharConstant(c) => write!(f, "{c}"),
+            Identifier(s) => f.write_str(s),
+            Reserved(s) => f.write_str(s),
+            #[cfg(not(feature = "no_custom_syntax"))]
+            Custom(s) => f.write_str(s),
+            LexError(err) => write!(f, "{err}"),
+            Comment(s) => f.write_str(s),
+
+            EOF => f.write_str("{EOF}"),
+
+            token => f.write_str(token.literal_syntax()),
+        }
     }
 }
 
 impl Token {
+    /// Is the token a literal symbol?
+    #[must_use]
+    pub const fn is_literal(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
+        use Token::*;
+
+        match self {
+            IntegerConstant(..) => false,
+            #[cfg(not(feature = "no_float"))]
+            FloatConstant(..) => false,
+            #[cfg(feature = "decimal")]
+            DecimalConstant(..) => false,
+            StringConstant(..)
+            | InterpolatedString(..)
+            | CharConstant(..)
+            | Identifier(..)
+            | Reserved(..) => false,
+            #[cfg(not(feature = "no_custom_syntax"))]
+            Custom(..) => false,
+            LexError(..) | Comment(..) => false,
+
+            EOF => false,
+
+            _ => true,
+        }
+    }
     /// Get the literal syntax of the token.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the token is not a literal symbol.
     #[must_use]
     pub const fn literal_syntax(&self) -> &'static str {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
@@ -690,34 +742,7 @@ impl Token {
             #[cfg(not(feature = "no_module"))]
             As => "as",
 
-            _ => "ERROR: NOT A KEYWORD",
-        }
-    }
-
-    /// Get the syntax of the token.
-    #[must_use]
-    pub fn syntax(&self) -> Cow<'static, str> {
-        use Token::*;
-
-        match self {
-            IntegerConstant(i) => i.to_string().into(),
-            #[cfg(not(feature = "no_float"))]
-            FloatConstant(f) => f.to_string().into(),
-            #[cfg(feature = "decimal")]
-            DecimalConstant(d) => d.to_string().into(),
-            StringConstant(s) => format!("\"{s}\"").into(),
-            InterpolatedString(..) => "string".into(),
-            CharConstant(c) => c.to_string().into(),
-            Identifier(s) => s.to_string().into(),
-            Reserved(s) => s.to_string().into(),
-            #[cfg(not(feature = "no_custom_syntax"))]
-            Custom(s) => s.to_string().into(),
-            LexError(err) => err.to_string().into(),
-            Comment(s) => s.to_string().into(),
-
-            EOF => "{EOF}".into(),
-
-            token => token.literal_syntax().into(),
+            _ => panic!("token is not a literal symbol"),
         }
     }
 
@@ -802,6 +827,7 @@ impl Token {
     /// Reverse lookup a symbol token from a piece of syntax.
     #[must_use]
     pub fn lookup_symbol_from_syntax(syntax: &str) -> Option<Self> {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         Some(match syntax {
@@ -941,21 +967,20 @@ impl Token {
     /// (not sure about `fn` name).
     #[must_use]
     pub const fn is_next_unary(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
-            LexError(..)     |
             SemiColon        | // ; - is unary
             Colon            | // #{ foo: - is unary
             Comma            | // ( ... , -expr ) - is unary
-            //Period           |
-            //Elvis            |
-            //DoubleQuestion   |
-            //QuestionBracket  |
-            ExclusiveRange            | // .. - is unary
+            //Period         |
+            //Elvis          |
+            DoubleQuestion   | // ?? - is unary
+            ExclusiveRange   | // .. - is unary
             InclusiveRange   | // ..= - is unary
             LeftBrace        | // { -expr } - is unary
-            // RightBrace    | { expr } - expr not unary & is closing
+            // RightBrace    | // { expr } - expr not unary & is closing
             LeftParen        | // ( -expr ) - is unary
             // RightParen    | // ( expr ) - expr not unary & is closing
             LeftBracket      | // [ -expr ] - is unary
@@ -989,7 +1014,7 @@ impl Token {
             Pipe             |
             Ampersand        |
             If               |
-            //Do               |
+            //Do             |
             While            |
             Until            |
             In               |
@@ -1000,15 +1025,21 @@ impl Token {
             XOr              |
             XOrAssign        |
             Return           |
-            Throw                           => true,
+            Throw               => true,
 
-            _ => false,
+            #[cfg(not(feature = "no_index"))]
+            QuestionBracket     => true,    // ?[ - is unary
+
+            LexError(..)        => true,
+
+            _                   => false,
         }
     }
 
     /// Get the precedence number of the token.
     #[must_use]
     pub const fn precedence(&self) -> Option<Precedence> {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         Precedence::new(match self {
@@ -1041,6 +1072,7 @@ impl Token {
     /// Does an expression bind to the right (instead of left)?
     #[must_use]
     pub const fn is_bind_right(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
@@ -1054,6 +1086,7 @@ impl Token {
     /// Is this token a standard symbol used in the language?
     #[must_use]
     pub const fn is_standard_symbol(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
@@ -1080,6 +1113,7 @@ impl Token {
     #[inline]
     #[must_use]
     pub const fn is_standard_keyword(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
         use Token::*;
 
         match self {
@@ -1127,7 +1161,7 @@ impl Token {
 impl From<Token> for String {
     #[inline(always)]
     fn from(token: Token) -> Self {
-        token.syntax().into()
+        token.to_string()
     }
 }
 
@@ -1476,13 +1510,13 @@ pub fn get_next_token(
 
 /// Test if the given character is a hex character.
 #[inline(always)]
-fn is_hex_digit(c: char) -> bool {
+const fn is_hex_digit(c: char) -> bool {
     matches!(c, 'a'..='f' | 'A'..='F' | '0'..='9')
 }
 
 /// Test if the given character is a numeric digit.
 #[inline(always)]
-fn is_numeric_digit(c: char) -> bool {
+const fn is_numeric_digit(c: char) -> bool {
     matches!(c, '0'..='9')
 }
 
@@ -1662,21 +1696,8 @@ fn get_next_token_inner(
                 });
 
                 // Parse number
-                return Some((
-                    if let Some(radix) = radix_base {
-                        let result = &result[2..];
-
-                        UNSIGNED_INT::from_str_radix(&result, radix)
-                            .map(|v| v as INT)
-                            .map_or_else(
-                                |_| {
-                                    Token::LexError(
-                                        LERR::MalformedNumber(result.to_string()).into(),
-                                    )
-                                },
-                                Token::IntegerConstant,
-                            )
-                    } else {
+                let token = radix_base.map_or_else(
+                    || {
                         let num = INT::from_str(&result).map(Token::IntegerConstant);
 
                         // If integer parsing is unnecessary, try float instead
@@ -1705,8 +1726,23 @@ fn get_next_token_inner(
                             Token::LexError(LERR::MalformedNumber(result.to_string()).into())
                         })
                     },
-                    num_pos,
-                ));
+                    |radix| {
+                        let result = &result[2..];
+
+                        UNSIGNED_INT::from_str_radix(result, radix)
+                            .map(|v| v as INT)
+                            .map_or_else(
+                                |_| {
+                                    Token::LexError(
+                                        LERR::MalformedNumber(result.to_string()).into(),
+                                    )
+                                },
+                                Token::IntegerConstant,
+                            )
+                    },
+                );
+
+                return Some((token, num_pos));
             }
 
             // letter or underscore ...
@@ -1735,7 +1771,7 @@ fn get_next_token_inner(
                     Some('\r') => {
                         eat_next(stream, pos);
                         // `\r\n
-                        if let Some('\n') = stream.peek_next() {
+                        if stream.peek_next() == Some('\n') {
                             eat_next(stream, pos);
                         }
                         pos.new_line();
@@ -1763,7 +1799,7 @@ fn get_next_token_inner(
             // ' - character literal
             ('\'', '\'') => {
                 return Some((
-                    Token::LexError(LERR::MalformedChar("".to_string()).into()),
+                    Token::LexError(LERR::MalformedChar(String::new()).into()),
                     start_pos,
                 ))
             }
@@ -1916,7 +1952,7 @@ fn get_next_token_inner(
                 while let Some(c) = stream.get_next() {
                     if c == '\r' {
                         // \r\n
-                        if let Some('\n') = stream.peek_next() {
+                        if stream.peek_next() == Some('\n') {
                             eat_next(stream, pos);
                         }
                         pos.new_line();
@@ -2399,7 +2435,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             Some((Token::Reserved(s), pos)) => (match
                 (s.as_str(),
                     #[cfg(not(feature = "no_custom_syntax"))]
-                    (!self.engine.custom_keywords.is_empty() && self.engine.custom_keywords.contains_key(&*s)),
+                    self.engine.custom_keywords.as_ref().map_or(false, |m| m.contains_key(&*s)),
                     #[cfg(feature = "no_custom_syntax")]
                     false
                 )
@@ -2436,7 +2472,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 #[cfg(feature = "no_custom_syntax")]
                 (.., true) => unreachable!("no custom operators"),
                 // Reserved keyword that is not custom and disabled.
-                (token, false) if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token) => {
+                (token, false) if self.engine.disabled_symbols.as_ref().map_or(false,|m| m.contains(token)) => {
                     let msg = format!("reserved {} '{token}' is disabled", if is_valid_identifier(token) { "keyword"} else {"symbol"});
                     Token::LexError(LERR::ImproperSymbol(s.to_string(), msg).into())
                 },
@@ -2445,13 +2481,13 @@ impl<'a> Iterator for TokenIterator<'a> {
             }, pos),
             // Custom keyword
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((Token::Identifier(s), pos)) if !self.engine.custom_keywords.is_empty() && self.engine.custom_keywords.contains_key(&*s) => {
+            Some((Token::Identifier(s), pos)) if self.engine.custom_keywords.as_ref().map_or(false,|m| m.contains_key(&*s)) => {
                 (Token::Custom(s), pos)
             }
             // Custom keyword/symbol - must be disabled
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((token, pos)) if !self.engine.custom_keywords.is_empty() && self.engine.custom_keywords.contains_key(token.literal_syntax()) => {
-                if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token.literal_syntax()) {
+            Some((token, pos)) if token.is_literal() && self.engine.custom_keywords.as_ref().map_or(false,|m| m.contains_key(token.literal_syntax())) => {
+                if self.engine.disabled_symbols.as_ref().map_or(false,|m| m.contains(token.literal_syntax())) {
                     // Disabled standard keyword/symbol
                     (Token::Custom(Box::new(token.literal_syntax().into())), pos)
                 } else {
@@ -2460,7 +2496,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 }
             }
             // Disabled symbol
-            Some((token, pos)) if !self.engine.disabled_symbols.is_empty() && self.engine.disabled_symbols.contains(token.literal_syntax()) => {
+            Some((token, pos)) if token.is_literal() && self.engine.disabled_symbols.as_ref().map_or(false,|m| m.contains(token.literal_syntax())) => {
                 (Token::Reserved(Box::new(token.literal_syntax().into())), pos)
             }
             // Normal symbol

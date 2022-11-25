@@ -1,4 +1,5 @@
 use crate::eval::calc_index;
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
     def_package, ExclusiveRange, InclusiveRange, Position, RhaiResultOf, ERR, INT, INT_BITS,
@@ -10,7 +11,7 @@ use std::prelude::v1::*;
 def_package! {
     /// Package of basic bit-field utilities.
     pub BitFieldPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         combine_with_exported_module!(lib, "bit_field", bit_field_functions);
     }
@@ -142,7 +143,7 @@ mod bit_field_functions {
         }
 
         // 2^bits - 1
-        let mask = ((2 as UNSIGNED_INT).pow(bits as u32) - 1) as crate::INT;
+        let mask = ((2 as UNSIGNED_INT).pow(bits as u32) - 1) as INT;
 
         Ok(((value & (mask << bit)) >> bit) & mask)
     }
@@ -229,7 +230,7 @@ mod bit_field_functions {
         }
 
         // 2^bits - 1
-        let mask = ((2 as UNSIGNED_INT).pow(bits as u32) - 1) as crate::INT;
+        let mask = ((2 as UNSIGNED_INT).pow(bits as u32) - 1) as INT;
 
         *value &= !(mask << bit);
         *value |= (new_value & mask) << bit;

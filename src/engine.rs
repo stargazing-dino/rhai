@@ -5,6 +5,7 @@ use crate::func::native::{
     locked_write, OnDebugCallback, OnDefVarCallback, OnParseTokenCallback, OnPrintCallback,
     OnVarCallback,
 };
+use crate::module::ModuleFlags;
 use crate::packages::{Package, StandardPackage};
 use crate::tokenizer::Token;
 use crate::types::StringsInterner;
@@ -95,24 +96,27 @@ pub struct Engine {
     pub(crate) global_modules: StaticVec<SharedModule>,
     /// A collection of all sub-modules directly loaded into the Engine.
     #[cfg(not(feature = "no_module"))]
-    pub(crate) global_sub_modules: std::collections::BTreeMap<Identifier, SharedModule>,
+    pub(crate) global_sub_modules:
+        Option<Box<std::collections::BTreeMap<Identifier, SharedModule>>>,
 
     /// A module resolution service.
     #[cfg(not(feature = "no_module"))]
     pub(crate) module_resolver: Box<dyn crate::ModuleResolver>,
 
     /// An empty [`ImmutableString`] for cloning purposes.
-    pub(crate) interned_strings: Locked<StringsInterner<'static>>,
+    pub(crate) interned_strings: Locked<StringsInterner>,
 
     /// A set of symbols to disable.
-    pub(crate) disabled_symbols: BTreeSet<Identifier>,
+    pub(crate) disabled_symbols: Option<Box<BTreeSet<Identifier>>>,
     /// A map containing custom keywords and precedence to recognize.
     #[cfg(not(feature = "no_custom_syntax"))]
-    pub(crate) custom_keywords: std::collections::BTreeMap<Identifier, Option<Precedence>>,
+    pub(crate) custom_keywords:
+        Option<Box<std::collections::BTreeMap<Identifier, Option<Precedence>>>>,
     /// Custom syntax.
     #[cfg(not(feature = "no_custom_syntax"))]
-    pub(crate) custom_syntax:
-        std::collections::BTreeMap<Identifier, crate::api::custom_syntax::CustomSyntax>,
+    pub(crate) custom_syntax: Option<
+        Box<std::collections::BTreeMap<Identifier, crate::api::custom_syntax::CustomSyntax>>,
+    >,
     /// Callback closure for filtering variable definition.
     pub(crate) def_var_filter: Option<Box<OnDefVarCallback>>,
     /// Callback closure for resolving variable access.
@@ -143,10 +147,12 @@ pub struct Engine {
 
     /// Callback closure for debugging.
     #[cfg(feature = "debugging")]
-    pub(crate) debugger: Option<(
-        Box<crate::eval::OnDebuggingInit>,
-        Box<crate::eval::OnDebuggerCallback>,
-    )>,
+    pub(crate) debugger: Option<
+        Box<(
+            Box<crate::eval::OnDebuggingInit>,
+            Box<crate::eval::OnDebuggerCallback>,
+        )>,
+    >,
 }
 
 impl fmt::Debug for Engine {
@@ -167,7 +173,8 @@ impl fmt::Debug for Engine {
             "custom_syntax",
             &self
                 .custom_syntax
-                .keys()
+                .iter()
+                .flat_map(|m| m.keys())
                 .map(crate::SmartString::as_str)
                 .collect::<String>(),
         );
@@ -263,17 +270,17 @@ impl Engine {
             global_modules: StaticVec::new_const(),
 
             #[cfg(not(feature = "no_module"))]
-            global_sub_modules: std::collections::BTreeMap::new(),
+            global_sub_modules: None,
 
             #[cfg(not(feature = "no_module"))]
             module_resolver: Box::new(crate::module::resolvers::DummyModuleResolver::new()),
 
             interned_strings: StringsInterner::new().into(),
-            disabled_symbols: BTreeSet::new(),
+            disabled_symbols: None,
             #[cfg(not(feature = "no_custom_syntax"))]
-            custom_keywords: std::collections::BTreeMap::new(),
+            custom_keywords: None,
             #[cfg(not(feature = "no_custom_syntax"))]
-            custom_syntax: std::collections::BTreeMap::new(),
+            custom_syntax: None,
 
             def_var_filter: None,
             resolve_var: None,
@@ -302,8 +309,8 @@ impl Engine {
         };
 
         // Add the global namespace module
-        let mut global_namespace = Module::with_capacity(0);
-        global_namespace.internal = true;
+        let mut global_namespace = Module::new();
+        global_namespace.flags |= ModuleFlags::INTERNAL;
         engine.global_modules.push(global_namespace.into());
 
         engine

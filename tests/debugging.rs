@@ -59,13 +59,13 @@ fn test_debugger_state() -> Result<(), Box<EvalAltResult>> {
             // Print debugger state - which is an object map
             println!(
                 "Current state = {}",
-                context.global_runtime_state_mut().debugger.state()
+                context.global_runtime_state_mut().debugger().state()
             );
 
             // Modify state
             let mut state = context
                 .global_runtime_state_mut()
-                .debugger
+                .debugger_mut()
                 .state_mut()
                 .write_lock::<Map>()
                 .unwrap();

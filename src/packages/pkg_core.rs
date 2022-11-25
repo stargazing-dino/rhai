@@ -3,6 +3,7 @@ use std::prelude::v1::*;
 
 use super::*;
 use crate::def_package;
+use crate::module::ModuleFlags;
 
 def_package! {
     /// Core package containing basic facilities.
@@ -23,6 +24,6 @@ def_package! {
             BasicFnPackage,
             #[cfg(feature = "debugging")] DebuggingPackage
         {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
     }
 }

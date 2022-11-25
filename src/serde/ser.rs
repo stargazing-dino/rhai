@@ -1,6 +1,6 @@
 //! Implement serialization support of [`Dynamic`][crate::Dynamic] for [`serde`].
 
-use crate::{Dynamic, Identifier, Position, RhaiError, RhaiResult, RhaiResultOf, ERR};
+use crate::{Dynamic, Identifier, Position, RhaiError, RhaiResult, RhaiResultOf, ERR, INT};
 use serde::ser::{
     Error, SerializeMap, SerializeSeq, SerializeStruct, SerializeTuple, SerializeTupleStruct,
 };
@@ -8,6 +8,9 @@ use serde::{Serialize, Serializer};
 use std::fmt;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+
+#[cfg(feature = "decimal")]
+use num_traits::FromPrimitive;
 
 /// Serializer for [`Dynamic`][crate::Dynamic].
 pub struct DynamicSerializer {
@@ -37,8 +40,9 @@ impl DynamicSerializer {
 /// # #[cfg(not(feature = "no_index"))]
 /// # #[cfg(not(feature = "no_object"))]
 /// # #[cfg(not(feature = "no_float"))]
+/// # #[cfg(not(feature = "f32_float"))]
 /// # {
-/// use rhai::{Dynamic, Array, Map, INT};
+/// use rhai::{Dynamic, Array, Map};
 /// use rhai::serde::to_dynamic;
 /// use serde::Serialize;
 ///
@@ -112,151 +116,166 @@ impl Serializer for &mut DynamicSerializer {
 
     #[inline(always)]
     fn serialize_i8(self, v: i8) -> RhaiResultOf<Self::Ok> {
-        #[cfg(not(feature = "only_i32"))]
-        return self.serialize_i64(i64::from(v));
-        #[cfg(feature = "only_i32")]
-        return self.serialize_i32(i32::from(v));
+        Ok(INT::from(v).into())
     }
 
     #[inline(always)]
     fn serialize_i16(self, v: i16) -> RhaiResultOf<Self::Ok> {
-        #[cfg(not(feature = "only_i32"))]
-        return self.serialize_i64(i64::from(v));
-        #[cfg(feature = "only_i32")]
-        return self.serialize_i32(i32::from(v));
+        Ok(INT::from(v).into())
     }
 
     #[inline(always)]
     fn serialize_i32(self, v: i32) -> RhaiResultOf<Self::Ok> {
-        #[cfg(not(feature = "only_i32"))]
-        return self.serialize_i64(i64::from(v));
-        #[cfg(feature = "only_i32")]
-        return Ok(v.into());
+        Ok(INT::from(v).into())
     }
 
     #[inline]
     fn serialize_i64(self, v: i64) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
-        {
-            Ok(v.into())
-        }
+        return Ok(v.into());
+
         #[cfg(feature = "only_i32")]
-        if v > i32::MAX as i64 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.serialize_i32(v as i32)
+        if v <= INT::MAX as i64 {
+            return Ok(Dynamic::from(v as INT));
+        }
+
+        #[allow(unreachable_code)]
+        {
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_i64(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
+
+            #[cfg(not(feature = "no_float"))]
+            return Ok(Dynamic::from_float(v as crate::FLOAT));
+
+            Err(Error::custom(format!("integer number too large: {v}")))
         }
     }
 
     #[inline]
     fn serialize_i128(self, v: i128) -> RhaiResultOf<Self::Ok> {
-        #[cfg(not(feature = "only_i32"))]
-        if v > i64::MAX as i128 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.serialize_i64(v as i64)
+        if v <= i128::from(INT::MAX) {
+            return Ok(Dynamic::from(v as INT));
         }
-        #[cfg(feature = "only_i32")]
-        if v > i32::MAX as i128 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.serialize_i32(v as i32)
+
+        #[allow(unreachable_code)]
+        {
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_i128(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
+
+            #[cfg(not(feature = "no_float"))]
+            return Ok(Dynamic::from_float(v as crate::FLOAT));
+
+            Err(Error::custom(format!("integer number too large: {v}")))
         }
     }
 
     #[inline(always)]
     fn serialize_u8(self, v: u8) -> RhaiResultOf<Self::Ok> {
-        #[cfg(not(feature = "only_i32"))]
-        return self.serialize_i64(i64::from(v));
-        #[cfg(feature = "only_i32")]
-        return self.serialize_i32(i32::from(v));
+        Ok(INT::from(v).into())
     }
 
     #[inline(always)]
     fn serialize_u16(self, v: u16) -> RhaiResultOf<Self::Ok> {
-        #[cfg(not(feature = "only_i32"))]
-        return self.serialize_i64(i64::from(v));
-        #[cfg(feature = "only_i32")]
-        return self.serialize_i32(i32::from(v));
+        Ok(INT::from(v).into())
     }
 
     #[inline]
     fn serialize_u32(self, v: u32) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "only_i32"))]
-        {
-            self.serialize_i64(i64::from(v))
-        }
+        return Ok(Dynamic::from(v as INT));
+
         #[cfg(feature = "only_i32")]
-        if v > i32::MAX as u32 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.serialize_i32(v as i32)
+        if v <= INT::MAX as u32 {
+            return Ok(Dynamic::from(v as INT));
+        }
+
+        #[allow(unreachable_code)]
+        {
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_u32(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
+
+            #[cfg(not(feature = "no_float"))]
+            return Ok(Dynamic::from_float(v as crate::FLOAT));
+
+            Err(Error::custom(format!("integer number too large: {v}")))
         }
     }
 
     #[inline]
     fn serialize_u64(self, v: u64) -> RhaiResultOf<Self::Ok> {
-        #[cfg(not(feature = "only_i32"))]
-        if v > i64::MAX as u64 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.serialize_i64(v as i64)
+        if v <= INT::MAX as u64 {
+            return Ok(Dynamic::from(v as INT));
         }
-        #[cfg(feature = "only_i32")]
-        if v > i32::MAX as u64 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.serialize_i32(v as i32)
+
+        #[cfg(feature = "decimal")]
+        if let Some(n) = rust_decimal::Decimal::from_u64(v) {
+            return Ok(Dynamic::from_decimal(n));
         }
+
+        #[cfg(not(feature = "no_float"))]
+        return Ok(Dynamic::from_float(v as crate::FLOAT));
+
+        #[allow(unreachable_code)]
+        Err(Error::custom(format!("integer number too large: {v}")))
     }
 
     #[inline]
     fn serialize_u128(self, v: u128) -> RhaiResultOf<Self::Ok> {
-        #[cfg(not(feature = "only_i32"))]
-        if v > i64::MAX as u128 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.serialize_i64(v as i64)
+        if v <= INT::MAX as u128 {
+            return Ok(Dynamic::from(v as INT));
         }
-        #[cfg(feature = "only_i32")]
-        if v > i32::MAX as u128 {
-            Ok(Dynamic::from(v))
-        } else {
-            self.serialize_i32(v as i32)
+
+        #[cfg(feature = "decimal")]
+        if let Some(n) = rust_decimal::Decimal::from_u128(v) {
+            return Ok(Dynamic::from_decimal(n));
         }
+
+        #[cfg(not(feature = "no_float"))]
+        return Ok(Dynamic::from_float(v as crate::FLOAT));
+
+        #[allow(unreachable_code)]
+        Err(Error::custom(format!("integer number too large: {v}")))
     }
 
-    #[inline]
+    #[inline(always)]
     fn serialize_f32(self, v: f32) -> RhaiResultOf<Self::Ok> {
-        #[cfg(any(not(feature = "no_float"), not(feature = "decimal")))]
-        return Ok(Dynamic::from(v));
+        #[cfg(not(feature = "no_float"))]
+        return Ok((v as crate::FLOAT).into());
 
-        #[cfg(feature = "no_float")]
-        #[cfg(feature = "decimal")]
+        #[allow(unreachable_code)]
         {
-            use rust_decimal::Decimal;
-            use std::convert::TryFrom;
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_f32(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
 
-            Decimal::try_from(v)
-                .map(|v| v.into())
-                .map_err(Error::custom)
+            Err(Error::custom(format!(
+                "floating-point number is not supported: {v}"
+            )))
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn serialize_f64(self, v: f64) -> RhaiResultOf<Self::Ok> {
-        #[cfg(any(not(feature = "no_float"), not(feature = "decimal")))]
-        return Ok(Dynamic::from(v));
+        #[cfg(not(feature = "no_float"))]
+        return Ok((v as crate::FLOAT).into());
 
-        #[cfg(feature = "no_float")]
-        #[cfg(feature = "decimal")]
+        #[allow(unreachable_code)]
         {
-            use rust_decimal::Decimal;
-            use std::convert::TryFrom;
+            #[cfg(feature = "decimal")]
+            if let Some(n) = rust_decimal::Decimal::from_f64(v) {
+                return Ok(Dynamic::from_decimal(n));
+            }
 
-            Decimal::try_from(v)
-                .map(|v| v.into())
-                .map_err(Error::custom)
+            Err(Error::custom(format!(
+                "floating-point number is not supported: {v}"
+            )))
         }
     }
 
@@ -332,10 +351,7 @@ impl Serializer for &mut DynamicSerializer {
         _value: &T,
     ) -> RhaiResultOf<Self::Ok> {
         #[cfg(not(feature = "no_object"))]
-        {
-            let content = to_dynamic(_value)?;
-            make_variant(_variant, content)
-        }
+        return Ok(make_variant(_variant, to_dynamic(_value)?));
         #[cfg(feature = "no_object")]
         return Err(ERR::ErrorMismatchDataType(
             "".into(),
@@ -688,7 +704,7 @@ impl serde::ser::SerializeTupleVariant for TupleVariantSerializer {
 
     #[inline]
     fn end(self) -> RhaiResultOf<Self::Ok> {
-        make_variant(self.variant, self.array.into())
+        Ok(make_variant(self.variant, self.array.into()))
     }
 }
 
@@ -716,14 +732,14 @@ impl serde::ser::SerializeStructVariant for StructVariantSerializer {
 
     #[inline]
     fn end(self) -> RhaiResultOf<Self::Ok> {
-        make_variant(self.variant, self.map.into())
+        Ok(make_variant(self.variant, self.map.into()))
     }
 }
 
 #[cfg(not(feature = "no_object"))]
 #[inline]
-fn make_variant(variant: &'static str, value: Dynamic) -> RhaiResult {
+fn make_variant(variant: &'static str, value: Dynamic) -> Dynamic {
     let mut map = crate::Map::new();
     map.insert(variant.into(), value);
-    Ok(map.into())
+    map.into()
 }

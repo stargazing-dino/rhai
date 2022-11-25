@@ -18,6 +18,7 @@ use std::{
 /// Options for calling a script-defined function via [`Engine::call_fn_with_options`].
 #[derive(Debug, Hash)]
 #[non_exhaustive]
+#[must_use]
 pub struct CallFnOptions<'t> {
     /// A value for binding to the `this` pointer (if any).
     pub this_ptr: Option<&'t mut Dynamic>,
@@ -120,7 +121,7 @@ impl Engine {
         name: impl AsRef<str>,
         args: impl FuncArgs,
     ) -> RhaiResultOf<T> {
-        self.call_fn_with_options(Default::default(), scope, ast, name, args)
+        self.call_fn_with_options(CallFnOptions::default(), scope, ast, name, args)
     }
     /// Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
     ///
@@ -255,25 +256,28 @@ impl Engine {
             #[cfg(not(feature = "no_closure"))]
             crate::func::ensure_no_data_race(name, args, false).map(|_| Dynamic::UNIT)?;
 
-            if let Some(fn_def) = ast.shared_lib().get_script_fn(name, args.len()) {
-                self.call_script_fn(
-                    global,
-                    caches,
-                    scope,
-                    this_ptr,
-                    fn_def,
-                    args,
-                    rewind_scope,
-                    Position::NONE,
+            ast.shared_lib()
+                .get_script_fn(name, args.len())
+                .map_or_else(
+                    || Err(ERR::ErrorFunctionNotFound(name.into(), Position::NONE).into()),
+                    |fn_def| {
+                        self.call_script_fn(
+                            global,
+                            caches,
+                            scope,
+                            this_ptr,
+                            fn_def,
+                            args,
+                            rewind_scope,
+                            Position::NONE,
+                        )
+                    },
                 )
-            } else {
-                Err(ERR::ErrorFunctionNotFound(name.into(), Position::NONE).into())
-            }
         });
 
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {
-            global.debugger.status = crate::eval::DebuggerStatus::Terminate;
+            global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
             self.run_debugger(global, caches, scope, this_ptr, node)?;
         }

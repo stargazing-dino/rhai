@@ -83,7 +83,10 @@ impl Engine {
         let orig_imports_len = global.num_imports();
 
         #[cfg(feature = "debugging")]
-        let orig_call_stack_len = global.debugger.call_stack().len();
+        let orig_call_stack_len = global
+            .debugger
+            .as_ref()
+            .map_or(0, |dbg| dbg.call_stack().len());
 
         // Put arguments into scope as variables
         scope.extend(fn_def.params.iter().cloned().zip(args.iter_mut().map(|v| {
@@ -94,10 +97,12 @@ impl Engine {
         // Push a new call stack frame
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {
-            global.debugger.push_call_stack_frame(
+            let source = global.source.clone();
+
+            global.debugger_mut().push_call_stack_frame(
                 fn_def.name.clone(),
                 scope.iter().skip(orig_scope_len).map(|(.., v)| v).collect(),
-                global.source.clone(),
+                source,
                 pos,
             );
         }
@@ -126,7 +131,7 @@ impl Engine {
         };
 
         #[cfg(feature = "debugging")]
-        {
+        if self.debugger.is_some() {
             let node = crate::ast::Stmt::Noop(fn_def.body.position());
             self.run_debugger(global, caches, scope, this_ptr, &node)?;
         }
@@ -156,12 +161,13 @@ impl Engine {
             });
 
         #[cfg(feature = "debugging")]
-        {
-            let trigger = match global.debugger.status {
+        if self.debugger.is_some() {
+            let trigger = match global.debugger_mut().status {
                 crate::eval::DebuggerStatus::FunctionExit(n) => n >= global.level,
                 crate::eval::DebuggerStatus::Next(.., true) => true,
                 _ => false,
             };
+
             if trigger {
                 let node = crate::ast::Stmt::Noop(fn_def.body.end_position().or_else(pos));
                 let node = (&node).into();
@@ -176,7 +182,11 @@ impl Engine {
             }
 
             // Pop the call stack
-            global.debugger.rewind_call_stack(orig_call_stack_len);
+            global
+                .debugger
+                .as_mut()
+                .unwrap()
+                .rewind_call_stack(orig_call_stack_len);
         }
 
         // Remove all local variables and imported modules
@@ -226,7 +236,7 @@ impl Engine {
             // Then check imported modules
             global.contains_qualified_fn(hash_script)
             // Then check sub-modules
-            || self.global_sub_modules.values().any(|m| m.contains_qualified_fn(hash_script));
+            || self.global_sub_modules.iter().flat_map(|m| m.values()).any(|m| m.contains_qualified_fn(hash_script));
 
         if !result && !cache.filter.is_absent_and_set(hash_script) {
             // Do not cache "one-hit wonders"

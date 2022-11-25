@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{def_package, Position, RhaiResultOf, ERR, INT};
 #[cfg(feature = "no_std")]
@@ -54,7 +55,7 @@ macro_rules! reg_functions {
 def_package! {
     /// Basic mathematical package.
     pub BasicMathPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         // Integer functions
         combine_with_exported_module!(lib, "int", int_functions);
@@ -144,6 +145,7 @@ mod int_functions {
             );
         }
 
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         INT::from_str_radix(string.trim(), radix as u32).map_err(|err| {
             ERR::ErrorArithmetic(
                 format!("Error parsing integer number '{string}': {err}"),
@@ -157,8 +159,6 @@ mod int_functions {
 #[cfg(not(feature = "no_float"))]
 #[export_module]
 mod trig_functions {
-    use crate::FLOAT;
-
     /// Return the sine of the floating-point number in radians.
     pub fn sin(x: FLOAT) -> FLOAT {
         x.sin()
@@ -221,8 +221,6 @@ mod trig_functions {
 #[cfg(not(feature = "no_float"))]
 #[export_module]
 mod float_functions {
-    use crate::FLOAT;
-
     /// Return the natural number _e_.
     #[rhai_fn(name = "E")]
     pub fn e() -> FLOAT {
@@ -312,6 +310,7 @@ mod float_functions {
     /// Convert the floating-point number into an integer.
     #[rhai_fn(name = "to_int", return_raw)]
     pub fn f32_to_int(x: f32) -> RhaiResultOf<INT> {
+        #[allow(clippy::cast_precision_loss)]
         if cfg!(not(feature = "unchecked")) && (x > (INT::MAX as f32) || x < (INT::MIN as f32)) {
             Err(
                 ERR::ErrorArithmetic(format!("Integer overflow: to_int({x})"), Position::NONE)
@@ -324,6 +323,7 @@ mod float_functions {
     /// Convert the floating-point number into an integer.
     #[rhai_fn(name = "to_int", return_raw)]
     pub fn f64_to_int(x: f64) -> RhaiResultOf<INT> {
+        #[allow(clippy::cast_precision_loss)]
         if cfg!(not(feature = "unchecked")) && (x > (INT::MAX as f64) || x < (INT::MIN as f64)) {
             Err(
                 ERR::ErrorArithmetic(format!("Integer overflow: to_int({x})"), Position::NONE)
@@ -356,7 +356,7 @@ mod float_functions {
     #[cfg(not(feature = "f32_float"))]
     #[rhai_fn(name = "to_float")]
     pub fn f32_to_f64(x: f32) -> f64 {
-        x as f64
+        x.into()
     }
 }
 
@@ -477,6 +477,7 @@ mod decimal_functions {
             }
         }
 
+        #[allow(clippy::cast_sign_loss)]
         Ok(x.round_dp(digits as u32))
     }
     /// Round the decimal number to the specified number of `digits` after the decimal point and return it.
@@ -494,6 +495,7 @@ mod decimal_functions {
             }
         }
 
+        #[allow(clippy::cast_sign_loss)]
         Ok(x.round_dp_with_strategy(digits as u32, RoundingStrategy::AwayFromZero))
     }
     /// Round the decimal number to the specified number of `digits` after the decimal point and return it.
@@ -511,6 +513,7 @@ mod decimal_functions {
             }
         }
 
+        #[allow(clippy::cast_sign_loss)]
         Ok(x.round_dp_with_strategy(digits as u32, RoundingStrategy::ToZero))
     }
     /// Round the decimal number to the specified number of `digits` after the decimal point and return it.
@@ -528,6 +531,7 @@ mod decimal_functions {
             }
         }
 
+        #[allow(clippy::cast_sign_loss)]
         Ok(x.round_dp_with_strategy(digits as u32, RoundingStrategy::MidpointAwayFromZero))
     }
     /// Round the decimal number to the specified number of `digits` after the decimal point and return it.
@@ -545,6 +549,7 @@ mod decimal_functions {
             }
         }
 
+        #[allow(clippy::cast_sign_loss)]
         Ok(x.round_dp_with_strategy(digits as u32, RoundingStrategy::MidpointTowardZero))
     }
     /// Convert the decimal number into an integer.
@@ -562,14 +567,15 @@ mod decimal_functions {
             return Some(n);
         });
 
-        match n {
-            Some(n) => Ok(n),
-            _ => Err(ERR::ErrorArithmetic(
-                format!("Integer overflow: to_int({x})"),
-                Position::NONE,
-            )
-            .into()),
-        }
+        n.map_or_else(
+            || {
+                Err(
+                    ERR::ErrorArithmetic(format!("Integer overflow: to_int({x})"), Position::NONE)
+                        .into(),
+                )
+            },
+            Ok,
+        )
     }
     /// Return the integral part of the decimal number.
     #[rhai_fn(name = "int", get = "int")]

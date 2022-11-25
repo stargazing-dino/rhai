@@ -107,7 +107,9 @@ impl Engine {
     /// ```
     #[inline(always)]
     pub fn disable_symbol(&mut self, symbol: impl Into<Identifier>) -> &mut Self {
-        self.disabled_symbols.insert(symbol.into());
+        self.disabled_symbols
+            .get_or_insert_with(Default::default)
+            .insert(symbol.into());
         self
     }
 
@@ -163,24 +165,30 @@ impl Engine {
             // Active standard keywords cannot be made custom
             // Disabled keywords are OK
             Some(token) if token.is_standard_keyword() => {
-                if self.disabled_symbols.is_empty()
-                    || !self.disabled_symbols.contains(&*token.syntax())
+                if !self
+                    .disabled_symbols
+                    .as_ref()
+                    .map_or(false, |m| m.contains(token.literal_syntax()))
                 {
                     return Err(format!("'{keyword}' is a reserved keyword"));
                 }
             }
             // Active standard symbols cannot be made custom
             Some(token) if token.is_standard_symbol() => {
-                if self.disabled_symbols.is_empty()
-                    || !self.disabled_symbols.contains(&*token.syntax())
+                if !self
+                    .disabled_symbols
+                    .as_ref()
+                    .map_or(false, |m| m.contains(token.literal_syntax()))
                 {
                     return Err(format!("'{keyword}' is a reserved operator"));
                 }
             }
             // Active standard symbols cannot be made custom
             Some(token)
-                if self.disabled_symbols.is_empty()
-                    || !self.disabled_symbols.contains(&*token.syntax()) =>
+                if !self
+                    .disabled_symbols
+                    .as_ref()
+                    .map_or(false, |m| m.contains(token.literal_syntax())) =>
             {
                 return Err(format!("'{keyword}' is a reserved symbol"))
             }
@@ -190,6 +198,7 @@ impl Engine {
 
         // Add to custom keywords
         self.custom_keywords
+            .get_or_insert_with(Default::default)
             .insert(keyword.into(), Some(precedence));
 
         Ok(self)
@@ -198,7 +207,7 @@ impl Engine {
     /// Get the default value of the custom state for each evaluation run.
     #[inline(always)]
     #[must_use]
-    pub fn default_tag(&self) -> &Dynamic {
+    pub const fn default_tag(&self) -> &Dynamic {
         &self.def_tag
     }
     /// Get a mutable reference to the default value of the custom state for each evaluation run.

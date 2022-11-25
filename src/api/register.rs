@@ -683,13 +683,14 @@ impl Engine {
         name: impl AsRef<str>,
         module: SharedModule,
     ) -> &mut Self {
+        use std::collections::BTreeMap;
+
         fn register_static_module_raw(
-            root: &mut std::collections::BTreeMap<Identifier, SharedModule>,
+            root: &mut BTreeMap<Identifier, SharedModule>,
             name: &str,
             module: SharedModule,
         ) {
-            let separator = crate::tokenizer::Token::DoubleColon.syntax();
-            let separator = separator.as_ref();
+            let separator = crate::tokenizer::Token::DoubleColon.literal_syntax();
 
             if name.contains(separator) {
                 let mut iter = name.splitn(2, separator);
@@ -718,7 +719,11 @@ impl Engine {
             }
         }
 
-        register_static_module_raw(&mut self.global_sub_modules, name.as_ref(), module);
+        register_static_module_raw(
+            self.global_sub_modules.get_or_insert_with(Default::default),
+            name.as_ref(),
+            module,
+        );
         self
     }
     /// _(metadata)_ Generate a list of all registered functions.
@@ -738,15 +743,21 @@ impl Engine {
         signatures.extend(self.global_namespace().gen_fn_signatures());
 
         #[cfg(not(feature = "no_module"))]
-        for (name, m) in &self.global_sub_modules {
+        for (name, m) in self.global_sub_modules.iter().flat_map(|m| m.iter()) {
             signatures.extend(m.gen_fn_signatures().map(|f| format!("{name}::{f}")));
         }
+
+        let exclude_flags = if include_packages {
+            crate::module::ModuleFlags::INTERNAL
+        } else {
+            crate::module::ModuleFlags::INTERNAL | crate::module::ModuleFlags::STANDARD_LIB
+        };
 
         signatures.extend(
             self.global_modules
                 .iter()
                 .skip(1)
-                .filter(|m| !m.internal && (include_packages || !m.standard))
+                .filter(|m| !m.flags.contains(exclude_flags))
                 .flat_map(|m| m.gen_fn_signatures()),
         );
 

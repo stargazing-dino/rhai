@@ -772,7 +772,7 @@ impl AST {
     /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     #[inline]
-    pub fn iter_functions<'a>(&'a self) -> impl Iterator<Item = super::ScriptFnMetadata> + 'a {
+    pub fn iter_functions(&self) -> impl Iterator<Item = super::ScriptFnMetadata> {
         self.lib
             .iter_script_fn()
             .map(|(.., fn_def)| fn_def.as_ref().into())
@@ -942,7 +942,7 @@ impl Borrow<crate::Module> for AST {
     #[inline(always)]
     #[must_use]
     fn borrow(&self) -> &crate::Module {
-        &self.shared_lib()
+        self.shared_lib()
     }
 }
 
@@ -1012,7 +1012,20 @@ impl PartialEq for ASTNode<'_> {
 impl Eq for ASTNode<'_> {}
 
 impl ASTNode<'_> {
+    /// Is this [`ASTNode`] a [`Stmt`]?
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_stmt(&self) -> bool {
+        matches!(self, Self::Stmt(..))
+    }
+    /// Is this [`ASTNode`] an [`Expr`]?
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_expr(&self) -> bool {
+        matches!(self, Self::Expr(..))
+    }
     /// Get the [`Position`] of this [`ASTNode`].
+    #[inline]
     #[must_use]
     pub fn position(&self) -> Position {
         match self {

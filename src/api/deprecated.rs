@@ -3,8 +3,8 @@
 use crate::func::RegisterNativeFunction;
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, EvalAltResult, FnPtr, Identifier, ImmutableString, NativeCallContext,
-    Position, RhaiResult, RhaiResultOf, Scope, SharedModule, AST,
+    Dynamic, Engine, EvalAltResult, FnPtr, Identifier, ImmutableString, Module, NativeCallContext,
+    Position, RhaiResult, RhaiResultOf, Scope, SharedModule, TypeBuilder, AST,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -534,7 +534,7 @@ impl Position {
 }
 
 #[allow(deprecated)]
-impl<'a, T: Variant + Clone> crate::TypeBuilder<'a, T> {
+impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// Register a custom fallible function.
     ///
     /// # Deprecated
@@ -640,5 +640,21 @@ impl<'a, T: Variant + Clone> crate::TypeBuilder<'a, T> {
             + 'static,
     ) -> &mut Self {
         self.with_indexer_set(set_fn)
+    }
+}
+
+impl Module {
+    /// Create a new [`Module`] with a pre-sized capacity for functions.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated. Use `new` instead.
+    ///
+    /// This method will be removed in the next major version.
+    #[inline(always)]
+    #[must_use]
+    #[deprecated(since = "1.12.0", note = "use `new` instead")]
+    pub fn with_capacity(_capacity: usize) -> Self {
+        Self::new()
     }
 }

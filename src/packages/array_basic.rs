@@ -2,6 +2,7 @@
 
 use crate::engine::OP_EQUALS;
 use crate::eval::{calc_index, calc_offset_len};
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
     def_package, Array, Dynamic, ExclusiveRange, FnPtr, InclusiveRange, NativeCallContext,
@@ -14,7 +15,7 @@ use std::{any::TypeId, cmp::Ordering, mem};
 def_package! {
     /// Package of basic array utilities.
     pub BasicArrayPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         combine_with_exported_module!(lib, "array", array_functions);
 
@@ -229,6 +230,8 @@ pub mod array_functions {
         // Check if array will be over max size limit
         #[cfg(not(feature = "unchecked"))]
         {
+            use crate::types::dynamic::Union;
+
             if _ctx.engine().max_array_size() > 0 && len > _ctx.engine().max_array_size() {
                 return Err(
                     ERR::ErrorDataTooLarge("Size of array".to_string(), Position::NONE).into(),
@@ -236,10 +239,10 @@ pub mod array_functions {
             }
 
             let check_sizes = match item.0 {
-                crate::types::dynamic::Union::Str(..) => true,
-                crate::types::dynamic::Union::Array(..) => true,
+                Union::Str(..) => true,
+                Union::Array(..) => true,
                 #[cfg(not(feature = "no_object"))]
-                crate::types::dynamic::Union::Map(..) => true,
+                Union::Map(..) => true,
                 _ => false,
             };
 
@@ -247,8 +250,8 @@ pub mod array_functions {
                 let mut arr_len = array.len();
                 let mut arr = Dynamic::from_array(mem::take(array));
 
-                let (mut a1, mut m1, mut s1) = crate::Engine::calc_data_sizes(&arr, true);
-                let (a2, m2, s2) = crate::Engine::calc_data_sizes(&item, true);
+                let (mut a1, mut m1, mut s1) = arr.calc_data_sizes(true);
+                let (a2, m2, s2) = item.calc_data_sizes(true);
 
                 {
                     let mut guard = arr.write_lock::<Array>().unwrap();

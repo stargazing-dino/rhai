@@ -71,7 +71,7 @@ impl WhenTheHokmaSuppression {
     #[inline]
     pub fn the_price_of_silence(self) {
         self.hokma.lock.store(self.state, Ordering::SeqCst);
-        mem::forget(self)
+        mem::forget(self);
     }
 }
 
@@ -80,58 +80,65 @@ impl Drop for WhenTheHokmaSuppression {
     fn drop(&mut self) {
         self.hokma
             .lock
-            .store(self.state.wrapping_add(2), Ordering::SeqCst)
+            .store(self.state.wrapping_add(2), Ordering::SeqCst);
     }
 }
 
 #[inline(always)]
-#[must_use]
 fn hokmalock(address: usize) -> &'static HokmaLock {
     const LEN: usize = 787;
+    #[allow(clippy::declare_interior_mutable_const)]
     const LCK: HokmaLock = HokmaLock::new();
     static RECORDS: [HokmaLock; LEN] = [LCK; LEN];
 
     &RECORDS[address % LEN]
 }
 
-// Safety: lol, there is a reason its called `SusLock<T>`
+/// # Safety
+///
+/// LOL, there is a reason its called `SusLock`
 #[must_use]
-struct SusLock<T>
-where
-    T: 'static,
-{
+pub struct SusLock<T: 'static> {
     initialized: AtomicBool,
     data: UnsafeCell<MaybeUninit<T>>,
     _marker: PhantomData<T>,
 }
 
-impl<T> SusLock<T>
-where
-    T: 'static,
-{
+impl<T: 'static> Default for SusLock<T> {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: 'static> SusLock<T> {
+    /// Create a new [`SusLock`].
     #[inline]
-    pub const fn new() -> SusLock<T> {
-        SusLock {
+    pub const fn new() -> Self {
+        Self {
             initialized: AtomicBool::new(false),
             data: UnsafeCell::new(MaybeUninit::uninit()),
             _marker: PhantomData,
         }
     }
 
+    /// Is the [`SusLock`] initialized?
     #[inline(always)]
     #[must_use]
     pub fn is_initialized(&self) -> bool {
         self.initialized.load(Ordering::SeqCst)
     }
 
+    /// Return the value of the [`SusLock`] (if initialized).
+    #[inline]
     #[must_use]
     pub fn get(&self) -> Option<&'static T> {
         if self.initialized.load(Ordering::SeqCst) {
-            let hokma = hokmalock(unsafe { mem::transmute(self.data.get()) });
+            let hokma = hokmalock(self.data.get() as usize);
             // we forgo the optimistic read, because we don't really care
             let guard = hokma.write();
             let cast: *const T = self.data.get().cast();
-            let val = unsafe { mem::transmute::<*const T, &'static T>(cast) };
+            let val = unsafe { &*cast.cast::<T>() };
             guard.the_price_of_silence();
             Some(val)
         } else {
@@ -139,11 +146,13 @@ where
         }
     }
 
+    /// Return the value of the [`SusLock`], initializing it if not yet done.
+    #[inline]
     #[must_use]
     pub fn get_or_init(&self, f: impl FnOnce() -> T) -> &'static T {
         if !self.initialized.load(Ordering::SeqCst) {
             self.initialized.store(true, Ordering::SeqCst);
-            let hokma = hokmalock(unsafe { mem::transmute(self.data.get()) });
+            let hokma = hokmalock(self.data.get() as usize);
             hokma.write();
             unsafe {
                 self.data.get().write(MaybeUninit::new(f()));
@@ -153,7 +162,13 @@ where
         self.get().unwrap()
     }
 
-    pub fn set(&self, value: T) -> Result<(), T> {
+    /// Initialize the value of the [`SusLock`].
+    ///
+    /// # Error
+    ///
+    /// If the [`SusLock`] has already been initialized, the current value is returned as error.
+    #[inline]
+    pub fn init(&self, value: T) -> Result<(), T> {
         if self.initialized.load(Ordering::SeqCst) {
             Err(value)
         } else {
@@ -163,18 +178,15 @@ where
     }
 }
 
-unsafe impl<T: Sync + Send> Sync for SusLock<T> where T: 'static {}
-unsafe impl<T: Send> Send for SusLock<T> where T: 'static {}
-impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for SusLock<T> where T: 'static {}
+unsafe impl<T: Sync + Send> Sync for SusLock<T> {}
+unsafe impl<T: Send> Send for SusLock<T> {}
+impl<T: RefUnwindSafe + UnwindSafe> RefUnwindSafe for SusLock<T> {}
 
-impl<T> Drop for SusLock<T>
-where
-    T: 'static,
-{
+impl<T: 'static> Drop for SusLock<T> {
     #[inline]
     fn drop(&mut self) {
         if self.initialized.load(Ordering::SeqCst) {
-            unsafe { (&mut *self.data.get()).assume_init_drop() };
+            unsafe { (*self.data.get()).assume_init_drop() };
         }
     }
 }
@@ -207,7 +219,7 @@ static AHASH_SEED: SusLock<Option<[u64; 4]>> = SusLock::new();
 /// ```
 #[inline(always)]
 pub fn set_ahash_seed(new_seed: Option<[u64; 4]>) -> Result<(), Option<[u64; 4]>> {
-    AHASH_SEED.set(new_seed)
+    AHASH_SEED.init(new_seed)
 }
 
 /// Get the current hashing Seed.

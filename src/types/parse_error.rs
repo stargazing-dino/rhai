@@ -175,7 +175,6 @@ impl ParseErrorType {
     /// Make a [`ParseError`] using the current type and position.
     #[cold]
     #[inline(never)]
-    #[must_use]
     pub(crate) fn into_err(self, pos: Position) -> ParseError {
         ParseError(self.into(), pos)
     }
@@ -299,7 +298,6 @@ impl ParseError {
     /// Get the [type][ParseErrorType] of this parse error.
     #[cold]
     #[inline(never)]
-    #[must_use]
     pub const fn err_type(&self) -> &ParseErrorType {
         &self.0
     }
@@ -316,7 +314,7 @@ impl From<ParseErrorType> for RhaiError {
     #[cold]
     #[inline(never)]
     fn from(err: ParseErrorType) -> Self {
-        Box::new(err.into())
+        Self::new(err.into())
     }
 }
 
@@ -332,7 +330,7 @@ impl From<ParseError> for RhaiError {
     #[cold]
     #[inline(never)]
     fn from(err: ParseError) -> Self {
-        Box::new(err.into())
+        Self::new(err.into())
     }
 }
 

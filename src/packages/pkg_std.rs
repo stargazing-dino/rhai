@@ -3,6 +3,7 @@ use std::prelude::v1::*;
 
 use super::*;
 use crate::def_package;
+use crate::module::ModuleFlags;
 
 def_package! {
     /// Standard package containing all built-in features.
@@ -29,6 +30,6 @@ def_package! {
             #[cfg(not(feature = "no_time"))] BasicTimePackage,
             MoreStringPackage
     {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
     }
 }

@@ -353,6 +353,43 @@ impl Scope<'_> {
         self.values.push(value);
         self
     }
+    /// Remove the last entry from the [`Scope`].
+    ///
+    /// # Panics
+    ///
+    /// Panics is the [`Scope`] is empty.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rhai::Scope;
+    ///
+    /// let mut my_scope = Scope::new();
+    ///
+    /// my_scope.push("x", 42_i64);
+    /// my_scope.push("y", 123_i64);
+    /// assert!(my_scope.contains("x"));
+    /// assert!(my_scope.contains("y"));
+    /// assert_eq!(my_scope.len(), 2);
+    ///
+    /// my_scope.pop();
+    /// assert!(my_scope.contains("x"));
+    /// assert!(!my_scope.contains("y"));
+    /// assert_eq!(my_scope.len(), 1);
+    ///
+    /// my_scope.pop();
+    /// assert!(!my_scope.contains("x"));
+    /// assert!(!my_scope.contains("y"));
+    /// assert_eq!(my_scope.len(), 0);
+    /// assert!(my_scope.is_empty());
+    /// ```
+    #[inline(always)]
+    pub fn pop(&mut self) -> &mut Self {
+        self.names.pop().expect("`Scope` must not be empty");
+        self.values.pop().expect("`Scope` must not be empty");
+        self.aliases.pop().expect("`Scope` must not be empty");
+        self
+    }
     /// Truncate (rewind) the [`Scope`] to a previous size.
     ///
     /// # Example

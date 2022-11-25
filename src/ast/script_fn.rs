@@ -2,7 +2,7 @@
 #![cfg(not(feature = "no_function"))]
 
 use super::{FnAccess, StmtBlock};
-use crate::{ImmutableString, StaticVec};
+use crate::{FnArgsVec, ImmutableString};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{fmt, hash::Hash};
@@ -42,7 +42,7 @@ pub struct ScriptFnDef {
     /// Function access mode.
     pub access: FnAccess,
     /// Names of function parameters.
-    pub params: StaticVec<ImmutableString>,
+    pub params: FnArgsVec<ImmutableString>,
     /// _(metadata)_ Function doc-comments (if any).
     /// Exported under the `metadata` feature only.
     ///
@@ -72,7 +72,7 @@ impl fmt::Display for ScriptFnDef {
             self.params
                 .iter()
                 .map(|s| s.as_str())
-                .collect::<StaticVec<_>>()
+                .collect::<FnArgsVec<_>>()
                 .join(", ")
         )
     }
@@ -121,7 +121,7 @@ impl fmt::Display for ScriptFnMetadata<'_> {
             self.params
                 .iter()
                 .copied()
-                .collect::<StaticVec<_>>()
+                .collect::<FnArgsVec<_>>()
                 .join(", ")
         )
     }

@@ -217,6 +217,7 @@ impl Engine {
         scope_may_be_changed: bool,
         func: impl Fn(&mut EvalContext, &[Expression]) -> RhaiResult + SendSync + 'static,
     ) -> ParseResult<&mut Self> {
+        #[allow(clippy::wildcard_imports)]
         use markers::*;
 
         let mut segments = StaticVec::<ImmutableString>::new();
@@ -256,19 +257,29 @@ impl Engine {
                 // Standard or reserved keyword/symbol not in first position
                 _ if !segments.is_empty() && token.is_some() => {
                     // Make it a custom keyword/symbol if it is disabled or reserved
-                    if ((!self.disabled_symbols.is_empty() && self.disabled_symbols.contains(s))
+                    if (self
+                        .disabled_symbols
+                        .as_ref()
+                        .map_or(false, |m| m.contains(s))
                         || token.map_or(false, |v| v.is_reserved()))
-                        && (self.custom_keywords.is_empty()
-                            || !self.custom_keywords.contains_key(s))
+                        && !self
+                            .custom_keywords
+                            .as_ref()
+                            .map_or(false, |m| m.contains_key(s))
                     {
-                        self.custom_keywords.insert(s.into(), None);
+                        self.custom_keywords
+                            .get_or_insert_with(Default::default)
+                            .insert(s.into(), None);
                     }
                     s.into()
                 }
                 // Standard keyword in first position but not disabled
                 _ if segments.is_empty()
                     && token.as_ref().map_or(false, Token::is_standard_keyword)
-                    && (self.disabled_symbols.is_empty() || !self.disabled_symbols.contains(s)) =>
+                    && !self
+                        .disabled_symbols
+                        .as_ref()
+                        .map_or(false, |m| m.contains(s)) =>
                 {
                     return Err(LexError::ImproperSymbol(
                         s.to_string(),
@@ -282,12 +293,19 @@ impl Engine {
                 // Identifier in first position
                 _ if segments.is_empty() && is_valid_identifier(s) => {
                     // Make it a custom keyword/symbol if it is disabled or reserved
-                    if (!self.disabled_symbols.is_empty() && self.disabled_symbols.contains(s))
-                        || token.map_or(false, |v| v.is_reserved())
-                            && self.custom_keywords.is_empty()
-                        || !self.custom_keywords.contains_key(s)
+                    if self
+                        .disabled_symbols
+                        .as_ref()
+                        .map_or(false, |m| m.contains(s))
+                        || (token.map_or(false, |v| v.is_reserved())
+                            && !self
+                                .custom_keywords
+                                .as_ref()
+                                .map_or(false, |m| m.contains_key(s)))
                     {
-                        self.custom_keywords.insert(s.into(), None);
+                        self.custom_keywords
+                            .get_or_insert_with(Default::default)
+                            .insert(s.into(), None);
                     }
                     s.into()
                 }
@@ -372,14 +390,16 @@ impl Engine {
         scope_may_be_changed: bool,
         func: impl Fn(&mut EvalContext, &[Expression], &Dynamic) -> RhaiResult + SendSync + 'static,
     ) -> &mut Self {
-        self.custom_syntax.insert(
-            key.into(),
-            CustomSyntax {
-                parse: Box::new(parse),
-                func: Box::new(func),
-                scope_may_be_changed,
-            },
-        );
+        self.custom_syntax
+            .get_or_insert_with(Default::default)
+            .insert(
+                key.into(),
+                CustomSyntax {
+                    parse: Box::new(parse),
+                    func: Box::new(func),
+                    scope_may_be_changed,
+                },
+            );
         self
     }
 }

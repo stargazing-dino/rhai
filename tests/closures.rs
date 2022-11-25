@@ -14,7 +14,7 @@ fn test_fn_ptr_curry_call() -> Result<(), Box<EvalAltResult>> {
 
     engine.register_raw_fn(
         "call_with_arg",
-        &[TypeId::of::<FnPtr>(), TypeId::of::<INT>()],
+        [TypeId::of::<FnPtr>(), TypeId::of::<INT>()],
         |context, args| {
             let fn_ptr = std::mem::take(args[0]).cast::<FnPtr>();
             fn_ptr.call_raw(&context, None, [std::mem::take(args[1])])
@@ -165,7 +165,7 @@ fn test_closures() -> Result<(), Box<EvalAltResult>> {
 
     engine.register_raw_fn(
         "custom_call",
-        &[TypeId::of::<INT>(), TypeId::of::<FnPtr>()],
+        [TypeId::of::<INT>(), TypeId::of::<FnPtr>()],
         |context, args| {
             let func = take(args[1]).cast::<FnPtr>();
 
@@ -348,7 +348,7 @@ fn test_closures_shared_obj() -> Result<(), Box<EvalAltResult>> {
     let p1 = Rc::new(RefCell::new(41));
     let p2 = Rc::new(RefCell::new(1));
 
-    f(p1.clone(), p2.clone())?;
+    f(p1.clone(), p2)?;
 
     assert_eq!(*p1.borrow(), 42);
 

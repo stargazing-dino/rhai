@@ -58,7 +58,7 @@ impl Serialize for Dynamic {
             #[cfg(not(feature = "no_index"))]
             Union::Array(ref a, ..) => (**a).serialize(ser),
             #[cfg(not(feature = "no_index"))]
-            Union::Blob(ref a, ..) => ser.serialize_bytes(&**a),
+            Union::Blob(ref a, ..) => ser.serialize_bytes(a),
             #[cfg(not(feature = "no_object"))]
             Union::Map(ref m, ..) => {
                 let mut map = ser.serialize_map(Some(m.len()))?;

@@ -36,7 +36,12 @@ impl Engine {
 
         // Do a text-match search if the index doesn't work
         global.find_import(root).map_or_else(
-            || self.global_sub_modules.get(root).cloned(),
+            || {
+                self.global_sub_modules
+                    .as_ref()
+                    .and_then(|m| m.get(root))
+                    .cloned()
+            },
             |offset| global.get_shared_import(offset),
         )
     }
@@ -156,7 +161,7 @@ impl Engine {
                     .any(|(_, _, f, ..)| f == v.3.as_str()) =>
             {
                 let val: Dynamic =
-                    crate::FnPtr::new_unchecked(v.3.as_str(), Default::default()).into();
+                    crate::FnPtr::new_unchecked(v.3.as_str(), crate::StaticVec::default()).into();
                 return Ok(val.into());
             }
             Expr::Variable(v, None, ..) => v.0.map_or(0, NonZeroUsize::get),
@@ -186,14 +191,20 @@ impl Engine {
             match scope.search(var_name) {
                 Some(index) => index,
                 None => {
-                    return match self.global_modules.iter().find_map(|m| m.get_var(var_name)) {
-                        Some(val) => Ok(val.into()),
-                        None => Err(ERR::ErrorVariableNotFound(
-                            var_name.to_string(),
-                            expr.position(),
+                    return self
+                        .global_modules
+                        .iter()
+                        .find_map(|m| m.get_var(var_name))
+                        .map_or_else(
+                            || {
+                                Err(ERR::ErrorVariableNotFound(
+                                    var_name.to_string(),
+                                    expr.position(),
+                                )
+                                .into())
+                            },
+                            |val| Ok(val.into()),
                         )
-                        .into()),
-                    }
                 }
             }
         };
@@ -221,9 +232,10 @@ impl Engine {
             #[cfg(feature = "debugging")]
             let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
             #[cfg(feature = "debugging")]
-            let global = &mut *crate::types::RestoreOnDrop::lock(global, move |g| {
-                g.debugger.reset_status(reset)
-            });
+            let global =
+                &mut *crate::types::RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
+                    g.debugger_mut().reset_status(reset)
+                });
 
             self.track_operation(global, expr.position())?;
 
@@ -254,9 +266,10 @@ impl Engine {
         #[cfg(feature = "debugging")]
         let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
         #[cfg(feature = "debugging")]
-        let global = &mut *crate::types::RestoreOnDrop::lock(global, move |g| {
-            g.debugger.reset_status(reset)
-        });
+        let global =
+            &mut *crate::types::RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
+                g.debugger_mut().reset_status(reset)
+            });
 
         self.track_operation(global, expr.position())?;
 
@@ -307,7 +320,7 @@ impl Engine {
 
                             #[cfg(not(feature = "unchecked"))]
                             if self.has_data_size_limit() {
-                                let val_sizes = Self::calc_data_sizes(&value, true);
+                                let val_sizes = value.calc_data_sizes(true);
 
                                 total_data_sizes = (
                                     total_data_sizes.0 + val_sizes.0,
@@ -339,7 +352,7 @@ impl Engine {
 
                         #[cfg(not(feature = "unchecked"))]
                         if self.has_data_size_limit() {
-                            let delta = Self::calc_data_sizes(&value, true);
+                            let delta = value.calc_data_sizes(true);
                             total_data_sizes = (
                                 total_data_sizes.0 + delta.0,
                                 total_data_sizes.1 + delta.1,
@@ -393,13 +406,17 @@ impl Engine {
                 // The first token acts as the custom syntax's key
                 let key_token = custom.tokens.first().unwrap();
                 // The key should exist, unless the AST is compiled in a different Engine
-                let custom_def = self.custom_syntax.get(key_token.as_str()).ok_or_else(|| {
-                    Box::new(ERR::ErrorCustomSyntax(
-                        format!("Invalid custom syntax prefix: {key_token}"),
-                        custom.tokens.iter().map(<_>::to_string).collect(),
-                        *pos,
-                    ))
-                })?;
+                let custom_def = self
+                    .custom_syntax
+                    .as_ref()
+                    .and_then(|m| m.get(key_token.as_str()))
+                    .ok_or_else(|| {
+                        Box::new(ERR::ErrorCustomSyntax(
+                            format!("Invalid custom syntax prefix: {key_token}"),
+                            custom.tokens.iter().map(<_>::to_string).collect(),
+                            *pos,
+                        ))
+                    })?;
                 let mut context = EvalContext::new(self, global, caches, scope, this_ptr);
 
                 (custom_def.func)(&mut context, &expressions, &custom.state)
@@ -411,13 +428,11 @@ impl Engine {
 
             #[cfg(not(feature = "no_index"))]
             Expr::Index(..) => {
-                self.eval_dot_index_chain(global, caches, scope, this_ptr, expr, &mut None)
+                self.eval_dot_index_chain(global, caches, scope, this_ptr, expr, None)
             }
 
             #[cfg(not(feature = "no_object"))]
-            Expr::Dot(..) => {
-                self.eval_dot_index_chain(global, caches, scope, this_ptr, expr, &mut None)
-            }
+            Expr::Dot(..) => self.eval_dot_index_chain(global, caches, scope, this_ptr, expr, None),
 
             _ => unreachable!("expression cannot be evaluated: {:?}", expr),
         }

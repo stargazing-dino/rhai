@@ -12,7 +12,6 @@ use std::prelude::v1::*;
 use std::{
     fmt,
     hash::{Hash, Hasher},
-    marker::PhantomData,
     ops::AddAssign,
 };
 
@@ -24,28 +23,23 @@ pub const MAX_STRING_LEN: usize = 24;
 
 /// _(internals)_ A cache for interned strings.
 /// Exported under the `internals` feature only.
-pub struct StringsInterner<'a> {
-    /// Maximum number of strings interned.
-    pub capacity: usize,
-    /// Maximum string length.
-    pub max_string_len: usize,
+#[derive(Clone)]
+#[must_use]
+pub struct StringsInterner {
     /// Cached strings.
     cache: StraightHashMap<ImmutableString>,
     /// Bloom filter to avoid caching "one-hit wonders".
-    filter: BloomFilterU64,
-    /// Take care of the lifetime parameter.
-    dummy: PhantomData<&'a ()>,
+    bloom_filter: BloomFilterU64,
 }
 
-impl Default for StringsInterner<'_> {
+impl Default for StringsInterner {
     #[inline(always)]
-    #[must_use]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl fmt::Debug for StringsInterner<'_> {
+impl fmt::Debug for StringsInterner {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -53,17 +47,13 @@ impl fmt::Debug for StringsInterner<'_> {
     }
 }
 
-impl StringsInterner<'_> {
+impl StringsInterner {
     /// Create a new [`StringsInterner`].
     #[inline(always)]
-    #[must_use]
     pub fn new() -> Self {
         Self {
-            capacity: MAX_INTERNED_STRINGS,
-            max_string_len: MAX_STRING_LEN,
             cache: StraightHashMap::default(),
-            filter: BloomFilterU64::new(),
-            dummy: PhantomData,
+            bloom_filter: BloomFilterU64::new(),
         }
     }
 
@@ -79,20 +69,24 @@ impl StringsInterner<'_> {
     #[must_use]
     pub fn get_with_mapper<S: AsRef<str>>(
         &mut self,
-        id: &str,
+        category: &str,
         mapper: impl FnOnce(S) -> ImmutableString,
         text: S,
     ) -> ImmutableString {
         let key = text.as_ref();
 
         let hasher = &mut get_hasher();
-        id.hash(hasher);
+        category.hash(hasher);
         key.hash(hasher);
         let hash = hasher.finish();
 
         // Cache long strings only on the second try to avoid caching "one-hit wonders".
-        if key.len() > MAX_STRING_LEN && self.filter.is_absent_and_set(hash) {
+        if key.len() > MAX_STRING_LEN && self.bloom_filter.is_absent_and_set(hash) {
             return mapper(text);
+        }
+
+        if self.cache.is_empty() {
+            self.cache.reserve(MAX_INTERNED_STRINGS);
         }
 
         let result = match self.cache.entry(hash) {
@@ -114,26 +108,22 @@ impl StringsInterner<'_> {
     }
 
     /// If the interner is over capacity, remove the longest entry that has the lowest count
-    fn throttle_cache(&mut self, hash: u64) {
-        if self.cache.len() <= self.capacity {
+    #[inline]
+    fn throttle_cache(&mut self, skip_hash: u64) {
+        if self.cache.len() <= MAX_INTERNED_STRINGS {
             return;
         }
 
         // Leave some buffer to grow when shrinking the cache.
         // We leave at least two entries, one for the empty string, and one for the string
         // that has just been inserted.
-        let max = if self.capacity < 5 {
-            2
-        } else {
-            self.capacity - 3
-        };
-
-        while self.cache.len() > max {
+        while self.cache.len() > MAX_INTERNED_STRINGS - 3 {
             let (_, _, n) = self
                 .cache
                 .iter()
                 .fold((0, usize::MAX, 0), |(x, c, n), (&k, v)| {
-                    if k != hash && (v.strong_count() < c || (v.strong_count() == c && v.len() > x))
+                    if k != skip_hash
+                        && (v.strong_count() < c || (v.strong_count() == c && v.len() > x))
                     {
                         (v.len(), v.strong_count(), k)
                     } else {
@@ -169,14 +159,14 @@ impl StringsInterner<'_> {
     }
 }
 
-impl AddAssign<Self> for StringsInterner<'_> {
+impl AddAssign<Self> for StringsInterner {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
         self.cache.extend(rhs.cache.into_iter());
     }
 }
 
-impl AddAssign<&Self> for StringsInterner<'_> {
+impl AddAssign<&Self> for StringsInterner {
     #[inline(always)]
     fn add_assign(&mut self, rhs: &Self) {
         self.cache

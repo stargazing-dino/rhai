@@ -65,11 +65,15 @@
 // #![warn(clippy::undocumented_unsafe_blocks)]
 #![allow(clippy::unit_arg)]
 #![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::inline_always)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::negative_feature_names)]
 #![allow(clippy::module_inception)]
+#![allow(clippy::box_collection)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::upper_case_acronyms)]
 
 #[cfg(feature = "no_std")]
 extern crate alloc;

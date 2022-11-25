@@ -194,7 +194,9 @@ impl Engine {
         #[cfg(feature = "debugging")]
         let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, stmt)?;
         #[cfg(feature = "debugging")]
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.debugger.reset_status(reset));
+        let global = &mut *RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
+            g.debugger_mut().reset_status(reset)
+        });
 
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
@@ -258,7 +260,7 @@ impl Engine {
                     rhs_val = self.get_interned_string(value).into();
                 }
 
-                let _new_val = &mut Some((rhs_val, op_info));
+                let _new_val = Some((rhs_val, op_info));
 
                 // Must be either `var[index] op= val` or `var.prop op= val`
                 match lhs {
@@ -500,7 +502,8 @@ impl Engine {
                 #[cfg(not(feature = "no_module"))]
                 let func = func.or_else(|| global.get_iter(iter_type)).or_else(|| {
                     self.global_sub_modules
-                        .values()
+                        .iter()
+                        .flat_map(|m| m.values())
                         .find_map(|m| m.get_qualified_iter(iter_type))
                 });
 
@@ -533,6 +536,7 @@ impl Engine {
                         let index_value = x as INT;
 
                         #[cfg(not(feature = "unchecked"))]
+                        #[allow(clippy::absurd_extreme_comparisons)]
                         if index_value > crate::MAX_USIZE_INT {
                             return Err(ERR::ErrorArithmetic(
                                 format!("for-loop counter overflow: {x}"),
@@ -764,6 +768,8 @@ impl Engine {
             // Import statement
             #[cfg(not(feature = "no_module"))]
             Stmt::Import(x, _pos) => {
+                use crate::ModuleResolver;
+
                 let (expr, export) = &**x;
 
                 // Guard against too many modules
@@ -776,8 +782,6 @@ impl Engine {
                 let path = v.try_cast::<crate::ImmutableString>().ok_or_else(|| {
                     self.make_type_mismatch_err::<crate::ImmutableString>(typ, expr.position())
                 })?;
-
-                use crate::ModuleResolver;
 
                 let path_pos = expr.start_position();
 
@@ -799,10 +803,10 @@ impl Engine {
                         Err(ERR::ErrorModuleNotFound(path.to_string(), path_pos).into())
                     })?;
 
-                let (export, must_be_indexed) = if !export.is_empty() {
-                    (export.name.clone(), true)
-                } else {
+                let (export, must_be_indexed) = if export.is_empty() {
                     (self.const_empty_string(), false)
+                } else {
+                    (export.name.clone(), true)
                 };
 
                 if !must_be_indexed || module.is_indexed() {
@@ -824,13 +828,14 @@ impl Engine {
             Stmt::Export(x, ..) => {
                 let (Ident { name, pos, .. }, Ident { name: alias, .. }) = &**x;
                 // Mark scope variables as public
-                if let Some(index) = scope.search(name) {
-                    let alias = if alias.is_empty() { name } else { alias }.clone();
-                    scope.add_alias_by_index(index, alias.into());
-                    Ok(Dynamic::UNIT)
-                } else {
-                    Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into())
-                }
+                scope.search(name).map_or_else(
+                    || Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into()),
+                    |index| {
+                        let alias = if alias.is_empty() { name } else { alias }.clone();
+                        scope.add_alias_by_index(index, alias);
+                        Ok(Dynamic::UNIT)
+                    },
+                )
             }
 
             // Share statement
@@ -838,20 +843,21 @@ impl Engine {
             Stmt::Share(x) => {
                 x.iter()
                     .try_for_each(|(name, index, pos)| {
-                        if let Some(index) = index
+                        index
                             .map(|n| scope.len() - n.get())
                             .or_else(|| scope.search(name))
-                        {
-                            let val = scope.get_mut_by_index(index);
+                            .map_or_else(
+                                || Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into()),
+                                |index| {
+                                    let val = scope.get_mut_by_index(index);
 
-                            if !val.is_shared() {
-                                // Replace the variable with a shared value.
-                                *val = std::mem::take(val).into_shared();
-                            }
-                            Ok(())
-                        } else {
-                            Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into())
-                        }
+                                    if !val.is_shared() {
+                                        // Replace the variable with a shared value.
+                                        *val = std::mem::take(val).into_shared();
+                                    }
+                                    Ok(())
+                                },
+                            )
                     })
                     .map(|_| Dynamic::UNIT)
             }

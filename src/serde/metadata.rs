@@ -2,7 +2,7 @@
 #![cfg(feature = "metadata")]
 
 use crate::api::type_names::format_type;
-use crate::module::{calc_native_fn_hash, FuncInfo};
+use crate::module::{calc_native_fn_hash, FuncInfo, ModuleFlags};
 use crate::{calc_fn_hash, Engine, FnAccess, SmartString, StaticVec, AST};
 use serde::Serialize;
 #[cfg(feature = "no_std")]
@@ -66,13 +66,13 @@ impl Ord for FnMetadata<'_> {
 
 impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
     fn from(info: &'a FuncInfo) -> Self {
-        let base_hash = calc_fn_hash(None, &info.name, info.num_params);
+        let base_hash = calc_fn_hash(None, &info.metadata.name, info.metadata.num_params);
         let (typ, full_hash) = if info.func.is_script() {
             (FnType::Script, base_hash)
         } else {
             (
                 FnType::Native,
-                calc_native_fn_hash(None, &info.name, &info.param_types),
+                calc_native_fn_hash(None, &info.metadata.name, &info.metadata.param_types),
             )
         };
 
@@ -80,12 +80,13 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
             base_hash,
             full_hash,
             #[cfg(not(feature = "no_module"))]
-            namespace: info.namespace,
-            access: info.access,
-            name: &info.name,
+            namespace: info.metadata.namespace,
+            access: info.metadata.access,
+            name: &info.metadata.name,
             typ,
-            num_params: info.num_params,
+            num_params: info.metadata.num_params,
             params: info
+                .metadata
                 .params_info
                 .iter()
                 .map(|s| {
@@ -99,7 +100,7 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
                 })
                 .collect(),
             _dummy: None,
-            return_type: format_type(&info.return_type, true),
+            return_type: format_type(&info.metadata.return_type, true),
             signature: info.gen_signature().into(),
             doc_comments: if info.func.is_script() {
                 #[cfg(feature = "no_function")]
@@ -114,7 +115,7 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
                     .map(<_>::as_ref)
                     .collect()
             } else {
-                info.comments.iter().map(<_>::as_ref).collect()
+                info.metadata.comments.iter().map(<_>::as_ref).collect()
             },
         }
     }
@@ -170,14 +171,20 @@ pub fn gen_metadata_to_json(
     let mut global = ModuleMetadata::new();
 
     #[cfg(not(feature = "no_module"))]
-    for (name, m) in &engine.global_sub_modules {
+    for (name, m) in engine.global_sub_modules.iter().flat_map(|m| m.iter()) {
         global.modules.insert(name, m.as_ref().into());
     }
+
+    let exclude_flags = if include_standard_packages {
+        ModuleFlags::empty()
+    } else {
+        ModuleFlags::STANDARD_LIB
+    };
 
     engine
         .global_modules
         .iter()
-        .filter(|m| include_standard_packages || !m.standard)
+        .filter(|m| !m.flags.contains(exclude_flags))
         .flat_map(|m| m.iter_fn())
         .for_each(|f| {
             #[allow(unused_mut)]

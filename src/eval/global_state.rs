@@ -25,10 +25,11 @@ pub type GlobalConstants =
 pub struct GlobalRuntimeState {
     /// Names of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    imports: crate::StaticVec<ImmutableString>,
+    imports: Option<Box<crate::StaticVec<ImmutableString>>>,
     /// Stack of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    modules: crate::StaticVec<crate::SharedModule>,
+    modules: Option<Box<crate::StaticVec<crate::SharedModule>>>,
+
     /// The current stack of loaded [modules][crate::Module] containing script-defined functions.
     #[cfg(not(feature = "no_function"))]
     pub lib: crate::StaticVec<crate::SharedModule>,
@@ -57,9 +58,6 @@ pub struct GlobalRuntimeState {
     ///
     /// When that happens, this flag is turned on.
     pub always_search_scope: bool,
-    /// Function call hashes to index getters and setters.
-    #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-    fn_hash_indexing: (u64, u64),
     /// Embedded [module][crate::Module] resolver.
     #[cfg(not(feature = "no_module"))]
     pub embedded_module_resolver:
@@ -74,7 +72,7 @@ pub struct GlobalRuntimeState {
     pub tag: Dynamic,
     /// Debugging interface.
     #[cfg(feature = "debugging")]
-    pub debugger: super::Debugger,
+    pub(crate) debugger: Option<super::Debugger>,
 }
 
 impl GlobalRuntimeState {
@@ -84,9 +82,9 @@ impl GlobalRuntimeState {
     pub fn new(engine: &Engine) -> Self {
         Self {
             #[cfg(not(feature = "no_module"))]
-            imports: crate::StaticVec::new_const(),
+            imports: None,
             #[cfg(not(feature = "no_module"))]
-            modules: crate::StaticVec::new_const(),
+            modules: None,
             #[cfg(not(feature = "no_function"))]
             lib: crate::StaticVec::new_const(),
             source: None,
@@ -98,11 +96,6 @@ impl GlobalRuntimeState {
             always_search_scope: false,
             #[cfg(not(feature = "no_module"))]
             embedded_module_resolver: None,
-            #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-            fn_hash_indexing: (
-                crate::calc_fn_hash(None, crate::engine::FN_IDX_GET, 2),
-                crate::calc_fn_hash(None, crate::engine::FN_IDX_SET, 3),
-            ),
             #[cfg(not(feature = "no_module"))]
             #[cfg(not(feature = "no_function"))]
             constants: None,
@@ -110,36 +103,28 @@ impl GlobalRuntimeState {
             tag: engine.default_tag().clone(),
 
             #[cfg(feature = "debugging")]
-            debugger: crate::eval::Debugger::new(
-                if engine.debugger.is_some() {
-                    crate::eval::DebuggerStatus::Init
-                } else {
-                    crate::eval::DebuggerStatus::CONTINUE
-                },
-                match engine.debugger {
-                    Some((ref init, ..)) => init(engine),
-                    None => Dynamic::UNIT,
-                },
-            ),
+            debugger: engine.debugger.as_ref().map(|x| {
+                crate::eval::Debugger::new(crate::eval::DebuggerStatus::Init, (x.0)(engine))
+            }),
         }
     }
     /// Get the length of the stack of globally-imported [modules][crate::Module].
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn num_imports(&self) -> usize {
-        self.modules.len()
+        self.modules.as_ref().map_or(0, |m| m.len())
     }
     /// Get the globally-imported [module][crate::Module] at a particular index.
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn get_shared_import(&self, index: usize) -> Option<crate::SharedModule> {
-        self.modules.get(index).cloned()
+        self.modules.as_ref().and_then(|m| m.get(index).cloned())
     }
     /// Get a mutable reference to the globally-imported [module][crate::Module] at a
     /// particular index.
@@ -147,13 +132,13 @@ impl GlobalRuntimeState {
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
     #[allow(dead_code)]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub(crate) fn get_shared_import_mut(
         &mut self,
         index: usize,
     ) -> Option<&mut crate::SharedModule> {
-        self.modules.get_mut(index)
+        self.modules.as_mut().and_then(|m| m.get_mut(index))
     }
     /// Get the index of a globally-imported [module][crate::Module] by name.
     ///
@@ -162,33 +147,45 @@ impl GlobalRuntimeState {
     #[inline]
     #[must_use]
     pub fn find_import(&self, name: &str) -> Option<usize> {
-        self.imports
-            .iter()
-            .rev()
-            .position(|key| key.as_str() == name)
-            .map(|i| self.imports.len() - 1 - i)
+        self.imports.as_ref().and_then(|imports| {
+            imports
+                .iter()
+                .rev()
+                .position(|key| key.as_str() == name)
+                .map(|i| imports.len() - 1 - i)
+        })
     }
     /// Push an imported [module][crate::Module] onto the stack.
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
-    #[inline(always)]
+    #[inline]
     pub fn push_import(
         &mut self,
         name: impl Into<ImmutableString>,
         module: impl Into<crate::SharedModule>,
     ) {
-        self.imports.push(name.into());
-        self.modules.push(module.into());
+        self.imports
+            .get_or_insert_with(|| crate::StaticVec::new_const().into())
+            .push(name.into());
+
+        self.modules
+            .get_or_insert_with(|| crate::StaticVec::new_const().into())
+            .push(module.into());
     }
     /// Truncate the stack of globally-imported [modules][crate::Module] to a particular length.
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
-    #[inline(always)]
+    #[inline]
     pub fn truncate_imports(&mut self, size: usize) {
-        self.imports.truncate(size);
-        self.modules.truncate(size);
+        if size == 0 {
+            self.imports = None;
+            self.modules = None;
+        } else if self.imports.is_some() {
+            self.imports.as_mut().unwrap().truncate(size);
+            self.modules.as_mut().unwrap().truncate(size);
+        }
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in reverse order.
     ///
@@ -198,8 +195,9 @@ impl GlobalRuntimeState {
     pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &crate::Module)> {
         self.imports
             .iter()
-            .zip(self.modules.iter())
+            .flat_map(|x| x.iter())
             .rev()
+            .zip(self.modules.iter().flat_map(|x| x.iter()).rev())
             .map(|(name, module)| (name.as_str(), &**module))
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in reverse order.
@@ -210,7 +208,11 @@ impl GlobalRuntimeState {
     pub(crate) fn iter_imports_raw(
         &self,
     ) -> impl Iterator<Item = (&ImmutableString, &crate::SharedModule)> {
-        self.imports.iter().zip(self.modules.iter()).rev()
+        self.imports
+            .iter()
+            .flat_map(|x| x.iter())
+            .rev()
+            .zip(self.modules.iter().flat_map(|x| x.iter()).rev())
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in forward order.
     ///
@@ -220,18 +222,21 @@ impl GlobalRuntimeState {
     pub fn scan_imports_raw(
         &self,
     ) -> impl Iterator<Item = (&ImmutableString, &crate::SharedModule)> {
-        self.imports.iter().zip(self.modules.iter())
+        self.imports
+            .iter()
+            .flat_map(|x| x.iter())
+            .zip(self.modules.iter().flat_map(|x| x.iter()))
     }
     /// Can the particular function with [`Dynamic`] parameter(s) exist in the stack of
     /// globally-imported [modules][crate::Module]?
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
-    #[inline(always)]
+    #[inline]
     pub(crate) fn may_contain_dynamic_fn(&self, hash_script: u64) -> bool {
-        self.modules
-            .iter()
-            .any(|m| m.may_contain_dynamic_fn(hash_script))
+        self.modules.as_ref().map_or(false, |m| {
+            m.iter().any(|m| m.may_contain_dynamic_fn(hash_script))
+        })
     }
     /// Does the specified function hash key exist in the stack of globally-imported
     /// [modules][crate::Module]?
@@ -242,7 +247,9 @@ impl GlobalRuntimeState {
     #[inline]
     #[must_use]
     pub fn contains_qualified_fn(&self, hash: u64) -> bool {
-        self.modules.iter().any(|m| m.contains_qualified_fn(hash))
+        self.modules
+            .as_ref()
+            .map_or(false, |m| m.iter().any(|m| m.contains_qualified_fn(hash)))
     }
     /// Get the specified function via its hash key from the stack of globally-imported
     /// [modules][crate::Module].
@@ -255,10 +262,11 @@ impl GlobalRuntimeState {
         &self,
         hash: u64,
     ) -> Option<(&crate::func::CallableFunction, Option<&ImmutableString>)> {
-        self.modules
-            .iter()
-            .rev()
-            .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id_raw())))
+        self.modules.as_ref().and_then(|m| {
+            m.iter()
+                .rev()
+                .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id_raw())))
+        })
     }
     /// Does the specified [`TypeId`][std::any::TypeId] iterator exist in the stack of
     /// globally-imported [modules][crate::Module]?
@@ -269,7 +277,9 @@ impl GlobalRuntimeState {
     #[inline]
     #[must_use]
     pub fn contains_iter(&self, id: std::any::TypeId) -> bool {
-        self.modules.iter().any(|m| m.contains_qualified_iter(id))
+        self.modules
+            .as_ref()
+            .map_or(false, |m| m.iter().any(|m| m.contains_qualified_iter(id)))
     }
     /// Get the specified [`TypeId`][std::any::TypeId] iterator from the stack of globally-imported
     /// [modules][crate::Module].
@@ -280,9 +290,8 @@ impl GlobalRuntimeState {
     #[must_use]
     pub fn get_iter(&self, id: std::any::TypeId) -> Option<&crate::func::IteratorFn> {
         self.modules
-            .iter()
-            .rev()
-            .find_map(|m| m.get_qualified_iter(id))
+            .as_ref()
+            .and_then(|m| m.iter().rev().find_map(|m| m.get_qualified_iter(id)))
     }
     /// Get the current source.
     #[inline(always)]
@@ -297,19 +306,24 @@ impl GlobalRuntimeState {
     pub(crate) const fn source_raw(&self) -> Option<&ImmutableString> {
         self.source.as_ref()
     }
-    /// Get the pre-calculated index getter hash.
-    #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-    #[inline(always)]
-    #[must_use]
-    pub(crate) fn hash_idx_get(&mut self) -> u64 {
-        self.fn_hash_indexing.0
+
+    /// Return a reference to the debugging interface.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the debugging interface is not set.
+    #[cfg(feature = "debugging")]
+    pub fn debugger(&self) -> &super::Debugger {
+        self.debugger.as_ref().unwrap()
     }
-    /// Get the pre-calculated index setter hash.
-    #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-    #[inline(always)]
-    #[must_use]
-    pub(crate) fn hash_idx_set(&mut self) -> u64 {
-        self.fn_hash_indexing.1
+    /// Return a mutable reference to the debugging interface.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the debugging interface is not set.
+    #[cfg(feature = "debugging")]
+    pub fn debugger_mut(&mut self) -> &mut super::Debugger {
+        self.debugger.as_mut().unwrap()
     }
 }
 
@@ -317,9 +331,16 @@ impl GlobalRuntimeState {
 impl<K: Into<ImmutableString>, M: Into<crate::SharedModule>> Extend<(K, M)> for GlobalRuntimeState {
     #[inline]
     fn extend<T: IntoIterator<Item = (K, M)>>(&mut self, iter: T) {
+        let imports = self
+            .imports
+            .get_or_insert_with(|| crate::StaticVec::new_const().into());
+        let modules = self
+            .modules
+            .get_or_insert_with(|| crate::StaticVec::new_const().into());
+
         for (k, m) in iter {
-            self.imports.push(k.into());
-            self.modules.push(m.into());
+            imports.push(k.into());
+            modules.push(m.into());
         }
     }
 }
@@ -343,9 +364,6 @@ impl fmt::Debug for GlobalRuntimeState {
             .field("level", &self.level)
             .field("scope_level", &self.scope_level)
             .field("always_search_scope", &self.always_search_scope);
-
-        #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-        f.field("fn_hash_indexing", &self.fn_hash_indexing);
 
         #[cfg(not(feature = "no_module"))]
         #[cfg(not(feature = "no_function"))]

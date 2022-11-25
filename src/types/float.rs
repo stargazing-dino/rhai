@@ -14,7 +14,7 @@ use num_traits::float::FloatCore as Float;
 /// A type that wraps a floating-point number and implements [`Hash`].
 ///
 /// Not available under `no_float`.
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, PartialEq, PartialOrd)]
 pub struct FloatWrapper<F>(F);
 
 impl Hash for FloatWrapper<crate::FLOAT> {

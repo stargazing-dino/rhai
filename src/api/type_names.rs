@@ -139,8 +139,8 @@ pub fn format_type(typ: &str, is_return_type: bool) -> std::borrow::Cow<str> {
         } else {
             format!("&mut {r}").into()
         };
-    } else if typ.contains(" ") {
-        let typ = typ.replace(" ", "");
+    } else if typ.contains(' ') {
+        let typ = typ.replace(' ', "");
         let r = format_type(&typ, is_return_type);
         return r.into_owned().into();
     }
@@ -205,6 +205,7 @@ impl Engine {
                 return self
                     .global_sub_modules
                     .iter()
+                    .flat_map(|m| m.iter())
                     .find_map(|(_, m)| m.get_custom_type(name));
                 #[cfg(feature = "no_module")]
                 return None;
@@ -238,6 +239,7 @@ impl Engine {
                 return self
                     .global_sub_modules
                     .iter()
+                    .flat_map(|m| m.iter())
                     .find_map(|(_, m)| m.get_custom_type(name));
                 #[cfg(feature = "no_module")]
                 return None;

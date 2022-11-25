@@ -1,7 +1,8 @@
 //! Module that defines JSON manipulation functions for [`Engine`].
 #![cfg(not(feature = "no_object"))]
 
-use crate::parser::ParseState;
+use crate::func::native::locked_write;
+use crate::parser::{ParseSettingFlags, ParseState};
 use crate::tokenizer::Token;
 use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf, Scope};
 #[cfg(feature = "no_std")]
@@ -116,18 +117,21 @@ impl Engine {
             },
         );
 
-        let scope = Scope::new();
-        let mut state = ParseState::new(self, &scope, Default::default(), tokenizer_control);
+        let ast = {
+            let scope = Scope::new();
+            let interned_strings = &mut *locked_write(&self.interned_strings);
+            let mut state = ParseState::new(&scope, interned_strings, tokenizer_control);
 
-        let ast = self.parse_global_expr(
-            &mut stream.peekable(),
-            &mut state,
-            |s| s.allow_unquoted_map_properties = false,
-            #[cfg(not(feature = "no_optimize"))]
-            OptimizationLevel::None,
-            #[cfg(feature = "no_optimize")]
-            OptimizationLevel::default(),
-        )?;
+            self.parse_global_expr(
+                &mut stream.peekable(),
+                &mut state,
+                |s| s.flags |= ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES,
+                #[cfg(not(feature = "no_optimize"))]
+                OptimizationLevel::None,
+                #[cfg(feature = "no_optimize")]
+                OptimizationLevel::default(),
+            )?
+        };
 
         self.eval_ast(&ast)
     }
@@ -165,7 +169,7 @@ pub fn format_map_as_json(map: &Map) -> String {
         result.push(':');
 
         if let Some(val) = value.read_lock::<Map>() {
-            result.push_str(&format_map_as_json(&*val));
+            result.push_str(&format_map_as_json(&val));
         } else if value.is_unit() {
             result.push_str("null");
         } else {

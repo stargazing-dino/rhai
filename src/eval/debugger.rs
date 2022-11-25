@@ -193,7 +193,7 @@ impl BreakPoint {
     /// Is this [`BreakPoint`] enabled?
     #[inline(always)]
     #[must_use]
-    pub fn is_enabled(&self) -> bool {
+    pub const fn is_enabled(&self) -> bool {
         match self {
             #[cfg(not(feature = "no_position"))]
             Self::AtPosition { enabled, .. } => *enabled,
@@ -268,7 +268,7 @@ impl Debugger {
     /// Create a new [`Debugger`].
     #[inline(always)]
     #[must_use]
-    pub fn new(status: DebuggerStatus, state: Dynamic) -> Self {
+    pub const fn new(status: DebuggerStatus, state: Dynamic) -> Self {
         Self {
             status,
             break_points: Vec::new(),
@@ -297,7 +297,7 @@ impl Debugger {
         pos: Position,
     ) {
         self.call_stack.push(CallStackFrame {
-            fn_name: fn_name.into(),
+            fn_name,
             args,
             source,
             pos,
@@ -419,7 +419,7 @@ impl Engine {
             if let Some(cmd) =
                 self.run_debugger_with_reset_raw(global, caches, scope, this_ptr, node)?
             {
-                global.debugger.status = cmd;
+                global.debugger_mut().status = cmd;
             }
         }
 
@@ -469,27 +469,28 @@ impl Engine {
             _ => (),
         }
 
-        let event = match global.debugger.status {
-            DebuggerStatus::Init => Some(DebuggerEvent::Start),
-            DebuggerStatus::CONTINUE => None,
-            DebuggerStatus::NEXT if matches!(node, ASTNode::Stmt(..)) => Some(DebuggerEvent::Step),
-            DebuggerStatus::NEXT => None,
-            DebuggerStatus::INTO if matches!(node, ASTNode::Expr(..)) => Some(DebuggerEvent::Step),
-            DebuggerStatus::INTO => None,
-            DebuggerStatus::STEP => Some(DebuggerEvent::Step),
-            DebuggerStatus::FunctionExit(..) => None,
-            DebuggerStatus::Terminate => Some(DebuggerEvent::End),
-        };
+        if let Some(ref dbg) = global.debugger {
+            let event = match dbg.status {
+                DebuggerStatus::Init => Some(DebuggerEvent::Start),
+                DebuggerStatus::NEXT if node.is_stmt() => Some(DebuggerEvent::Step),
+                DebuggerStatus::INTO if node.is_expr() => Some(DebuggerEvent::Step),
+                DebuggerStatus::STEP => Some(DebuggerEvent::Step),
+                DebuggerStatus::Terminate => Some(DebuggerEvent::End),
+                _ => None,
+            };
 
-        let event = match event {
-            Some(e) => e,
-            None => match global.debugger.is_break_point(global.source(), node) {
-                Some(bp) => DebuggerEvent::BreakPoint(bp),
-                None => return Ok(None),
-            },
-        };
+            let event = match event {
+                Some(e) => e,
+                None => match dbg.is_break_point(global.source(), node) {
+                    Some(bp) => DebuggerEvent::BreakPoint(bp),
+                    None => return Ok(None),
+                },
+            };
 
-        self.run_debugger_raw(global, caches, scope, this_ptr, node, event)
+            self.run_debugger_raw(global, caches, scope, this_ptr, node, event)
+        } else {
+            Ok(None)
+        }
     }
     /// Run the debugger callback unconditionally.
     ///
@@ -511,24 +512,26 @@ impl Engine {
         let src = src.as_ref().map(|s| s.as_str());
         let context = crate::EvalContext::new(self, global, caches, scope, this_ptr);
 
-        if let Some((.., ref on_debugger)) = self.debugger {
+        if let Some(ref x) = self.debugger {
+            let (.., ref on_debugger) = **x;
+
             let command = on_debugger(context, event, node, src, node.position())?;
 
             match command {
                 DebuggerCommand::Continue => {
-                    global.debugger.status = DebuggerStatus::CONTINUE;
+                    global.debugger_mut().status = DebuggerStatus::CONTINUE;
                     Ok(None)
                 }
                 DebuggerCommand::Next => {
-                    global.debugger.status = DebuggerStatus::CONTINUE;
+                    global.debugger_mut().status = DebuggerStatus::CONTINUE;
                     Ok(Some(DebuggerStatus::NEXT))
                 }
                 DebuggerCommand::StepOver => {
-                    global.debugger.status = DebuggerStatus::CONTINUE;
+                    global.debugger_mut().status = DebuggerStatus::CONTINUE;
                     Ok(Some(DebuggerStatus::STEP))
                 }
                 DebuggerCommand::StepInto => {
-                    global.debugger.status = DebuggerStatus::STEP;
+                    global.debugger_mut().status = DebuggerStatus::STEP;
                     Ok(None)
                 }
                 DebuggerCommand::FunctionExit => {
@@ -542,7 +545,7 @@ impl Engine {
                         }
                         _ => global.level,
                     };
-                    global.debugger.status = DebuggerStatus::FunctionExit(level);
+                    global.debugger_mut().status = DebuggerStatus::FunctionExit(level);
                     Ok(None)
                 }
             }

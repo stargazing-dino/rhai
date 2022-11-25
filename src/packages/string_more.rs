@@ -1,7 +1,8 @@
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
-    def_package, Dynamic, ExclusiveRange, InclusiveRange, RhaiResultOf, StaticVec, INT,
-    MAX_USIZE_INT,
+    def_package, Dynamic, ExclusiveRange, ImmutableString, InclusiveRange, Position, RhaiResultOf,
+    SmartString, StaticVec, ERR, INT, MAX_USIZE_INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -12,7 +13,7 @@ use super::string_basic::{print_with_func, FUNC_TO_STRING};
 def_package! {
     /// Package of additional string utilities over [`BasicStringPackage`][super::BasicStringPackage]
     pub MoreStringPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         combine_with_exported_module!(lib, "string", string_functions);
     }
@@ -20,8 +21,6 @@ def_package! {
 
 #[export_module]
 mod string_functions {
-    use crate::{ImmutableString, SmartString};
-
     #[rhai_fn(name = "+", pure)]
     pub fn add_append(
         ctx: NativeCallContext,
@@ -33,7 +32,9 @@ mod string_functions {
         if s.is_empty() {
             string.clone()
         } else {
-            format!("{string}{s}").into()
+            let mut buf = SmartString::from(string.as_str());
+            buf.push_str(&s);
+            buf.into()
         }
     }
     #[rhai_fn(name = "+=", name = "append")]
@@ -41,7 +42,9 @@ mod string_functions {
         let s = print_with_func(FUNC_TO_STRING, &ctx, &mut item);
 
         if !s.is_empty() {
-            *string = format!("{string}{s}").into();
+            let mut buf = SmartString::from(string.as_str());
+            buf.push_str(&s);
+            *string = buf.into();
         }
     }
     #[rhai_fn(name = "+", pure)]
@@ -74,7 +77,10 @@ mod string_functions {
     }
     #[rhai_fn(name = "+")]
     pub fn add_prepend_char(character: char, string: &str) -> ImmutableString {
-        format!("{character}{string}").into()
+        let mut buf = SmartString::new_const();
+        buf.push(character);
+        buf.push_str(string);
+        buf.into()
     }
 
     #[rhai_fn(name = "+")]
@@ -127,7 +133,7 @@ mod string_functions {
         }
         #[rhai_fn(name = "+=", name = "append")]
         pub fn add(string: &mut ImmutableString, utf8: Blob) {
-            let mut s = crate::SmartString::from(string.as_str());
+            let mut s = SmartString::from(string.as_str());
             if !utf8.is_empty() {
                 s.push_str(&String::from_utf8_lossy(&utf8));
                 *string = s.into();
@@ -146,6 +152,25 @@ mod string_functions {
             }
 
             s.into()
+        }
+
+        /// Convert the string into an UTF-8 encoded byte-stream as a BLOB.
+        ///
+        /// # Example
+        ///
+        /// ```rhai
+        /// let text = "朝には紅顔ありて夕べには白骨となる";
+        ///
+        /// let bytes = text.to_blob();
+        ///
+        /// print(bytes.len());     // prints 51
+        /// ```
+        pub fn to_blob(string: &str) -> Blob {
+            if string.is_empty() {
+                Blob::new()
+            } else {
+                string.as_bytes().into()
+            }
         }
     }
 
@@ -188,25 +213,6 @@ mod string_functions {
             string.len() as INT
         }
     }
-    /// Convert the string into an UTF-8 encoded byte-stream as a BLOB.
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// let text = "朝には紅顔ありて夕べには白骨となる";
-    ///
-    /// let bytes = text.to_blob();
-    ///
-    /// print(bytes.len());     // prints 51
-    /// ```
-    #[cfg(not(feature = "no_index"))]
-    pub fn to_blob(string: &str) -> crate::Blob {
-        if string.is_empty() {
-            crate::Blob::new()
-        } else {
-            string.as_bytes().into()
-        }
-    }
     /// Remove all occurrences of a sub-string from the string.
     ///
     /// # Example
@@ -239,9 +245,10 @@ mod string_functions {
     /// Clear the string, making it empty.
     pub fn clear(string: &mut ImmutableString) {
         if !string.is_empty() {
-            match string.get_mut() {
-                Some(s) => s.clear(),
-                _ => *string = ImmutableString::new(),
+            if let Some(s) = string.get_mut() {
+                s.clear()
+            } else {
+                *string = ImmutableString::new()
             }
         }
     }
@@ -265,6 +272,7 @@ mod string_functions {
     /// ```
     pub fn truncate(string: &mut ImmutableString, len: INT) {
         if len > 0 {
+            #[allow(clippy::cast_sign_loss)]
             let len = len.min(MAX_USIZE_INT) as usize;
             let chars: StaticVec<_> = string.chars().collect();
             let copy = string.make_mut();
@@ -286,20 +294,17 @@ mod string_functions {
     /// print(text);    // prints "hello"
     /// ```
     pub fn trim(string: &mut ImmutableString) {
-        match string.get_mut() {
-            Some(s) => {
-                let trimmed = s.trim();
+        if let Some(s) = string.get_mut() {
+            let trimmed = s.trim();
 
-                if trimmed != s {
-                    *s = trimmed.into();
-                }
+            if trimmed != s {
+                *s = trimmed.into();
             }
-            None => {
-                let trimmed = string.trim();
+        } else {
+            let trimmed = string.trim();
 
-                if trimmed != string {
-                    *string = trimmed.into();
-                }
+            if trimmed != string {
+                *string = trimmed.into();
             }
         }
     }
@@ -536,7 +541,7 @@ mod string_functions {
     /// ```
     #[rhai_fn(name = "contains")]
     pub fn contains_char(string: &str, character: char) -> bool {
-        string.contains(character).into()
+        string.contains(character)
     }
 
     /// Return `true` if the string starts with a specified string.
@@ -1219,11 +1224,9 @@ mod string_functions {
 
         // Check if string will be over max size limit
         if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
-            return Err(crate::ERR::ErrorDataTooLarge(
-                "Length of string".to_string(),
-                crate::Position::NONE,
-            )
-            .into());
+            return Err(
+                ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
+            );
         }
 
         let orig_len = string.chars().count();
@@ -1237,11 +1240,9 @@ mod string_functions {
 
             if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size()
             {
-                return Err(crate::ERR::ErrorDataTooLarge(
-                    "Length of string".to_string(),
-                    crate::Position::NONE,
-                )
-                .into());
+                return Err(
+                    ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
+                );
             }
         }
 
@@ -1279,11 +1280,9 @@ mod string_functions {
 
         // Check if string will be over max size limit
         if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
-            return Err(crate::ERR::ErrorDataTooLarge(
-                "Length of string".to_string(),
-                crate::Position::NONE,
-            )
-            .into());
+            return Err(
+                ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
+            );
         }
 
         let mut str_len = string.chars().count();
@@ -1304,11 +1303,9 @@ mod string_functions {
 
             if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size()
             {
-                return Err(crate::ERR::ErrorDataTooLarge(
-                    "Length of string".to_string(),
-                    crate::Position::NONE,
-                )
-                .into());
+                return Err(
+                    ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
+                );
             }
         }
 
@@ -1317,7 +1314,7 @@ mod string_functions {
 
     #[cfg(not(feature = "no_index"))]
     pub mod arrays {
-        use crate::{Array, ImmutableString};
+        use crate::Array;
 
         /// Split the string into two at the specified `index` position and return it both strings
         /// as an array.

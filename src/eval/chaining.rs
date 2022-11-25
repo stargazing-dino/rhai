@@ -3,12 +3,35 @@
 
 use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, Expr, OpAssignment};
+use crate::config::hashing::SusLock;
+use crate::engine::{FN_IDX_GET, FN_IDX_SET};
 use crate::types::dynamic::Union;
 use crate::types::RestoreOnDrop;
-use crate::{Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, ERR};
+use crate::{
+    calc_fn_hash, Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, ERR,
+};
 use std::hash::Hash;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+
+/// Function call hashes to index getters and setters.
+///
+/// # Safety
+///
+/// Uses the extremely unsafe [`SusLock`].  Change to [`OnceCell`] when it is stabilized.
+static INDEXER_HASHES: SusLock<(u64, u64)> = SusLock::new();
+
+/// Get the pre-calculated index getter/setter hashes.
+#[inline(always)]
+#[must_use]
+fn hash_idx() -> (u64, u64) {
+    *INDEXER_HASHES.get_or_init(|| {
+        (
+            calc_fn_hash(None, FN_IDX_GET, 2),
+            calc_fn_hash(None, FN_IDX_SET, 3),
+        )
+    })
+}
 
 /// Method of chaining.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -45,16 +68,21 @@ impl Engine {
         idx: &mut Dynamic,
         pos: Position,
     ) -> RhaiResultOf<Dynamic> {
-        let args = &mut [target, idx];
-        let hash = global.hash_idx_get();
-        let fn_name = crate::engine::FN_IDX_GET;
-
         let orig_level = global.level;
         global.level += 1;
         let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
-        self.exec_native_fn_call(global, caches, fn_name, None, hash, args, true, pos)
-            .map(|(r, ..)| r)
+        self.exec_native_fn_call(
+            global,
+            caches,
+            FN_IDX_GET,
+            None,
+            hash_idx().0,
+            &mut [target, idx],
+            true,
+            pos,
+        )
+        .map(|(r, ..)| r)
     }
 
     /// Call a set indexer.
@@ -69,15 +97,20 @@ impl Engine {
         is_ref_mut: bool,
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
-        let hash = global.hash_idx_set();
-        let args = &mut [target, idx, new_val];
-        let fn_name = crate::engine::FN_IDX_SET;
-
         let orig_level = global.level;
         global.level += 1;
         let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
-        self.exec_native_fn_call(global, caches, fn_name, None, hash, args, is_ref_mut, pos)
+        self.exec_native_fn_call(
+            global,
+            caches,
+            FN_IDX_SET,
+            None,
+            hash_idx().1,
+            &mut [target, idx, new_val],
+            is_ref_mut,
+            pos,
+        )
     }
 
     /// Get the value at the indexed position of a base type.
@@ -168,6 +201,7 @@ impl Engine {
                         ERR::ErrorBitFieldBounds(crate::INT_BITS, end, idx_pos).into()
                     })?;
 
+                    #[allow(clippy::cast_possible_truncation)]
                     if end <= start {
                         (0, 0)
                     } else if end == crate::INT_BITS && start == 0 {
@@ -193,6 +227,7 @@ impl Engine {
                         ERR::ErrorBitFieldBounds(crate::INT_BITS, end, idx_pos).into()
                     })?;
 
+                    #[allow(clippy::cast_possible_truncation)]
                     if end < start {
                         (0, 0)
                     } else if end == crate::INT_BITS - 1 && start == 0 {
@@ -237,6 +272,7 @@ impl Engine {
                 Ok(Target::Bit {
                     source: target,
                     value: bit_value.into(),
+                    #[allow(clippy::cast_possible_truncation)]
                     bit: bit as u8,
                 })
             }
@@ -249,12 +285,14 @@ impl Engine {
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
 
                 let (ch, offset) = if index >= 0 {
+                    #[allow(clippy::absurd_extreme_comparisons)]
                     if index >= crate::MAX_USIZE_INT {
                         return Err(
                             ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
                         );
                     }
 
+                    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                     let offset = index as usize;
                     (
                         s.chars().nth(offset).ok_or_else(|| {
@@ -271,6 +309,7 @@ impl Engine {
                         );
                     }
 
+                    #[allow(clippy::cast_possible_truncation)]
                     let offset = abs_index as usize;
                     (
                         // Count from end if negative
@@ -317,7 +356,7 @@ impl Engine {
         scope: &mut Scope,
         this_ptr: &mut Dynamic,
         expr: &Expr,
-        new_val: &mut Option<(Dynamic, &OpAssignment)>,
+        new_val: Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResult {
         let chain_type = ChainType::from(expr);
 
@@ -507,7 +546,7 @@ impl Engine {
         target: &mut Target,
         rhs: &Expr,
         idx_values: &mut FnArgsVec<Dynamic>,
-        new_val: &mut Option<(Dynamic, &OpAssignment)>,
+        new_val: Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResultOf<(Dynamic, bool)> {
         let is_ref_mut = target.is_ref();
         let op_pos = parent.position();
@@ -576,7 +615,7 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, parent)?;
 
-                        let (new_val, op_info) = new_val.take().expect("`Some`");
+                        let (new_val, op_info) = new_val.expect("`Some`");
                         let idx_val = &mut idx_values.pop().unwrap();
                         let idx = &mut idx_val.clone();
 
@@ -657,9 +696,10 @@ impl Engine {
                         let reset =
                             self.run_debugger_with_reset(global, caches, scope, this_ptr, rhs)?;
                         #[cfg(feature = "debugging")]
-                        let global = &mut *RestoreOnDrop::lock(global, move |g| {
-                            g.debugger.reset_status(reset)
-                        });
+                        let global =
+                            &mut *RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
+                                g.debugger_mut().reset_status(reset)
+                            });
 
                         let crate::ast::FnCallExpr {
                             name, hashes, args, ..
@@ -686,12 +726,12 @@ impl Engine {
                         unreachable!("function call in dot chain should not be namespace-qualified")
                     }
                     // {xxx:map}.id op= ???
-                    Expr::Property(x, pos) if target.is_map() && new_val.is_some() => {
+                    Expr::Property(x, pos) if new_val.is_some() && target.is_map() => {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, rhs)?;
 
                         let index = &mut x.2.clone().into();
-                        let (new_val, op_info) = new_val.take().expect("`Some`");
+                        let (new_val, op_info) = new_val.expect("`Some`");
                         {
                             let val_target = &mut self.get_indexed_mut(
                                 global, caches, target, index, *pos, op_pos, true, false,
@@ -720,7 +760,7 @@ impl Engine {
                         self.run_debugger(global, caches, scope, this_ptr, rhs)?;
 
                         let ((getter, hash_get), (setter, hash_set), name) = &**x;
-                        let (mut new_val, op_info) = new_val.take().expect("`Some`");
+                        let (mut new_val, op_info) = new_val.expect("`Some`");
 
                         if op_info.is_op_assignment() {
                             let args = &mut [target.as_mut()];
@@ -826,9 +866,11 @@ impl Engine {
                                     global, caches, scope, this_ptr, _node,
                                 )?;
                                 #[cfg(feature = "debugging")]
-                                let global = &mut *RestoreOnDrop::lock(global, move |g| {
-                                    g.debugger.reset_status(reset)
-                                });
+                                let global = &mut *RestoreOnDrop::lock_if(
+                                    reset.is_some(),
+                                    global,
+                                    move |g| g.debugger_mut().reset_status(reset),
+                                );
 
                                 let crate::ast::FnCallExpr {
                                     name, hashes, args, ..
@@ -950,9 +992,11 @@ impl Engine {
                                         global, caches, scope, this_ptr, _node,
                                     )?;
                                     #[cfg(feature = "debugging")]
-                                    let global = &mut *RestoreOnDrop::lock(global, move |g| {
-                                        g.debugger.reset_status(reset)
-                                    });
+                                    let global = &mut *RestoreOnDrop::lock_if(
+                                        reset.is_some(),
+                                        global,
+                                        move |g| g.debugger_mut().reset_status(reset),
+                                    );
 
                                     let crate::ast::FnCallExpr {
                                         name, hashes, args, ..

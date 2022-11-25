@@ -147,7 +147,6 @@ impl FromStr for ImmutableString {
     type Err = ();
 
     #[inline(always)]
-    #[must_use]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s: SmartString = s.into();
         Ok(Self(s.into()))

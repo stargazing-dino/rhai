@@ -1,6 +1,7 @@
 //! Module that defines the public evaluation API of [`Engine`].
 
 use crate::eval::{Caches, GlobalRuntimeState};
+use crate::func::native::locked_write;
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
 use crate::{
@@ -69,7 +70,7 @@ impl Engine {
     ) -> RhaiResultOf<T> {
         let ast = self.compile_with_scope_and_optimization_level(
             scope,
-            &[script],
+            [script],
             self.optimization_level,
         )?;
         self.eval_ast_with_scope(scope, &ast)
@@ -117,20 +118,25 @@ impl Engine {
         script: &str,
     ) -> RhaiResultOf<T> {
         let scripts = [script];
-        let (stream, tokenizer_control) =
-            self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
-        let mut state = ParseState::new(self, scope, Default::default(), tokenizer_control);
+        let ast = {
+            let interned_strings = &mut *locked_write(&self.interned_strings);
 
-        // No need to optimize a lone expression
-        let ast = self.parse_global_expr(
-            &mut stream.peekable(),
-            &mut state,
-            |_| {},
-            #[cfg(not(feature = "no_optimize"))]
-            OptimizationLevel::None,
-            #[cfg(feature = "no_optimize")]
-            OptimizationLevel::default(),
-        )?;
+            let (stream, tokenizer_control) =
+                self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
+
+            let mut state = ParseState::new(scope, interned_strings, tokenizer_control);
+
+            // No need to optimize a lone expression
+            self.parse_global_expr(
+                &mut stream.peekable(),
+                &mut state,
+                |_| {},
+                #[cfg(not(feature = "no_optimize"))]
+                OptimizationLevel::None,
+                #[cfg(feature = "no_optimize")]
+                OptimizationLevel::default(),
+            )?
+        };
 
         self.eval_ast_with_scope(scope, &ast)
     }
@@ -238,7 +244,7 @@ impl Engine {
 
         #[cfg(feature = "debugging")]
         if self.debugger.is_some() {
-            global.debugger.status = crate::eval::DebuggerStatus::Terminate;
+            global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
             let mut this = Dynamic::NULL;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
 

@@ -926,10 +926,7 @@ impl Stmt {
     #[inline]
     #[must_use]
     pub const fn is_control_flow_break(&self) -> bool {
-        match self {
-            Self::Return(..) | Self::BreakLoop(..) => true,
-            _ => false,
-        }
+        matches!(self, Self::Return(..) | Self::BreakLoop(..))
     }
     /// Recursively walk this statement.
     /// Return `false` from the callback to terminate the walk.

@@ -1,7 +1,8 @@
 use crate::eval::calc_index;
+use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
-    def_package, ExclusiveRange, InclusiveRange, RhaiResultOf, INT, INT_BITS, MAX_USIZE_INT,
+    def_package, ExclusiveRange, InclusiveRange, RhaiResultOf, ERR, INT, INT_BITS, MAX_USIZE_INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -65,14 +66,11 @@ impl<T: Copy + PartialOrd> StepRange<T> {
         if let Some(n) = add(from, step) {
             #[cfg(not(feature = "unchecked"))]
             if n == from {
-                return Err(crate::ERR::ErrorInFunctionCall(
+                return Err(ERR::ErrorInFunctionCall(
                     "range".to_string(),
                     String::new(),
-                    crate::ERR::ErrorArithmetic(
-                        "step value cannot be zero".to_string(),
-                        Position::NONE,
-                    )
-                    .into(),
+                    ERR::ErrorArithmetic("step value cannot be zero".to_string(), Position::NONE)
+                        .into(),
                     Position::NONE,
                 )
                 .into());
@@ -127,7 +125,7 @@ pub struct BitRange(INT, usize);
 impl BitRange {
     pub fn new(value: INT, from: INT, len: INT) -> RhaiResultOf<Self> {
         let from = calc_index(INT_BITS, from, true, || {
-            crate::ERR::ErrorBitFieldBounds(INT_BITS, from, Position::NONE).into()
+            ERR::ErrorBitFieldBounds(INT_BITS, from, Position::NONE).into()
         })?;
 
         let len = if len < 0 {
@@ -329,7 +327,7 @@ macro_rules! reg_range {
 def_package! {
     /// Package of basic range iterators
     pub BasicIteratorPackage(lib) {
-        lib.standard = true;
+        lib.flags |= ModuleFlags::STANDARD_LIB;
 
         reg_range!(lib | "range" => INT);
 
