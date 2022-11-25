@@ -204,8 +204,9 @@ impl Engine {
                 #[cfg(not(feature = "no_module"))]
                 return self
                     .global_sub_modules
-                    .iter()
-                    .flat_map(|m| m.iter())
+                    .as_deref()
+                    .into_iter()
+                    .flatten()
                     .find_map(|(_, m)| m.get_custom_type(name));
                 #[cfg(feature = "no_module")]
                 return None;
@@ -238,8 +239,9 @@ impl Engine {
                 #[cfg(not(feature = "no_module"))]
                 return self
                     .global_sub_modules
-                    .iter()
-                    .flat_map(|m| m.iter())
+                    .as_deref()
+                    .into_iter()
+                    .flatten()
                     .find_map(|(_, m)| m.get_custom_type(name));
                 #[cfg(feature = "no_module")]
                 return None;

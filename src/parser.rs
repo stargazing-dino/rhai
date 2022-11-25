@@ -142,7 +142,8 @@ impl<'e, 's> ParseState<'e, 's> {
 
         (
             self.stack
-                .iter()
+                .as_deref()
+                .into_iter()
                 .flat_map(|s| s.iter_rev_raw())
                 .enumerate()
                 .find(|&(.., (n, ..))| {
@@ -196,9 +197,10 @@ impl<'e, 's> ParseState<'e, 's> {
                 && index == 0
                 && !self
                     .external_vars
-                    .iter()
-                    .flat_map(|v| v.iter())
-                    .any(|v| v.as_str() == name)
+                    .as_deref()
+                    .into_iter()
+                    .flatten()
+                    .any(|v| v.name == name)
             {
                 self.external_vars
                     .get_or_insert_with(Default::default)
@@ -234,8 +236,9 @@ impl<'e, 's> ParseState<'e, 's> {
     #[must_use]
     pub fn find_module(&self, name: &str) -> Option<NonZeroUsize> {
         self.imports
-            .iter()
-            .flat_map(|m| m.iter())
+            .as_deref()
+            .into_iter()
+            .flatten()
             .rev()
             .enumerate()
             .find(|(.., n)| n.as_str() == name)
@@ -602,8 +605,9 @@ impl Engine {
                         && !is_global
                         && !state
                             .global_imports
-                            .iter()
-                            .flat_map(|m| m.iter())
+                            .as_deref()
+                            .into_iter()
+                            .flatten()
                             .any(|m| m.as_str() == root)
                         && !self
                             .global_sub_modules
@@ -677,8 +681,9 @@ impl Engine {
                             && !is_global
                             && !state
                                 .global_imports
-                                .iter()
-                                .flat_map(|m| m.iter())
+                                .as_deref()
+                                .into_iter()
+                                .flatten()
                                 .any(|m| m.as_str() == root)
                             && !self
                                 .global_sub_modules
@@ -1433,7 +1438,7 @@ impl Engine {
                     new_state
                         .global_imports
                         .get_or_insert_with(Default::default)
-                        .extend(state.imports.iter().flat_map(|m| m.iter()).cloned());
+                        .extend(state.imports.as_deref().into_iter().flatten().cloned());
                 }
 
                 #[cfg(not(feature = "no_closure"))]
@@ -1468,8 +1473,9 @@ impl Engine {
                 #[cfg(not(feature = "no_closure"))]
                 new_state
                     .external_vars
-                    .iter()
-                    .flat_map(|v| v.iter())
+                    .as_deref()
+                    .into_iter()
+                    .flatten()
                     .try_for_each(|Ident { name, pos }| {
                         let (index, is_func) = state.access_var(name, lib, *pos);
 
@@ -1883,8 +1889,9 @@ impl Engine {
                         && !is_global
                         && !state
                             .global_imports
-                            .iter()
-                            .flat_map(|m| m.iter())
+                            .as_deref()
+                            .into_iter()
+                            .flatten()
                             .any(|m| m.as_str() == root)
                         && !self
                             .global_sub_modules
@@ -3312,7 +3319,7 @@ impl Engine {
                             new_state
                                 .global_imports
                                 .get_or_insert_with(Default::default)
-                                .extend(state.imports.iter().flat_map(|m| m.iter()).cloned());
+                                .extend(state.imports.as_deref().into_iter().flatten().cloned());
                         }
 
                         let options = self.options | (settings.options & LangOptions::STRICT_VAR);

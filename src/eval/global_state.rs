@@ -195,10 +195,11 @@ impl GlobalRuntimeState {
     #[inline]
     pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &crate::Module)> {
         self.imports
-            .iter()
-            .flat_map(|x| x.iter())
+            .as_deref()
+            .into_iter()
+            .flatten()
             .rev()
-            .zip(self.modules.iter().flat_map(|x| x.iter()).rev())
+            .zip(self.modules.as_deref().into_iter().flatten().rev())
             .map(|(name, module)| (name.as_str(), &**module))
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in reverse order.
@@ -210,10 +211,11 @@ impl GlobalRuntimeState {
         &self,
     ) -> impl Iterator<Item = (&ImmutableString, &crate::SharedModule)> {
         self.imports
-            .iter()
-            .flat_map(|x| x.iter())
+            .as_deref()
+            .into_iter()
+            .flatten()
             .rev()
-            .zip(self.modules.iter().flat_map(|x| x.iter()).rev())
+            .zip(self.modules.as_deref().into_iter().flatten())
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in forward order.
     ///
@@ -224,9 +226,10 @@ impl GlobalRuntimeState {
         &self,
     ) -> impl Iterator<Item = (&ImmutableString, &crate::SharedModule)> {
         self.imports
-            .iter()
-            .flat_map(|x| x.iter())
-            .zip(self.modules.iter().flat_map(|x| x.iter()))
+            .as_deref()
+            .into_iter()
+            .flatten()
+            .zip(self.modules.as_deref().into_iter().flatten())
     }
     /// Can the particular function with [`Dynamic`] parameter(s) exist in the stack of
     /// globally-imported [modules][crate::Module]?

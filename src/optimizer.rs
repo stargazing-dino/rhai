@@ -1247,9 +1247,10 @@ impl Engine {
         #[cfg(not(feature = "no_module"))]
         if self
             .global_sub_modules
-            .iter()
-            .flat_map(|m| m.values())
-            .any(|m| m.contains_qualified_fn(hash))
+            .as_deref()
+            .into_iter()
+            .flatten()
+            .any(|(_, m)| m.contains_qualified_fn(hash))
         {
             return true;
         }

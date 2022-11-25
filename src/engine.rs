@@ -191,6 +191,9 @@ impl fmt::Debug for Engine {
         #[cfg(not(feature = "unchecked"))]
         f.field("limits", &self.limits);
 
+        #[cfg(not(feature = "debugging"))]
+        f.field("debugger_interface", &self.debugger_interface.is_some());
+
         f.finish()
     }
 }

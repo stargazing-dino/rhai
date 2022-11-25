@@ -231,7 +231,8 @@ impl fmt::Debug for Module {
                 "modules",
                 &self
                     .modules
-                    .iter()
+                    .as_deref()
+                    .into_iter()
                     .flat_map(|m| m.keys())
                     .map(SmartString::as_str)
                     .collect::<Vec<_>>(),
@@ -1025,8 +1026,8 @@ impl Module {
         #[cfg(feature = "metadata")]
         let (param_names, return_type_name) = {
             let mut names = _arg_names
-                .iter()
-                .flat_map(|&p| p.iter())
+                .into_iter()
+                .flatten()
                 .map(|&s| s.into())
                 .collect::<StaticVec<_>>();
             let return_type = if names.len() > arg_types.as_ref().len() {
@@ -1908,16 +1909,20 @@ impl Module {
     #[inline]
     pub fn iter_sub_modules(&self) -> impl Iterator<Item = (&str, &SharedModule)> {
         self.modules
-            .iter()
-            .flat_map(|m| m.iter().map(|(k, m)| (k.as_str(), m)))
+            .as_deref()
+            .into_iter()
+            .flatten()
+            .map(|(k, m)| (k.as_str(), m))
     }
 
     /// Get an iterator to the variables in the [`Module`].
     #[inline]
     pub fn iter_var(&self) -> impl Iterator<Item = (&str, &Dynamic)> {
         self.variables
-            .iter()
-            .flat_map(|m| m.iter().map(|(k, v)| (k.as_str(), v)))
+            .as_deref()
+            .into_iter()
+            .flatten()
+            .map(|(k, v)| (k.as_str(), v))
     }
 
     /// Get an iterator to the functions in the [`Module`].
@@ -2235,7 +2240,7 @@ impl Module {
             }
 
             // Index all Rust functions
-            for (&hash, f) in module.functions.iter().flat_map(|m| m.iter()) {
+            for (&hash, f) in module.functions.iter().flatten() {
                 match f.metadata.namespace {
                     FnNamespace::Global => {
                         // Flatten all functions with global namespace

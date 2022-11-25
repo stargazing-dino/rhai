@@ -236,7 +236,9 @@ impl Engine {
             // Then check imported modules
             global.contains_qualified_fn(hash_script)
             // Then check sub-modules
-            || self.global_sub_modules.iter().flat_map(|m| m.values()).any(|m| m.contains_qualified_fn(hash_script));
+            || self.global_sub_modules.as_deref().map_or(false, |m| {
+                m.values().any(|m| m.contains_qualified_fn(hash_script))
+            });
 
         if !result && !cache.filter.is_absent_and_set(hash_script) {
             // Do not cache "one-hit wonders"

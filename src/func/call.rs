@@ -212,9 +212,12 @@ impl Engine {
                     } else {
                         func.or_else(|| _global.get_qualified_fn(hash)).or_else(|| {
                             self.global_sub_modules
-                                .iter()
-                                .flat_map(|m| m.values())
-                                .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id_raw())))
+                                .as_deref()
+                                .into_iter()
+                                .flatten()
+                                .find_map(|(_, m)| {
+                                    m.get_qualified_fn(hash).map(|f| (f, m.id_raw()))
+                                })
                         })
                     };
 
@@ -251,11 +254,9 @@ impl Engine {
                         #[cfg(not(feature = "no_module"))]
                         let is_dynamic = is_dynamic
                             || _global.may_contain_dynamic_fn(hash_base)
-                            || self
-                                .global_sub_modules
-                                .iter()
-                                .flat_map(|m| m.values())
-                                .any(|m| m.may_contain_dynamic_fn(hash_base));
+                            || self.global_sub_modules.as_deref().map_or(false, |m| {
+                                m.values().any(|m| m.may_contain_dynamic_fn(hash_base))
+                            });
 
                         // Set maximum bitmask when there are dynamic versions of the function
                         if is_dynamic {
@@ -270,24 +271,25 @@ impl Engine {
                         }
 
                         // Try to find a built-in version
-                        let builtin =
-                            args.and_then(|args| match op_token {
-                                Token::NonToken => None,
-                                token if token.is_op_assignment() => {
-                                    let (first_arg, rest_args) = args.split_first().unwrap();
+                        let builtin = args.and_then(|args| match op_token {
+                            Token::NonToken => None,
+                            token if token.is_op_assignment() => {
+                                let (first_arg, rest_args) = args.split_first().unwrap();
 
-                                    get_builtin_op_assignment_fn(token, first_arg, rest_args[0])
-                                        .map(|f| FnResolutionCacheEntry {
-                                            func: CallableFunction::Method(Shared::new(f)),
-                                            source: None,
-                                        })
-                                }
-                                token => get_builtin_binary_op_fn(token.clone(), args[0], args[1])
-                                    .map(|f| FnResolutionCacheEntry {
+                                get_builtin_op_assignment_fn(token, first_arg, rest_args[0]).map(
+                                    |f| FnResolutionCacheEntry {
                                         func: CallableFunction::Method(Shared::new(f)),
                                         source: None,
-                                    }),
-                            });
+                                    },
+                                )
+                            }
+                            token => get_builtin_binary_op_fn(token, args[0], args[1]).map(|f| {
+                                FnResolutionCacheEntry {
+                                    func: CallableFunction::Method(Shared::new(f)),
+                                    source: None,
+                                }
+                            }),
+                        });
 
                         return if cache.filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"

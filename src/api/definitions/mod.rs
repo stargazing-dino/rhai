@@ -368,8 +368,9 @@ impl Definitions<'_> {
         let mut m = self
             .engine
             .global_sub_modules
-            .iter()
-            .flat_map(|m| m.iter())
+            .as_deref()
+            .into_iter()
+            .flatten()
             .map(move |(name, module)| {
                 (
                     name.to_string(),
