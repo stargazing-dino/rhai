@@ -349,7 +349,9 @@ impl Engine {
     #[inline(always)]
     pub fn register_debugger(
         &mut self,
-        init: impl Fn(&Self) -> Dynamic + SendSync + 'static,
+        init: impl Fn(&Self, crate::debugger::Debugger) -> crate::debugger::Debugger
+            + SendSync
+            + 'static,
         callback: impl Fn(
                 EvalContext,
                 crate::eval::DebuggerEvent,

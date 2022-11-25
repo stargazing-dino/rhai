@@ -4,10 +4,15 @@ Rhai Release Notes
 Version 1.12.0
 ==============
 
-Buf fixes
+Bug fixes
 ---------
 
 * Integer numbers that are too large to deserialize into `INT` now fall back to `Decimal` or `FLOAT` instead of silently truncating.
+
+Breaking API changes
+--------------------
+
+* The callback for initializing a debugger instance has changed to `Fn(&Engine, Debugger) -> Debugger`. This allows more control over the initial setup of the debugger.
 
 Net features
 ------------
@@ -21,6 +26,7 @@ Net features
 Enhancements
 ------------
 
+* Optimizations have been done to key data structures to minimize size and creation time, which involves turning rarely-used fields into `Option<Box<T>>`. This resulted in some speed improvements.
 * `CallableFunction` is exported under `internals`.
 * The `TypeBuilder` type and `CustomType` trait are no longer marked as volatile.
 * `FuncArgs` is also implemented for arrays.

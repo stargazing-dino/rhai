@@ -604,7 +604,10 @@ fn main() {
     #[allow(deprecated)]
     engine.register_debugger(
         // Store the current source in the debugger state
-        |_| "".into(),
+        |engine, mut debugger| {
+            debugger.set_state(engine.const_empty_string());
+            debugger
+        },
         // Main debugging interface
         move |context, event, node, source, pos| {
             debug_callback(context, event, node, source, pos, &lines)

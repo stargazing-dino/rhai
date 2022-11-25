@@ -104,7 +104,8 @@ impl GlobalRuntimeState {
 
             #[cfg(feature = "debugging")]
             debugger: engine.debugger.as_ref().map(|x| {
-                crate::eval::Debugger::new(crate::eval::DebuggerStatus::Init, (x.0)(engine))
+                let dbg = crate::eval::Debugger::new(crate::eval::DebuggerStatus::Init);
+                (x.0)(engine, dbg)
             }),
         }
     }

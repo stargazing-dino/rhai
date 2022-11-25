@@ -10,10 +10,10 @@ use std::{fmt, iter::repeat, mem};
 
 /// Callback function to initialize the debugger.
 #[cfg(not(feature = "sync"))]
-pub type OnDebuggingInit = dyn Fn(&Engine) -> Dynamic;
+pub type OnDebuggingInit = dyn Fn(&Engine, Debugger) -> Debugger;
 /// Callback function to initialize the debugger.
 #[cfg(feature = "sync")]
-pub type OnDebuggingInit = dyn Fn(&Engine) -> Dynamic + Send + Sync;
+pub type OnDebuggingInit = dyn Fn(&Engine, Debugger) -> Debugger + Send + Sync;
 
 /// Callback function for debugging.
 #[cfg(not(feature = "sync"))]
@@ -268,12 +268,12 @@ impl Debugger {
     /// Create a new [`Debugger`].
     #[inline(always)]
     #[must_use]
-    pub const fn new(status: DebuggerStatus, state: Dynamic) -> Self {
+    pub const fn new(status: DebuggerStatus) -> Self {
         Self {
             status,
             break_points: Vec::new(),
             call_stack: Vec::new(),
-            state,
+            state: Dynamic::UNIT,
         }
     }
     /// Get the current call stack.
