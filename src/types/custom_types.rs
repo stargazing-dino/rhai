@@ -13,7 +13,7 @@ pub struct CustomTypeInfo {
 
 /// _(internals)_ A collection of custom types.
 /// Exported under the `internals` feature only.
-#[derive(Clone, Hash, Default)]
+#[derive(Clone, Hash)]
 pub struct CustomTypesCollection(BTreeMap<Identifier, CustomTypeInfo>);
 
 impl fmt::Debug for CustomTypesCollection {
@@ -22,6 +22,13 @@ impl fmt::Debug for CustomTypesCollection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("CustomTypesCollection ")?;
         f.debug_map().entries(self.0.iter()).finish()
+    }
+}
+
+impl Default for CustomTypesCollection {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -71,6 +71,9 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::negative_feature_names)]
 #![allow(clippy::module_inception)]
+#![allow(clippy::box_collection)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::upper_case_acronyms)]
 
 #[cfg(feature = "no_std")]
 extern crate alloc;

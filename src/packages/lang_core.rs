@@ -304,12 +304,12 @@ fn collect_fn_metadata(
 
                 let mut ns = SmartString::new_const();
                 write!(&mut ns, "{namespace}{}{name}", DoubleColon.literal_syntax()).unwrap();
-                scan_module(engine, list, &ns, &**m, filter);
+                scan_module(engine, list, &ns, m, filter);
             }
         }
 
         for (ns, m) in ctx.iter_imports_raw() {
-            scan_module(engine, &mut list, ns, &**m, filter);
+            scan_module(engine, &mut list, ns, m, filter);
         }
     }
 

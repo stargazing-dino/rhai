@@ -574,7 +574,7 @@ mod decimal_functions {
                         .into(),
                 )
             },
-            |n| Ok(n),
+            Ok,
         )
     }
     /// Return the integral part of the decimal number.

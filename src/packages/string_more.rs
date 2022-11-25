@@ -541,7 +541,7 @@ mod string_functions {
     /// ```
     #[rhai_fn(name = "contains")]
     pub fn contains_char(string: &str, character: char) -> bool {
-        string.contains(character).into()
+        string.contains(character)
     }
 
     /// Return `true` if the string starts with a specified string.

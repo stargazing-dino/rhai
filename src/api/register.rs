@@ -720,8 +720,7 @@ impl Engine {
         }
 
         register_static_module_raw(
-            self.global_sub_modules
-                .get_or_insert_with(|| BTreeMap::new().into()),
+            self.global_sub_modules.get_or_insert_with(Default::default),
             name.as_ref(),
             module,
         );

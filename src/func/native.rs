@@ -182,7 +182,7 @@ impl<'a> NativeCallContext<'a> {
         Self {
             engine,
             fn_name: &context.fn_name,
-            source: context.source.as_ref().map(String::as_str),
+            source: context.source.as_deref(),
             global: &context.global,
             pos: context.pos,
         }

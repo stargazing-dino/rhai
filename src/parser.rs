@@ -201,7 +201,7 @@ impl<'e, 's> ParseState<'e, 's> {
                     .any(|v| v.as_str() == name)
             {
                 self.external_vars
-                    .get_or_insert_with(|| FnArgsVec::new().into())
+                    .get_or_insert_with(Default::default)
                     .push(Ident {
                         name: name.into(),
                         pos: _pos,
@@ -1659,7 +1659,7 @@ impl Engine {
                     }
                     // Access to `this` as a variable is OK within a function scope
                     #[cfg(not(feature = "no_function"))]
-                    _ if &*s == KEYWORD_THIS && settings.has_flag(ParseSettingFlags::FN_SCOPE) => {
+                    _ if *s == KEYWORD_THIS && settings.has_flag(ParseSettingFlags::FN_SCOPE) => {
                         Expr::Variable(
                             (None, ns, 0, state.get_interned_string(*s)).into(),
                             None,
@@ -1667,7 +1667,7 @@ impl Engine {
                         )
                     }
                     // Cannot access to `this` as a variable not in a function scope
-                    _ if &*s == KEYWORD_THIS => {
+                    _ if *s == KEYWORD_THIS => {
                         let msg = format!("'{s}' can only be used in functions");
                         return Err(
                             LexError::ImproperSymbol(s.to_string(), msg).into_err(settings.pos)
@@ -2055,7 +2055,7 @@ impl Engine {
             }
             // var (indexed) = rhs
             Expr::Variable(ref x, i, var_pos) => {
-                let stack = state.stack.get_or_insert_with(|| Scope::new().into());
+                let stack = state.stack.get_or_insert_with(Default::default);
                 let (index, .., name) = &**x;
                 let index = i.map_or_else(
                     || index.expect("either long or short index is `None`").get(),
@@ -2482,7 +2482,7 @@ impl Engine {
             let marker = state.get_interned_string(SCOPE_SEARCH_BARRIER_MARKER);
             state
                 .stack
-                .get_or_insert_with(|| Scope::new().into())
+                .get_or_insert_with(Default::default)
                 .push(marker, ());
         }
 
@@ -2846,7 +2846,7 @@ impl Engine {
         };
 
         let prev_stack_len = {
-            let stack = state.stack.get_or_insert_with(|| Scope::new().into());
+            let stack = state.stack.get_or_insert_with(Default::default);
 
             let prev_stack_len = stack.len();
 
@@ -2887,7 +2887,7 @@ impl Engine {
         let (name, pos) = parse_var_name(input)?;
 
         {
-            let stack = state.stack.get_or_insert_with(|| Scope::new().into());
+            let stack = state.stack.get_or_insert_with(Default::default);
 
             if !self.allow_shadowing() && stack.iter().any(|(v, ..)| v == name) {
                 return Err(PERR::VariableExists(name.into()).into_err(pos));
@@ -3486,7 +3486,7 @@ impl Engine {
             let name = state.get_interned_string(name);
             state
                 .stack
-                .get_or_insert_with(|| Scope::new().into())
+                .get_or_insert_with(Default::default)
                 .push(name.clone(), ());
             Ident { name, pos }
         } else {
@@ -3568,7 +3568,7 @@ impl Engine {
                         let s = state.get_interned_string(*s);
                         state
                             .stack
-                            .get_or_insert_with(|| Scope::new().into())
+                            .get_or_insert_with(Default::default)
                             .push(s.clone(), ());
                         params.push((s, pos));
                     }
@@ -3713,7 +3713,7 @@ impl Engine {
                         let s = state.get_interned_string(*s);
                         state
                             .stack
-                            .get_or_insert_with(|| Scope::new().into())
+                            .get_or_insert_with(Default::default)
                             .push(s.clone(), ());
                         params_list.push(s);
                     }

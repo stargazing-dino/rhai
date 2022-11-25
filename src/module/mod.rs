@@ -462,7 +462,7 @@ impl Module {
     #[inline(always)]
     pub fn set_custom_type<T>(&mut self, name: &str) -> &mut Self {
         self.custom_types
-            .get_or_insert_with(|| CustomTypesCollection::new().into())
+            .get_or_insert_with(Default::default)
             .add_type::<T>(name);
         self
     }
@@ -488,7 +488,7 @@ impl Module {
         name: impl Into<Identifier>,
     ) -> &mut Self {
         self.custom_types
-            .get_or_insert_with(|| CustomTypesCollection::new().into())
+            .get_or_insert_with(Default::default)
             .add(type_path, name);
         self
     }
@@ -656,11 +656,11 @@ impl Module {
         if self.is_indexed() {
             let hash_var = crate::calc_var_hash(Some(""), &ident);
             self.all_variables
-                .get_or_insert_with(|| Default::default())
+                .get_or_insert_with(Default::default)
                 .insert(hash_var, value.clone());
         }
         self.variables
-            .get_or_insert_with(|| Default::default())
+            .get_or_insert_with(Default::default)
             .insert(ident, value);
         self
     }
@@ -687,25 +687,23 @@ impl Module {
         let hash_script = crate::calc_fn_hash(None, &fn_def.name, num_params);
         #[cfg(feature = "metadata")]
         let params_info = fn_def.params.iter().map(Into::into).collect();
-        self.functions
-            .get_or_insert_with(|| StraightHashMap::default().into())
-            .insert(
-                hash_script,
-                FuncInfo {
-                    name: fn_def.name.as_str().into(),
-                    namespace: FnNamespace::Internal,
-                    access: fn_def.access,
-                    num_params,
-                    param_types: StaticVec::new_const(),
-                    #[cfg(feature = "metadata")]
-                    params_info,
-                    #[cfg(feature = "metadata")]
-                    return_type: "".into(),
-                    #[cfg(feature = "metadata")]
-                    comments: Box::default(),
-                    func: fn_def.into(),
-                },
-            );
+        self.functions.get_or_insert_with(Default::default).insert(
+            hash_script,
+            FuncInfo {
+                name: fn_def.name.as_str().into(),
+                namespace: FnNamespace::Internal,
+                access: fn_def.access,
+                num_params,
+                param_types: StaticVec::new_const(),
+                #[cfg(feature = "metadata")]
+                params_info,
+                #[cfg(feature = "metadata")]
+                return_type: "".into(),
+                #[cfg(feature = "metadata")]
+                comments: Box::default(),
+                func: fn_def.into(),
+            },
+        );
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
         hash_script
     }
@@ -747,7 +745,7 @@ impl Module {
         self.all_type_iterators = None;
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
-        self.modules.get_or_insert_with(|| Default::default())
+        self.modules.get_or_insert_with(Default::default)
     }
 
     /// Does a sub-module exist in the [`Module`]?
@@ -809,7 +807,7 @@ impl Module {
         sub_module: impl Into<SharedModule>,
     ) -> &mut Self {
         self.modules
-            .get_or_insert_with(|| Default::default())
+            .get_or_insert_with(Default::default)
             .insert(name.into(), sub_module.into());
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
         self
@@ -1605,12 +1603,10 @@ impl Module {
         #[cfg(feature = "metadata")]
         if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
             if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
-                self.doc
-                    .get_or_insert_with(|| SmartString::new_const())
-                    .push('\n');
+                self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
-                .get_or_insert_with(|| SmartString::new_const())
+                .get_or_insert_with(Default::default)
                 .push_str(other.doc.as_ref().unwrap());
         }
 
@@ -1657,12 +1653,10 @@ impl Module {
         #[cfg(feature = "metadata")]
         if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
             if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
-                self.doc
-                    .get_or_insert_with(|| SmartString::new_const())
-                    .push('\n');
+                self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
-                .get_or_insert_with(|| SmartString::new_const())
+                .get_or_insert_with(Default::default)
                 .push_str(other.doc.as_ref().unwrap());
         }
 
@@ -1674,7 +1668,7 @@ impl Module {
     #[inline]
     pub fn fill_with(&mut self, other: &Self) -> &mut Self {
         if let Some(ref modules) = other.modules {
-            let m = self.modules.get_or_insert_with(|| Default::default());
+            let m = self.modules.get_or_insert_with(Default::default);
 
             for (k, v) in modules.iter() {
                 if !m.contains_key(k) {
@@ -1684,7 +1678,7 @@ impl Module {
         }
         if let Some(ref variables) = other.variables {
             for (k, v) in variables.iter() {
-                let map = self.variables.get_or_insert_with(|| Default::default());
+                let map = self.variables.get_or_insert_with(Default::default);
 
                 if !map.contains_key(k) {
                     map.insert(k.clone(), v.clone());
@@ -1693,7 +1687,7 @@ impl Module {
         }
         if let Some(ref functions) = other.functions {
             for (k, f) in functions.iter() {
-                let map = self.functions.get_or_insert_with(|| Default::default());
+                let map = self.functions.get_or_insert_with(Default::default);
 
                 if !map.contains_key(k) {
                     map.insert(*k, f.clone());
@@ -1702,9 +1696,7 @@ impl Module {
         }
         self.dynamic_functions_filter += &other.dynamic_functions_filter;
         if let Some(ref type_iterators) = other.type_iterators {
-            let t = self
-                .type_iterators
-                .get_or_insert_with(|| Default::default());
+            let t = self.type_iterators.get_or_insert_with(Default::default);
 
             for (&k, v) in type_iterators.iter() {
                 t.entry(k).or_insert_with(|| v.clone());
@@ -1718,12 +1710,10 @@ impl Module {
         #[cfg(feature = "metadata")]
         if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
             if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
-                self.doc
-                    .get_or_insert_with(|| SmartString::new_const())
-                    .push('\n');
+                self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
-                .get_or_insert_with(|| SmartString::new_const())
+                .get_or_insert_with(Default::default)
                 .push_str(other.doc.as_ref().unwrap());
         }
 
@@ -1797,12 +1787,10 @@ impl Module {
         #[cfg(feature = "metadata")]
         if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
             if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
-                self.doc
-                    .get_or_insert_with(|| SmartString::new_const())
-                    .push('\n');
+                self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
-                .get_or_insert_with(|| SmartString::new_const())
+                .get_or_insert_with(Default::default)
                 .push_str(other.doc.as_ref().unwrap());
         }
 
@@ -2285,11 +2273,11 @@ impl Module {
         let func = Shared::new(func);
         if self.is_indexed() {
             self.all_type_iterators
-                .get_or_insert_with(|| Default::default())
+                .get_or_insert_with(Default::default)
                 .insert(type_id, func.clone());
         }
         self.type_iterators
-            .get_or_insert_with(|| Default::default())
+            .get_or_insert_with(Default::default)
             .insert(type_id, func);
         self
     }

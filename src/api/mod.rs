@@ -35,7 +35,6 @@ pub mod definitions;
 
 use crate::{Dynamic, Engine, Identifier};
 
-use std::collections::BTreeSet;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -109,7 +108,7 @@ impl Engine {
     #[inline(always)]
     pub fn disable_symbol(&mut self, symbol: impl Into<Identifier>) -> &mut Self {
         self.disabled_symbols
-            .get_or_insert_with(|| BTreeSet::new().into())
+            .get_or_insert_with(Default::default)
             .insert(symbol.into());
         self
     }
@@ -199,7 +198,7 @@ impl Engine {
 
         // Add to custom keywords
         self.custom_keywords
-            .get_or_insert_with(|| std::collections::BTreeMap::new().into())
+            .get_or_insert_with(Default::default)
             .insert(keyword.into(), Some(precedence));
 
         Ok(self)

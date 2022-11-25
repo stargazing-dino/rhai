@@ -121,7 +121,7 @@ impl<T: 'static> SusLock<T> {
     #[must_use]
     pub fn get(&self) -> Option<&'static T> {
         if self.initialized.load(Ordering::SeqCst) {
-            let hokma = hokmalock(unsafe { mem::transmute(self.data.get()) });
+            let hokma = hokmalock(self.data.get() as usize);
             // we forgo the optimistic read, because we don't really care
             let guard = hokma.write();
             let cast: *const T = self.data.get().cast();

@@ -12,7 +12,7 @@ use crate::{
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{borrow::Borrow, collections::BTreeMap, ops::Deref};
+use std::{borrow::Borrow, ops::Deref};
 
 /// Collection of special markers for custom syntax definition.
 pub mod markers {
@@ -268,7 +268,7 @@ impl Engine {
                             .map_or(false, |m| m.contains_key(s))
                     {
                         self.custom_keywords
-                            .get_or_insert_with(|| BTreeMap::new().into())
+                            .get_or_insert_with(Default::default)
                             .insert(s.into(), None);
                     }
                     s.into()
@@ -304,7 +304,7 @@ impl Engine {
                                 .map_or(false, |m| m.contains_key(s)))
                     {
                         self.custom_keywords
-                            .get_or_insert_with(|| BTreeMap::new().into())
+                            .get_or_insert_with(Default::default)
                             .insert(s.into(), None);
                     }
                     s.into()
@@ -391,7 +391,7 @@ impl Engine {
         func: impl Fn(&mut EvalContext, &[Expression], &Dynamic) -> RhaiResult + SendSync + 'static,
     ) -> &mut Self {
         self.custom_syntax
-            .get_or_insert_with(|| BTreeMap::new().into())
+            .get_or_insert_with(Default::default)
             .insert(
                 key.into(),
                 CustomSyntax {
