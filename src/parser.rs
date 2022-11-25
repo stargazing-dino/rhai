@@ -72,10 +72,10 @@ pub struct ParseState<'e, 's> {
     pub allow_capture: bool,
     /// Encapsulates a local stack with imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
-    pub imports: StaticVec<ImmutableString>,
+    pub imports: Option<Box<StaticVec<ImmutableString>>>,
     /// List of globally-imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
-    pub global_imports: StaticVec<ImmutableString>,
+    pub global_imports: Option<Box<StaticVec<ImmutableString>>>,
 }
 
 impl fmt::Debug for ParseState<'_, '_> {
@@ -122,9 +122,9 @@ impl<'e, 's> ParseState<'e, 's> {
             stack: None,
             block_stack_len: 0,
             #[cfg(not(feature = "no_module"))]
-            imports: StaticVec::new_const(),
+            imports: None,
             #[cfg(not(feature = "no_module"))]
-            global_imports: StaticVec::new_const(),
+            global_imports: None,
         }
     }
 
@@ -235,6 +235,7 @@ impl<'e, 's> ParseState<'e, 's> {
     pub fn find_module(&self, name: &str) -> Option<NonZeroUsize> {
         self.imports
             .iter()
+            .flat_map(|m| m.iter())
             .rev()
             .enumerate()
             .find(|(.., n)| n.as_str() == name)
@@ -599,7 +600,11 @@ impl Engine {
                     if settings.has_option(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
-                        && !state.global_imports.iter().any(|m| m.as_str() == root)
+                        && !state
+                            .global_imports
+                            .iter()
+                            .flat_map(|m| m.iter())
+                            .any(|m| m.as_str() == root)
                         && !self
                             .global_sub_modules
                             .as_ref()
@@ -670,7 +675,11 @@ impl Engine {
                         if settings.has_option(LangOptions::STRICT_VAR)
                             && index.is_none()
                             && !is_global
-                            && !state.global_imports.iter().any(|m| m.as_str() == root)
+                            && !state
+                                .global_imports
+                                .iter()
+                                .flat_map(|m| m.iter())
+                                .any(|m| m.as_str() == root)
                             && !self
                                 .global_sub_modules
                                 .as_ref()
@@ -1420,7 +1429,8 @@ impl Engine {
                     new_state.global_imports.clone_from(&state.global_imports);
                     new_state
                         .global_imports
-                        .extend(state.imports.iter().cloned());
+                        .get_or_insert_with(Default::default)
+                        .extend(state.imports.iter().flat_map(|m| m.iter()).cloned());
                 }
 
                 #[cfg(not(feature = "no_closure"))]
@@ -1868,7 +1878,11 @@ impl Engine {
                     if settings.has_option(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
-                        && !state.global_imports.iter().any(|m| m.as_str() == root)
+                        && !state
+                            .global_imports
+                            .iter()
+                            .flat_map(|m| m.iter())
+                            .any(|m| m.as_str() == root)
                         && !self
                             .global_sub_modules
                             .as_ref()
@@ -3005,7 +3019,10 @@ impl Engine {
             }
         };
 
-        state.imports.push(export.name.clone());
+        state
+            .imports
+            .get_or_insert_with(Default::default)
+            .push(export.name.clone());
 
         Ok(Stmt::Import((expr, export).into(), settings.pos))
     }
@@ -3107,7 +3124,7 @@ impl Engine {
         state.block_stack_len = state.stack.as_ref().map_or(0, |s| s.len());
 
         #[cfg(not(feature = "no_module"))]
-        let orig_imports_len = state.imports.len();
+        let orig_imports_len = state.imports.as_ref().map_or(0, |m| m.len());
 
         let end_pos = loop {
             // Terminated?
@@ -3170,7 +3187,9 @@ impl Engine {
         state.block_stack_len = prev_entry_stack_len;
 
         #[cfg(not(feature = "no_module"))]
-        state.imports.truncate(orig_imports_len);
+        if let Some(ref mut imports) = state.imports {
+            imports.truncate(orig_imports_len);
+        }
 
         Ok((statements, settings.pos, end_pos).into())
     }
@@ -3290,7 +3309,8 @@ impl Engine {
                             new_state.global_imports.clone_from(&state.global_imports);
                             new_state
                                 .global_imports
-                                .extend(state.imports.iter().cloned());
+                                .get_or_insert_with(Default::default)
+                                .extend(state.imports.iter().flat_map(|m| m.iter()).cloned());
                         }
 
                         let options = self.options | (settings.options & LangOptions::STRICT_VAR);
