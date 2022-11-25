@@ -121,15 +121,14 @@ impl Engine {
         let ast = {
             let interned_strings = &mut *locked_write(&self.interned_strings);
 
-            let (stream, tokenizer_control) =
-                self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
+            let (stream, tc) = self.lex_raw(&scripts, self.token_mapper.as_deref());
 
-            let mut state = ParseState::new(scope, interned_strings, tokenizer_control);
+            let state = &mut ParseState::new(scope, interned_strings, tc);
 
             // No need to optimize a lone expression
             self.parse_global_expr(
-                &mut stream.peekable(),
-                &mut state,
+                stream.peekable(),
+                state,
                 |_| {},
                 #[cfg(not(feature = "no_optimize"))]
                 OptimizationLevel::None,
@@ -243,7 +242,7 @@ impl Engine {
         let result = self.eval_global_statements(global, caches, scope, statements);
 
         #[cfg(feature = "debugging")]
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
             global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
             let mut this = Dynamic::NULL;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
@@ -262,25 +261,6 @@ impl Engine {
         global.source = orig_source;
 
         result
-    }
-    /// _(internals)_ Evaluate a list of statements with no `this` pointer.
-    /// Exported under the `internals` feature only.
-    ///
-    /// This is commonly used to evaluate a list of statements in an [`AST`] or a script function body.
-    ///
-    /// # WARNING - Low Level API
-    ///
-    /// This function is very low level.
-    #[cfg(feature = "internals")]
-    #[inline(always)]
-    pub fn eval_statements_raw(
-        &self,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
-        scope: &mut Scope,
-        statements: &[crate::ast::Stmt],
-    ) -> RhaiResult {
-        self.eval_global_statements(global, caches, scope, statements)
     }
 }
 

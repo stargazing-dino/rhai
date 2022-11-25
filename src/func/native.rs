@@ -424,8 +424,7 @@ impl<'a> NativeCallContext<'a> {
         let caches = &mut Caches::new();
 
         let fn_name = fn_name.as_ref();
-        let op_token = Token::lookup_symbol_from_syntax(fn_name);
-        let op_token = op_token.as_ref();
+        let op_token = Token::lookup_symbol_from_syntax(fn_name).unwrap_or(Token::NonToken);
         let args_len = args.len();
 
         global.level += 1;

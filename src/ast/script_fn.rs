@@ -24,7 +24,7 @@ pub struct EncapsulatedEnviron {
     /// Imported [modules][crate::Module].
     pub imports: Box<[(ImmutableString, crate::SharedModule)]>,
     /// Globally-defined constants.
-    pub constants: Option<crate::eval::GlobalConstants>,
+    pub constants: Option<crate::eval::SharedGlobalConstants>,
 }
 
 /// _(internals)_ A type containing information on a script-defined function.

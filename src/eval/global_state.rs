@@ -8,7 +8,7 @@ use std::prelude::v1::*;
 /// Collection of globally-defined constants.
 #[cfg(not(feature = "no_module"))]
 #[cfg(not(feature = "no_function"))]
-pub type GlobalConstants =
+pub type SharedGlobalConstants =
     crate::Shared<crate::Locked<std::collections::BTreeMap<ImmutableString, Dynamic>>>;
 
 /// _(internals)_ Global runtime states.
@@ -67,12 +67,12 @@ pub struct GlobalRuntimeState {
     /// Interior mutability is needed because it is shared in order to aid in cloning.
     #[cfg(not(feature = "no_module"))]
     #[cfg(not(feature = "no_function"))]
-    pub constants: Option<GlobalConstants>,
+    pub constants: Option<SharedGlobalConstants>,
     /// Custom state that can be used by the external host.
     pub tag: Dynamic,
     /// Debugging interface.
     #[cfg(feature = "debugging")]
-    pub(crate) debugger: Option<super::Debugger>,
+    pub(crate) debugger: Option<Box<super::Debugger>>,
 }
 
 impl GlobalRuntimeState {
@@ -103,9 +103,9 @@ impl GlobalRuntimeState {
             tag: engine.default_tag().clone(),
 
             #[cfg(feature = "debugging")]
-            debugger: engine.debugger.as_ref().map(|x| {
+            debugger: engine.debugger_interface.as_ref().map(|x| {
                 let dbg = crate::eval::Debugger::new(crate::eval::DebuggerStatus::Init);
-                (x.0)(engine, dbg)
+                (x.0)(engine, dbg).into()
             }),
         }
     }
@@ -116,7 +116,7 @@ impl GlobalRuntimeState {
     #[inline]
     #[must_use]
     pub fn num_imports(&self) -> usize {
-        self.modules.as_ref().map_or(0, |m| m.len())
+        self.modules.as_deref().map_or(0, crate::StaticVec::len)
     }
     /// Get the globally-imported [module][crate::Module] at a particular index.
     ///
@@ -139,7 +139,7 @@ impl GlobalRuntimeState {
         &mut self,
         index: usize,
     ) -> Option<&mut crate::SharedModule> {
-        self.modules.as_mut().and_then(|m| m.get_mut(index))
+        self.modules.as_deref_mut().and_then(|m| m.get_mut(index))
     }
     /// Get the index of a globally-imported [module][crate::Module] by name.
     ///
@@ -184,8 +184,8 @@ impl GlobalRuntimeState {
             self.imports = None;
             self.modules = None;
         } else if self.imports.is_some() {
-            self.imports.as_mut().unwrap().truncate(size);
-            self.modules.as_mut().unwrap().truncate(size);
+            self.imports.as_deref_mut().unwrap().truncate(size);
+            self.modules.as_deref_mut().unwrap().truncate(size);
         }
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in reverse order.
@@ -235,7 +235,7 @@ impl GlobalRuntimeState {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     pub(crate) fn may_contain_dynamic_fn(&self, hash_script: u64) -> bool {
-        self.modules.as_ref().map_or(false, |m| {
+        self.modules.as_deref().map_or(false, |m| {
             m.iter().any(|m| m.may_contain_dynamic_fn(hash_script))
         })
     }
@@ -324,7 +324,7 @@ impl GlobalRuntimeState {
     /// Panics if the debugging interface is not set.
     #[cfg(feature = "debugging")]
     pub fn debugger_mut(&mut self) -> &mut super::Debugger {
-        self.debugger.as_mut().unwrap()
+        self.debugger.as_deref_mut().unwrap()
     }
 }
 

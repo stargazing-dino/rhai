@@ -218,13 +218,10 @@ impl Engine {
         scripts: impl AsRef<[S]>,
         optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
-        let (stream, tokenizer_control) = self.lex_raw(
-            scripts.as_ref(),
-            self.token_mapper.as_ref().map(<_>::as_ref),
-        );
+        let (stream, tc) = self.lex_raw(scripts.as_ref(), self.token_mapper.as_deref());
         let interned_strings = &mut *locked_write(&self.interned_strings);
-        let mut state = ParseState::new(scope, interned_strings, tokenizer_control);
-        let mut _ast = self.parse(&mut stream.peekable(), &mut state, optimization_level)?;
+        let state = &mut ParseState::new(scope, interned_strings, tc);
+        let mut _ast = self.parse(stream.peekable(), state, optimization_level)?;
         #[cfg(feature = "metadata")]
         _ast.set_doc(state.tokenizer_control.borrow().global_comments.join("\n"));
         Ok(_ast)
@@ -292,12 +289,9 @@ impl Engine {
         script: impl AsRef<str>,
     ) -> ParseResult<AST> {
         let scripts = [script];
-        let (stream, tokenizer_control) =
-            self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
-
-        let mut peekable = stream.peekable();
+        let (stream, t) = self.lex_raw(&scripts, self.token_mapper.as_deref());
         let interned_strings = &mut *locked_write(&self.interned_strings);
-        let mut state = ParseState::new(scope, interned_strings, tokenizer_control);
-        self.parse_global_expr(&mut peekable, &mut state, |_| {}, self.optimization_level)
+        let state = &mut ParseState::new(scope, interned_strings, t);
+        self.parse_global_expr(stream.peekable(), state, |_| {}, self.optimization_level)
     }
 }

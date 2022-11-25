@@ -147,7 +147,7 @@ pub struct Engine {
 
     /// Callback closure for debugging.
     #[cfg(feature = "debugging")]
-    pub(crate) debugger: Option<
+    pub(crate) debugger_interface: Option<
         Box<(
             Box<crate::eval::OnDebuggingInit>,
             Box<crate::eval::OnDebuggerCallback>,
@@ -305,7 +305,7 @@ impl Engine {
             limits: crate::api::limits::Limits::new(),
 
             #[cfg(feature = "debugging")]
-            debugger: None,
+            debugger_interface: None,
         };
 
         // Add the global namespace module
@@ -347,5 +347,13 @@ impl Engine {
     #[must_use]
     pub fn const_empty_string(&self) -> ImmutableString {
         self.get_interned_string("")
+    }
+
+    /// Is there a debugger interface registered with this [`Engine`]?
+    #[cfg(feature = "debugging")]
+    #[inline(always)]
+    #[must_use]
+    pub(crate) const fn is_debugger_registered(&self) -> bool {
+        self.debugger_interface.is_some()
     }
 }

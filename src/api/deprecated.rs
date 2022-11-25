@@ -26,7 +26,7 @@ impl Engine {
     ///
     /// This method is deprecated. Use [`run_file`][Engine::run_file] instead.
     ///
-    /// This method will be removed in the next majocd cr version.
+    /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `run_file` instead")]
     #[cfg(not(feature = "no_std"))]
     #[cfg(not(target_family = "wasm"))]
@@ -136,12 +136,6 @@ impl Engine {
         self.call_fn_raw(scope, ast, eval_ast, true, name, this_ptr, arg_values)
     }
     /// Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
-    ///
-    /// The following options are available:
-    ///
-    /// * whether to evaluate the [`AST`] to load necessary modules before calling the function
-    /// * whether to rewind the [`Scope`] after the function call
-    /// * a value for binding to the `this` pointer (if any)
     ///
     /// Not available under `no_function`.
     ///
@@ -253,12 +247,6 @@ impl Engine {
     /// This method is deprecated. Use [`register_indexer_get`][Engine::register_indexer_get] instead.
     ///
     /// This method will be removed in the next major version.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the type is [`Array`][crate::Array], [`Map`][crate::Map], [`String`],
-    /// [`ImmutableString`][crate::ImmutableString], `&str` or [`INT`][crate::INT].
-    /// Indexers for arrays, object maps, strings and integers cannot be registered.
     #[deprecated(since = "1.9.1", note = "use `register_indexer_get` instead")]
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline(always)]
@@ -284,12 +272,6 @@ impl Engine {
     /// This method is deprecated. Use [`register_indexer_set`][Engine::register_indexer_set] instead.
     ///
     /// This method will be removed in the next major version.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the type is [`Array`][crate::Array], [`Map`][crate::Map], [`String`],
-    /// [`ImmutableString`][crate::ImmutableString], `&str` or [`INT`][crate::INT].
-    /// Indexers for arrays, object maps, strings and integers cannot be registered.
     #[deprecated(since = "1.9.1", note = "use `register_indexer_set` instead")]
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline(always)]
@@ -316,34 +298,6 @@ impl Engine {
     /// Use [`register_custom_syntax_with_state_raw`][Engine::register_custom_syntax_with_state_raw] instead.
     ///
     /// This method will be removed in the next major version.
-    ///
-    /// # WARNING - Low Level API
-    ///
-    /// This function is very low level.
-    ///
-    /// * `scope_may_be_changed` specifies variables have been added/removed by this custom syntax.
-    /// * `parse` is the parsing function.
-    /// * `func` is the implementation function.
-    ///
-    /// All custom keywords used as symbols must be manually registered via [`Engine::register_custom_operator`].
-    /// Otherwise, they won't be recognized.
-    ///
-    /// # Parsing Function Signature
-    ///
-    /// The parsing function has the following signature:
-    ///
-    /// `Fn(symbols: &[ImmutableString], look_ahead: &str) -> Result<Option<ImmutableString>, ParseError>`
-    ///
-    /// where:
-    /// * `symbols`: a slice of symbols that have been parsed so far, possibly containing `$expr$` and/or `$block$`;
-    ///   `$ident$` and other literal markers are replaced by the actual text
-    /// * `look_ahead`: a string slice containing the next symbol that is about to be read
-    ///
-    /// ## Return value
-    ///
-    /// * `Ok(None)`: parsing complete and there are no more symbols to match.
-    /// * `Ok(Some(symbol))`: the next symbol to match, which can also be `$expr$`, `$ident$` or `$block$`.
-    /// * `Err(ParseError)`: error that is reflected back to the [`Engine`], normally `ParseError(ParseErrorType::BadInput(LexError::ImproperSymbol(message)), Position::NONE)` to indicate a syntax error, but it can be any [`ParseError`][crate::ParseError].
     #[deprecated(
         since = "1.11.0",
         note = "use `register_custom_syntax_with_state_raw` instead"
@@ -367,6 +321,24 @@ impl Engine {
             scope_may_be_changed,
             move |context, expressions, _| func(context, expressions),
         )
+    }
+    /// _(internals)_ Evaluate a list of statements with no `this` pointer.
+    /// Exported under the `internals` feature only.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated. It will be removed in the next major version.
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    #[deprecated(since = "1.12.0")]
+    pub fn eval_statements_raw(
+        &self,
+        global: &mut crate::eval::GlobalRuntimeState,
+        caches: &mut crate::eval::Caches,
+        scope: &mut Scope,
+        statements: &[crate::ast::Stmt],
+    ) -> RhaiResult {
+        self.eval_global_statements(global, caches, scope, statements)
     }
 }
 

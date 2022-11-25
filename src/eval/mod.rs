@@ -17,10 +17,10 @@ pub use debugger::{
     OnDebuggerCallback, OnDebuggingInit,
 };
 pub use eval_context::EvalContext;
+pub use global_state::GlobalRuntimeState;
 #[cfg(not(feature = "no_module"))]
 #[cfg(not(feature = "no_function"))]
-pub use global_state::GlobalConstants;
-pub use global_state::GlobalRuntimeState;
+pub use global_state::SharedGlobalConstants;
 #[cfg(not(feature = "no_index"))]
 pub use target::calc_offset_len;
 pub use target::{calc_index, Target};

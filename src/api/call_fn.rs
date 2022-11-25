@@ -81,7 +81,7 @@ impl Engine {
     ///
     /// The [`AST`] is evaluated before calling the function.
     /// This allows a script to load the necessary modules.
-    /// This is usually desired. If not, use [`call_fn_with_options`] instead.
+    /// This is usually desired. If not, use [`call_fn_with_options`][Engine::call_fn_with_options] instead.
     ///
     /// # Example
     ///
@@ -276,7 +276,7 @@ impl Engine {
         });
 
         #[cfg(feature = "debugging")]
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
             global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
             self.run_debugger(global, caches, scope, this_ptr, node)?;

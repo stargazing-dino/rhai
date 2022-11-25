@@ -415,7 +415,7 @@ impl Engine {
         this_ptr: &mut Dynamic,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<()> {
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
             if let Some(cmd) =
                 self.run_debugger_with_reset_raw(global, caches, scope, this_ptr, node)?
             {
@@ -440,7 +440,7 @@ impl Engine {
         this_ptr: &mut Dynamic,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<Option<DebuggerStatus>> {
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
             self.run_debugger_with_reset_raw(global, caches, scope, this_ptr, node)
         } else {
             Ok(None)
@@ -512,7 +512,7 @@ impl Engine {
         let src = src.as_ref().map(|s| s.as_str());
         let context = crate::EvalContext::new(self, global, caches, scope, this_ptr);
 
-        if let Some(ref x) = self.debugger {
+        if let Some(ref x) = self.debugger_interface {
             let (.., ref on_debugger) = **x;
 
             let command = on_debugger(context, event, node, src, node.position())?;

@@ -120,11 +120,11 @@ impl Engine {
         let ast = {
             let scope = Scope::new();
             let interned_strings = &mut *locked_write(&self.interned_strings);
-            let mut state = ParseState::new(&scope, interned_strings, tokenizer_control);
+            let state = &mut ParseState::new(&scope, interned_strings, tokenizer_control);
 
             self.parse_global_expr(
-                &mut stream.peekable(),
-                &mut state,
+                stream.peekable(),
+                state,
                 |s| s.flags |= ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES,
                 #[cfg(not(feature = "no_optimize"))]
                 OptimizationLevel::None,

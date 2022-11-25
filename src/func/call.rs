@@ -165,7 +165,7 @@ impl Engine {
         _global: &GlobalRuntimeState,
         caches: &'s mut Caches,
         local_entry: &'s mut Option<FnResolutionCacheEntry>,
-        op_token: Option<&Token>,
+        op_token: Token,
         hash_base: u64,
         args: Option<&mut FnCallArgs>,
         allow_dynamic: bool,
@@ -174,7 +174,7 @@ impl Engine {
             return None;
         }
 
-        let mut hash = args.as_ref().map_or(hash_base, |args| {
+        let mut hash = args.as_deref().map_or(hash_base, |args| {
             calc_fn_hash_full(hash_base, args.iter().map(|a| a.type_id()))
         });
 
@@ -183,7 +183,7 @@ impl Engine {
         match cache.map.entry(hash) {
             Entry::Occupied(entry) => entry.into_mut().as_ref(),
             Entry::Vacant(entry) => {
-                let num_args = args.as_ref().map_or(0, |a| a.len());
+                let num_args = args.as_deref().map_or(0, |a| a.len());
                 let mut max_bitmask = 0; // One above maximum bitmask based on number of parameters.
                                          // Set later when a specific matching function is not found.
                 let mut bitmask = 1usize; // Bitmask of which parameter to replace with `Dynamic`
@@ -272,7 +272,8 @@ impl Engine {
                         // Try to find a built-in version
                         let builtin =
                             args.and_then(|args| match op_token {
-                                Some(token) if token.is_op_assignment() => {
+                                Token::NonToken => None,
+                                token if token.is_op_assignment() => {
                                     let (first_arg, rest_args) = args.split_first().unwrap();
 
                                     get_builtin_op_assignment_fn(token, first_arg, rest_args[0])
@@ -281,13 +282,11 @@ impl Engine {
                                             source: None,
                                         })
                                 }
-                                Some(token) => get_builtin_binary_op_fn(token, args[0], args[1])
+                                token => get_builtin_binary_op_fn(token.clone(), args[0], args[1])
                                     .map(|f| FnResolutionCacheEntry {
                                         func: CallableFunction::Method(Shared::new(f)),
                                         source: None,
                                     }),
-
-                                None => None,
                             });
 
                         return if cache.filter.is_absent_and_set(hash) {
@@ -340,7 +339,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         name: &str,
-        op_token: Option<&Token>,
+        op_token: Token,
         hash: u64,
         args: &mut FnCallArgs,
         is_ref_mut: bool,
@@ -385,7 +384,7 @@ impl Engine {
                 &mut *RestoreOnDrop::lock_if(swap, args, move |a| backup.restore_first_arg(a));
 
             #[cfg(feature = "debugging")]
-            if self.debugger.is_some() {
+            if self.is_debugger_registered() {
                 let source = source.clone().or_else(|| global.source.clone());
 
                 global.debugger_mut().push_call_stack_frame(
@@ -417,7 +416,7 @@ impl Engine {
             };
 
             #[cfg(feature = "debugging")]
-            if self.debugger.is_some() {
+            if self.is_debugger_registered() {
                 use crate::eval::{DebuggerEvent, DebuggerStatus};
 
                 let trigger = match global.debugger().status {
@@ -559,7 +558,7 @@ impl Engine {
         caches: &mut Caches,
         _scope: Option<&mut Scope>,
         fn_name: &str,
-        op_token: Option<&Token>,
+        op_token: Token,
         hashes: FnCallHashes,
         mut _args: &mut FnCallArgs,
         is_ref_mut: bool,
@@ -638,7 +637,15 @@ impl Engine {
             let local_entry = &mut None;
 
             if let Some(FnResolutionCacheEntry { func, ref source }) = self
-                .resolve_fn(global, caches, local_entry, None, hash, None, false)
+                .resolve_fn(
+                    global,
+                    caches,
+                    local_entry,
+                    Token::NonToken,
+                    hash,
+                    None,
+                    false,
+                )
                 .cloned()
             {
                 // Script function call
@@ -721,7 +728,7 @@ impl Engine {
 
         // Do not match function exit for arguments
         #[cfg(feature = "debugging")]
-        let reset = global.debugger.as_mut().and_then(|dbg| {
+        let reset = global.debugger.as_deref_mut().and_then(|dbg| {
             dbg.clear_status_if(|status| {
                 matches!(status, crate::eval::DebuggerStatus::FunctionExit(..))
             })
@@ -782,7 +789,7 @@ impl Engine {
                     caches,
                     None,
                     fn_name,
-                    None,
+                    Token::NonToken,
                     new_hash,
                     &mut args,
                     false,
@@ -836,7 +843,7 @@ impl Engine {
                     caches,
                     None,
                     &fn_name,
-                    None,
+                    Token::NonToken,
                     new_hash,
                     &mut args,
                     is_ref_mut,
@@ -935,7 +942,7 @@ impl Engine {
                     caches,
                     None,
                     fn_name,
-                    None,
+                    Token::NonToken,
                     hash,
                     &mut args,
                     is_ref_mut,
@@ -961,7 +968,7 @@ impl Engine {
         scope: &mut Scope,
         this_ptr: &mut Dynamic,
         fn_name: &str,
-        op_token: Option<&Token>,
+        op_token: Token,
         first_arg: Option<&Expr>,
         args_expr: &[Expr],
         hashes: FnCallHashes,
@@ -977,7 +984,7 @@ impl Engine {
         let redirected; // Handle call() - Redirect function call
 
         match name {
-            _ if op_token.is_some() => (),
+            _ if op_token != Token::NonToken => (),
 
             // Handle call()
             KEYWORD_FN_PTR_CALL if total_args >= 1 => {
@@ -1488,10 +1495,10 @@ impl Engine {
             ..
         } = expr;
 
-        let op_token = op_token.as_ref();
+        let op_token = op_token.clone();
 
         // Short-circuit native binary operator call if under Fast Operators mode
-        if op_token.is_some() && self.fast_operators() && args.len() == 2 {
+        if op_token != Token::NonToken && self.fast_operators() && args.len() == 2 {
             let mut lhs = self
                 .get_arg_value(global, caches, scope, this_ptr, &args[0])?
                 .0
@@ -1504,8 +1511,7 @@ impl Engine {
 
             let operands = &mut [&mut lhs, &mut rhs];
 
-            if let Some(func) =
-                get_builtin_binary_op_fn(op_token.as_ref().unwrap(), operands[0], operands[1])
+            if let Some(func) = get_builtin_binary_op_fn(op_token.clone(), operands[0], operands[1])
             {
                 // Built-in found
                 let orig_level = global.level;

@@ -259,7 +259,7 @@ impl Engine {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if (self
                         .disabled_symbols
-                        .as_ref()
+                        .as_deref()
                         .map_or(false, |m| m.contains(s))
                         || token.map_or(false, |v| v.is_reserved()))
                         && !self

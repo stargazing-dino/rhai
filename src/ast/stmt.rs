@@ -61,10 +61,8 @@ impl OpAssignment {
     #[must_use]
     #[inline(always)]
     pub fn new_op_assignment(name: &str, pos: Position) -> Self {
-        Self::new_op_assignment_from_token(
-            &Token::lookup_symbol_from_syntax(name).expect("operator"),
-            pos,
-        )
+        let op = Token::lookup_symbol_from_syntax(name).expect("operator");
+        Self::new_op_assignment_from_token(op, pos)
     }
     /// Create a new [`OpAssignment`] from a [`Token`].
     ///
@@ -72,10 +70,11 @@ impl OpAssignment {
     ///
     /// Panics if the token is not an op-assignment operator.
     #[must_use]
-    pub fn new_op_assignment_from_token(op: &Token, pos: Position) -> Self {
+    pub fn new_op_assignment_from_token(op: Token, pos: Position) -> Self {
         let op_raw = op
             .get_base_op_from_assignment()
             .expect("op-assignment operator");
+
         Self {
             hash_op_assign: calc_fn_hash(None, op.literal_syntax(), 2),
             hash_op: calc_fn_hash(None, op_raw.literal_syntax(), 2),
@@ -92,10 +91,8 @@ impl OpAssignment {
     #[must_use]
     #[inline(always)]
     pub fn new_op_assignment_from_base(name: &str, pos: Position) -> Self {
-        Self::new_op_assignment_from_base_token(
-            &Token::lookup_symbol_from_syntax(name).expect("operator"),
-            pos,
-        )
+        let op = Token::lookup_symbol_from_syntax(name).expect("operator");
+        Self::new_op_assignment_from_base_token(op, pos)
     }
     /// Convert a [`Token`] into a new [`OpAssignment`].
     ///
@@ -104,8 +101,8 @@ impl OpAssignment {
     /// Panics if the token is cannot be converted into an op-assignment operator.
     #[inline(always)]
     #[must_use]
-    pub fn new_op_assignment_from_base_token(op: &Token, pos: Position) -> Self {
-        Self::new_op_assignment_from_token(&op.convert_to_op_assignment().expect("operator"), pos)
+    pub fn new_op_assignment_from_base_token(op: Token, pos: Position) -> Self {
+        Self::new_op_assignment_from_token(op.convert_to_op_assignment().expect("operator"), pos)
     }
 }
 

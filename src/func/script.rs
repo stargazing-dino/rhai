@@ -69,7 +69,7 @@ impl Engine {
         }
 
         #[cfg(feature = "debugging")]
-        if self.debugger.is_none() && fn_def.body.is_empty() {
+        if self.debugger_interface.is_none() && fn_def.body.is_empty() {
             return Ok(Dynamic::UNIT);
         }
         #[cfg(not(feature = "debugging"))]
@@ -96,7 +96,7 @@ impl Engine {
 
         // Push a new call stack frame
         #[cfg(feature = "debugging")]
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
             let source = global.source.clone();
 
             global.debugger_mut().push_call_stack_frame(
@@ -131,7 +131,7 @@ impl Engine {
         };
 
         #[cfg(feature = "debugging")]
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
             let node = crate::ast::Stmt::Noop(fn_def.body.position());
             self.run_debugger(global, caches, scope, this_ptr, &node)?;
         }
@@ -161,7 +161,7 @@ impl Engine {
             });
 
         #[cfg(feature = "debugging")]
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
             let trigger = match global.debugger_mut().status {
                 crate::eval::DebuggerStatus::FunctionExit(n) => n >= global.level,
                 crate::eval::DebuggerStatus::Next(.., true) => true,

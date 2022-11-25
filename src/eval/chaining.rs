@@ -5,8 +5,8 @@ use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, Expr, OpAssignment};
 use crate::config::hashing::SusLock;
 use crate::engine::{FN_IDX_GET, FN_IDX_SET};
-use crate::types::dynamic::Union;
-use crate::types::RestoreOnDrop;
+use crate::tokenizer::Token;
+use crate::types::{dynamic::Union, RestoreOnDrop};
 use crate::{
     calc_fn_hash, Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, ERR,
 };
@@ -76,7 +76,7 @@ impl Engine {
             global,
             caches,
             FN_IDX_GET,
-            None,
+            Token::NonToken,
             hash_idx().0,
             &mut [target, idx],
             true,
@@ -105,7 +105,7 @@ impl Engine {
             global,
             caches,
             FN_IDX_SET,
-            None,
+            Token::NonToken,
             hash_idx().1,
             &mut [target, idx, new_val],
             is_ref_mut,
@@ -766,7 +766,14 @@ impl Engine {
                             let args = &mut [target.as_mut()];
                             let (mut orig_val, ..) = self
                                 .exec_native_fn_call(
-                                    global, caches, getter, None, *hash_get, args, is_ref_mut, *pos,
+                                    global,
+                                    caches,
+                                    getter,
+                                    Token::NonToken,
+                                    *hash_get,
+                                    args,
+                                    is_ref_mut,
+                                    *pos,
                                 )
                                 .or_else(|err| match *err {
                                     // Try an indexer if property does not exist
@@ -799,7 +806,14 @@ impl Engine {
 
                         let args = &mut [target.as_mut(), &mut new_val];
                         self.exec_native_fn_call(
-                            global, caches, setter, None, *hash_set, args, is_ref_mut, *pos,
+                            global,
+                            caches,
+                            setter,
+                            Token::NonToken,
+                            *hash_set,
+                            args,
+                            is_ref_mut,
+                            *pos,
                         )
                         .or_else(|err| match *err {
                             // Try an indexer if property does not exist
@@ -825,7 +839,14 @@ impl Engine {
                         let ((getter, hash_get), _, name) = &**x;
                         let args = &mut [target.as_mut()];
                         self.exec_native_fn_call(
-                            global, caches, getter, None, *hash_get, args, is_ref_mut, *pos,
+                            global,
+                            caches,
+                            getter,
+                            Token::NonToken,
+                            *hash_get,
+                            args,
+                            is_ref_mut,
+                            *pos,
                         )
                         .map_or_else(
                             |err| match *err {
@@ -921,7 +942,13 @@ impl Engine {
                                 // Assume getters are always pure
                                 let (mut val, ..) = self
                                     .exec_native_fn_call(
-                                        global, caches, getter, None, *hash_get, args, is_ref_mut,
+                                        global,
+                                        caches,
+                                        getter,
+                                        Token::NonToken,
+                                        *hash_get,
+                                        args,
+                                        is_ref_mut,
                                         pos,
                                     )
                                     .or_else(|err| match *err {
@@ -955,7 +982,13 @@ impl Engine {
                                     let mut arg_values = [target.as_mut(), val.as_mut()];
                                     let args = &mut arg_values;
                                     self.exec_native_fn_call(
-                                        global, caches, setter, None, *hash_set, args, is_ref_mut,
+                                        global,
+                                        caches,
+                                        setter,
+                                        Token::NonToken,
+                                        *hash_set,
+                                        args,
+                                        is_ref_mut,
                                         pos,
                                     )
                                     .or_else(

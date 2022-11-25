@@ -392,7 +392,7 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn doc(&self) -> &str {
-        self.doc.as_ref().map_or("", |s| s.as_str())
+        self.doc.as_deref().map_or("", SmartString::as_str)
     }
 
     /// Set the documentation of the [`Module`].
@@ -542,16 +542,28 @@ impl Module {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.flags.contains(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS)
-            && self.functions.as_ref().map_or(true, |m| m.is_empty())
-            && self.variables.as_ref().map_or(true, |m| m.is_empty())
-            && self.modules.as_ref().map_or(true, |m| m.is_empty())
-            && self.type_iterators.as_ref().map_or(true, |t| t.is_empty())
-            && self.all_functions.as_ref().map_or(true, |m| m.is_empty())
-            && self.all_variables.as_ref().map_or(true, |m| m.is_empty())
+            && self
+                .functions
+                .as_ref()
+                .map_or(true, StraightHashMap::is_empty)
+            && self.variables.as_deref().map_or(true, BTreeMap::is_empty)
+            && self.modules.as_deref().map_or(true, BTreeMap::is_empty)
+            && self
+                .type_iterators
+                .as_deref()
+                .map_or(true, BTreeMap::is_empty)
+            && self
+                .all_functions
+                .as_deref()
+                .map_or(true, StraightHashMap::is_empty)
+            && self
+                .all_variables
+                .as_deref()
+                .map_or(true, StraightHashMap::is_empty)
             && self
                 .all_type_iterators
-                .as_ref()
-                .map_or(true, |m| m.is_empty())
+                .as_deref()
+                .map_or(true, BTreeMap::is_empty)
     }
 
     /// Is the [`Module`] indexed?
@@ -1633,8 +1645,8 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
-            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+        if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
+            if !self.doc.as_deref().map_or(true, SmartString::is_empty) {
                 self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
@@ -1689,8 +1701,8 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
-            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+        if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
+            if !self.doc.as_deref().map_or(true, SmartString::is_empty) {
                 self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
@@ -1754,8 +1766,8 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
-            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+        if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
+            if !self.doc.as_deref().map_or(true, SmartString::is_empty) {
                 self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
@@ -1837,8 +1849,8 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
-            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+        if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
+            if !self.doc.as_deref().map_or(true, SmartString::is_empty) {
                 self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
@@ -1886,9 +1898,9 @@ impl Module {
     #[must_use]
     pub fn count(&self) -> (usize, usize, usize) {
         (
-            self.variables.as_ref().map_or(0, |m| m.len()),
-            self.functions.as_ref().map_or(0, |m| m.len()),
-            self.type_iterators.as_ref().map_or(0, |t| t.len()),
+            self.variables.as_deref().map_or(0, BTreeMap::len),
+            self.functions.as_ref().map_or(0, StraightHashMap::len),
+            self.type_iterators.as_deref().map_or(0, BTreeMap::len),
         )
     }
 
@@ -2260,11 +2272,11 @@ impl Module {
         if !self.is_indexed() {
             let mut path = Vec::with_capacity(4);
             let mut variables = StraightHashMap::with_capacity_and_hasher(
-                self.variables.as_ref().map_or(0, |m| m.len()),
+                self.variables.as_deref().map_or(0, BTreeMap::len),
                 Default::default(),
             );
             let mut functions = StraightHashMap::with_capacity_and_hasher(
-                self.functions.as_ref().map_or(0, |m| m.len()),
+                self.functions.as_ref().map_or(0, StraightHashMap::len),
                 Default::default(),
             );
             let mut type_iterators = BTreeMap::new();

@@ -101,7 +101,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
         Self {
             engine,
             name: None,
-            _marker: PhantomData::default(),
+            _marker: PhantomData,
         }
     }
 }

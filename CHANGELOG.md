@@ -14,6 +14,12 @@ Breaking API changes
 
 * The callback for initializing a debugger instance has changed to `Fn(&Engine, Debugger) -> Debugger`. This allows more control over the initial setup of the debugger.
 
+Deprecated API's
+----------------
+
+* `Module::with_capacity` is deprecated.
+* The internal method `Engine::eval_statements_raw` is deprecated.
+
 Net features
 ------------
 

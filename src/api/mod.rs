@@ -1,7 +1,5 @@
 //! Module defining the public API of the Rhai engine.
 
-pub mod type_names;
-
 pub mod eval;
 
 pub mod run;
@@ -23,15 +21,6 @@ pub mod optimize;
 pub mod limits;
 
 pub mod events;
-
-pub mod custom_syntax;
-
-pub mod deprecated;
-
-pub mod build_type;
-
-#[cfg(feature = "metadata")]
-pub mod definitions;
 
 use crate::{Dynamic, Engine, Identifier};
 
@@ -291,3 +280,14 @@ impl Engine {
         0
     }
 }
+
+pub mod type_names;
+
+pub mod custom_syntax;
+
+pub mod build_type;
+
+#[cfg(feature = "metadata")]
+pub mod definitions;
+
+pub mod deprecated;

@@ -65,7 +65,7 @@ struct OptimizerState<'a> {
 }
 
 impl<'a> OptimizerState<'a> {
-    /// Create a new State.
+    /// Create a new [`OptimizerState`].
     #[inline(always)]
     pub fn new(
         engine: &'a Engine,
@@ -138,7 +138,7 @@ impl<'a> OptimizerState<'a> {
     pub fn call_fn_with_constant_arguments(
         &mut self,
         fn_name: &str,
-        op_token: Option<&Token>,
+        op_token: Token,
         arg_values: &mut [Dynamic],
     ) -> Dynamic {
         self.engine
@@ -154,39 +154,6 @@ impl<'a> OptimizerState<'a> {
             )
             .map_or(Dynamic::NULL, |(v, ..)| v)
     }
-}
-
-// Has a system function a Rust-native override?
-fn has_native_fn_override(
-    engine: &Engine,
-    hash_script: u64,
-    arg_types: impl AsRef<[TypeId]>,
-) -> bool {
-    let hash = calc_fn_hash_full(hash_script, arg_types.as_ref().iter().copied());
-
-    // First check the global namespace and packages, but skip modules that are standard because
-    // they should never conflict with system functions.
-    if engine
-        .global_modules
-        .iter()
-        .filter(|m| !m.flags.contains(ModuleFlags::STANDARD_LIB))
-        .any(|m| m.contains_fn(hash))
-    {
-        return true;
-    }
-
-    // Then check sub-modules
-    #[cfg(not(feature = "no_module"))]
-    if engine
-        .global_sub_modules
-        .iter()
-        .flat_map(|m| m.values())
-        .any(|m| m.contains_qualified_fn(hash))
-    {
-        return true;
-    }
-
-    false
 }
 
 /// Optimize a block of [statements][Stmt].
@@ -1150,8 +1117,8 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     return;
                 }
                 // Overloaded operators can override built-in.
-                _ if x.args.len() == 2 && x.op_token.is_some() && (state.engine.fast_operators() || !has_native_fn_override(state.engine, x.hashes.native(), &arg_types)) => {
-                    if let Some(result) = get_builtin_binary_op_fn(x.op_token.as_ref().unwrap(), &arg_values[0], &arg_values[1])
+                _ if x.args.len() == 2 && x.op_token != Token::NonToken && (state.engine.fast_operators() || !state.engine.has_native_fn_override(x.hashes.native(), &arg_types)) => {
+                    if let Some(result) = get_builtin_binary_op_fn(x.op_token.clone(), &arg_values[0], &arg_values[1])
                         .and_then(|f| {
                             let context = (state.engine, x.name.as_str(),None, &state.global, *pos).into();
                             let (first, second) = arg_values.split_first_mut().unwrap();
@@ -1204,7 +1171,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     KEYWORD_TYPE_OF if arg_values.len() == 1 => state.engine.map_type_name(arg_values[0].type_name()).into(),
                     #[cfg(not(feature = "no_closure"))]
                     crate::engine::KEYWORD_IS_SHARED if arg_values.len() == 1 => Dynamic::FALSE,
-                    _ => state.call_fn_with_constant_arguments(&x.name, x.op_token.as_ref(), arg_values)
+                    _ => state.call_fn_with_constant_arguments(&x.name, x.op_token.clone(), arg_values)
                 };
 
                 if !result.is_null() {
@@ -1260,124 +1227,149 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
     }
 }
 
-/// Optimize a block of [statements][Stmt] at top level.
-///
-/// Constants and variables from the scope are added.
-fn optimize_top_level(
-    statements: StmtBlockContainer,
-    engine: &Engine,
-    scope: &Scope,
-    #[cfg(not(feature = "no_function"))] lib: &[crate::SharedModule],
-    optimization_level: OptimizationLevel,
-) -> StmtBlockContainer {
-    let mut statements = statements;
+impl Engine {
+    /// Has a system function a Rust-native override?
+    fn has_native_fn_override(&self, hash_script: u64, arg_types: impl AsRef<[TypeId]>) -> bool {
+        let hash = calc_fn_hash_full(hash_script, arg_types.as_ref().iter().copied());
 
-    // If optimization level is None then skip optimizing
-    if optimization_level == OptimizationLevel::None {
+        // First check the global namespace and packages, but skip modules that are standard because
+        // they should never conflict with system functions.
+        if self
+            .global_modules
+            .iter()
+            .filter(|m| !m.flags.contains(ModuleFlags::STANDARD_LIB))
+            .any(|m| m.contains_fn(hash))
+        {
+            return true;
+        }
+
+        // Then check sub-modules
+        #[cfg(not(feature = "no_module"))]
+        if self
+            .global_sub_modules
+            .iter()
+            .flat_map(|m| m.values())
+            .any(|m| m.contains_qualified_fn(hash))
+        {
+            return true;
+        }
+
+        false
+    }
+
+    /// Optimize a block of [statements][Stmt] at top level.
+    ///
+    /// Constants and variables from the scope are added.
+    fn optimize_top_level(
+        &self,
+        statements: StmtBlockContainer,
+        scope: &Scope,
+        #[cfg(not(feature = "no_function"))] lib: &[crate::SharedModule],
+        optimization_level: OptimizationLevel,
+    ) -> StmtBlockContainer {
+        let mut statements = statements;
+
+        // If optimization level is None then skip optimizing
+        if optimization_level == OptimizationLevel::None {
+            statements.shrink_to_fit();
+            return statements;
+        }
+
+        // Set up the state
+        let mut state = OptimizerState::new(
+            self,
+            #[cfg(not(feature = "no_function"))]
+            lib,
+            optimization_level,
+        );
+
+        // Add constants from global modules
+        for (name, value) in self.global_modules.iter().rev().flat_map(|m| m.iter_var()) {
+            state.push_var(name, AccessMode::ReadOnly, value.clone());
+        }
+
+        // Add constants and variables from the scope
+        for (name, constant, value) in scope.iter() {
+            if constant {
+                state.push_var(name, AccessMode::ReadOnly, value);
+            } else {
+                state.push_var(name, AccessMode::ReadWrite, Dynamic::NULL);
+            }
+        }
+
+        optimize_stmt_block(statements, &mut state, true, false, true)
+    }
+
+    /// Optimize a collection of statements and functions into an [`AST`].
+    pub(crate) fn optimize_into_ast(
+        &self,
+        scope: &Scope,
+        statements: StmtBlockContainer,
+        #[cfg(not(feature = "no_function"))] functions: StaticVec<
+            crate::Shared<crate::ast::ScriptFnDef>,
+        >,
+        optimization_level: OptimizationLevel,
+    ) -> AST {
+        let mut statements = statements;
+
+        #[cfg(not(feature = "no_function"))]
+        let lib: crate::Shared<_> = {
+            let mut module = crate::Module::new();
+
+            if optimization_level != OptimizationLevel::None {
+                // We only need the script library's signatures for optimization purposes
+                let mut lib2 = crate::Module::new();
+
+                for fn_def in &functions {
+                    lib2.set_script_fn(crate::ast::ScriptFnDef {
+                        name: fn_def.name.clone(),
+                        access: fn_def.access,
+                        body: crate::ast::StmtBlock::NONE,
+                        params: fn_def.params.clone(),
+                        #[cfg(not(feature = "no_module"))]
+                        environ: None,
+                        #[cfg(not(feature = "no_function"))]
+                        #[cfg(feature = "metadata")]
+                        comments: Box::default(),
+                    });
+                }
+
+                let lib2 = &[lib2.into()];
+
+                for fn_def in functions {
+                    let mut fn_def = crate::func::shared_take_or_clone(fn_def);
+
+                    // Optimize the function body
+                    let body = mem::take(&mut *fn_def.body);
+
+                    *fn_def.body = self.optimize_top_level(body, scope, lib2, optimization_level);
+
+                    module.set_script_fn(fn_def);
+                }
+            } else {
+                for fn_def in functions {
+                    module.set_script_fn(fn_def);
+                }
+            }
+
+            module.into()
+        };
+
         statements.shrink_to_fit();
-        return statements;
-    }
 
-    // Set up the state
-    let mut state = OptimizerState::new(
-        engine,
-        #[cfg(not(feature = "no_function"))]
-        lib,
-        optimization_level,
-    );
-
-    // Add constants from global modules
-    for (name, value) in engine
-        .global_modules
-        .iter()
-        .rev()
-        .flat_map(|m| m.iter_var())
-    {
-        state.push_var(name, AccessMode::ReadOnly, value.clone());
-    }
-
-    // Add constants and variables from the scope
-    for (name, constant, value) in scope.iter() {
-        if constant {
-            state.push_var(name, AccessMode::ReadOnly, value);
-        } else {
-            state.push_var(name, AccessMode::ReadWrite, Dynamic::NULL);
-        }
-    }
-
-    optimize_stmt_block(statements, &mut state, true, false, true)
-}
-
-/// Optimize an [`AST`].
-pub fn optimize_into_ast(
-    engine: &Engine,
-    scope: &Scope,
-    statements: StmtBlockContainer,
-    #[cfg(not(feature = "no_function"))] functions: StaticVec<
-        crate::Shared<crate::ast::ScriptFnDef>,
-    >,
-    optimization_level: OptimizationLevel,
-) -> AST {
-    let mut statements = statements;
-
-    #[cfg(not(feature = "no_function"))]
-    let lib: crate::Shared<_> = {
-        let mut module = crate::Module::new();
-
-        if optimization_level != OptimizationLevel::None {
-            // We only need the script library's signatures for optimization purposes
-            let mut lib2 = crate::Module::new();
-
-            for fn_def in &functions {
-                lib2.set_script_fn(crate::ast::ScriptFnDef {
-                    name: fn_def.name.clone(),
-                    access: fn_def.access,
-                    body: crate::ast::StmtBlock::NONE,
-                    params: fn_def.params.clone(),
-                    #[cfg(not(feature = "no_module"))]
-                    environ: None,
+        AST::new(
+            match optimization_level {
+                OptimizationLevel::None => statements,
+                OptimizationLevel::Simple | OptimizationLevel::Full => self.optimize_top_level(
+                    statements,
+                    scope,
                     #[cfg(not(feature = "no_function"))]
-                    #[cfg(feature = "metadata")]
-                    comments: Box::default(),
-                });
-            }
-
-            let lib2 = &[lib2.into()];
-
-            for fn_def in functions {
-                let mut fn_def = crate::func::shared_take_or_clone(fn_def);
-
-                // Optimize the function body
-                let body = mem::take(&mut *fn_def.body);
-
-                *fn_def.body = optimize_top_level(body, engine, scope, lib2, optimization_level);
-
-                module.set_script_fn(fn_def);
-            }
-        } else {
-            for fn_def in functions {
-                module.set_script_fn(fn_def);
-            }
-        }
-
-        module.into()
-    };
-
-    statements.shrink_to_fit();
-
-    AST::new(
-        match optimization_level {
-            OptimizationLevel::None => statements,
-            OptimizationLevel::Simple | OptimizationLevel::Full => optimize_top_level(
-                statements,
-                engine,
-                scope,
-                #[cfg(not(feature = "no_function"))]
-                &[lib.clone()],
-                optimization_level,
-            ),
-        },
-        #[cfg(not(feature = "no_function"))]
-        lib,
-    )
+                    &[lib.clone()],
+                    optimization_level,
+                ),
+            },
+            #[cfg(not(feature = "no_function"))]
+            lib,
+        )
+    }
 }

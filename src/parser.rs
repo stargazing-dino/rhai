@@ -607,7 +607,7 @@ impl Engine {
                             .any(|m| m.as_str() == root)
                         && !self
                             .global_sub_modules
-                            .as_ref()
+                            .as_deref()
                             .map_or(false, |m| m.contains_key(root))
                     {
                         return Err(
@@ -633,7 +633,7 @@ impl Engine {
                 return Ok(FnCallExpr {
                     name: state.get_interned_string(id),
                     capture_parent_scope,
-                    op_token: None,
+                    op_token: Token::NonToken,
                     #[cfg(not(feature = "no_module"))]
                     namespace,
                     hashes,
@@ -682,7 +682,7 @@ impl Engine {
                                 .any(|m| m.as_str() == root)
                             && !self
                                 .global_sub_modules
-                                .as_ref()
+                                .as_deref()
                                 .map_or(false, |m| m.contains_key(root))
                         {
                             return Err(
@@ -708,7 +708,7 @@ impl Engine {
                     return Ok(FnCallExpr {
                         name: state.get_interned_string(id),
                         capture_parent_scope,
-                        op_token: None,
+                        op_token: Token::NonToken,
                         #[cfg(not(feature = "no_module"))]
                         namespace,
                         hashes,
@@ -1413,8 +1413,11 @@ impl Engine {
             Token::Pipe | Token::Or if settings.has_option(LangOptions::ANON_FN) => {
                 // Build new parse state
                 let new_interner = &mut StringsInterner::new();
-                let mut new_state =
-                    ParseState::new(state.scope, new_interner, state.tokenizer_control.clone());
+                let new_state = &mut ParseState::new(
+                    state.scope,
+                    new_interner,
+                    state.tokenizer_control.clone(),
+                );
 
                 // We move the strings interner to the new parse state object by swapping it...
                 std::mem::swap(state.interned_strings, new_state.interned_strings);
@@ -1455,7 +1458,7 @@ impl Engine {
                     ..settings
                 };
 
-                let result = self.parse_anon_fn(input, &mut new_state, state, lib, new_settings);
+                let result = self.parse_anon_fn(input, new_state, state, lib, new_settings);
 
                 // Restore the strings interner by swapping it back
                 std::mem::swap(state.interned_strings, new_state.interned_strings);
@@ -1568,12 +1571,12 @@ impl Engine {
             Token::Custom(key) | Token::Reserved(key) | Token::Identifier(key)
                 if self
                     .custom_syntax
-                    .as_ref()
+                    .as_deref()
                     .map_or(false, |m| m.contains_key(&**key)) =>
             {
                 let (key, syntax) = self
                     .custom_syntax
-                    .as_ref()
+                    .as_deref()
                     .and_then(|m| m.get_key_value(&**key))
                     .unwrap();
                 let (.., pos) = input.next().expect(NEVER_ENDS);
@@ -1885,7 +1888,7 @@ impl Engine {
                             .any(|m| m.as_str() == root)
                         && !self
                             .global_sub_modules
-                            .as_ref()
+                            .as_deref()
                             .map_or(false, |m| m.contains_key(root))
                     {
                         return Err(
@@ -1954,7 +1957,7 @@ impl Engine {
                             name: state.get_interned_string("-"),
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "-", 1)),
                             args,
-                            op_token: Some(token),
+                            op_token: token,
                             capture_parent_scope: false,
                         }
                         .into_fn_call_expr(pos))
@@ -1983,7 +1986,7 @@ impl Engine {
                             name: state.get_interned_string("+"),
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "+", 1)),
                             args,
-                            op_token: Some(token),
+                            op_token: token,
                             capture_parent_scope: false,
                         }
                         .into_fn_call_expr(pos))
@@ -2005,7 +2008,7 @@ impl Engine {
                     name: state.get_interned_string("!"),
                     hashes: FnCallHashes::from_native(calc_fn_hash(None, "!", 1)),
                     args,
-                    op_token: Some(token),
+                    op_token: token,
                     capture_parent_scope: false,
                 }
                 .into_fn_call_expr(pos))
@@ -2019,7 +2022,7 @@ impl Engine {
 
     /// Make an assignment statement.
     fn make_assignment_stmt(
-        op: Option<Token>,
+        op: Token,
         state: &mut ParseState,
         lhs: Expr,
         rhs: Expr,
@@ -2052,7 +2055,7 @@ impl Engine {
             }
         }
 
-        let op_info = if let Some(ref op) = op {
+        let op_info = if op != Token::NonToken {
             OpAssignment::new_op_assignment_from_token(op, op_pos)
         } else {
             OpAssignment::new_assignment(op_pos)
@@ -2133,12 +2136,11 @@ impl Engine {
     ) -> ParseResult<Stmt> {
         let (op, pos) = match input.peek().expect(NEVER_ENDS) {
             // var = ...
-            (Token::Equals, ..) => (None, eat_token(input, Token::Equals)),
+            (Token::Equals, ..) => (Token::NonToken, eat_token(input, Token::Equals)),
             // var op= ...
-            (token, ..) if token.is_op_assignment() => input
-                .next()
-                .map(|(op, pos)| (Some(op), pos))
-                .expect(NEVER_ENDS),
+            (token, ..) if token.is_op_assignment() => {
+                input.next().map(|(op, pos)| (op, pos)).expect(NEVER_ENDS)
+            }
             // Not op-assignment
             _ => return Ok(Stmt::Expr(lhs.into())),
         };
@@ -2327,7 +2329,7 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .as_ref()
+                    .as_deref()
                     .and_then(|m| m.get(&**c))
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*current_pos))?,
@@ -2353,7 +2355,7 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .as_ref()
+                    .as_deref()
                     .and_then(|m| m.get(&**c))
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*next_pos))?,
@@ -2380,9 +2382,9 @@ impl Engine {
             let hash = calc_fn_hash(None, &op, 2);
             let is_valid_script_function = is_valid_function_name(&op);
             let operator_token = if is_valid_script_function {
-                None
+                Token::NonToken
             } else {
-                Some(op_token.clone())
+                op_token.clone()
             };
 
             let mut args = StaticVec::new_const();
@@ -2446,7 +2448,7 @@ impl Engine {
                 Token::Custom(s)
                     if self
                         .custom_keywords
-                        .as_ref()
+                        .as_deref()
                         .and_then(|m| m.get(s.as_str()))
                         .map_or(false, Option::is_some) =>
                 {
@@ -2875,7 +2877,7 @@ impl Engine {
         settings.flags |= ParseSettingFlags::BREAKABLE;
         let body = self.parse_block(input, state, lib, settings.level_up()?)?;
 
-        state.stack.as_mut().unwrap().rewind(prev_stack_len);
+        state.stack.as_deref_mut().unwrap().rewind(prev_stack_len);
 
         Ok(Stmt::For(
             Box::new((loop_var, counter_var, expr, body.into())),
@@ -2956,7 +2958,7 @@ impl Engine {
 
         let (existing, hit_barrier) = state.find_var(&name);
 
-        let stack = state.stack.as_mut().unwrap();
+        let stack = state.stack.as_deref_mut().unwrap();
 
         let existing = if !hit_barrier && existing > 0 {
             let offset = stack.len() - existing;
@@ -3072,7 +3074,7 @@ impl Engine {
                 pos: id_pos,
             },
             Ident {
-                name: state.get_interned_string(alias.as_ref().map_or("", <_>::as_ref)),
+                name: state.get_interned_string(alias.as_deref().unwrap_or("")),
                 pos: alias_pos,
             },
         );
@@ -3121,10 +3123,10 @@ impl Engine {
         }
 
         let prev_entry_stack_len = state.block_stack_len;
-        state.block_stack_len = state.stack.as_ref().map_or(0, |s| s.len());
+        state.block_stack_len = state.stack.as_deref().map_or(0, Scope::len);
 
         #[cfg(not(feature = "no_module"))]
-        let orig_imports_len = state.imports.as_ref().map_or(0, |m| m.len());
+        let orig_imports_len = state.imports.as_deref().map_or(0, StaticVec::len);
 
         let end_pos = loop {
             // Terminated?
@@ -3293,7 +3295,7 @@ impl Engine {
                 match input.next().expect(NEVER_ENDS) {
                     (Token::Fn, pos) => {
                         // Build new parse state
-                        let mut new_state = ParseState::new(
+                        let new_state = &mut ParseState::new(
                             state.scope,
                             state.interned_strings,
                             state.tokenizer_control.clone(),
@@ -3330,7 +3332,7 @@ impl Engine {
 
                         let func = self.parse_fn(
                             input,
-                            &mut new_state,
+                            new_state,
                             lib,
                             access,
                             new_settings,
@@ -3521,7 +3523,7 @@ impl Engine {
 
         if !catch_var.is_empty() {
             // Remove the error variable from the stack
-            state.stack.as_mut().unwrap().pop();
+            state.stack.as_deref_mut().unwrap().pop();
         }
 
         Ok(Stmt::TryCatch(
@@ -3684,7 +3686,7 @@ impl Engine {
                 num_externals + 1,
             )),
             args,
-            op_token: None,
+            op_token: Token::NonToken,
             capture_parent_scope: false,
         }
         .into_fn_call_expr(pos);
@@ -3820,7 +3822,7 @@ impl Engine {
     /// Parse a global level expression.
     pub(crate) fn parse_global_expr(
         &self,
-        input: &mut TokenStream,
+        mut input: TokenStream,
         state: &mut ParseState,
         process_settings: impl FnOnce(&mut ParseSettings),
         _optimization_level: OptimizationLevel,
@@ -3842,7 +3844,7 @@ impl Engine {
         };
         process_settings(&mut settings);
 
-        let expr = self.parse_expr(input, state, &mut functions, settings)?;
+        let expr = self.parse_expr(&mut input, state, &mut functions, settings)?;
 
         assert!(functions.is_empty());
 
@@ -3856,8 +3858,7 @@ impl Engine {
         statements.push(Stmt::Expr(expr.into()));
 
         #[cfg(not(feature = "no_optimize"))]
-        return Ok(crate::optimizer::optimize_into_ast(
-            self,
+        return Ok(self.optimize_into_ast(
             state.scope,
             statements,
             #[cfg(not(feature = "no_function"))]
@@ -3876,7 +3877,7 @@ impl Engine {
     /// Parse the global level statements.
     fn parse_global_level(
         &self,
-        input: &mut TokenStream,
+        mut input: TokenStream,
         state: &mut ParseState,
         process_settings: impl FnOnce(&mut ParseSettings),
     ) -> ParseResult<(StmtBlockContainer, StaticVec<Shared<ScriptFnDef>>)> {
@@ -3893,8 +3894,8 @@ impl Engine {
         };
         process_settings(&mut settings);
 
-        while !input.peek().expect(NEVER_ENDS).0.is_eof() {
-            let stmt = self.parse_stmt(input, state, &mut functions, settings)?;
+        while input.peek().expect(NEVER_ENDS).0 != Token::EOF {
+            let stmt = self.parse_stmt(&mut input, state, &mut functions, settings)?;
 
             if stmt.is_noop() {
                 continue;
@@ -3909,7 +3910,7 @@ impl Engine {
                 (Token::EOF, ..) => break,
                 // stmt ;
                 (Token::SemiColon, ..) if need_semicolon => {
-                    eat_token(input, Token::SemiColon);
+                    eat_token(&mut input, Token::SemiColon);
                 }
                 // stmt ;
                 (Token::SemiColon, ..) if !need_semicolon => (),
@@ -3936,15 +3937,14 @@ impl Engine {
     #[inline]
     pub(crate) fn parse(
         &self,
-        input: &mut TokenStream,
+        input: TokenStream,
         state: &mut ParseState,
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
         let (statements, _lib) = self.parse_global_level(input, state, |_| {})?;
 
         #[cfg(not(feature = "no_optimize"))]
-        return Ok(crate::optimizer::optimize_into_ast(
-            self,
+        return Ok(self.optimize_into_ast(
             state.scope,
             statements,
             #[cfg(not(feature = "no_function"))]
