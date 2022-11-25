@@ -1960,9 +1960,14 @@ impl Module {
     pub fn iter_script_fn_info(
         &self,
     ) -> impl Iterator<Item = (FnNamespace, FnAccess, &str, usize)> {
-        self.iter_fn()
-            .filter(|&f| f.func.is_script())
-            .map(|f| (f.namespace, f.access, f.name.as_str(), f.num_params))
+        self.iter_fn().filter(|&f| f.func.is_script()).map(|f| {
+            (
+                f.metadata.namespace,
+                f.metadata.access,
+                f.metadata.name.as_str(),
+                f.metadata.num_params,
+            )
+        })
     }
 
     /// _(internals)_ Get an iterator over all script-defined functions in the [`Module`].
