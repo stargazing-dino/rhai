@@ -3,12 +3,35 @@
 
 use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, Expr, OpAssignment};
+use crate::config::hashing::SusLock;
+use crate::engine::{FN_IDX_GET, FN_IDX_SET};
 use crate::types::dynamic::Union;
 use crate::types::RestoreOnDrop;
-use crate::{Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, ERR};
+use crate::{
+    calc_fn_hash, Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, ERR,
+};
 use std::hash::Hash;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+
+/// Function call hashes to index getters and setters.
+///
+/// # Safety
+///
+/// Uses the extremely unsafe [`SusLock`].  Change to [`OnceCell`] when it is stabilized.
+static INDEXER_HASHES: SusLock<(u64, u64)> = SusLock::new();
+
+/// Get the pre-calculated index getter/setter hashes.
+#[inline(always)]
+#[must_use]
+fn hash_idx() -> (u64, u64) {
+    *INDEXER_HASHES.get_or_init(|| {
+        (
+            calc_fn_hash(None, FN_IDX_GET, 2),
+            calc_fn_hash(None, FN_IDX_SET, 3),
+        )
+    })
+}
 
 /// Method of chaining.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -45,16 +68,21 @@ impl Engine {
         idx: &mut Dynamic,
         pos: Position,
     ) -> RhaiResultOf<Dynamic> {
-        let args = &mut [target, idx];
-        let hash = global.hash_idx_get();
-        let fn_name = crate::engine::FN_IDX_GET;
-
         let orig_level = global.level;
         global.level += 1;
         let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
-        self.exec_native_fn_call(global, caches, fn_name, None, hash, args, true, pos)
-            .map(|(r, ..)| r)
+        self.exec_native_fn_call(
+            global,
+            caches,
+            FN_IDX_GET,
+            None,
+            hash_idx().0,
+            &mut [target, idx],
+            true,
+            pos,
+        )
+        .map(|(r, ..)| r)
     }
 
     /// Call a set indexer.
@@ -69,15 +97,20 @@ impl Engine {
         is_ref_mut: bool,
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
-        let hash = global.hash_idx_set();
-        let args = &mut [target, idx, new_val];
-        let fn_name = crate::engine::FN_IDX_SET;
-
         let orig_level = global.level;
         global.level += 1;
         let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
-        self.exec_native_fn_call(global, caches, fn_name, None, hash, args, is_ref_mut, pos)
+        self.exec_native_fn_call(
+            global,
+            caches,
+            FN_IDX_SET,
+            None,
+            hash_idx().1,
+            &mut [target, idx, new_val],
+            is_ref_mut,
+            pos,
+        )
     }
 
     /// Get the value at the indexed position of a base type.

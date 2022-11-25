@@ -94,15 +94,25 @@ fn hokmalock(address: usize) -> &'static HokmaLock {
     &RECORDS[address % LEN]
 }
 
-// Safety: lol, there is a reason its called `SusLock<T>`
+/// # Safety
+///
+/// LOL, there is a reason its called `SusLock`
 #[must_use]
-struct SusLock<T: 'static> {
+pub struct SusLock<T: 'static> {
     initialized: AtomicBool,
     data: UnsafeCell<MaybeUninit<T>>,
     _marker: PhantomData<T>,
 }
 
+impl<T: 'static> Default for SusLock<T> {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: 'static> SusLock<T> {
+    /// Create a new [`SusLock`].
     #[inline]
     pub const fn new() -> Self {
         Self {
@@ -112,12 +122,15 @@ impl<T: 'static> SusLock<T> {
         }
     }
 
+    /// Is the [`SusLock`] initialized?
     #[inline(always)]
     #[must_use]
     pub fn is_initialized(&self) -> bool {
         self.initialized.load(Ordering::SeqCst)
     }
 
+    /// Return the value of the [`SusLock`] (if initialized).
+    #[inline]
     #[must_use]
     pub fn get(&self) -> Option<&'static T> {
         if self.initialized.load(Ordering::SeqCst) {
@@ -133,6 +146,8 @@ impl<T: 'static> SusLock<T> {
         }
     }
 
+    /// Return the value of the [`SusLock`], initializing it if not yet done.
+    #[inline]
     #[must_use]
     pub fn get_or_init(&self, f: impl FnOnce() -> T) -> &'static T {
         if !self.initialized.load(Ordering::SeqCst) {
@@ -147,7 +162,13 @@ impl<T: 'static> SusLock<T> {
         self.get().unwrap()
     }
 
-    pub fn set(&self, value: T) -> Result<(), T> {
+    /// Initialize the value of the [`SusLock`].
+    ///
+    /// # Error
+    ///
+    /// If the [`SusLock`] has already been initialized, the current value is returned as error.
+    #[inline]
+    pub fn init(&self, value: T) -> Result<(), T> {
         if self.initialized.load(Ordering::SeqCst) {
             Err(value)
         } else {
@@ -198,7 +219,7 @@ static AHASH_SEED: SusLock<Option<[u64; 4]>> = SusLock::new();
 /// ```
 #[inline(always)]
 pub fn set_ahash_seed(new_seed: Option<[u64; 4]>) -> Result<(), Option<[u64; 4]>> {
-    AHASH_SEED.set(new_seed)
+    AHASH_SEED.init(new_seed)
 }
 
 /// Get the current hashing Seed.
