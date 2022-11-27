@@ -127,9 +127,13 @@ impl Engine {
         }
 
         let statements = ast.statements();
-        if !statements.is_empty() {
-            self.eval_global_statements(global, caches, scope, statements)?;
-        }
+
+        let result = if !statements.is_empty() {
+            self.eval_global_statements(global, caches, scope, statements)
+                .map(|_| ())
+        } else {
+            Ok(())
+        };
 
         #[cfg(feature = "debugging")]
         if self.is_debugger_registered() {
@@ -139,7 +143,7 @@ impl Engine {
             self.run_debugger(global, caches, scope, &mut this, node)?;
         }
 
-        Ok(())
+        result
     }
 }
 
