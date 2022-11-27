@@ -306,7 +306,7 @@ pub enum Expr {
     Variable(
         #[cfg(not(feature = "no_module"))]
         Box<(Option<NonZeroUsize>, super::Namespace, u64, ImmutableString)>,
-        #[cfg(feature = "no_module")] Box<(Option<NonZeroUsize>, (), u64, ImmutableString)>,
+        #[cfg(feature = "no_module")] Box<(Option<NonZeroUsize>, [(); 0], u64, ImmutableString)>,
         Option<NonZeroU8>,
         Position,
     ),

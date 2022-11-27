@@ -1595,7 +1595,7 @@ impl Engine {
                 #[cfg(not(feature = "no_module"))]
                 let ns = crate::ast::Namespace::NONE;
                 #[cfg(feature = "no_module")]
-                let ns = ();
+                let ns = [];
 
                 let s = match input.next().expect(NEVER_ENDS) {
                     (Token::Identifier(s), ..) => s,
@@ -1660,7 +1660,7 @@ impl Engine {
                 #[cfg(not(feature = "no_module"))]
                 let ns = crate::ast::Namespace::NONE;
                 #[cfg(feature = "no_module")]
-                let ns = ();
+                let ns = [];
 
                 let s = match input.next().expect(NEVER_ENDS) {
                     (Token::Reserved(s), ..) => s,
@@ -2542,7 +2542,7 @@ impl Engine {
                     #[cfg(not(feature = "no_module"))]
                     let ns = crate::ast::Namespace::NONE;
                     #[cfg(feature = "no_module")]
-                    let ns = ();
+                    let ns = [];
 
                     segments.push(name.clone());
                     tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_IDENT));
