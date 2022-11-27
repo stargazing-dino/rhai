@@ -183,16 +183,8 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
                 Ampersand => Some(impl_op!(INT => as_int & as_int)),
                 Pipe => Some(impl_op!(INT => as_int | as_int)),
                 XOr => Some(impl_op!(INT => as_int ^ as_int)),
-                ExclusiveRange => Some(|_, args| {
-                    let x = args[0].as_int().expect(BUILTIN);
-                    let y = args[1].as_int().expect(BUILTIN);
-                    Ok((x..y).into())
-                }),
-                InclusiveRange => Some(|_, args| {
-                    let x = args[0].as_int().expect(BUILTIN);
-                    let y = args[1].as_int().expect(BUILTIN);
-                    Ok((x..=y).into())
-                }),
+                ExclusiveRange => Some(impl_op!(INT => as_int .. as_int)),
+                InclusiveRange => Some(impl_op!(INT => as_int ..= as_int)),
                 _ => None,
             };
         }
@@ -219,11 +211,8 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
                     let s2 = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
 
                     #[cfg(not(feature = "unchecked"))]
-                    if !s1.is_empty() && !s2.is_empty() {
-                        let total_len = s1.len() + s2.len();
-                        _ctx.engine()
-                            .raise_err_if_over_data_size_limit((0, 0, total_len))?;
-                    }
+                    _ctx.engine()
+                        .raise_err_if_over_data_size_limit((0, 0, s1.len() + s2.len()))?;
 
                     Ok((s1 + s2).into())
                 }),
@@ -270,25 +259,22 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
 
             return match op {
                 Plus => Some(|_ctx, args| {
-                    let blob1 = &*args[0].read_lock::<Blob>().expect(BUILTIN);
-                    let blob2 = &*args[1].read_lock::<Blob>().expect(BUILTIN);
+                    let b2 = &*args[1].read_lock::<Blob>().expect(BUILTIN);
+                    if b2.is_empty() {
+                        return Ok(args[0].flatten_clone());
+                    }
+                    let b1 = &*args[0].read_lock::<Blob>().expect(BUILTIN);
+                    if b1.is_empty() {
+                        return Ok(args[1].flatten_clone());
+                    }
 
-                    Ok(Dynamic::from_blob(if blob2.is_empty() {
-                        blob1.clone()
-                    } else if blob1.is_empty() {
-                        blob2.clone()
-                    } else {
-                        #[cfg(not(feature = "unchecked"))]
-                        _ctx.engine().raise_err_if_over_data_size_limit((
-                            blob1.len() + blob2.len(),
-                            0,
-                            0,
-                        ))?;
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.engine()
+                        .raise_err_if_over_data_size_limit((b1.len() + b2.len(), 0, 0))?;
 
-                        let mut blob = blob1.clone();
-                        blob.extend(blob2);
-                        blob
-                    }))
+                    let mut blob = b1.clone();
+                    blob.extend(b2);
+                    Ok(Dynamic::from_blob(blob))
                 }),
                 EqualsTo => Some(impl_op!(Blob == Blob)),
                 NotEqualsTo => Some(impl_op!(Blob != Blob)),
