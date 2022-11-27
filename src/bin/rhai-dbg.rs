@@ -109,7 +109,7 @@ fn print_error(input: &str, mut err: EvalAltResult) {
             // Display position marker
             println!(
                 "\x1b[31m{0:>1$}{err_line}\x1b[39m",
-                if i > 0 { "  " } else { "^ " },
+                if i > 0 { "| " } else { "^ " },
                 line_no.len() + pos.position().unwrap() + 1,
             );
         }

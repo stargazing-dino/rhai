@@ -135,20 +135,20 @@ impl fmt::Display for EvalAltResult {
 
             #[cfg(not(feature = "no_function"))]
             Self::ErrorInFunctionCall(s, src, err, ..) if crate::parser::is_anonymous_fn(s) => {
-                write!(f, "{err}\n| in closure call")?;
+                write!(f, "{err}\nin closure call")?;
                 if !src.is_empty() {
                     write!(f, " @ '{src}'")?;
                 }
             }
             Self::ErrorInFunctionCall(s, src, err, ..) => {
-                write!(f, "{err}\n| in call to function '{s}'")?;
+                write!(f, "{err}\nin call to function '{s}'")?;
                 if !src.is_empty() {
                     write!(f, " @ '{src}'")?;
                 }
             }
 
-            Self::ErrorInModule(s, err, ..) if s.is_empty() => write!(f, "{err}\n| in module")?,
-            Self::ErrorInModule(s, err, ..) => write!(f, "{err}\n| in module '{s}'")?,
+            Self::ErrorInModule(s, err, ..) if s.is_empty() => write!(f, "{err}\nin module")?,
+            Self::ErrorInModule(s, err, ..) => write!(f, "{err}\nin module '{s}'")?,
 
             Self::ErrorVariableExists(s, ..) => write!(f, "Variable already defined: {s}")?,
             Self::ErrorForbiddenVariable(s, ..) => write!(f, "Forbidden variable name: {s}")?,

@@ -35,7 +35,7 @@ fn print_error(input: &str, mut err: EvalAltResult) {
             // Display position marker
             println!(
                 "{0:>1$}{err_line}",
-                if i > 0 { "  " } else { "^ " },
+                if i > 0 { "| " } else { "^ " },
                 line_no.len() + pos.position().unwrap() + 1,
             );
         }
