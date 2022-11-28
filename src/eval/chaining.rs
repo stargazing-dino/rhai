@@ -599,13 +599,15 @@ impl Engine {
                             // Try to call index setter if value is changed
                             let idx = &mut idx_val_for_setter;
                             let new_val = &mut new_val;
-                            self.call_indexer_set(
-                                global, caches, target, idx, new_val, is_ref_mut, op_pos,
-                            )
-                            .or_else(|e| match *e {
-                                ERR::ErrorIndexingType(..) => Ok((Dynamic::UNIT, false)),
-                                _ => Err(e),
-                            })?;
+                            // The return value of a indexer setter (usually `()`) is thrown away and not used.
+                            let _ = self
+                                .call_indexer_set(
+                                    global, caches, target, idx, new_val, is_ref_mut, op_pos,
+                                )
+                                .or_else(|e| match *e {
+                                    ERR::ErrorIndexingType(..) => Ok((Dynamic::UNIT, false)),
+                                    _ => Err(e),
+                                })?;
                         }
 
                         Ok(result)
@@ -659,8 +661,8 @@ impl Engine {
 
                             // Try to call index setter
                             let new_val = &mut new_val;
-
-                            self.call_indexer_set(
+                            // The return value of a indexer setter (usually `()`) is thrown away and not used.
+                            let _ = self.call_indexer_set(
                                 global, caches, target, idx_val, new_val, is_ref_mut, op_pos,
                             )?;
                         }
@@ -981,18 +983,19 @@ impl Engine {
                                     // Re-use args because the first &mut parameter will not be consumed
                                     let mut arg_values = [target.as_mut(), val.as_mut()];
                                     let args = &mut arg_values;
-                                    self.exec_native_fn_call(
-                                        global,
-                                        caches,
-                                        setter,
-                                        Token::NonToken,
-                                        *hash_set,
-                                        args,
-                                        is_ref_mut,
-                                        pos,
-                                    )
-                                    .or_else(
-                                        |err| match *err {
+                                    // The return value is thrown away and not used.
+                                    let _ = self
+                                        .exec_native_fn_call(
+                                            global,
+                                            caches,
+                                            setter,
+                                            Token::NonToken,
+                                            *hash_set,
+                                            args,
+                                            is_ref_mut,
+                                            pos,
+                                        )
+                                        .or_else(|err| match *err {
                                             // Try an indexer if property does not exist
                                             ERR::ErrorDotExpr(..) => {
                                                 let idx = &mut name.into();
@@ -1011,8 +1014,7 @@ impl Engine {
                                                 })
                                             }
                                             _ => Err(err),
-                                        },
-                                    )?;
+                                        })?;
                                 }
 
                                 Ok((result, may_be_changed))

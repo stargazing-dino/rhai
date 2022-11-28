@@ -386,7 +386,7 @@ impl Scope<'_> {
     #[inline(always)]
     pub fn pop(&mut self) -> &mut Self {
         self.names.pop().expect("`Scope` must not be empty");
-        self.values.pop().expect("`Scope` must not be empty");
+        let _ = self.values.pop().expect("`Scope` must not be empty");
         self.aliases.pop().expect("`Scope` must not be empty");
         self
     }

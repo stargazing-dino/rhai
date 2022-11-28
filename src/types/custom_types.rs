@@ -65,6 +65,7 @@ impl CustomTypesCollection {
     }
     /// Find a custom type.
     #[inline(always)]
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<&CustomTypeInfo> {
         self.0.get(key)
     }

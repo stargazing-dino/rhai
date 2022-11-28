@@ -81,6 +81,7 @@ pub fn calc_index<E>(
 
 /// A type that encapsulates a mutation target for an expression with side effects.
 #[derive(Debug)]
+#[must_use]
 pub enum Target<'a> {
     /// The target is a mutable reference to a [`Dynamic`].
     RefMut(&'a mut Dynamic),
@@ -195,7 +196,6 @@ impl<'a> Target<'a> {
     }
     /// Get the value of the [`Target`] as a [`Dynamic`], cloning a referenced value if necessary.
     #[inline]
-    #[must_use]
     pub fn take_or_clone(self) -> Dynamic {
         match self {
             Self::RefMut(r) => r.clone(), // Referenced value is cloned
@@ -223,7 +223,6 @@ impl<'a> Target<'a> {
     }
     /// Convert a shared or reference [`Target`] into a target with an owned value.
     #[inline(always)]
-    #[must_use]
     pub fn into_owned(self) -> Self {
         match self {
             Self::RefMut(r) => Self::TempValue(r.clone()),
@@ -437,7 +436,6 @@ impl AsMut<Dynamic> for Target<'_> {
 
 impl<T: Into<Dynamic>> From<T> for Target<'_> {
     #[inline(always)]
-    #[must_use]
     fn from(value: T) -> Self {
         Self::TempValue(value.into())
     }

@@ -2105,7 +2105,8 @@ impl Module {
 
         global.source = orig_source;
 
-        result?;
+        // The return value is thrown away and not used
+        let _ = result?;
 
         // Variables with an alias left in the scope become module variables
         for (_name, value, mut aliases) in scope {
