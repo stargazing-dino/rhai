@@ -1,9 +1,9 @@
 //! Module defining script expressions.
 
-use super::{ASTFlags, ASTNode, Ident, Stmt, StmtBlock};
+use super::{ASTFlags, ASTNode, Ident, Namespace, Stmt, StmtBlock};
 use crate::engine::{KEYWORD_FN_PTR, OP_EXCLUSIVE_RANGE, OP_INCLUSIVE_RANGE};
 use crate::func::hashing::ALT_ZERO_HASH;
-use crate::tokenizer::Token;
+use crate::tokenizer::{Token, NO_TOKEN};
 use crate::types::dynamic::Union;
 use crate::{
     calc_fn_hash, Dynamic, FnPtr, Identifier, ImmutableString, Position, SmartString, StaticVec,
@@ -197,8 +197,7 @@ impl FnCallHashes {
 #[derive(Clone, Hash)]
 pub struct FnCallExpr {
     /// Namespace of the function, if any.
-    #[cfg(not(feature = "no_module"))]
-    pub namespace: super::Namespace,
+    pub namespace: Namespace,
     /// Function name.
     pub name: ImmutableString,
     /// Pre-calculated hashes.
@@ -208,7 +207,7 @@ pub struct FnCallExpr {
     /// Does this function call capture the parent scope?
     pub capture_parent_scope: bool,
     /// Is this function call a native operator?
-    /// Otherwise set to [`Token::NonToken`].
+    /// Otherwise set to [`Token::NONE`].
     pub op_token: Token,
 }
 
@@ -217,14 +216,13 @@ impl fmt::Debug for FnCallExpr {
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ff = f.debug_struct("FnCallExpr");
-        #[cfg(not(feature = "no_module"))]
         if !self.namespace.is_empty() {
             ff.field("namespace", &self.namespace);
         }
         ff.field("hash", &self.hashes)
             .field("name", &self.name)
             .field("args", &self.args);
-        if self.op_token != Token::NonToken {
+        if self.op_token != NO_TOKEN {
             ff.field("op_token", &self.op_token);
         }
         if self.capture_parent_scope {
@@ -241,10 +239,7 @@ impl FnCallExpr {
     #[inline(always)]
     #[must_use]
     pub fn is_qualified(&self) -> bool {
-        #[cfg(not(feature = "no_module"))]
-        return !self.namespace.is_empty();
-        #[cfg(feature = "no_module")]
-        return false;
+        !self.namespace.is_empty()
     }
     /// Convert this into an [`Expr::FnCall`].
     #[inline(always)]
@@ -304,9 +299,7 @@ pub enum Expr {
     /// majority of cases (unless there are more than 255 variables defined!).
     /// This is to avoid reading a pointer redirection during each variable access.
     Variable(
-        #[cfg(not(feature = "no_module"))]
-        Box<(Option<NonZeroUsize>, super::Namespace, u64, ImmutableString)>,
-        #[cfg(feature = "no_module")] Box<(Option<NonZeroUsize>, [(); 0], u64, ImmutableString)>,
+        Box<(Option<NonZeroUsize>, Namespace, u64, ImmutableString)>,
         Option<NonZeroU8>,
         Position,
     ),
@@ -584,13 +577,12 @@ impl Expr {
 
             Union::FnPtr(f, ..) if !f.is_curried() => Self::FnCall(
                 FnCallExpr {
-                    #[cfg(not(feature = "no_module"))]
-                    namespace: super::Namespace::NONE,
+                    namespace: Namespace::NONE,
                     name: KEYWORD_FN_PTR.into(),
                     hashes: calc_fn_hash(None, f.fn_name(), 1).into(),
                     args: once(Self::StringConstant(f.fn_name().into(), pos)).collect(),
                     capture_parent_scope: false,
-                    op_token: Token::NonToken,
+                    op_token: NO_TOKEN,
                 }
                 .into(),
                 pos,

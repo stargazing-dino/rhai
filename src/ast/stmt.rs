@@ -2,7 +2,8 @@
 
 use super::{ASTFlags, ASTNode, BinaryExpr, Expr, FnCallExpr, Ident};
 use crate::engine::KEYWORD_EVAL;
-use crate::tokenizer::{Span, Token};
+use crate::tokenizer::Token;
+use crate::types::Span;
 use crate::{calc_fn_hash, Position, StaticVec, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;

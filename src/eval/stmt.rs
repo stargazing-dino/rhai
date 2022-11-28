@@ -6,12 +6,25 @@ use crate::ast::{
     ASTFlags, BinaryExpr, Expr, Ident, OpAssignment, Stmt, SwitchCasesCollection, TryCatchBlock,
 };
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
-use crate::types::dynamic::AccessMode;
+use crate::types::dynamic::{AccessMode, Union};
 use crate::types::RestoreOnDrop;
 use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, ERR, INT};
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+
+impl Dynamic {
+    /// If the value is a string, intern it.
+    #[inline(always)]
+    fn intern_string(self, engine: &Engine) -> Self {
+        match self.0 {
+            Union::Str(..) => engine
+                .get_interned_string(self.into_immutable_string().expect("`ImmutableString`"))
+                .into(),
+            _ => self,
+        }
+    }
+}
 
 impl Engine {
     /// Evaluate a statements block.
@@ -169,14 +182,13 @@ impl Engine {
             self.check_data_size(&*args[0], root.position())?;
         } else {
             // Normal assignment
-
-            // If value is a string, intern it
-            if new_val.is_string() {
-                let value = new_val.into_immutable_string().expect("`ImmutableString`");
-                new_val = self.get_interned_string(value).into();
+            match target {
+                // Lock it again just in case it is shared
+                Target::RefMut(_) | Target::TempValue(_) => {
+                    *target.write_lock::<Dynamic>().unwrap() = new_val
+                }
+                _ => **target = new_val,
             }
-
-            *target.write_lock::<Dynamic>().unwrap() = new_val;
         }
 
         target.propagate_changed_value(op_info.pos)
@@ -224,14 +236,13 @@ impl Engine {
 
                 let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
 
+                let is_temp_result = !target.is_ref();
                 let var_name = x.3.as_str();
 
                 #[cfg(not(feature = "no_closure"))]
                 // Also handle case where target is a `Dynamic` shared value
                 // (returned by a variable resolver, for example)
-                let is_temp_result = !target.is_ref() && !target.is_shared();
-                #[cfg(feature = "no_closure")]
-                let is_temp_result = !target.is_ref();
+                let is_temp_result = is_temp_result && !target.is_shared();
 
                 // Cannot assign to temp result from expression
                 if is_temp_result {
@@ -251,36 +262,31 @@ impl Engine {
 
             #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
             {
-                let mut rhs_val = self
+                let rhs_val = self
                     .eval_expr(global, caches, scope, this_ptr, rhs)?
-                    .flatten();
-
-                // If value is a string, intern it
-                if rhs_val.is_string() {
-                    let value = rhs_val.into_immutable_string().expect("`ImmutableString`");
-                    rhs_val = self.get_interned_string(value).into();
-                }
+                    .flatten()
+                    .intern_string(self);
 
                 let _new_val = Some((rhs_val, op_info));
 
-                // Must be either `var[index] op= val` or `var.prop op= val`
-                match lhs {
-                    // name op= rhs (handled above)
-                    Expr::Variable(..) => {
-                        unreachable!("Expr::Variable case is already handled")
-                    }
-                    // idx_lhs[idx_expr] op= rhs
-                    #[cfg(not(feature = "no_index"))]
-                    Expr::Index(..) => {
-                        self.eval_dot_index_chain(global, caches, scope, this_ptr, lhs, _new_val)
-                    }
-                    // dot_lhs.dot_rhs op= rhs
-                    #[cfg(not(feature = "no_object"))]
-                    Expr::Dot(..) => {
-                        self.eval_dot_index_chain(global, caches, scope, this_ptr, lhs, _new_val)
-                    }
-                    _ => unreachable!("cannot assign to expression: {:?}", lhs),
-                }?;
+                // Must be either `var[index] op= val` or `var.prop op= val`.
+                // The return value of any op-assignment (should be `()`) is thrown away and not used.
+                let _ =
+                    match lhs {
+                        // name op= rhs (handled above)
+                        Expr::Variable(..) => {
+                            unreachable!("Expr::Variable case is already handled")
+                        }
+                        // idx_lhs[idx_expr] op= rhs
+                        #[cfg(not(feature = "no_index"))]
+                        Expr::Index(..) => self
+                            .eval_dot_index_chain(global, caches, scope, this_ptr, lhs, _new_val),
+                        // dot_lhs.dot_rhs op= rhs
+                        #[cfg(not(feature = "no_object"))]
+                        Expr::Dot(..) => self
+                            .eval_dot_index_chain(global, caches, scope, this_ptr, lhs, _new_val),
+                        _ => unreachable!("cannot assign to expression: {:?}", lhs),
+                    }?;
 
                 return Ok(Dynamic::UNIT);
             }
@@ -723,7 +729,8 @@ impl Engine {
                 // Evaluate initial value
                 let mut value = self
                     .eval_expr(global, caches, scope, this_ptr, expr)?
-                    .flatten();
+                    .flatten()
+                    .intern_string(self);
 
                 let _alias = if !rewind_scope {
                     // Put global constants into global module

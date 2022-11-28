@@ -207,9 +207,9 @@ pub use engine::{Engine, OP_CONTAINS, OP_EQUALS};
 pub use eval::EvalContext;
 pub use func::{NativeCallContext, RegisterNativeFunction};
 pub use module::{FnNamespace, Module};
-pub use tokenizer::Position;
 #[cfg(not(feature = "no_time"))]
 pub use types::Instant;
+pub use types::Position;
 pub use types::{
     Dynamic, EvalAltResult, FnPtr, ImmutableString, LexError, ParseError, ParseErrorType, Scope,
 };
@@ -311,12 +311,12 @@ pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant}
 pub use types::FloatWrapper;
 
 #[cfg(feature = "internals")]
-pub use types::StringsInterner;
+pub use types::{Span, StringsInterner};
 
 #[cfg(feature = "internals")]
 pub use tokenizer::{
     get_next_token, is_valid_function_name, is_valid_identifier, parse_string_literal, InputStream,
-    MultiInputsStream, Span, Token, TokenIterator, TokenizeState, TokenizerControl,
+    MultiInputsStream, Token, TokenIterator, TokenizeState, TokenizerControl,
     TokenizerControlBlock,
 };
 

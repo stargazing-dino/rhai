@@ -69,14 +69,15 @@ impl<'a> OptimizerState<'a> {
     #[inline(always)]
     pub fn new(
         engine: &'a Engine,
-        #[cfg(not(feature = "no_function"))] lib: &'a [crate::SharedModule],
+        lib: &'a [crate::SharedModule],
         optimization_level: OptimizationLevel,
     ) -> Self {
         let mut _global = GlobalRuntimeState::new(engine);
+        let _lib = lib;
 
         #[cfg(not(feature = "no_function"))]
         {
-            _global.lib = lib.iter().cloned().collect();
+            _global.lib = _lib.iter().cloned().collect();
         }
 
         Self {
@@ -986,7 +987,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         // ``
         Expr::InterpolatedString(x, pos) if x.is_empty() => {
             state.set_dirty();
-            *expr = Expr::StringConstant(state.engine.get_interned_string(""), *pos);
+            *expr = Expr::StringConstant(state.engine.const_empty_string(), *pos);
         }
         // `... ${const} ...`
         Expr::InterpolatedString(..) if expr.is_constant() => {
@@ -1117,7 +1118,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     return;
                 }
                 // Overloaded operators can override built-in.
-                _ if x.args.len() == 2 && x.op_token != Token::NonToken && (state.engine.fast_operators() || !state.engine.has_native_fn_override(x.hashes.native(), &arg_types)) => {
+                _ if x.args.len() == 2 && x.op_token != Token::NONE && (state.engine.fast_operators() || !state.engine.has_native_fn_override(x.hashes.native(), &arg_types)) => {
                     if let Some(result) = get_builtin_binary_op_fn(x.op_token.clone(), &arg_values[0], &arg_values[1])
                         .and_then(|f| {
                             let context = (state.engine, x.name.as_str(),None, &state.global, *pos).into();
@@ -1265,7 +1266,7 @@ impl Engine {
         &self,
         statements: StmtBlockContainer,
         scope: &Scope,
-        #[cfg(not(feature = "no_function"))] lib: &[crate::SharedModule],
+        lib: &[crate::SharedModule],
         optimization_level: OptimizationLevel,
     ) -> StmtBlockContainer {
         let mut statements = statements;
@@ -1277,12 +1278,7 @@ impl Engine {
         }
 
         // Set up the state
-        let mut state = OptimizerState::new(
-            self,
-            #[cfg(not(feature = "no_function"))]
-            lib,
-            optimization_level,
-        );
+        let mut state = OptimizerState::new(self, lib, optimization_level);
 
         // Add constants from global modules
         for (name, value) in self.global_modules.iter().rev().flat_map(|m| m.iter_var()) {
@@ -1355,19 +1351,17 @@ impl Engine {
 
             module.into()
         };
+        #[cfg(feature = "no_function")]
+        let lib: crate::Shared<_> = crate::Module::new().into();
 
         statements.shrink_to_fit();
 
         AST::new(
             match optimization_level {
                 OptimizationLevel::None => statements,
-                OptimizationLevel::Simple | OptimizationLevel::Full => self.optimize_top_level(
-                    statements,
-                    scope,
-                    #[cfg(not(feature = "no_function"))]
-                    &[lib.clone()],
-                    optimization_level,
-                ),
+                OptimizationLevel::Simple | OptimizationLevel::Full => {
+                    self.optimize_top_level(statements, scope, &[lib.clone()], optimization_level)
+                }
             },
             #[cfg(not(feature = "no_function"))]
             lib,

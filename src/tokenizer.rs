@@ -5,7 +5,7 @@ use crate::engine::{
     KEYWORD_FN_PTR_CURRY, KEYWORD_IS_DEF_VAR, KEYWORD_PRINT, KEYWORD_THIS, KEYWORD_TYPE_OF,
 };
 use crate::func::native::OnParseTokenCallback;
-use crate::{Engine, Identifier, LexError, SmartString, StaticVec, INT, UNSIGNED_INT};
+use crate::{Engine, Identifier, LexError, Position, SmartString, StaticVec, INT, UNSIGNED_INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -13,7 +13,6 @@ use std::{
     char, fmt,
     iter::{FusedIterator, Peekable},
     num::NonZeroUsize,
-    ops::{Add, AddAssign},
     rc::Rc,
     str::{Chars, FromStr},
 };
@@ -50,325 +49,11 @@ type LERR = LexError;
 /// Separator character for numbers.
 const NUMBER_SEPARATOR: char = '_';
 
+/// No token.
+pub const NO_TOKEN: Token = Token::NONE;
+
 /// A stream of tokens.
 pub type TokenStream<'a> = Peekable<TokenIterator<'a>>;
-
-/// A location (line number + character position) in the input script.
-///
-/// # Limitations
-///
-/// In order to keep footprint small, both line number and character position have 16-bit resolution,
-/// meaning they go up to a maximum of 65,535 lines and 65,535 characters per line.
-///
-/// Advancing beyond the maximum line length or maximum number of lines is not an error but has no effect.
-#[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
-pub struct Position {
-    /// Line number: 0 = none
-    #[cfg(not(feature = "no_position"))]
-    line: u16,
-    /// Character position: 0 = BOL
-    #[cfg(not(feature = "no_position"))]
-    pos: u16,
-}
-
-impl Position {
-    /// A [`Position`] representing no position.
-    pub const NONE: Self = Self {
-        #[cfg(not(feature = "no_position"))]
-        line: 0,
-        #[cfg(not(feature = "no_position"))]
-        pos: 0,
-    };
-    /// A [`Position`] representing the first position.
-    pub const START: Self = Self {
-        #[cfg(not(feature = "no_position"))]
-        line: 1,
-        #[cfg(not(feature = "no_position"))]
-        pos: 0,
-    };
-
-    /// Create a new [`Position`].
-    ///
-    /// `line` must not be zero.
-    ///
-    /// If `position` is zero, then it is at the beginning of a line.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `line` is zero.
-    #[inline]
-    #[must_use]
-    pub const fn new(line: u16, position: u16) -> Self {
-        assert!(line != 0, "line cannot be zero");
-
-        let _pos = position;
-
-        Self {
-            #[cfg(not(feature = "no_position"))]
-            line,
-            #[cfg(not(feature = "no_position"))]
-            pos: _pos,
-        }
-    }
-    /// Get the line number (1-based), or [`None`] if there is no position.
-    #[inline]
-    #[must_use]
-    pub const fn line(self) -> Option<usize> {
-        #[cfg(not(feature = "no_position"))]
-        return if self.is_none() {
-            None
-        } else {
-            Some(self.line as usize)
-        };
-
-        #[cfg(feature = "no_position")]
-        return None;
-    }
-    /// Get the character position (1-based), or [`None`] if at beginning of a line.
-    #[inline]
-    #[must_use]
-    pub const fn position(self) -> Option<usize> {
-        #[cfg(not(feature = "no_position"))]
-        return if self.is_none() || self.pos == 0 {
-            None
-        } else {
-            Some(self.pos as usize)
-        };
-
-        #[cfg(feature = "no_position")]
-        return None;
-    }
-    /// Advance by one character position.
-    #[inline]
-    pub(crate) fn advance(&mut self) {
-        #[cfg(not(feature = "no_position"))]
-        {
-            assert!(!self.is_none(), "cannot advance Position::none");
-
-            // Advance up to maximum position
-            if self.pos < u16::MAX {
-                self.pos += 1;
-            }
-        }
-    }
-    /// Go backwards by one character position.
-    ///
-    /// # Panics
-    ///
-    /// Panics if already at beginning of a line - cannot rewind to a previous line.
-    #[inline]
-    pub(crate) fn rewind(&mut self) {
-        #[cfg(not(feature = "no_position"))]
-        {
-            assert!(!self.is_none(), "cannot rewind Position::none");
-            assert!(self.pos > 0, "cannot rewind at position 0");
-            self.pos -= 1;
-        }
-    }
-    /// Advance to the next line.
-    #[inline]
-    pub(crate) fn new_line(&mut self) {
-        #[cfg(not(feature = "no_position"))]
-        {
-            assert!(!self.is_none(), "cannot advance Position::none");
-
-            // Advance up to maximum position
-            if self.line < u16::MAX {
-                self.line += 1;
-                self.pos = 0;
-            }
-        }
-    }
-    /// Is this [`Position`] at the beginning of a line?
-    #[inline]
-    #[must_use]
-    pub const fn is_beginning_of_line(self) -> bool {
-        #[cfg(not(feature = "no_position"))]
-        return self.pos == 0 && !self.is_none();
-        #[cfg(feature = "no_position")]
-        return false;
-    }
-    /// Is there no [`Position`]?
-    #[inline]
-    #[must_use]
-    pub const fn is_none(self) -> bool {
-        #[cfg(not(feature = "no_position"))]
-        return self.line == 0 && self.pos == 0;
-        #[cfg(feature = "no_position")]
-        return true;
-    }
-    /// Returns an fallback [`Position`] if it is [`NONE`][Position::NONE]?
-    #[inline]
-    #[must_use]
-    pub const fn or_else(self, pos: Self) -> Self {
-        if self.is_none() {
-            pos
-        } else {
-            self
-        }
-    }
-    /// Print this [`Position`] for debug purposes.
-    #[inline]
-    pub(crate) fn debug_print(self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !self.is_none() {
-            write!(_f, " @ {:?}", self)?;
-        }
-        Ok(())
-    }
-}
-
-impl Default for Position {
-    #[inline(always)]
-    #[must_use]
-    fn default() -> Self {
-        Self::START
-    }
-}
-
-impl fmt::Display for Position {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_none() {
-            write!(f, "none")?;
-        } else {
-            #[cfg(not(feature = "no_position"))]
-            write!(f, "line {}, position {}", self.line, self.pos)?;
-            #[cfg(feature = "no_position")]
-            unreachable!("no position");
-        }
-
-        Ok(())
-    }
-}
-
-impl fmt::Debug for Position {
-    #[cold]
-    #[inline(never)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_none() {
-            f.write_str("none")
-        } else {
-            #[cfg(not(feature = "no_position"))]
-            if self.is_beginning_of_line() {
-                write!(f, "{}", self.line)
-            } else {
-                write!(f, "{}:{}", self.line, self.pos)
-            }
-
-            #[cfg(feature = "no_position")]
-            unreachable!("no position");
-        }
-    }
-}
-
-impl Add for Position {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        if rhs.is_none() {
-            self
-        } else {
-            #[cfg(not(feature = "no_position"))]
-            return Self {
-                line: self.line + rhs.line - 1,
-                pos: if rhs.is_beginning_of_line() {
-                    self.pos
-                } else {
-                    self.pos + rhs.pos - 1
-                },
-            };
-            #[cfg(feature = "no_position")]
-            unreachable!("no position");
-        }
-    }
-}
-
-impl AddAssign for Position {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-
-/// _(internals)_ A span consisting of a starting and an ending [positions][Position].
-/// Exported under the `internals` feature only.
-#[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
-pub struct Span {
-    /// Starting [position][Position].
-    start: Position,
-    /// Ending [position][Position].
-    end: Position,
-}
-
-impl Default for Span {
-    #[inline(always)]
-    #[must_use]
-    fn default() -> Self {
-        Self::NONE
-    }
-}
-
-impl Span {
-    /// Empty [`Span`].
-    pub const NONE: Self = Self::new(Position::NONE, Position::NONE);
-
-    /// Create a new [`Span`].
-    #[inline(always)]
-    #[must_use]
-    pub const fn new(start: Position, end: Position) -> Self {
-        Self { start, end }
-    }
-    /// Is this [`Span`] non-existent?
-    #[inline]
-    #[must_use]
-    pub const fn is_none(&self) -> bool {
-        self.start.is_none() && self.end.is_none()
-    }
-    /// Get the [`Span`]'s starting [position][Position].
-    #[inline(always)]
-    #[must_use]
-    pub const fn start(&self) -> Position {
-        self.start
-    }
-    /// Get the [`Span`]'s ending [position][Position].
-    #[inline(always)]
-    #[must_use]
-    pub const fn end(&self) -> Position {
-        self.end
-    }
-}
-
-impl fmt::Display for Span {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let _f = f;
-
-        #[cfg(not(feature = "no_position"))]
-        match (self.start(), self.end()) {
-            (Position::NONE, Position::NONE) => write!(_f, "{:?}", Position::NONE),
-            (Position::NONE, end) => write!(_f, "..{:?}", end),
-            (start, Position::NONE) => write!(_f, "{:?}", start),
-            (start, end) if start.line() != end.line() => {
-                write!(_f, "{:?}-{:?}", start, end)
-            }
-            (start, end) => write!(
-                _f,
-                "{}:{}-{}",
-                start.line().unwrap(),
-                start.position().unwrap_or(0),
-                end.position().unwrap_or(0)
-            ),
-        }
-
-        #[cfg(feature = "no_position")]
-        Ok(())
-    }
-}
-
-impl fmt::Debug for Span {
-    #[cold]
-    #[inline(never)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self, f)
-    }
-}
 
 /// _(internals)_ A Rhai language token.
 /// Exported under the `internals` feature only.
@@ -587,7 +272,7 @@ pub enum Token {
     /// Used as a placeholder for the end of input.
     EOF,
     /// Placeholder to indicate the lack of a token.
-    NonToken,
+    NONE,
 }
 
 impl fmt::Display for Token {
@@ -613,7 +298,7 @@ impl fmt::Display for Token {
             Comment(s) => f.write_str(s),
 
             EOF => f.write_str("{EOF}"),
-            NonToken => f.write_str("{NONE}"),
+            NONE => f.write_str("{NONE}"),
 
             token => f.write_str(token.literal_syntax()),
         }
@@ -642,7 +327,7 @@ impl Token {
             Custom(..) => false,
             LexError(..) | Comment(..) => false,
 
-            EOF | NonToken => false,
+            EOF | NONE => false,
 
             _ => true,
         }

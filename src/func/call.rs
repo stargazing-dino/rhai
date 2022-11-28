@@ -8,7 +8,7 @@ use crate::engine::{
     KEYWORD_IS_DEF_VAR, KEYWORD_PRINT, KEYWORD_TYPE_OF,
 };
 use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
-use crate::tokenizer::{is_valid_function_name, Token};
+use crate::tokenizer::{is_valid_function_name, Token, NO_TOKEN};
 use crate::types::RestoreOnDrop;
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString,
@@ -272,7 +272,7 @@ impl Engine {
 
                         // Try to find a built-in version
                         let builtin = args.and_then(|args| match op_token {
-                            Token::NonToken => None,
+                            Token::NONE => None,
                             token if token.is_op_assignment() => {
                                 let (first_arg, rest_args) = args.split_first().unwrap();
 
@@ -639,15 +639,7 @@ impl Engine {
             let local_entry = &mut None;
 
             if let Some(FnResolutionCacheEntry { func, ref source }) = self
-                .resolve_fn(
-                    global,
-                    caches,
-                    local_entry,
-                    Token::NonToken,
-                    hash,
-                    None,
-                    false,
-                )
+                .resolve_fn(global, caches, local_entry, NO_TOKEN, hash, None, false)
                 .cloned()
             {
                 // Script function call
@@ -791,7 +783,7 @@ impl Engine {
                     caches,
                     None,
                     fn_name,
-                    Token::NonToken,
+                    NO_TOKEN,
                     new_hash,
                     &mut args,
                     false,
@@ -845,7 +837,7 @@ impl Engine {
                     caches,
                     None,
                     &fn_name,
-                    Token::NonToken,
+                    NO_TOKEN,
                     new_hash,
                     &mut args,
                     is_ref_mut,
@@ -944,7 +936,7 @@ impl Engine {
                     caches,
                     None,
                     fn_name,
-                    Token::NonToken,
+                    NO_TOKEN,
                     hash,
                     &mut args,
                     is_ref_mut,
@@ -986,7 +978,7 @@ impl Engine {
         let redirected; // Handle call() - Redirect function call
 
         match name {
-            _ if op_token != Token::NonToken => (),
+            _ if op_token != NO_TOKEN => (),
 
             // Handle call()
             KEYWORD_FN_PTR_CALL if total_args >= 1 => {
@@ -1217,12 +1209,7 @@ impl Engine {
 
                 self.track_operation(global, first_expr.position())?;
 
-                #[cfg(not(feature = "no_closure"))]
-                let target_is_shared = target.is_shared();
-                #[cfg(feature = "no_closure")]
-                let target_is_shared = false;
-
-                if target_is_shared || target.is_temp_value() {
+                if target.is_shared() || target.is_temp_value() {
                     arg_values.insert(0, target.take_or_clone().flatten());
                 } else {
                     // Turn it into a method call only if the object is not shared and not a simple value
@@ -1500,7 +1487,7 @@ impl Engine {
         let op_token = op_token.clone();
 
         // Short-circuit native binary operator call if under Fast Operators mode
-        if op_token != Token::NonToken && self.fast_operators() && args.len() == 2 {
+        if op_token != NO_TOKEN && self.fast_operators() && args.len() == 2 {
             let mut lhs = self
                 .get_arg_value(global, caches, scope, this_ptr, &args[0])?
                 .0

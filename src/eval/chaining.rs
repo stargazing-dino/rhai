@@ -5,7 +5,7 @@ use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, Expr, OpAssignment};
 use crate::config::hashing::SusLock;
 use crate::engine::{FN_IDX_GET, FN_IDX_SET};
-use crate::tokenizer::Token;
+use crate::tokenizer::NO_TOKEN;
 use crate::types::{dynamic::Union, RestoreOnDrop};
 use crate::{
     calc_fn_hash, Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, ERR,
@@ -72,17 +72,11 @@ impl Engine {
         global.level += 1;
         let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
-        self.exec_native_fn_call(
-            global,
-            caches,
-            FN_IDX_GET,
-            Token::NonToken,
-            hash_idx().0,
-            &mut [target, idx],
-            true,
-            pos,
-        )
-        .map(|(r, ..)| r)
+        let hash = hash_idx().0;
+        let args = &mut [target, idx];
+
+        self.exec_native_fn_call(global, caches, FN_IDX_GET, NO_TOKEN, hash, args, true, pos)
+            .map(|(r, ..)| r)
     }
 
     /// Call a set indexer.
@@ -101,15 +95,11 @@ impl Engine {
         global.level += 1;
         let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
+        let hash = hash_idx().1;
+        let args = &mut [target, idx, new_val];
+
         self.exec_native_fn_call(
-            global,
-            caches,
-            FN_IDX_SET,
-            Token::NonToken,
-            hash_idx().1,
-            &mut [target, idx, new_val],
-            is_ref_mut,
-            pos,
+            global, caches, FN_IDX_SET, NO_TOKEN, hash, args, is_ref_mut, pos,
         )
     }
 
@@ -766,15 +756,10 @@ impl Engine {
 
                         if op_info.is_op_assignment() {
                             let args = &mut [target.as_mut()];
+
                             let (mut orig_val, ..) = self
                                 .exec_native_fn_call(
-                                    global,
-                                    caches,
-                                    getter,
-                                    Token::NonToken,
-                                    *hash_get,
-                                    args,
-                                    is_ref_mut,
+                                    global, caches, getter, NO_TOKEN, *hash_get, args, is_ref_mut,
                                     *pos,
                                 )
                                 .or_else(|err| match *err {
@@ -807,15 +792,9 @@ impl Engine {
                         }
 
                         let args = &mut [target.as_mut(), &mut new_val];
+
                         self.exec_native_fn_call(
-                            global,
-                            caches,
-                            setter,
-                            Token::NonToken,
-                            *hash_set,
-                            args,
-                            is_ref_mut,
-                            *pos,
+                            global, caches, setter, NO_TOKEN, *hash_set, args, is_ref_mut, *pos,
                         )
                         .or_else(|err| match *err {
                             // Try an indexer if property does not exist
@@ -840,15 +819,9 @@ impl Engine {
 
                         let ((getter, hash_get), _, name) = &**x;
                         let args = &mut [target.as_mut()];
+
                         self.exec_native_fn_call(
-                            global,
-                            caches,
-                            getter,
-                            Token::NonToken,
-                            *hash_get,
-                            args,
-                            is_ref_mut,
-                            *pos,
+                            global, caches, getter, NO_TOKEN, *hash_get, args, is_ref_mut, *pos,
                         )
                         .map_or_else(
                             |err| match *err {
@@ -938,20 +911,13 @@ impl Engine {
                                 self.run_debugger(global, caches, scope, this_ptr, _node)?;
 
                                 let ((getter, hash_get), (setter, hash_set), name) = &**p;
-                                let mut arg_values = [target.as_mut(), &mut Dynamic::UNIT.clone()];
-                                let args = &mut arg_values[..1];
+                                let args = &mut [target.as_mut()];
 
                                 // Assume getters are always pure
                                 let (mut val, ..) = self
                                     .exec_native_fn_call(
-                                        global,
-                                        caches,
-                                        getter,
-                                        Token::NonToken,
-                                        *hash_get,
-                                        args,
-                                        is_ref_mut,
-                                        pos,
+                                        global, caches, getter, NO_TOKEN, *hash_get, args,
+                                        is_ref_mut, pos,
                                     )
                                     .or_else(|err| match *err {
                                         // Try an indexer if property does not exist
@@ -981,19 +947,13 @@ impl Engine {
                                 // Feed the value back via a setter just in case it has been updated
                                 if may_be_changed {
                                     // Re-use args because the first &mut parameter will not be consumed
-                                    let mut arg_values = [target.as_mut(), val.as_mut()];
-                                    let args = &mut arg_values;
+                                    let args = &mut [target.as_mut(), val.as_mut()];
+
                                     // The return value is thrown away and not used.
                                     let _ = self
                                         .exec_native_fn_call(
-                                            global,
-                                            caches,
-                                            setter,
-                                            Token::NonToken,
-                                            *hash_set,
-                                            args,
-                                            is_ref_mut,
-                                            pos,
+                                            global, caches, setter, NO_TOKEN, *hash_set, args,
+                                            is_ref_mut, pos,
                                         )
                                         .or_else(|err| match *err {
                                             // Try an indexer if property does not exist

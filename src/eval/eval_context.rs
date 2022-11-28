@@ -7,7 +7,6 @@ use std::prelude::v1::*;
 
 /// Context of a script evaluation process.
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// The current [`Engine`].
     engine: &'a Engine,

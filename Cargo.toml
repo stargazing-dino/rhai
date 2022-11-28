@@ -43,7 +43,7 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 [features]
 default = ["std", "ahash/runtime-rng"]  # ahash/runtime-rng trumps ahash/compile-time-rng
 std = ["ahash/std", "num-traits/std", "smartstring/std"]
-unchecked = []                  # unchecked arithmetic
+unchecked = []                  # disable safety checks
 sync = []                       # restrict to only types that implement Send + Sync
 no_position = []                # do not track position in the parser
 no_optimize = []                # no script optimizer

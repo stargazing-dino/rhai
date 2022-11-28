@@ -9,6 +9,8 @@ pub mod fn_ptr;
 pub mod immutable_string;
 pub mod interner;
 pub mod parse_error;
+pub mod position;
+pub mod position_none;
 pub mod restore;
 pub mod scope;
 pub mod variant;
@@ -25,6 +27,12 @@ pub use fn_ptr::FnPtr;
 pub use immutable_string::ImmutableString;
 pub use interner::StringsInterner;
 pub use parse_error::{LexError, ParseError, ParseErrorType};
+
+#[cfg(not(feature = "no_position"))]
+pub use position::{Position, Span};
+#[cfg(feature = "no_position")]
+pub use position_none::{Position, Span};
+
 pub use restore::RestoreOnDrop;
 pub use scope::Scope;
 pub use variant::Variant;

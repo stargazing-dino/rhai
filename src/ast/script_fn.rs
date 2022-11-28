@@ -16,7 +16,6 @@ use std::{fmt, hash::Hash};
 ///
 /// Not available under `no_module` or `no_function`.
 #[cfg(not(feature = "no_module"))]
-#[cfg(not(feature = "no_function"))]
 #[derive(Debug, Clone)]
 pub struct EncapsulatedEnviron {
     /// Functions defined within the same [`AST`][crate::AST].
@@ -35,7 +34,6 @@ pub struct ScriptFnDef {
     pub body: StmtBlock,
     /// Encapsulated AST environment, if any.
     #[cfg(not(feature = "no_module"))]
-    #[cfg(not(feature = "no_function"))]
     pub environ: Option<crate::Shared<EncapsulatedEnviron>>,
     /// Function name.
     pub name: ImmutableString,

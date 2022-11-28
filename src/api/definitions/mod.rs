@@ -461,7 +461,7 @@ impl Module {
                     || def
                         .engine
                         .custom_keywords
-                        .as_ref()
+                        .as_deref()
                         .map_or(false, |m| m.contains_key(f.metadata.name.as_str()));
 
                 f.write_definition(writer, def, operator)?;
