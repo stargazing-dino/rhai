@@ -1,3 +1,4 @@
+//! Placeholder script character position type.
 #![cfg(feature = "no_position")]
 #![allow(unused_variables)]
 
@@ -25,12 +26,16 @@ impl Position {
         Self
     }
     /// Get the line number (1-based), or [`None`] if there is no position.
+    ///
+    /// Always returns [`None`].
     #[inline(always)]
     #[must_use]
     pub const fn line(self) -> Option<usize> {
         None
     }
     /// Get the character position (1-based), or [`None`] if at beginning of a line.
+    ///
+    /// Always returns [`None`].
     #[inline(always)]
     #[must_use]
     pub const fn position(self) -> Option<usize> {
@@ -46,18 +51,24 @@ impl Position {
     #[inline(always)]
     pub(crate) fn new_line(&mut self) {}
     /// Is this [`Position`] at the beginning of a line?
+    ///
+    /// Always returns `false`.
     #[inline(always)]
     #[must_use]
     pub const fn is_beginning_of_line(self) -> bool {
         false
     }
     /// Is there no [`Position`]?
+    ///
+    /// Always returns `true`.
     #[inline(always)]
     #[must_use]
     pub const fn is_none(self) -> bool {
         true
     }
     /// Returns an fallback [`Position`] if it is [`NONE`][Position::NONE]?
+    ///
+    /// Always returns the fallback.
     #[inline(always)]
     #[must_use]
     pub const fn or_else(self, pos: Self) -> Self {
@@ -130,22 +141,28 @@ impl Span {
         Self
     }
     /// Is this [`Span`] non-existent?
+    ///
+    /// Always returns `true`.
     #[inline(always)]
     #[must_use]
     pub const fn is_none(&self) -> bool {
         true
     }
     /// Get the [`Span`]'s starting [position][Position].
+    ///
+    /// Always returns [`Position::NONE`].
     #[inline(always)]
     #[must_use]
     pub const fn start(&self) -> Position {
-        Position
+        Position::NONE
     }
     /// Get the [`Span`]'s ending [position][Position].
+    ///
+    /// Always returns [`Position::NONE`].
     #[inline(always)]
     #[must_use]
     pub const fn end(&self) -> Position {
-        Position
+        Position::NONE
     }
 }
 

@@ -1464,7 +1464,7 @@ impl Engine {
                 // Restore the strings interner by swapping it back
                 std::mem::swap(state.interned_strings, new_state.interned_strings);
 
-                let (expr, func) = result?;
+                let (expr, f) = result?;
 
                 #[cfg(not(feature = "no_closure"))]
                 new_state
@@ -1490,8 +1490,8 @@ impl Engine {
                         }
                     })?;
 
-                let hash_script = calc_fn_hash(None, &func.name, func.params.len());
-                lib.insert(hash_script, func.into());
+                let hash_script = calc_fn_hash(None, &f.name, f.params.len());
+                lib.insert(hash_script, f.into());
 
                 expr
             }
@@ -2170,42 +2170,42 @@ impl Engine {
             )),
             // lhs.nnn::func(...) - syntax error
             #[cfg(not(feature = "no_module"))]
-            (.., Expr::FnCall(func, ..)) if func.is_qualified() => {
-                Err(PERR::PropertyExpected.into_err(func.namespace.position()))
+            (.., Expr::FnCall(f, ..)) if f.is_qualified() => {
+                Err(PERR::PropertyExpected.into_err(f.namespace.position()))
             }
             // lhs.Fn() or lhs.eval()
-            (.., Expr::FnCall(func, func_pos))
-                if func.args.is_empty()
+            (.., Expr::FnCall(f, func_pos))
+                if f.args.is_empty()
                     && [crate::engine::KEYWORD_FN_PTR, crate::engine::KEYWORD_EVAL]
-                        .contains(&func.name.as_str()) =>
+                        .contains(&f.name.as_str()) =>
             {
                 let err_msg = format!(
                     "'{}' should not be called in method style. Try {}(...);",
-                    func.name, func.name
+                    f.name, f.name
                 );
-                Err(LexError::ImproperSymbol(func.name.to_string(), err_msg).into_err(func_pos))
+                Err(LexError::ImproperSymbol(f.name.to_string(), err_msg).into_err(func_pos))
             }
             // lhs.func!(...)
-            (.., Expr::FnCall(func, func_pos)) if func.capture_parent_scope => {
+            (.., Expr::FnCall(f, func_pos)) if f.capture_parent_scope => {
                 Err(PERR::MalformedCapture(
                     "method-call style does not support running within the caller's scope".into(),
                 )
                 .into_err(func_pos))
             }
             // lhs.func(...)
-            (lhs, Expr::FnCall(mut func, func_pos)) => {
+            (lhs, Expr::FnCall(mut f, func_pos)) => {
                 // Recalculate hash
-                func.hashes = if is_valid_function_name(&func.name) {
+                f.hashes = if is_valid_function_name(&f.name) {
                     FnCallHashes::from_all(
                         #[cfg(not(feature = "no_function"))]
-                        calc_fn_hash(None, &func.name, func.args.len()),
-                        calc_fn_hash(None, &func.name, func.args.len() + 1),
+                        calc_fn_hash(None, &f.name, f.args.len()),
+                        calc_fn_hash(None, &f.name, f.args.len() + 1),
                     )
                 } else {
-                    FnCallHashes::from_native(calc_fn_hash(None, &func.name, func.args.len() + 1))
+                    FnCallHashes::from_native(calc_fn_hash(None, &f.name, f.args.len() + 1))
                 };
 
-                let rhs = Expr::MethodCall(func, func_pos);
+                let rhs = Expr::MethodCall(f, func_pos);
                 Ok(Expr::Dot(BinaryExpr { lhs, rhs }.into(), op_flags, op_pos))
             }
             // lhs.dot_lhs.dot_rhs or lhs.dot_lhs[idx_rhs]
@@ -2224,8 +2224,8 @@ impl Engine {
                     }
                     // lhs.module::func().dot_rhs or lhs.module::func()[idx_rhs] - syntax error
                     #[cfg(not(feature = "no_module"))]
-                    Expr::FnCall(func, ..) if func.is_qualified() => {
-                        Err(PERR::PropertyExpected.into_err(func.namespace.position()))
+                    Expr::FnCall(f, ..) if f.is_qualified() => {
+                        Err(PERR::PropertyExpected.into_err(f.namespace.position()))
                     }
                     // lhs.id.dot_rhs or lhs.id[idx_rhs]
                     Expr::Variable(..) | Expr::Property(..) => {
@@ -2243,24 +2243,20 @@ impl Engine {
                         Ok(Expr::Dot(BinaryExpr { lhs, rhs }.into(), op_flags, op_pos))
                     }
                     // lhs.func().dot_rhs or lhs.func()[idx_rhs]
-                    Expr::FnCall(mut func, func_pos) => {
+                    Expr::FnCall(mut f, func_pos) => {
                         // Recalculate hash
-                        func.hashes = if is_valid_function_name(&func.name) {
+                        f.hashes = if is_valid_function_name(&f.name) {
                             FnCallHashes::from_all(
                                 #[cfg(not(feature = "no_function"))]
-                                calc_fn_hash(None, &func.name, func.args.len()),
-                                calc_fn_hash(None, &func.name, func.args.len() + 1),
+                                calc_fn_hash(None, &f.name, f.args.len()),
+                                calc_fn_hash(None, &f.name, f.args.len() + 1),
                             )
                         } else {
-                            FnCallHashes::from_native(calc_fn_hash(
-                                None,
-                                &func.name,
-                                func.args.len() + 1,
-                            ))
+                            FnCallHashes::from_native(calc_fn_hash(None, &f.name, f.args.len() + 1))
                         };
 
                         let new_lhs = BinaryExpr {
-                            lhs: Expr::MethodCall(func, func_pos),
+                            lhs: Expr::MethodCall(f, func_pos),
                             rhs: x.rhs,
                         }
                         .into();
@@ -3303,7 +3299,7 @@ impl Engine {
                             max_expr_depth: self.max_function_expr_depth(),
                         };
 
-                        let func = self.parse_fn(
+                        let f = self.parse_fn(
                             input,
                             new_state,
                             lib,
@@ -3312,22 +3308,21 @@ impl Engine {
                             #[cfg(not(feature = "no_function"))]
                             #[cfg(feature = "metadata")]
                             comments,
-                        );
+                        )?;
 
                         // Restore parse state
-                        let func = func?;
 
-                        let hash = calc_fn_hash(None, &func.name, func.params.len());
+                        let hash = calc_fn_hash(None, &f.name, f.params.len());
 
                         if !lib.is_empty() && lib.contains_key(&hash) {
                             return Err(PERR::FnDuplicatedDefinition(
-                                func.name.to_string(),
-                                func.params.len(),
+                                f.name.to_string(),
+                                f.params.len(),
                             )
                             .into_err(pos));
                         }
 
-                        lib.insert(hash, func.into());
+                        lib.insert(hash, f.into());
 
                         Ok(Stmt::Noop(pos))
                     }

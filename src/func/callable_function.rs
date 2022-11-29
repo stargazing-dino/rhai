@@ -204,16 +204,16 @@ impl CallableFunction {
 #[cfg(not(feature = "no_function"))]
 impl From<crate::ast::ScriptFnDef> for CallableFunction {
     #[inline(always)]
-    fn from(_func: crate::ast::ScriptFnDef) -> Self {
-        Self::Script(_func.into())
+    fn from(func: crate::ast::ScriptFnDef) -> Self {
+        Self::Script(func.into())
     }
 }
 
 #[cfg(not(feature = "no_function"))]
 impl From<Shared<crate::ast::ScriptFnDef>> for CallableFunction {
     #[inline(always)]
-    fn from(_func: Shared<crate::ast::ScriptFnDef>) -> Self {
-        Self::Script(_func)
+    fn from(func: Shared<crate::ast::ScriptFnDef>) -> Self {
+        Self::Script(func)
     }
 }
 

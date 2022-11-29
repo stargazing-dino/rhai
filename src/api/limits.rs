@@ -6,23 +6,20 @@ use std::num::{NonZeroU64, NonZeroUsize};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
+#[cfg(debug_assertions)]
 pub mod default_limits {
-    #[cfg(debug_assertions)]
     #[cfg(not(feature = "no_function"))]
     pub const MAX_CALL_STACK_DEPTH: usize = 8;
-    #[cfg(debug_assertions)]
     pub const MAX_EXPR_DEPTH: usize = 32;
     #[cfg(not(feature = "no_function"))]
-    #[cfg(debug_assertions)]
     pub const MAX_FUNCTION_EXPR_DEPTH: usize = 16;
-
-    #[cfg(not(debug_assertions))]
+}
+#[cfg(not(debug_assertions))]
+pub mod default_limits {
     #[cfg(not(feature = "no_function"))]
     pub const MAX_CALL_STACK_DEPTH: usize = 64;
-    #[cfg(not(debug_assertions))]
     pub const MAX_EXPR_DEPTH: usize = 64;
     #[cfg(not(feature = "no_function"))]
-    #[cfg(not(debug_assertions))]
     pub const MAX_FUNCTION_EXPR_DEPTH: usize = 32;
 }
 
@@ -55,7 +52,7 @@ pub struct Limits {
     #[cfg(not(feature = "no_module"))]
     pub max_modules: usize,
     /// Maximum length of a [string][crate::ImmutableString].
-    pub max_string_size: Option<NonZeroUsize>,
+    pub max_string_len: Option<NonZeroUsize>,
     /// Maximum length of an [array][crate::Array].
     ///
     /// Not available under `no_index`.
@@ -83,7 +80,7 @@ impl Limits {
             max_operations: None,
             #[cfg(not(feature = "no_module"))]
             max_modules: usize::MAX,
-            max_string_size: None,
+            max_string_len: None,
             #[cfg(not(feature = "no_index"))]
             max_array_size: None,
             #[cfg(not(feature = "no_object"))]
@@ -104,7 +101,7 @@ impl Engine {
     /// Is there a data size limit set?
     #[inline(always)]
     pub(crate) const fn has_data_size_limit(&self) -> bool {
-        self.limits.max_string_size.is_some()
+        self.limits.max_string_len.is_some()
             || {
                 #[cfg(not(feature = "no_index"))]
                 {
@@ -222,19 +219,19 @@ impl Engine {
         #[cfg(feature = "no_function")]
         return 0;
     }
-    /// Set the maximum length of [strings][crate::ImmutableString] (0 for unlimited).
+    /// Set the maximum length, in bytes, of [strings][crate::ImmutableString] (0 for unlimited).
     ///
     /// Not available under `unchecked`.
     #[inline(always)]
-    pub fn set_max_string_size(&mut self, max_size: usize) -> &mut Self {
-        self.limits.max_string_size = NonZeroUsize::new(max_size);
+    pub fn set_max_string_size(&mut self, max_len: usize) -> &mut Self {
+        self.limits.max_string_len = NonZeroUsize::new(max_len);
         self
     }
-    /// The maximum length of [strings][crate::ImmutableString] (0 for unlimited).
+    /// The maximum length, in bytes, of [strings][crate::ImmutableString] (0 for unlimited).
     #[inline]
     #[must_use]
     pub const fn max_string_size(&self) -> usize {
-        match self.limits.max_string_size {
+        match self.limits.max_string_len {
             Some(n) => n.get(),
             None => 0,
         }

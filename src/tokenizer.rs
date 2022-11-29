@@ -852,7 +852,7 @@ impl From<Token> for String {
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct TokenizeState {
     /// Maximum length of a string.
-    pub max_string_size: Option<NonZeroUsize>,
+    pub max_string_len: Option<NonZeroUsize>,
     /// Can the next token be a unary operator?
     pub next_token_cannot_be_unary: bool,
     /// Shared object to allow controlling the tokenizer externally.
@@ -877,6 +877,18 @@ pub trait InputStream {
     /// Peek the next character in the `InputStream`.
     #[must_use]
     fn peek_next(&mut self) -> Option<char>;
+}
+
+/// Return error if the string is longer than the maximum length.
+#[inline]
+fn ensure_string_len_within_limit(max: Option<NonZeroUsize>, value: &str) -> Result<(), LexError> {
+    if let Some(max) = max {
+        if value.len() > max.get() {
+            return Err(LexError::StringTooLong(max.get()));
+        }
+    }
+
+    Ok(())
 }
 
 /// _(internals)_ Parse a string literal ended by a specified termination character.
@@ -968,11 +980,8 @@ pub fn parse_string_literal(
             break;
         }
 
-        if let Some(max) = state.max_string_size {
-            if result.len() > max.get() {
-                return Err((LexError::StringTooLong(max.get()), *pos));
-            }
-        }
+        ensure_string_len_within_limit(state.max_string_len, &result)
+            .map_err(|err| (err, start))?;
 
         // Close wrapper
         if termination_char == next_char && escape.is_empty() {
@@ -1107,11 +1116,7 @@ pub fn parse_string_literal(
         }
     }
 
-    if let Some(max) = state.max_string_size {
-        if result.len() > max.get() {
-            return Err((LexError::StringTooLong(max.get()), *pos));
-        }
-    }
+    ensure_string_len_within_limit(state.max_string_len, &result).map_err(|err| (err, start))?;
 
     Ok((result, interpolated, first_char))
 }
@@ -1430,11 +1435,17 @@ fn get_next_token_inner(
             // letter or underscore ...
             #[cfg(not(feature = "unicode-xid-ident"))]
             ('a'..='z' | '_' | 'A'..='Z', ..) => {
-                return Some(get_token_as_identifier(stream, pos, start_pos, c));
+                return Some(
+                    parse_identifier_token(stream, pos, start_pos, c)
+                        .unwrap_or_else(|err| (Token::LexError(err.into()), start_pos)),
+                );
             }
             #[cfg(feature = "unicode-xid-ident")]
             (ch, ..) if unicode_xid::UnicodeXID::is_xid_start(ch) || ch == '_' => {
-                return Some(get_token_as_identifier(stream, pos, start_pos, c));
+                return Some(
+                    parse_identifier_token(stream, pos, start_pos, c)
+                        .unwrap_or_else(|err| (Token::LexError(err.into()), start_pos)),
+                );
             }
 
             // " - string literal
@@ -1902,12 +1913,12 @@ fn get_next_token_inner(
 }
 
 /// Get the next token, parsing it as an identifier.
-fn get_token_as_identifier(
+fn parse_identifier_token(
     stream: &mut impl InputStream,
     pos: &mut Position,
     start_pos: Position,
     first_char: char,
-) -> (Token, Position) {
+) -> Result<(Token, Position), LexError> {
     let mut identifier = SmartString::new_const();
     identifier.push(first_char);
 
@@ -1922,19 +1933,20 @@ fn get_token_as_identifier(
     }
 
     if let Some(token) = Token::lookup_symbol_from_syntax(&identifier) {
-        return (token, start_pos);
-    } else if Token::is_reserved_keyword(&identifier) {
-        return (Token::Reserved(Box::new(identifier)), start_pos);
+        return Ok((token, start_pos));
+    }
+    if Token::is_reserved_keyword(&identifier) {
+        return Ok((Token::Reserved(Box::new(identifier)), start_pos));
     }
 
     if !is_valid_identifier(&identifier) {
-        return (
+        return Ok((
             Token::LexError(LERR::MalformedIdentifier(identifier.to_string()).into()),
             start_pos,
-        );
+        ));
     }
 
-    (Token::Identifier(identifier.into()), start_pos)
+    Ok((Token::Identifier(identifier.into()), start_pos))
 }
 
 /// Is a keyword allowed as a function?
@@ -2236,10 +2248,7 @@ impl Engine {
             TokenIterator {
                 engine: self,
                 state: TokenizeState {
-                    #[cfg(not(feature = "unchecked"))]
-                    max_string_size: self.limits.max_string_size,
-                    #[cfg(feature = "unchecked")]
-                    max_string_size: None,
+                    max_string_len: NonZeroUsize::new(self.max_string_size()),
                     next_token_cannot_be_unary: false,
                     tokenizer_control: buffer,
                     comment_level: 0,

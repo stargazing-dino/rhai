@@ -186,6 +186,7 @@ impl<'a> Target<'a> {
             Self::RefMut(r) => r.is_shared(),
             Self::SharedValue { .. } => true,
             Self::TempValue(value) => value.is_shared(),
+            #[cfg(not(feature = "no_index"))]
             Self::Bit { .. }
             | Self::BitField { .. }
             | Self::BlobByte { .. }

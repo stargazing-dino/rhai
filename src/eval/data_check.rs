@@ -80,7 +80,7 @@ impl Engine {
     ) -> RhaiResultOf<()> {
         if self
             .limits
-            .max_string_size
+            .max_string_len
             .map_or(false, |max| s > max.get())
         {
             return Err(

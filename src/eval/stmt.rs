@@ -501,21 +501,23 @@ impl Engine {
                 // 2) Global modules - packages
                 // 3) Imported modules - functions marked with global namespace
                 // 4) Global sub-modules - functions marked with global namespace
-                let func = self
+                let iter_func = self
                     .global_modules
                     .iter()
                     .find_map(|m| m.get_iter(iter_type));
 
                 #[cfg(not(feature = "no_module"))]
-                let func = func.or_else(|| global.get_iter(iter_type)).or_else(|| {
-                    self.global_sub_modules
-                        .as_deref()
-                        .into_iter()
-                        .flatten()
-                        .find_map(|(_, m)| m.get_qualified_iter(iter_type))
-                });
+                let iter_func = iter_func
+                    .or_else(|| global.get_iter(iter_type))
+                    .or_else(|| {
+                        self.global_sub_modules
+                            .as_deref()
+                            .into_iter()
+                            .flatten()
+                            .find_map(|(_, m)| m.get_qualified_iter(iter_type))
+                    });
 
-                let func = func.ok_or_else(|| ERR::ErrorFor(expr.start_position()))?;
+                let iter_func = iter_func.ok_or_else(|| ERR::ErrorFor(expr.start_position()))?;
 
                 // Restore scope at end of statement
                 let orig_scope_len = scope.len();
@@ -536,7 +538,7 @@ impl Engine {
 
                 let mut result = Dynamic::UNIT;
 
-                for (x, iter_value) in func(iter_obj).enumerate() {
+                for (x, iter_value) in iter_func(iter_obj).enumerate() {
                     // Increment counter
                     if counter_index < usize::MAX {
                         // As the variable increments from 0, this should always work
@@ -604,10 +606,7 @@ impl Engine {
             Stmt::TryCatch(x, ..) => {
                 let TryCatchBlock {
                     try_block,
-                    catch_var:
-                        Ident {
-                            name: catch_var, ..
-                        },
+                    catch_var,
                     catch_block,
                 } = &**x;
 
@@ -659,7 +658,7 @@ impl Engine {
                             });
 
                         if !catch_var.is_empty() {
-                            scope.push(catch_var.clone(), err_value);
+                            scope.push(catch_var.name.clone(), err_value);
                         }
 
                         self.eval_stmt_block(global, caches, scope, this_ptr, catch_block, true)
@@ -768,7 +767,7 @@ impl Engine {
 
                 #[cfg(not(feature = "no_module"))]
                 if let Some(alias) = _alias {
-                    scope.add_alias_by_index(scope.len() - 1, alias.name.as_str().into());
+                    scope.add_alias_by_index(scope.len() - 1, alias.as_str().into());
                 }
 
                 Ok(Dynamic::UNIT)
