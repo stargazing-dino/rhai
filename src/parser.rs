@@ -90,12 +90,15 @@ impl fmt::Debug for ParseState<'_, '_> {
             .field("global", &self.global)
             .field("stack", &self.stack)
             .field("block_stack_len", &self.block_stack_len);
+
         #[cfg(not(feature = "no_closure"))]
         f.field("external_vars", &self.external_vars)
             .field("allow_capture", &self.allow_capture);
+
         #[cfg(not(feature = "no_module"))]
         f.field("imports", &self.imports)
             .field("global_imports", &self.global_imports);
+
         f.finish()
     }
 }
@@ -140,24 +143,24 @@ impl<'e, 's> ParseState<'e, 's> {
     pub fn find_var(&self, name: &str) -> (usize, bool) {
         let mut hit_barrier = false;
 
-        (
-            self.stack
-                .as_deref()
-                .into_iter()
-                .flat_map(|s| s.iter_rev_raw())
-                .enumerate()
-                .find(|&(.., (n, ..))| {
-                    if n == SCOPE_SEARCH_BARRIER_MARKER {
-                        // Do not go beyond the barrier
-                        hit_barrier = true;
-                        false
-                    } else {
-                        n == name
-                    }
-                })
-                .map_or(0, |(i, ..)| i + 1),
-            hit_barrier,
-        )
+        let index = self
+            .stack
+            .as_deref()
+            .into_iter()
+            .flat_map(|s| s.iter_rev_raw())
+            .enumerate()
+            .find(|&(.., (n, ..))| {
+                if n == SCOPE_SEARCH_BARRIER_MARKER {
+                    // Do not go beyond the barrier
+                    hit_barrier = true;
+                    false
+                } else {
+                    n == name
+                }
+            })
+            .map_or(0, |(i, ..)| i + 1);
+
+        (index, hit_barrier)
     }
 
     /// Find explicitly declared variable by name in the [`ParseState`], searching in reverse order.
@@ -300,6 +303,7 @@ bitflags! {
         const CLOSURE_SCOPE = 0b0000_0100;
         /// Is the construct being parsed located inside a breakable loop?
         const BREAKABLE = 0b0000_1000;
+
         /// Disallow statements in blocks?
         const DISALLOW_STATEMENTS_IN_BLOCKS = 0b0001_0000;
         /// Disallow unquoted map properties?
@@ -869,19 +873,15 @@ impl Engine {
                         let (token, pos) = input.next().expect(NEVER_ENDS);
                         let prev_pos = settings.pos;
                         settings.pos = pos;
+                        let settings = settings.level_up()?;
                         // Recursively parse the indexing chain, right-binding each
+                        let options = match token {
+                            Token::LeftBracket => ASTFlags::NONE,
+                            Token::QuestionBracket => ASTFlags::NEGATED,
+                            _ => unreachable!("`[` or `?[`"),
+                        };
                         let idx_expr = self.parse_index_chain(
-                            input,
-                            state,
-                            lib,
-                            idx_expr,
-                            match token {
-                                Token::LeftBracket => ASTFlags::NONE,
-                                Token::QuestionBracket => ASTFlags::NEGATED,
-                                _ => unreachable!("`[` or `?[`"),
-                            },
-                            false,
-                            settings.level_up()?,
+                            input, state, lib, idx_expr, options, false, settings,
                         )?;
                         // Indexing binds to right
                         Ok(Expr::Index(
@@ -1437,29 +1437,29 @@ impl Engine {
                         .extend(state.imports.as_deref().into_iter().flatten().cloned());
                 }
 
+                // Brand new options
                 #[cfg(not(feature = "no_closure"))]
-                let options = self.options & !LangOptions::STRICT_VAR; // A capturing closure can access variables not defined locally
+                let options = self.options & !LangOptions::STRICT_VAR; // a capturing closure can access variables not defined locally, so turn off Strict Variables mode
                 #[cfg(feature = "no_closure")]
                 let options = self.options | (settings.options & LangOptions::STRICT_VAR);
 
-                let flags = (settings.flags
-                    & !ParseSettingFlags::GLOBAL_LEVEL
-                    & ParseSettingFlags::BREAKABLE)
-                    | ParseSettingFlags::FN_SCOPE;
+                // Brand new flags, turn on function scope
+                let flags = ParseSettingFlags::FN_SCOPE
+                    | (settings.flags
+                        & (ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES
+                            | ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS));
 
                 #[cfg(not(feature = "no_closure"))]
-                let flags = flags | ParseSettingFlags::CLOSURE_SCOPE;
+                let flags = flags | ParseSettingFlags::CLOSURE_SCOPE; // turn on closure scope
 
                 let new_settings = ParseSettings {
-                    level: 0,
                     flags,
                     options,
-                    #[cfg(not(feature = "unchecked"))]
-                    max_expr_depth: self.max_function_expr_depth(),
                     ..settings
                 };
 
-                let result = self.parse_anon_fn(input, new_state, state, lib, new_settings);
+                let result =
+                    self.parse_anon_fn(input, new_state, state, lib, new_settings.level_up()?);
 
                 // Restore the strings interner by swapping it back
                 std::mem::swap(state.interned_strings, new_state.interned_strings);
@@ -1582,8 +1582,8 @@ impl Engine {
                     .and_then(|m| m.get_key_value(&**key))
                     .unwrap();
                 let (.., pos) = input.next().expect(NEVER_ENDS);
-                let settings2 = settings.level_up()?;
-                self.parse_custom_syntax(input, state, lib, settings2, key, syntax, pos)?
+                let settings = settings.level_up()?;
+                self.parse_custom_syntax(input, state, lib, settings, key, syntax, pos)?
             }
 
             // Identifier
@@ -1789,15 +1789,8 @@ impl Engine {
                         Token::QuestionBracket => ASTFlags::NEGATED,
                         _ => unreachable!("`[` or `?[`"),
                     };
-                    self.parse_index_chain(
-                        input,
-                        state,
-                        lib,
-                        expr,
-                        opt,
-                        true,
-                        settings.level_up()?,
-                    )?
+                    let settings = settings.level_up()?;
+                    self.parse_index_chain(input, state, lib, expr, opt, true, settings)?
                 }
                 // Property access
                 #[cfg(not(feature = "no_object"))]
@@ -1850,12 +1843,11 @@ impl Engine {
                 {
                     let root = namespace.root();
                     let index = state.find_module(root);
+                    let is_global = false;
 
                     #[cfg(not(feature = "no_function"))]
                     #[cfg(not(feature = "no_module"))]
-                    let is_global = root == crate::engine::KEYWORD_GLOBAL;
-                    #[cfg(any(feature = "no_function", feature = "no_module"))]
-                    let is_global = false;
+                    let is_global = is_global || root == crate::engine::KEYWORD_GLOBAL;
 
                     if settings.has_option(LangOptions::STRICT_VAR)
                         && index.is_none()
@@ -2142,14 +2134,8 @@ impl Engine {
         match (lhs, rhs) {
             // lhs[idx_expr].rhs
             (Expr::Index(mut x, options, pos), rhs) => {
-                x.rhs = Self::make_dot_expr(
-                    state,
-                    x.rhs,
-                    rhs,
-                    options | parent_options,
-                    op_flags,
-                    op_pos,
-                )?;
+                let options = options | parent_options;
+                x.rhs = Self::make_dot_expr(state, x.rhs, rhs, options, op_flags, op_pos)?;
                 Ok(Expr::Index(x, ASTFlags::NONE, pos))
             }
             // lhs.module::id - syntax error
@@ -2403,7 +2389,7 @@ impl Engine {
                     let lhs = op_base.args.pop().unwrap();
                     Expr::Coalesce(BinaryExpr { lhs, rhs }.into(), pos)
                 }
-                Token::In => {
+                Token::In | Token::NotIn => {
                     // Swap the arguments
                     let lhs = op_base.args.remove(0);
                     let pos = lhs.start_position();
@@ -2413,7 +2399,26 @@ impl Engine {
                     // Convert into a call to `contains`
                     op_base.hashes = calc_fn_hash(None, OP_CONTAINS, 2).into();
                     op_base.name = state.get_interned_string(OP_CONTAINS);
-                    op_base.into_fn_call_expr(pos)
+                    let fn_call = op_base.into_fn_call_expr(pos);
+
+                    if op_token == Token::In {
+                        fn_call
+                    } else {
+                        // Put a `!` call in front
+                        let op = Token::Bang.literal_syntax();
+                        let mut args = StaticVec::new_const();
+                        args.push(fn_call);
+
+                        let not_base = FnCallExpr {
+                            namespace: Namespace::NONE,
+                            name: state.get_interned_string(op),
+                            hashes: FnCallHashes::from_native(calc_fn_hash(None, op, 1).into()),
+                            args,
+                            op_token: Token::Bang,
+                            capture_parent_scope: false,
+                        };
+                        not_base.into_fn_call_expr(pos)
+                    }
                 }
 
                 #[cfg(not(feature = "no_custom_syntax"))]
@@ -2727,10 +2732,13 @@ impl Engine {
     ) -> ParseResult<Stmt> {
         // do ...
         let mut settings = settings;
+        let orig_breakable = settings.flags.contains(ParseSettingFlags::BREAKABLE);
+        settings.flags |= ParseSettingFlags::BREAKABLE;
+
         settings.pos = eat_token(input, Token::Do);
 
         // do { body } [while|until] guard
-        settings.flags |= ParseSettingFlags::BREAKABLE;
+
         let body = self.parse_block(input, state, lib, settings.level_up()?)?;
 
         let negated = match input.next().expect(NEVER_ENDS) {
@@ -2744,7 +2752,9 @@ impl Engine {
             }
         };
 
-        settings.flags &= !ParseSettingFlags::BREAKABLE;
+        if !orig_breakable {
+            settings.flags &= !ParseSettingFlags::BREAKABLE;
+        }
 
         ensure_not_statement_expr(input, "a boolean")?;
         let guard = self
@@ -3284,8 +3294,10 @@ impl Engine {
                                 .extend(state.imports.as_deref().into_iter().flatten().cloned());
                         }
 
+                        // Brand new options
                         let options = self.options | (settings.options & LangOptions::STRICT_VAR);
 
+                        // Brand new flags, turn on function scope
                         let flags = ParseSettingFlags::FN_SCOPE
                             | (settings.flags
                                 & ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES);
@@ -3518,7 +3530,7 @@ impl Engine {
         #[cfg(feature = "metadata")]
         comments: StaticVec<SmartString>,
     ) -> ParseResult<ScriptFnDef> {
-        let mut settings = settings;
+        let settings = settings;
 
         let (token, pos) = input.next().expect(NEVER_ENDS);
 
@@ -3585,10 +3597,7 @@ impl Engine {
 
         // Parse function body
         let body = match input.peek().expect(NEVER_ENDS) {
-            (Token::LeftBrace, ..) => {
-                settings.flags &= !ParseSettingFlags::BREAKABLE;
-                self.parse_block(input, state, lib, settings.level_up()?)?
-            }
+            (Token::LeftBrace, ..) => self.parse_block(input, state, lib, settings.level_up()?)?,
             (.., pos) => return Err(PERR::FnMissingBody(name.into()).into_err(*pos)),
         }
         .into();
@@ -3685,7 +3694,7 @@ impl Engine {
         lib: &mut FnLib,
         settings: ParseSettings,
     ) -> ParseResult<(Expr, ScriptFnDef)> {
-        let mut settings = settings;
+        let settings = settings;
         let mut params_list = StaticVec::<ImmutableString>::new_const();
 
         if input.next().expect(NEVER_ENDS).0 != Token::Or && !match_token(input, Token::Pipe).0 {
@@ -3732,7 +3741,6 @@ impl Engine {
         }
 
         // Parse function body
-        settings.flags &= !ParseSettingFlags::BREAKABLE;
         let body = self.parse_stmt(input, state, lib, settings.level_up()?)?;
 
         // External variables may need to be processed in a consistent order,

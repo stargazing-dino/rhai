@@ -23,6 +23,10 @@ Deprecated API's
 Net features
 ------------
 
+### `!in`
+
+* A new operator `!in` is added which maps to `!(... in ...)`.
+
 ### `Engine::call_fn_with_options`
 
 * `Engine::call_fn_raw` is deprecated in favor of `Engine::call_fn_with_options` which allows setting options for the function call.

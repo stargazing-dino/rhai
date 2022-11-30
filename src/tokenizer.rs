@@ -174,6 +174,8 @@ pub enum Token {
     For,
     /// `in`
     In,
+    /// `!in`
+    NotIn,
     /// `<`
     LessThan,
     /// `>`
@@ -385,6 +387,7 @@ impl Token {
             Loop => "loop",
             For => "for",
             In => "in",
+            NotIn => "!in",
             LessThan => "<",
             GreaterThan => ">",
             Bang => "!",
@@ -439,37 +442,43 @@ impl Token {
     #[inline]
     #[must_use]
     pub const fn is_op_assignment(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
+        use Token::*;
+
         matches!(
             self,
-            Self::PlusAssign
-                | Self::MinusAssign
-                | Self::MultiplyAssign
-                | Self::DivideAssign
-                | Self::LeftShiftAssign
-                | Self::RightShiftAssign
-                | Self::ModuloAssign
-                | Self::PowerOfAssign
-                | Self::AndAssign
-                | Self::OrAssign
-                | Self::XOrAssign
+            PlusAssign
+                | MinusAssign
+                | MultiplyAssign
+                | DivideAssign
+                | LeftShiftAssign
+                | RightShiftAssign
+                | ModuloAssign
+                | PowerOfAssign
+                | AndAssign
+                | OrAssign
+                | XOrAssign
         )
     }
 
     /// Get the corresponding operator of the token if it is an op-assignment operator.
     #[must_use]
     pub const fn get_base_op_from_assignment(&self) -> Option<Self> {
+        #[allow(clippy::enum_glob_use)]
+        use Token::*;
+
         Some(match self {
-            Self::PlusAssign => Self::Plus,
-            Self::MinusAssign => Self::Minus,
-            Self::MultiplyAssign => Self::Multiply,
-            Self::DivideAssign => Self::Divide,
-            Self::LeftShiftAssign => Self::LeftShift,
-            Self::RightShiftAssign => Self::RightShift,
-            Self::ModuloAssign => Self::Modulo,
-            Self::PowerOfAssign => Self::PowerOf,
-            Self::AndAssign => Self::Ampersand,
-            Self::OrAssign => Self::Pipe,
-            Self::XOrAssign => Self::XOr,
+            PlusAssign => Plus,
+            MinusAssign => Minus,
+            MultiplyAssign => Multiply,
+            DivideAssign => Divide,
+            LeftShiftAssign => LeftShift,
+            RightShiftAssign => RightShift,
+            ModuloAssign => Modulo,
+            PowerOfAssign => PowerOf,
+            AndAssign => Ampersand,
+            OrAssign => Pipe,
+            XOrAssign => XOr,
             _ => return None,
         })
     }
@@ -478,37 +487,42 @@ impl Token {
     #[inline]
     #[must_use]
     pub const fn has_op_assignment(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
+        use Token::*;
+
         matches!(
             self,
-            Self::Plus
-                | Self::Minus
-                | Self::Multiply
-                | Self::Divide
-                | Self::LeftShift
-                | Self::RightShift
-                | Self::Modulo
-                | Self::PowerOf
-                | Self::Ampersand
-                | Self::Pipe
-                | Self::XOr
+            Plus | Minus
+                | Multiply
+                | Divide
+                | LeftShift
+                | RightShift
+                | Modulo
+                | PowerOf
+                | Ampersand
+                | Pipe
+                | XOr
         )
     }
 
     /// Get the corresponding op-assignment operator of the token.
     #[must_use]
     pub const fn convert_to_op_assignment(&self) -> Option<Self> {
+        #[allow(clippy::enum_glob_use)]
+        use Token::*;
+
         Some(match self {
-            Self::Plus => Self::PlusAssign,
-            Self::Minus => Self::MinusAssign,
-            Self::Multiply => Self::MultiplyAssign,
-            Self::Divide => Self::DivideAssign,
-            Self::LeftShift => Self::LeftShiftAssign,
-            Self::RightShift => Self::RightShiftAssign,
-            Self::Modulo => Self::ModuloAssign,
-            Self::PowerOf => Self::PowerOfAssign,
-            Self::Ampersand => Self::AndAssign,
-            Self::Pipe => Self::OrAssign,
-            Self::XOr => Self::XOrAssign,
+            Plus => PlusAssign,
+            Minus => MinusAssign,
+            Multiply => MultiplyAssign,
+            Divide => DivideAssign,
+            LeftShift => LeftShiftAssign,
+            RightShift => RightShiftAssign,
+            Modulo => ModuloAssign,
+            PowerOf => PowerOfAssign,
+            Ampersand => AndAssign,
+            Pipe => OrAssign,
+            XOr => XOrAssign,
             _ => return None,
         })
     }
@@ -560,6 +574,7 @@ impl Token {
             "loop" => Loop,
             "for" => For,
             "in" => In,
+            "!in" => NotIn,
             "<" => LessThan,
             ">" => GreaterThan,
             "!" => Bang,
@@ -700,6 +715,7 @@ impl Token {
             While            |
             Until            |
             In               |
+            NotIn            |
             And              |
             AndAssign        |
             Or               |
@@ -731,7 +747,7 @@ impl Token {
 
             EqualsTo | NotEqualsTo => 90,
 
-            In => 110,
+            In | NotIn => 110,
 
             LessThan | LessThanEqualsTo | GreaterThan | GreaterThanEqualsTo => 130,
 
@@ -1812,6 +1828,15 @@ fn get_next_token_inner(
             }
             ('>', ..) => return Some((Token::GreaterThan, start_pos)),
 
+            ('!', 'i') => {
+                eat_next(stream, pos);
+                if stream.peek_next() == Some('n') {
+                    eat_next(stream, pos);
+                    return Some((Token::NotIn, start_pos));
+                }
+                stream.unget('i');
+                return Some((Token::Bang, start_pos));
+            }
             ('!', '=') => {
                 eat_next(stream, pos);
 
