@@ -325,9 +325,9 @@ impl Engine {
         }
     }
 
-    /// # Main Entry-Point
+    /// # Main Entry-Point (Native by Name)
     ///
-    /// Call a native Rust function registered with the [`Engine`].
+    /// Call a native Rust function registered with the [`Engine`] by name.
     ///
     /// # WARNING
     ///
@@ -543,9 +543,9 @@ impl Engine {
         }
     }
 
-    /// # Main Entry-Point
+    /// # Main Entry-Point (By Name)
     ///
-    /// Perform an actual function call, native Rust or scripted, taking care of special functions.
+    /// Perform an actual function call, native Rust or scripted, by name, taking care of special functions.
     ///
     /// # WARNING
     ///
@@ -1463,6 +1463,8 @@ impl Engine {
         self.eval_global_statements(global, caches, scope, statements)
     }
 
+    /// # Main Entry-Point (`FnCallExpr`)
+    ///
     /// Evaluate a function call expression.
     pub(crate) fn eval_fn_call_expr(
         &self,
@@ -1485,6 +1487,22 @@ impl Engine {
         } = expr;
 
         let op_token = op_token.clone();
+
+        // Short-circuit native unary operator call if under Fast Operators mode
+        if op_token == Token::Bang && self.fast_operators() && args.len() == 1 {
+            let mut value = self
+                .get_arg_value(global, caches, scope, this_ptr, &args[0])?
+                .0
+                .flatten();
+
+            return value.as_bool().and_then(|r| Ok((!r).into())).or_else(|_| {
+                let operand = &mut [&mut value];
+                self.exec_fn_call(
+                    global, caches, None, name, op_token, *hashes, operand, false, false, pos,
+                )
+                .map(|(v, ..)| v)
+            });
+        }
 
         // Short-circuit native binary operator call if under Fast Operators mode
         if op_token != NO_TOKEN && self.fast_operators() && args.len() == 2 {

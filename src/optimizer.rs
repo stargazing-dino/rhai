@@ -4,7 +4,9 @@
 use crate::ast::{
     ASTFlags, Expr, OpAssignment, Stmt, StmtBlock, StmtBlockContainer, SwitchCasesCollection,
 };
-use crate::engine::{KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_PRINT, KEYWORD_TYPE_OF};
+use crate::engine::{
+    KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_PRINT, KEYWORD_TYPE_OF, OP_NOT,
+};
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::builtin::get_builtin_binary_op_fn;
 use crate::func::hashing::get_hasher;
@@ -1064,6 +1066,20 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             state.set_dirty();
             *expr = mem::take(&mut x.lhs);
         },
+
+        // !true or !false
+        Expr::FnCall(x,..)
+            if x.name == OP_NOT
+            && x.args.len() == 1
+            && matches!(x.args[0], Expr::BoolConstant(..))
+        => {
+            state.set_dirty();
+            if let Expr::BoolConstant(b, pos) = x.args[0] {
+                *expr = Expr::BoolConstant(!b, pos)
+            } else {
+                unreachable!()
+            }
+        }
 
         // eval!
         Expr::FnCall(x, ..) if x.name == KEYWORD_EVAL => {
