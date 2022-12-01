@@ -4,7 +4,7 @@
 /// State is stored inside an object map bound to 'state'.
 fn init() {
     // Add 'bool_state' as new state variable if one does not exist
-    if !("bool_state" in state) {
+    if "bool_state" !in state {
         state.bool_state = false;
     }
     // Add 'obj_state' as new state variable (overwrites any existing)
@@ -37,7 +37,7 @@ fn start(data) {
 
 /// 'end' event handler
 fn end(data) {
-    if !state.bool_state || !("start_mode" in state) {
+    if !state.bool_state || "start_mode" !in state {
         throw "Not yet started!";
     }
     if state.value > 0 {

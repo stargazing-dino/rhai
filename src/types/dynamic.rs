@@ -1175,6 +1175,7 @@ impl Dynamic {
     /// ```
     #[inline]
     #[must_use]
+    #[allow(unused_mut)]
     pub fn try_cast<T: Any>(mut self) -> Option<T> {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
 

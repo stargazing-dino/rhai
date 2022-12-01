@@ -665,6 +665,7 @@ mod range_functions {
     }
     /// Return true if the range contains no items.
     #[rhai_fn(get = "is_empty", name = "is_empty", pure)]
+    #[allow(unstable_name_collisions)]
     pub fn is_empty_exclusive(range: &mut ExclusiveRange) -> bool {
         range.is_empty()
     }

@@ -3,7 +3,7 @@
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::api::events::VarDefInfo;
 use crate::ast::{
-    ASTFlags, BinaryExpr, Expr, Ident, OpAssignment, Stmt, SwitchCasesCollection, TryCatchBlock,
+    ASTFlags, BinaryExpr, Expr, OpAssignment, Stmt, SwitchCasesCollection, TryCatchBlock,
 };
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::types::dynamic::{AccessMode, Union};
@@ -834,6 +834,7 @@ impl Engine {
             // Export statement
             #[cfg(not(feature = "no_module"))]
             Stmt::Export(x, ..) => {
+                use crate::ast::Ident;
                 let (Ident { name, pos, .. }, Ident { name: alias, .. }) = &**x;
                 // Mark scope variables as public
                 scope.search(name).map_or_else(
