@@ -882,13 +882,10 @@ impl Module {
     pub fn update_fn_metadata<S: AsRef<str>>(
         &mut self,
         hash_fn: u64,
-        arg_names: impl AsRef<[S]>,
+        arg_names: impl IntoIterator<Item = S>,
     ) -> &mut Self {
-        let mut param_names: StaticVec<_> = arg_names
-            .as_ref()
-            .iter()
-            .map(|s| s.as_ref().into())
-            .collect();
+        let mut param_names: StaticVec<_> =
+            arg_names.into_iter().map(|s| s.as_ref().into()).collect();
 
         if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
             let (param_names, return_type_name) = if param_names.len() > f.metadata.num_params {
@@ -920,32 +917,30 @@ impl Module {
     ///
     /// ## Comments
     ///
-    /// Block doc-comments should be kept in a single line.
+    /// Block doc-comments should be kept in a separate string slice.
     ///
-    /// Line doc-comments should be kept in one string slice per line without the termination line-break.
+    /// Line doc-comments should be merged, with line-breaks, into a single string slice without a final termination line-break.
     ///
     /// Leading white-spaces should be stripped, and each string slice always starts with the corresponding
     /// doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
     #[inline]
     pub fn update_fn_metadata_with_comments<A: AsRef<str>, C: AsRef<str>>(
         &mut self,
         hash_fn: u64,
-        arg_names: impl AsRef<[A]>,
-        comments: impl AsRef<[C]>,
+        arg_names: impl IntoIterator<Item = A>,
+        comments: impl IntoIterator<Item = C>,
     ) -> &mut Self {
         self.update_fn_metadata(hash_fn, arg_names);
 
-        let comments = comments.as_ref();
-
-        if !comments.is_empty() {
-            let f = self
-                .functions
-                .as_mut()
-                .and_then(|m| m.get_mut(&hash_fn))
-                .unwrap();
-            f.metadata.comments = comments.iter().map(|s| s.as_ref().into()).collect();
-        }
+        self.functions
+            .as_mut()
+            .and_then(|m| m.get_mut(&hash_fn))
+            .unwrap()
+            .metadata
+            .comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
 
         self
     }
@@ -1099,12 +1094,14 @@ impl Module {
     ///
     /// ## Comments
     ///
-    /// Block doc-comments should be kept in a single line.
+    /// Block doc-comments should be kept in a separate string slice.
     ///
-    /// Line doc-comments should be kept in one string slice per line without the termination line-break.
+    /// Line doc-comments should be merged, with line-breaks, into a single string slice without a final termination line-break.
     ///
     /// Leading white-spaces should be stripped, and each string slice always starts with the corresponding
     /// doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
     #[inline]
     pub fn set_fn_with_comments<S: AsRef<str>>(

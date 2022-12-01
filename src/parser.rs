@@ -3208,6 +3208,7 @@ impl Engine {
         let comments = {
             let mut comments = StaticVec::<SmartString>::new();
             let mut comments_pos = Position::NONE;
+            let mut buf = SmartString::new_const();
 
             // Handle doc-comments.
             while let (Token::Comment(ref comment), pos) = input.peek().expect(NEVER_ENDS) {
@@ -3225,7 +3226,19 @@ impl Engine {
 
                 match input.next().expect(NEVER_ENDS).0 {
                     Token::Comment(comment) => {
-                        comments.push(*comment);
+                        if comment.contains('\n') {
+                            // Assume block comment
+                            if !buf.is_empty() {
+                                comments.push(buf.clone());
+                                buf.clear();
+                            }
+                            comments.push(*comment);
+                        } else {
+                            if !buf.is_empty() {
+                                buf.push('\n');
+                            }
+                            buf.push_str(&comment);
+                        }
 
                         match input.peek().expect(NEVER_ENDS) {
                             (Token::Fn | Token::Private, ..) => break,
@@ -3235,6 +3248,10 @@ impl Engine {
                     }
                     token => unreachable!("Token::Comment expected but gets {:?}", token),
                 }
+            }
+
+            if !buf.is_empty() {
+                comments.push(buf);
             }
 
             comments

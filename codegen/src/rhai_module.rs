@@ -230,7 +230,7 @@ pub fn generate_body(
                 syn::parse2::<syn::Stmt>(quote! {
                     #(#cfg_attrs)*
                     m.set_fn_with_comments(#fn_literal, FnNamespace::#ns_str, FnAccess::Public,
-                             #param_names, &[#(#fn_input_types),*], &[#(#comments),*], #fn_token_name().into());
+                             #param_names, [#(#fn_input_types),*], [#(#comments),*], #fn_token_name().into());
                 })
                 .unwrap()
             });

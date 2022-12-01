@@ -92,10 +92,11 @@ mod module_tests {
                 .cloned()
                 .collect::<Vec<_>>(),
             vec![
-                "/// This is a doc-comment.",
-                "/// Another line.",
-                "/// block doc-comment ",
-                "/// Final line.",
+                "\
+                /// This is a doc-comment.\n\
+                /// Another line.\n\
+                /// block doc-comment \n\
+                /// Final line.",
                 "/** doc-comment\n                    in multiple lines\n                 */"
             ]
         );
@@ -444,11 +445,8 @@ mod generate_tests {
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
                     m.set_fn_with_comments("get_mystic_number", FnNamespace::Internal, FnAccess::Public,
-                             Some(get_mystic_number_token::PARAM_NAMES), &[], &[
-                                 "/// This is a doc-comment.",
-                                 "/// Another line.",
-                                 "/// block doc-comment ",
-                                 "/// Final line.",
+                             Some(get_mystic_number_token::PARAM_NAMES), [], [
+                                 "/// This is a doc-comment.\n/// Another line.\n/// block doc-comment \n/// Final line.",
                                  "/** doc-comment\n                    in multiple lines\n                 */"
                              ], get_mystic_number_token().into());
                     if flatten {} else {}

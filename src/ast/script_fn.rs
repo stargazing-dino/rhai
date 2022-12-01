@@ -49,10 +49,12 @@ pub struct ScriptFnDef {
     ///
     /// Block doc-comments are kept in a single string slice with line-breaks within.
     ///
-    /// Line doc-comments are kept in one string slice per line without the termination line-break.
+    /// Line doc-comments are merged, with line-breaks, into a single string slice without a termination line-break.
     ///
     /// Leading white-spaces are stripped, and each string slice always starts with the
     /// corresponding doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments starts with `///`.
     #[cfg(feature = "metadata")]
     pub comments: Box<[Box<str>]>,
 }
@@ -98,10 +100,12 @@ pub struct ScriptFnMetadata<'a> {
     ///
     /// Block doc-comments are kept in a single string slice with line-breaks within.
     ///
-    /// Line doc-comments are kept in one string slice per line without the termination line-break.
+    /// Line doc-comments are merged, with line-breaks, into a single string slice without a termination line-break.
     ///
     /// Leading white-spaces are stripped, and each string slice always starts with the
     /// corresponding doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments starts with `///`.
     #[cfg(feature = "metadata")]
     pub comments: Vec<&'a str>,
 }
