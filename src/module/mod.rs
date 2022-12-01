@@ -9,8 +9,8 @@ use crate::func::{
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypesCollection};
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Identifier, ImmutableString, NativeCallContext,
-    RhaiResultOf, Shared, SharedModule, SmartString, StaticVec,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, FnArgsVec, Identifier, ImmutableString,
+    NativeCallContext, RhaiResultOf, Shared, SharedModule, SmartString, StaticVec,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -76,10 +76,10 @@ pub struct FuncInfoMetadata {
     /// Number of parameters.
     pub num_params: usize,
     /// Parameter types (if applicable).
-    pub param_types: StaticVec<TypeId>,
+    pub param_types: FnArgsVec<TypeId>,
     /// Parameter names and types (if available).
     #[cfg(feature = "metadata")]
-    pub params_info: StaticVec<Identifier>,
+    pub params_info: FnArgsVec<Identifier>,
     /// Return type name.
     #[cfg(feature = "metadata")]
     pub return_type: Identifier,
@@ -115,7 +115,7 @@ impl FuncInfo {
                 }
             }
         } else {
-            let params: StaticVec<_> = self
+            let params: FnArgsVec<_> = self
                 .metadata
                 .params_info
                 .iter()
@@ -723,7 +723,7 @@ impl Module {
                         namespace: FnNamespace::Internal,
                         access: fn_def.access,
                         num_params,
-                        param_types: StaticVec::new_const(),
+                        param_types: FnArgsVec::new_const(),
                         #[cfg(feature = "metadata")]
                         params_info,
                         #[cfg(feature = "metadata")]
@@ -884,7 +884,7 @@ impl Module {
         hash_fn: u64,
         arg_names: impl IntoIterator<Item = S>,
     ) -> &mut Self {
-        let mut param_names: StaticVec<_> =
+        let mut param_names: FnArgsVec<_> =
             arg_names.into_iter().map(|s| s.as_ref().into()).collect();
 
         if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
@@ -1005,12 +1005,11 @@ impl Module {
         let _arg_names = arg_names;
         let is_method = func.is_method();
 
-        let mut param_types: StaticVec<_> = arg_types
+        let mut param_types: FnArgsVec<_> = arg_types
             .as_ref()
             .iter()
-            .copied()
             .enumerate()
-            .map(|(i, type_id)| Self::map_type(!is_method || i > 0, type_id))
+            .map(|(i, &type_id)| Self::map_type(!is_method || i > 0, type_id))
             .collect();
         param_types.shrink_to_fit();
 
@@ -1024,8 +1023,8 @@ impl Module {
                 .into_iter()
                 .flatten()
                 .map(|&s| s.into())
-                .collect::<StaticVec<_>>();
-            let return_type = if names.len() > arg_types.as_ref().len() {
+                .collect::<FnArgsVec<_>>();
+            let return_type = if names.len() > param_types.len() {
                 names.pop().unwrap()
             } else {
                 crate::SmartString::new_const()
@@ -1111,17 +1110,18 @@ impl Module {
         access: FnAccess,
         arg_names: Option<&[&str]>,
         arg_types: impl AsRef<[TypeId]>,
-        comments: impl AsRef<[S]>,
+        comments: impl IntoIterator<Item = S>,
         func: CallableFunction,
     ) -> u64 {
         let hash = self.set_fn(name, namespace, access, arg_names, arg_types, func);
 
-        let comments = comments.as_ref();
-
-        if !comments.is_empty() {
-            let f = self.functions.as_mut().unwrap().get_mut(&hash).unwrap();
-            f.metadata.comments = comments.iter().map(|s| s.as_ref().into()).collect();
-        }
+        self.functions
+            .as_mut()
+            .unwrap()
+            .get_mut(&hash)
+            .unwrap()
+            .metadata
+            .comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
 
         hash
     }
@@ -1251,7 +1251,7 @@ impl Module {
             FnNamespace::Internal,
             FnAccess::Public,
             None,
-            &F::param_types(),
+            F::param_types(),
             func.into_callable_function(),
         )
     }
@@ -1287,7 +1287,7 @@ impl Module {
             FnNamespace::Global,
             FnAccess::Public,
             None,
-            &F::param_types(),
+            F::param_types(),
             func.into_callable_function(),
         )
     }
@@ -1328,7 +1328,7 @@ impl Module {
             FnNamespace::Global,
             FnAccess::Public,
             None,
-            &F::param_types(),
+            F::param_types(),
             func.into_callable_function(),
         )
     }
@@ -1431,7 +1431,7 @@ impl Module {
             FnNamespace::Global,
             FnAccess::Public,
             None,
-            &F::param_types(),
+            F::param_types(),
             func.into_callable_function(),
         )
     }
@@ -1492,7 +1492,7 @@ impl Module {
             FnNamespace::Global,
             FnAccess::Public,
             None,
-            &F::param_types(),
+            F::param_types(),
             func.into_callable_function(),
         )
     }

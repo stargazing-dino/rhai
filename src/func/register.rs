@@ -139,8 +139,8 @@ macro_rules! def_register {
             $($par: Variant + Clone,)*
             RET: Variant + Clone
         > RegisterNativeFunction<($($mark,)*), RET, ()> for FN {
-            #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
+            #[inline(always)] fn param_types() -> Box<[TypeId]> { Box::new([$(TypeId::of::<$par>()),*]) }
+            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { Box::new([$(std::any::type_name::<$param>()),*]) }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |_ctx: NativeCallContext, args: &mut FnCallArgs| {
@@ -164,8 +164,8 @@ macro_rules! def_register {
             $($par: Variant + Clone,)*
             RET: Variant + Clone
         > RegisterNativeFunction<($($mark,)*), RET, NativeCallContext<'static>> for FN {
-            #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
+            #[inline(always)] fn param_types() -> Box<[TypeId]> { Box::new([$(TypeId::of::<$par>()),*]) }
+            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { Box::new([$(std::any::type_name::<$param>()),*]) }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
@@ -189,8 +189,8 @@ macro_rules! def_register {
             $($par: Variant + Clone,)*
             RET: Variant + Clone
         > RegisterNativeFunction<($($mark,)*), RET, RhaiResultOf<()>> for FN {
-            #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
+            #[inline(always)] fn param_types() -> Box<[TypeId]> { Box::new([$(TypeId::of::<$par>()),*]) }
+            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { Box::new([$(std::any::type_name::<$param>()),*]) }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { std::any::type_name::<RhaiResultOf<RET>>() }
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
@@ -212,8 +212,8 @@ macro_rules! def_register {
             $($par: Variant + Clone,)*
             RET: Variant + Clone
         > RegisterNativeFunction<($($mark,)*), RET, RhaiResultOf<NativeCallContext<'static>>> for FN {
-            #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
+            #[inline(always)] fn param_types() -> Box<[TypeId]> { Box::new([$(TypeId::of::<$par>()),*]) }
+            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { Box::new([$(std::any::type_name::<$param>()),*]) }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { std::any::type_name::<RhaiResultOf<RET>>() }
             #[inline(always)] fn into_callable_function(self) -> CallableFunction {
