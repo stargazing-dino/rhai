@@ -247,6 +247,7 @@ fn setup_editor() -> Editor<()> {
     rl
 }
 
+/// Module containing sample functions.
 #[export_module]
 mod sample_functions {
     /// This is a sample function.
