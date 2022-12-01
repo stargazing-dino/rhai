@@ -26,6 +26,7 @@ pub struct ExportedType {
 }
 
 pub fn generate_body(
+    doc: &str,
     fns: &mut [ExportedFn],
     consts: &[ExportedConst],
     custom_types: &[ExportedType],
@@ -246,6 +247,17 @@ pub fn generate_body(
         gen_fn_tokens.push(function.generate_impl(&fn_token_name.to_string()));
     }
 
+    let module_docs = if doc.is_empty() {
+        None
+    } else {
+        Some(
+            syn::parse2::<syn::Stmt>(quote! {
+                m.set_doc(#doc);
+            })
+            .unwrap(),
+        )
+    };
+
     let mut generate_fn_call = syn::parse2::<syn::ItemMod>(quote! {
         pub mod generate_info {
             #[allow(unused_imports)]
@@ -254,6 +266,7 @@ pub fn generate_body(
             #[doc(hidden)]
             pub fn rhai_module_generate() -> Module {
                 let mut m = Module::new();
+                #module_docs
                 rhai_generate_into_module(&mut m, false);
                 m.build_index();
                 m

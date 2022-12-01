@@ -106,6 +106,7 @@ impl Module {
 impl Parse for Module {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut mod_all: syn::ItemMod = input.parse()?;
+
         let fns: Vec<_>;
         let mut consts = Vec::new();
         let mut custom_types = Vec::new();
@@ -269,11 +270,17 @@ impl Module {
         let (.., orig_content) = mod_all.content.take().unwrap();
         let mod_attrs = mem::take(&mut mod_all.attrs);
 
+        #[cfg(feature = "metadata")]
+        let mod_doc = crate::attrs::doc_attributes(&mod_attrs)?.join("\n");
+        #[cfg(not(feature = "metadata"))]
+        let mod_doc = String::new();
+
         if !params.skip {
             // Generate new module items.
             //
             // This is done before inner module recursive generation, because that is destructive.
             let mod_gen = crate::rhai_module::generate_body(
+                &mod_doc,
                 &mut fns,
                 &consts,
                 &custom_types,

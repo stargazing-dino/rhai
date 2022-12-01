@@ -403,6 +403,12 @@ mod generate_tests {
     #[test]
     fn one_factory_fn_with_comments_module() {
         let input_tokens: TokenStream = quote! {
+            /// This is the one_fn module!
+            /** block doc-comment
+             *  multi-line
+             */
+            /// Another line!
+            /// Final line!
             pub mod one_fn {
                 /// This is a doc-comment.
                 /// Another line.
@@ -419,6 +425,12 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            /// This is the one_fn module!
+            /** block doc-comment
+             *  multi-line
+             */
+            /// Another line!
+            /// Final line!
             pub mod one_fn {
                 /// This is a doc-comment.
                 /// Another line.
@@ -437,6 +449,7 @@ mod generate_tests {
                 #[doc(hidden)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
+                    m.set_doc("/// This is the one_fn module!\n/** block doc-comment\n             *  multi-line\n             */\n/// Another line!\n/// Final line!");
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m

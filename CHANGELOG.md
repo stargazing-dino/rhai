@@ -44,6 +44,7 @@ Enhancements
 * `Engine::set_XXX` API can now be chained.
 * `EvalContext::scope_mut` now returns `&mut Scope` instead of `&mut &mut Scope`.
 * Line-style doc-comments are now merged into a single string to avoid creating many strings. Block-style doc-comments continue to be independent strings.
+* Doc-comments on plugin modules are now captured in the module's `doc` field.
 
 
 Version 1.11.0
