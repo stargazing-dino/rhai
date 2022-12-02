@@ -185,10 +185,10 @@ impl Engine {
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `register_fn` instead")]
     #[inline(always)]
-    pub fn register_result_fn<A, R, S>(
+    pub fn register_result_fn<A, const N: usize, R, S>(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
-        func: impl RegisterNativeFunction<A, R, RhaiResultOf<S>>,
+        func: impl RegisterNativeFunction<A, N, R, RhaiResultOf<S>>,
     ) -> &mut Self {
         self.register_fn(name, func)
     }
@@ -209,7 +209,7 @@ impl Engine {
     pub fn register_get_result<T: Variant + Clone, V: Variant + Clone, S>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl RegisterNativeFunction<(Mut<T>,), V, RhaiResultOf<S>>
+        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, V, RhaiResultOf<S>>
             + crate::func::SendSync
             + 'static,
     ) -> &mut Self {
@@ -230,7 +230,7 @@ impl Engine {
     pub fn register_set_result<T: Variant + Clone, V: Variant + Clone, S>(
         &mut self,
         name: impl AsRef<str>,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, V), (), RhaiResultOf<S>>
+        set_fn: impl RegisterNativeFunction<(Mut<T>, V), 2, (), RhaiResultOf<S>>
             + crate::func::SendSync
             + 'static,
     ) -> &mut Self {
@@ -257,7 +257,7 @@ impl Engine {
         S,
     >(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<T>, X), V, RhaiResultOf<S>>
+        get_fn: impl RegisterNativeFunction<(Mut<T>, X), 2, V, RhaiResultOf<S>>
             + crate::func::SendSync
             + 'static,
     ) -> &mut Self {
@@ -282,7 +282,7 @@ impl Engine {
         S,
     >(
         &mut self,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), (), RhaiResultOf<S>>
+        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), 3, (), RhaiResultOf<S>>
             + crate::func::SendSync
             + 'static,
     ) -> &mut Self {
@@ -516,10 +516,10 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `with_fn` instead")]
     #[inline(always)]
-    pub fn with_result_fn<N, A, F, R, S>(&mut self, name: N, method: F) -> &mut Self
+    pub fn with_result_fn<X, A, const N: usize, F, R, S>(&mut self, name: X, method: F) -> &mut Self
     where
-        N: AsRef<str> + Into<Identifier>,
-        F: RegisterNativeFunction<A, R, RhaiResultOf<S>>,
+        X: AsRef<str> + Into<Identifier>,
+        F: RegisterNativeFunction<A, N, R, RhaiResultOf<S>>,
     {
         self.with_fn(name, method)
     }
@@ -541,7 +541,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     pub fn with_get_result<V: Variant + Clone, S>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl RegisterNativeFunction<(Mut<T>,), V, RhaiResultOf<S>>
+        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, V, RhaiResultOf<S>>
             + crate::func::SendSync
             + 'static,
     ) -> &mut Self {
@@ -563,7 +563,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     pub fn with_set_result<V: Variant + Clone, S>(
         &mut self,
         name: impl AsRef<str>,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, V), (), RhaiResultOf<S>>
+        set_fn: impl RegisterNativeFunction<(Mut<T>, V), 2, (), RhaiResultOf<S>>
             + crate::func::SendSync
             + 'static,
     ) -> &mut Self {
@@ -586,7 +586,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     #[inline(always)]
     pub fn with_indexer_get_result<X: Variant + Clone, V: Variant + Clone, S>(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<T>, X), V, RhaiResultOf<S>>
+        get_fn: impl RegisterNativeFunction<(Mut<T>, X), 2, V, RhaiResultOf<S>>
             + crate::func::SendSync
             + 'static,
     ) -> &mut Self {
@@ -607,7 +607,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     #[inline(always)]
     pub fn with_indexer_set_result<X: Variant + Clone, V: Variant + Clone, S>(
         &mut self,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), (), RhaiResultOf<S>>
+        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), 3, (), RhaiResultOf<S>>
             + crate::func::SendSync
             + 'static,
     ) -> &mut Self {
