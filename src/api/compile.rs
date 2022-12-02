@@ -223,7 +223,7 @@ impl Engine {
         let state = &mut ParseState::new(scope, interned_strings, tc);
         let mut _ast = self.parse(stream.peekable(), state, optimization_level)?;
         #[cfg(feature = "metadata")]
-        _ast.set_doc(state.tokenizer_control.borrow().global_comments.join("\n"));
+        _ast.set_doc(&state.tokenizer_control.borrow().global_comments);
         Ok(_ast)
     }
     /// Compile a string containing an expression into an [`AST`],

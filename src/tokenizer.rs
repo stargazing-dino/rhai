@@ -23,9 +23,9 @@ pub struct TokenizerControlBlock {
     /// Is the current tokenizer position within an interpolated text string?
     /// This flag allows switching the tokenizer back to _text_ parsing after an interpolation stream.
     pub is_within_text: bool,
-    /// Collection of global comments.
+    /// Global comments.
     #[cfg(feature = "metadata")]
-    pub global_comments: Vec<SmartString>,
+    pub global_comments: String,
 }
 
 impl TokenizerControlBlock {
@@ -36,7 +36,7 @@ impl TokenizerControlBlock {
         Self {
             is_within_text: false,
             #[cfg(feature = "metadata")]
-            global_comments: Vec::new(),
+            global_comments: String::new(),
         }
     }
 }
@@ -262,7 +262,7 @@ pub enum Token {
     /// A lexer error.
     LexError(Box<LexError>),
     /// A comment block.
-    Comment(Box<SmartString>),
+    Comment(Box<String>),
     /// A reserved symbol.
     Reserved(Box<SmartString>),
     /// A custom keyword.
@@ -1149,7 +1149,7 @@ fn scan_block_comment(
     stream: &mut impl InputStream,
     level: usize,
     pos: &mut Position,
-    comment: Option<&mut SmartString>,
+    comment: Option<&mut String>,
 ) -> usize {
     let mut level = level;
     let mut comment = comment;
@@ -1244,7 +1244,7 @@ fn get_next_token_inner(
     if state.comment_level > 0 {
         let start_pos = *pos;
         let mut comment = if state.include_comments {
-            Some(SmartString::new_const())
+            Some(String::new())
         } else {
             None
         };
@@ -1637,7 +1637,7 @@ fn get_next_token_inner(
             ('/', '/') => {
                 eat_next(stream, pos);
 
-                let mut comment: Option<SmartString> = match stream.peek_next() {
+                let mut comment: Option<String> = match stream.peek_next() {
                     #[cfg(not(feature = "no_function"))]
                     #[cfg(feature = "metadata")]
                     Some('/') => {
@@ -1680,11 +1680,13 @@ fn get_next_token_inner(
                 if let Some(comment) = comment {
                     match comment {
                         #[cfg(feature = "metadata")]
-                        _ if comment.starts_with("//!") => state
-                            .tokenizer_control
-                            .borrow_mut()
-                            .global_comments
-                            .push(comment),
+                        _ if comment.starts_with("//!") => {
+                            let g = &mut state.tokenizer_control.borrow_mut().global_comments;
+                            if !g.is_empty() {
+                                g.push('\n');
+                            }
+                            g.push_str(&comment);
+                        }
                         _ => return Some((Token::Comment(comment.into()), start_pos)),
                     }
                 }
@@ -1693,7 +1695,7 @@ fn get_next_token_inner(
                 state.comment_level = 1;
                 eat_next(stream, pos);
 
-                let mut comment: Option<SmartString> = match stream.peek_next() {
+                let mut comment: Option<String> = match stream.peek_next() {
                     #[cfg(not(feature = "no_function"))]
                     #[cfg(feature = "metadata")]
                     Some('*') => {

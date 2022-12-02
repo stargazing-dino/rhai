@@ -492,6 +492,35 @@ fn match_token(input: &mut TokenStream, token: Token) -> (bool, Position) {
     }
 }
 
+/// Process a block comment such that it indents properly relative to the start token.
+#[cfg(not(feature = "no_function"))]
+#[cfg(feature = "metadata")]
+#[inline]
+fn unindent_block_comment(comment: String, pos: usize) -> String {
+    if pos == 0 || !comment.contains('\n') {
+        return comment;
+    }
+
+    let offset = comment
+        .split('\n')
+        .skip(1)
+        .map(|s| s.len() - s.trim_start().len())
+        .min()
+        .unwrap_or(pos)
+        .min(pos);
+
+    if offset == 0 {
+        return comment;
+    }
+
+    comment
+        .split('\n')
+        .enumerate()
+        .map(|(i, s)| if i > 0 { &s[offset..] } else { s })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Parse a variable name.
 fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position)> {
     match input.next().expect(NEVER_ENDS) {
@@ -3206,9 +3235,9 @@ impl Engine {
         #[cfg(not(feature = "no_function"))]
         #[cfg(feature = "metadata")]
         let comments = {
-            let mut comments = StaticVec::<SmartString>::new();
+            let mut comments = StaticVec::<String>::new();
             let mut comments_pos = Position::NONE;
-            let mut buf = SmartString::new_const();
+            let mut buf = String::new();
 
             // Handle doc-comments.
             while let (Token::Comment(ref comment), pos) = input.peek().expect(NEVER_ENDS) {
@@ -3224,15 +3253,17 @@ impl Engine {
                     return Err(PERR::WrongDocComment.into_err(comments_pos));
                 }
 
-                match input.next().expect(NEVER_ENDS).0 {
-                    Token::Comment(comment) => {
+                match input.next().expect(NEVER_ENDS) {
+                    (Token::Comment(comment), pos) => {
                         if comment.contains('\n') {
                             // Assume block comment
                             if !buf.is_empty() {
                                 comments.push(buf.clone());
                                 buf.clear();
                             }
-                            comments.push(*comment);
+                            let c =
+                                unindent_block_comment(*comment, pos.position().unwrap_or(1) - 1);
+                            comments.push(c);
                         } else {
                             if !buf.is_empty() {
                                 buf.push('\n');
@@ -3246,7 +3277,7 @@ impl Engine {
                             _ => return Err(PERR::WrongDocComment.into_err(comments_pos)),
                         }
                     }
-                    token => unreachable!("Token::Comment expected but gets {:?}", token),
+                    (token, ..) => unreachable!("Token::Comment expected but gets {:?}", token),
                 }
             }
 
@@ -3545,7 +3576,7 @@ impl Engine {
         settings: ParseSettings,
         #[cfg(not(feature = "no_function"))]
         #[cfg(feature = "metadata")]
-        comments: StaticVec<SmartString>,
+        comments: impl IntoIterator<Item = String>,
     ) -> ParseResult<ScriptFnDef> {
         let settings = settings;
 
@@ -3633,7 +3664,7 @@ impl Engine {
             #[cfg(feature = "metadata")]
             comments: comments
                 .into_iter()
-                .map(|s| s.to_string().into_boxed_str())
+                .map(|s| s.into_boxed_str())
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
         })
