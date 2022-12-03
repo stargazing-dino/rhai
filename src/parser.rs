@@ -3235,9 +3235,9 @@ impl Engine {
         #[cfg(not(feature = "no_function"))]
         #[cfg(feature = "metadata")]
         let comments = {
-            let mut comments = StaticVec::<String>::new();
+            let mut comments = StaticVec::<Identifier>::new();
             let mut comments_pos = Position::NONE;
-            let mut buf = String::new();
+            let mut buf = Identifier::new();
 
             // Handle doc-comments.
             while let (Token::Comment(ref comment), pos) = input.peek().expect(NEVER_ENDS) {
@@ -3263,7 +3263,7 @@ impl Engine {
                             }
                             let c =
                                 unindent_block_comment(*comment, pos.position().unwrap_or(1) - 1);
-                            comments.push(c);
+                            comments.push(c.into());
                         } else {
                             if !buf.is_empty() {
                                 buf.push('\n');
@@ -3365,7 +3365,6 @@ impl Engine {
                             lib,
                             access,
                             new_settings,
-                            #[cfg(not(feature = "no_function"))]
                             #[cfg(feature = "metadata")]
                             comments,
                         )?;
@@ -3567,14 +3566,14 @@ impl Engine {
 
     /// Parse a function definition.
     #[cfg(not(feature = "no_function"))]
-    fn parse_fn<S: Into<Identifier>>(
+    fn parse_fn(
         &self,
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
         access: crate::FnAccess,
         settings: ParseSettings,
-        #[cfg(feature = "metadata")] comments: impl IntoIterator<Item = S>,
+        #[cfg(feature = "metadata")] comments: impl IntoIterator<Item = Identifier>,
     ) -> ParseResult<ScriptFnDef> {
         let settings = settings;
 
@@ -3659,7 +3658,7 @@ impl Engine {
             #[cfg(not(feature = "no_module"))]
             environ: None,
             #[cfg(feature = "metadata")]
-            comments: comments.into_iter().map(Into::into).collect(),
+            comments: comments.into_iter().collect(),
         })
     }
 
