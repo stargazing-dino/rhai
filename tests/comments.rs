@@ -75,12 +75,15 @@ fn test_comments_doc() -> Result<(), Box<EvalAltResult>> {
         ",
     )?;
 
+    #[cfg(not(feature = "no_position"))]
     assert_eq!(
         ast.iter_functions().next().unwrap().comments[0],
-        #[cfg(feature = "no_position")]
-        "/** Hello world\n            ** how are you?\n            **/",
-        #[cfg(not(feature = "no_position"))]
         "/** Hello world\n** how are you?\n**/"
+    );
+    #[cfg(feature = "no_position")]
+    assert_eq!(
+        ast.iter_functions().next().unwrap().comments[0],
+        "/** Hello world\n            ** how are you?\n            **/",
     );
 
     assert!(engine
