@@ -187,6 +187,7 @@ impl Engine {
                 Target::RefMut(_) | Target::TempValue(_) => {
                     *target.write_lock::<Dynamic>().unwrap() = new_val
                 }
+                #[allow(unreachable_patterns)]
                 _ => **target = new_val,
             }
         }

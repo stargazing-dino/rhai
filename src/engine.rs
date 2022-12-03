@@ -52,9 +52,6 @@ pub const FN_ANONYMOUS: &str = "anon$";
 /// function to compare two [`Dynamic`] values.
 pub const OP_EQUALS: &str = Token::EqualsTo.literal_syntax();
 
-/// Standard not operator.
-pub const OP_NOT: &str = Token::Bang.literal_syntax();
-
 /// Standard concatenation operator.
 ///
 /// Used primarily to build up interpolated strings.

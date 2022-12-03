@@ -10,7 +10,7 @@ use crate::func::{
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypesCollection};
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, FnArgsVec, Identifier, ImmutableString,
-    NativeCallContext, RhaiResultOf, Shared, SharedModule, SmartString, StaticVec,
+    NativeCallContext, RhaiResultOf, Shared, SharedModule, SmartString,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -2084,7 +2084,7 @@ impl Module {
         let mut module = Module::new();
 
         // Extra modules left become sub-modules
-        let mut imports = StaticVec::new_const();
+        let mut imports = crate::StaticVec::new_const();
 
         if result.is_ok() {
             global

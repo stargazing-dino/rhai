@@ -8,7 +8,6 @@
 use super::call::FnCallArgs;
 use super::callable_function::CallableFunction;
 use super::native::{SendSync, Shared};
-use crate::engine::{FN_IDX_SET, FN_SET};
 use crate::types::dynamic::{DynamicWriteLock, Variant};
 use crate::{reify, Dynamic, NativeCallContext, RhaiResultOf};
 #[cfg(feature = "no_std")]
@@ -114,11 +113,11 @@ macro_rules! check_constant {
 
             #[cfg(not(feature = "no_index"))]
             if $n == 3 && !deny {
-                deny = $ctx.fn_name() == FN_IDX_SET && $args[0].is_read_only();
+                deny = $ctx.fn_name() == crate::engine::FN_IDX_SET && $args[0].is_read_only();
             }
             #[cfg(not(feature = "no_object"))]
             if $n == 2 && !deny {
-                deny = $ctx.fn_name().starts_with(FN_SET) && $args[0].is_read_only();
+                deny = $ctx.fn_name().starts_with(crate::engine::FN_SET) && $args[0].is_read_only();
             }
 
             if deny {
