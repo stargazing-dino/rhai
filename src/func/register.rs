@@ -72,7 +72,9 @@ pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
 /// # Type Parameters
 ///
 /// * `ARGS` - a tuple containing parameter types, with `&mut T` represented by `Mut<T>`.
+/// * `NUM` - a constant generic containing the number of parameters, must be consistent with `ARGS`.
 /// * `RET` - return type of the function; if the function returns `Result`, it is the unwrapped inner value type.
+/// * `RESULT` - a type to distinguish between multiple forms.  Must match the function signature.
 pub trait RegisterNativeFunction<ARGS, const NUM: usize, RET, RESULT> {
     /// Convert this function into a [`CallableFunction`].
     #[must_use]
