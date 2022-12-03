@@ -3567,16 +3567,14 @@ impl Engine {
 
     /// Parse a function definition.
     #[cfg(not(feature = "no_function"))]
-    fn parse_fn(
+    fn parse_fn<S: Into<Identifier>>(
         &self,
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
         access: crate::FnAccess,
         settings: ParseSettings,
-        #[cfg(not(feature = "no_function"))]
-        #[cfg(feature = "metadata")]
-        comments: impl IntoIterator<Item = String>,
+        #[cfg(feature = "metadata")] comments: impl IntoIterator<Item = S>,
     ) -> ParseResult<ScriptFnDef> {
         let settings = settings;
 
@@ -3660,13 +3658,8 @@ impl Engine {
             body,
             #[cfg(not(feature = "no_module"))]
             environ: None,
-            #[cfg(not(feature = "no_function"))]
             #[cfg(feature = "metadata")]
-            comments: comments
-                .into_iter()
-                .map(|s| s.into_boxed_str())
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
+            comments: comments.into_iter().map(Into::into).collect(),
         })
     }
 

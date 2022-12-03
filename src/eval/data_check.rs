@@ -74,10 +74,7 @@ impl Engine {
     ///
     /// [`Position`] in [`EvalAltResult`][crate::EvalAltResult] is always [`NONE`][Position::NONE]
     /// and should be set afterwards.
-    pub(crate) fn raise_err_if_over_data_size_limit(
-        &self,
-        (_arr, _map, s): (usize, usize, usize),
-    ) -> RhaiResultOf<()> {
+    pub(crate) fn throw_on_size(&self, (_arr, _map, s): (usize, usize, usize)) -> RhaiResultOf<()> {
         if self
             .limits
             .max_string_len
@@ -127,9 +124,10 @@ impl Engine {
 
         let sizes = value.borrow().calc_data_sizes(true);
 
-        self.raise_err_if_over_data_size_limit(sizes)
-            .map(|_| value)
-            .map_err(|err| err.fill_position(pos))
+        self.throw_on_size(sizes)
+            .map_err(|err| err.fill_position(pos))?;
+
+        Ok(value)
     }
 
     /// Raise an error if the size of a [`Dynamic`] is out of limits (if any).

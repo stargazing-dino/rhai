@@ -81,8 +81,7 @@ pub mod blob_functions {
 
         // Check if blob will be over max size limit
         #[cfg(not(feature = "unchecked"))]
-        _ctx.engine()
-            .raise_err_if_over_data_size_limit((len, 0, 0))?;
+        _ctx.engine().throw_on_size((len, 0, 0))?;
 
         let mut blob = Blob::new();
         blob.resize(len, (value & 0x0000_00ff) as u8);

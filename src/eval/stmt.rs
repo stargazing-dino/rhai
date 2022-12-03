@@ -142,7 +142,7 @@ impl Engine {
             let args = &mut [&mut *lock_guard, &mut new_val];
 
             if self.fast_operators() {
-                if let Some(func) =
+                if let Some((func, ctx)) =
                     get_builtin_op_assignment_fn(op_assign_token.clone(), args[0], args[1])
                 {
                     // Built-in found
@@ -152,7 +152,11 @@ impl Engine {
                     global.level += 1;
                     let global = &*RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
-                    let context = (self, op, None, global, *op_pos).into();
+                    let context = if ctx {
+                        Some((self, op, None, global, *op_pos).into())
+                    } else {
+                        None
+                    };
                     return func(context, args).map(|_| ());
                 }
             }

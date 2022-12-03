@@ -72,7 +72,7 @@ pub struct FuncInfoMetadata {
     /// Function access mode.
     pub access: FnAccess,
     /// Function name.
-    pub name: ImmutableString,
+    pub name: Identifier,
     /// Number of parameters.
     pub num_params: usize,
     /// Parameter types (if applicable).
@@ -85,7 +85,7 @@ pub struct FuncInfoMetadata {
     pub return_type: Identifier,
     /// Comments.
     #[cfg(feature = "metadata")]
-    pub comments: Box<[Box<str>]>,
+    pub comments: Box<[Identifier]>,
 }
 
 /// A type containing a single registered function.
@@ -879,13 +879,12 @@ impl Module {
     /// In other words, the number of entries should be one larger than the number of parameters.
     #[cfg(feature = "metadata")]
     #[inline]
-    pub fn update_fn_metadata<S: AsRef<str>>(
+    pub fn update_fn_metadata<S: Into<Identifier>>(
         &mut self,
         hash_fn: u64,
         arg_names: impl IntoIterator<Item = S>,
     ) -> &mut Self {
-        let mut param_names: FnArgsVec<_> =
-            arg_names.into_iter().map(|s| s.as_ref().into()).collect();
+        let mut param_names: FnArgsVec<_> = arg_names.into_iter().map(Into::into).collect();
 
         if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
             let (param_names, return_type_name) = if param_names.len() > f.metadata.num_params {
@@ -927,7 +926,7 @@ impl Module {
     /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
     #[inline]
-    pub fn update_fn_metadata_with_comments<A: AsRef<str>, C: AsRef<str>>(
+    pub fn update_fn_metadata_with_comments<A: Into<Identifier>, C: Into<Identifier>>(
         &mut self,
         hash_fn: u64,
         arg_names: impl IntoIterator<Item = A>,
@@ -940,7 +939,7 @@ impl Module {
             .and_then(|m| m.get_mut(&hash_fn))
             .unwrap()
             .metadata
-            .comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
+            .comments = comments.into_iter().map(Into::into).collect();
 
         self
     }
@@ -1201,8 +1200,9 @@ impl Module {
         arg_types: impl AsRef<[TypeId]>,
         func: impl Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResultOf<T> + SendSync + 'static,
     ) -> u64 {
-        let f =
-            move |ctx: NativeCallContext, args: &mut FnCallArgs| func(ctx, args).map(Dynamic::from);
+        let f = move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
+            func(ctx.unwrap(), args).map(Dynamic::from)
+        };
 
         self.set_fn(
             name,
@@ -1210,7 +1210,7 @@ impl Module {
             access,
             None,
             arg_types,
-            CallableFunction::Method(Shared::new(f)),
+            CallableFunction::Method(Shared::new(f), true),
         )
     }
 
@@ -1246,13 +1246,24 @@ impl Module {
         T: Variant + Clone,
         F: RegisterNativeFunction<A, N, C, T, true>,
     {
+        let fn_name = name.into();
+        let no_const = false;
+
+        #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+        let no_const = no_const || (F::num_params() == 3 && fn_name == crate::engine::FN_IDX_SET);
+        #[cfg(not(feature = "no_object"))]
+        let no_const =
+            no_const || (F::num_params() == 2 && fn_name.starts_with(crate::engine::FN_SET));
+
+        let func = func.into_callable_function(fn_name.clone(), no_const);
+
         self.set_fn(
-            name,
+            fn_name,
             FnNamespace::Internal,
             FnAccess::Public,
             None,
             F::param_types(),
-            func.into_callable_function(),
+            func,
         )
     }
 
@@ -1282,13 +1293,16 @@ impl Module {
         T: Variant + Clone,
         F: RegisterNativeFunction<(Mut<A>,), 1, C, T, true> + SendSync + 'static,
     {
+        let fn_name = crate::engine::make_getter(name.as_ref());
+        let func = func.into_callable_function(fn_name.clone(), false);
+
         self.set_fn(
-            crate::engine::make_getter(name.as_ref()).as_str(),
+            fn_name,
             FnNamespace::Global,
             FnAccess::Public,
             None,
             F::param_types(),
-            func.into_callable_function(),
+            func,
         )
     }
 
@@ -1323,13 +1337,16 @@ impl Module {
         T: Variant + Clone,
         F: RegisterNativeFunction<(Mut<A>, T), 2, C, (), true> + SendSync + 'static,
     {
+        let fn_name = crate::engine::make_setter(name.as_ref());
+        let func = func.into_callable_function(fn_name.clone(), true);
+
         self.set_fn(
-            crate::engine::make_setter(name.as_ref()).as_str(),
+            fn_name,
             FnNamespace::Global,
             FnAccess::Public,
             None,
             F::param_types(),
-            func.into_callable_function(),
+            func,
         )
     }
 
@@ -1437,7 +1454,7 @@ impl Module {
             FnAccess::Public,
             None,
             F::param_types(),
-            func.into_callable_function(),
+            func.into_callable_function(crate::engine::FN_IDX_GET.into(), false),
         )
     }
 
@@ -1498,7 +1515,7 @@ impl Module {
             FnAccess::Public,
             None,
             F::param_types(),
-            func.into_callable_function(),
+            func.into_callable_function(crate::engine::FN_IDX_SET.into(), true),
         )
     }
 

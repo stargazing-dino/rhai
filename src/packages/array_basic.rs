@@ -261,8 +261,7 @@ pub mod array_functions {
                         m1 += m2;
                         s1 += s2;
 
-                        _ctx.engine()
-                            .raise_err_if_over_data_size_limit((a1, m1, s1))?;
+                        _ctx.engine().throw_on_size((a1, m1, s1))?;
 
                         guard.push(item.clone());
                         arr_len += 1;

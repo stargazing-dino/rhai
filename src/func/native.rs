@@ -546,13 +546,16 @@ pub fn locked_write<T>(value: &Locked<T>) -> LockGuardMut<T> {
 
 /// General Rust function trail object.
 #[cfg(not(feature = "sync"))]
-pub type FnAny = dyn Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult;
+pub type FnAny = dyn Fn(Option<NativeCallContext>, &mut FnCallArgs) -> RhaiResult;
 /// General Rust function trail object.
 #[cfg(feature = "sync")]
-pub type FnAny = dyn Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult + Send + Sync;
+pub type FnAny = dyn Fn(Option<NativeCallContext>, &mut FnCallArgs) -> RhaiResult + Send + Sync;
 
 /// Built-in function trait object.
-pub type FnBuiltin = fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult;
+pub type FnBuiltin = (
+    fn(Option<NativeCallContext>, &mut FnCallArgs) -> RhaiResult,
+    bool,
+);
 
 /// Function that gets an iterator from a type.
 #[cfg(not(feature = "sync"))]

@@ -90,13 +90,24 @@ impl Engine {
         #[cfg(not(feature = "metadata"))]
         let param_type_names: Option<&[&str]> = None;
 
+        let fn_name = name.as_ref();
+        let no_const = false;
+
+        #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+        let no_const = no_const || (F::num_params() == 3 && fn_name == crate::engine::FN_IDX_SET);
+        #[cfg(not(feature = "no_object"))]
+        let no_const =
+            no_const || (F::num_params() == 2 && fn_name.starts_with(crate::engine::FN_SET));
+
+        let func = func.into_callable_function(fn_name.into(), no_const);
+
         self.global_namespace_mut().set_fn(
             name,
             FnNamespace::Global,
             FnAccess::Public,
             param_type_names,
             param_types,
-            func.into_callable_function(),
+            func,
         );
         self
     }

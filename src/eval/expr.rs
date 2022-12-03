@@ -329,7 +329,7 @@ impl Engine {
                                     total_data_sizes.1 + val_sizes.1,
                                     total_data_sizes.2 + val_sizes.2,
                                 );
-                                self.raise_err_if_over_data_size_limit(total_data_sizes)
+                                self.throw_on_size(total_data_sizes)
                                     .map_err(|err| err.fill_position(item_expr.position()))?;
                             }
 
@@ -360,7 +360,7 @@ impl Engine {
                                 total_data_sizes.1 + delta.1,
                                 total_data_sizes.2 + delta.2,
                             );
-                            self.raise_err_if_over_data_size_limit(total_data_sizes)
+                            self.throw_on_size(total_data_sizes)
                                 .map_err(|err| err.fill_position(value_expr.position()))?;
                         }
 

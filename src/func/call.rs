@@ -271,25 +271,25 @@ impl Engine {
                         }
 
                         // Try to find a built-in version
-                        let builtin = args.and_then(|args| match op_token {
-                            Token::NONE => None,
-                            token if token.is_op_assignment() => {
-                                let (first_arg, rest_args) = args.split_first().unwrap();
+                        let builtin =
+                            args.and_then(|args| match op_token {
+                                Token::NONE => None,
+                                token if token.is_op_assignment() => {
+                                    let (first_arg, rest_args) = args.split_first().unwrap();
 
-                                get_builtin_op_assignment_fn(token, first_arg, rest_args[0]).map(
-                                    |f| FnResolutionCacheEntry {
-                                        func: CallableFunction::Method(Shared::new(f)),
+                                    get_builtin_op_assignment_fn(token, first_arg, rest_args[0])
+                                        .map(|(f, ctx)| FnResolutionCacheEntry {
+                                            func: CallableFunction::Method(Shared::new(f), ctx),
+                                            source: None,
+                                        })
+                                }
+                                token => get_builtin_binary_op_fn(token, args[0], args[1]).map(
+                                    |(f, ctx)| FnResolutionCacheEntry {
+                                        func: CallableFunction::Method(Shared::new(f), ctx),
                                         source: None,
                                     },
-                                )
-                            }
-                            token => get_builtin_binary_op_fn(token, args[0], args[1]).map(|f| {
-                                FnResolutionCacheEntry {
-                                    func: CallableFunction::Method(Shared::new(f)),
-                                    source: None,
-                                }
-                            }),
-                        });
+                                ),
+                            });
 
                         return if cache.filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
@@ -400,22 +400,26 @@ impl Engine {
             // Run external function
             let is_method = func.is_method();
             let src = source.as_ref().map(|s| s.as_str());
-            let context = (self, name, src, &*global, pos).into();
 
-            let mut _result = if func.is_plugin_fn() {
-                let f = func.get_plugin_fn().unwrap();
+            let mut _result = if let Some(f) = func.get_plugin_fn() {
                 if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
                 } else {
+                    let context = (self, name, src, &*global, pos).into();
                     f.call(context, args)
-                        .and_then(|r| self.check_data_size(r, pos))
-                        .map_err(|err| err.fill_position(pos))
                 }
+            } else if let Some(f) = func.get_native_fn() {
+                let context = if func.has_context() {
+                    Some((self, name, src, &*global, pos).into())
+                } else {
+                    None
+                };
+                f(context, args)
             } else {
-                func.get_native_fn().unwrap()(context, args)
-                    .and_then(|r| self.check_data_size(r, pos))
-                    .map_err(|err| err.fill_position(pos))
-            };
+                unreachable!();
+            }
+            .and_then(|r| self.check_data_size(r, pos))
+            .map_err(|err| err.fill_position(pos));
 
             #[cfg(feature = "debugging")]
             if self.is_debugger_registered() {
@@ -1398,7 +1402,11 @@ impl Engine {
 
             Some(f) if f.is_native() => {
                 let func = f.get_native_fn().expect("native function");
-                let context = (self, fn_name, module.id(), &*global, pos).into();
+                let context = if f.has_context() {
+                    Some((self, fn_name, module.id(), &*global, pos).into())
+                } else {
+                    None
+                };
                 func(context, &mut args).and_then(|r| self.check_data_size(r, pos))
             }
 
@@ -1518,14 +1526,19 @@ impl Engine {
 
             let operands = &mut [&mut lhs, &mut rhs];
 
-            if let Some(func) = get_builtin_binary_op_fn(op_token.clone(), operands[0], operands[1])
+            if let Some((func, ctx)) =
+                get_builtin_binary_op_fn(op_token.clone(), operands[0], operands[1])
             {
                 // Built-in found
                 let orig_level = global.level;
                 global.level += 1;
                 let global = &*RestoreOnDrop::lock(global, move |g| g.level = orig_level);
 
-                let context = (self, name.as_str(), None, global, pos).into();
+                let context = if ctx {
+                    Some((self, name.as_str(), None, global, pos).into())
+                } else {
+                    None
+                };
                 return func(context, operands);
             }
 

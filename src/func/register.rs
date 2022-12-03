@@ -9,7 +9,7 @@ use super::call::FnCallArgs;
 use super::callable_function::CallableFunction;
 use super::native::{SendSync, Shared};
 use crate::types::dynamic::{DynamicWriteLock, Variant};
-use crate::{reify, Dynamic, NativeCallContext, RhaiResultOf};
+use crate::{reify, Dynamic, Identifier, NativeCallContext, RhaiResultOf};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -78,13 +78,19 @@ pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
 pub trait RegisterNativeFunction<ARGS, const NUM: usize, const CTX: bool, RET, const FALL: bool> {
     /// Convert this function into a [`CallableFunction`].
     #[must_use]
-    fn into_callable_function(self) -> CallableFunction;
+    fn into_callable_function(self, name: Identifier, no_const: bool) -> CallableFunction;
     /// Get the type ID's of this function's parameters.
     #[must_use]
     fn param_types() -> [TypeId; NUM];
     /// Get the number of parameters for this function.
+    #[inline(always)]
     #[must_use]
-    fn num_params() -> usize;
+    fn num_params() -> usize {
+        NUM
+    }
+    /// Is there a [`NativeCallContext`] parameter for this function?
+    #[must_use]
+    fn has_context() -> bool;
     /// _(metadata)_ Get the type names of this function's parameters.
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
@@ -106,27 +112,14 @@ pub trait RegisterNativeFunction<ARGS, const NUM: usize, const CTX: bool, RET, c
 }
 
 macro_rules! check_constant {
-    ($abi:ident, $n:expr, $ctx:ident, $args:ident) => {
+    ($abi:ident, $n:expr, $fn_name:ident, $no_const:ident, $args:ident) => {
         #[cfg(any(not(feature = "no_object"), not(feature = "no_index")))]
-        if stringify!($abi) == "Method" {
-            let mut deny = false;
-
-            #[cfg(not(feature = "no_index"))]
-            if $n == 3 && !deny {
-                deny = $ctx.fn_name() == crate::engine::FN_IDX_SET && $args[0].is_read_only();
-            }
-            #[cfg(not(feature = "no_object"))]
-            if $n == 2 && !deny {
-                deny = $ctx.fn_name().starts_with(crate::engine::FN_SET) && $args[0].is_read_only();
-            }
-
-            if deny {
-                return Err(crate::ERR::ErrorNonPureMethodCallOnConstant(
-                    $ctx.fn_name().to_string(),
-                    crate::Position::NONE,
-                )
-                .into());
-            }
+        if stringify!($abi) == "Method" && $no_const && $args[0].is_read_only() {
+            return Err(crate::ERR::ErrorNonPureMethodCallOnConstant(
+                $fn_name.to_string(),
+                crate::Position::NONE,
+            )
+            .into());
         }
     };
 }
@@ -147,16 +140,16 @@ macro_rules! def_register {
         impl<
             FN: Fn($($param),*) -> RET + SendSync + 'static,
             $($par: Variant + Clone,)*
-            RET: Variant + Clone
+            RET: Variant + Clone,
         > RegisterNativeFunction<($($mark,)*), $n, false, RET, false> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
-            #[inline(always)] fn num_params() -> usize { $n }
+            #[inline(always)] fn has_context() -> bool { false }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
-            #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+                CallableFunction::$abi(Shared::new(move |_, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, $n, ctx, args);
+                    check_constant!($abi, $n, fn_name, no_const, args);
 
                     let mut drain = args.iter_mut();
                     $(let mut $par = $clone(drain.next().unwrap()); )*
@@ -166,23 +159,25 @@ macro_rules! def_register {
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }))
+                }), false)
             }
         }
 
         impl<
             FN: for<'a> Fn(NativeCallContext<'a>, $($param),*) -> RET + SendSync + 'static,
             $($par: Variant + Clone,)*
-            RET: Variant + Clone
+            RET: Variant + Clone,
         > RegisterNativeFunction<($($mark,)*), $n, true, RET, false> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
-            #[inline(always)] fn num_params() -> usize { $n }
+            #[inline(always)] fn has_context() -> bool { true }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
-            #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+                CallableFunction::$abi(Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
+                    let ctx = ctx.unwrap();
+
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, $n, ctx, args);
+                    check_constant!($abi, $n, fn_name, no_const, args);
 
                     let mut drain = args.iter_mut();
                     $(let mut $par = $clone(drain.next().unwrap()); )*
@@ -192,7 +187,7 @@ macro_rules! def_register {
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }))
+                }), true)
             }
         }
 
@@ -202,21 +197,21 @@ macro_rules! def_register {
             RET: Variant + Clone
         > RegisterNativeFunction<($($mark,)*), $n, false, RET, true> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
-            #[inline(always)] fn num_params() -> usize { $n }
+            #[inline(always)] fn has_context() -> bool { false }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
-            #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+                CallableFunction::$abi(Shared::new(move |_, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, $n, ctx, args);
+                    check_constant!($abi, $n, fn_name, no_const, args);
 
                     let mut drain = args.iter_mut();
                     $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     self($($arg),*).map(Dynamic::from)
-                }))
+                }), false)
             }
         }
 
@@ -226,21 +221,23 @@ macro_rules! def_register {
             RET: Variant + Clone
         > RegisterNativeFunction<($($mark,)*), $n, true, RET, true> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
-            #[inline(always)] fn num_params() -> usize { $n }
+            #[inline(always)] fn has_context() -> bool { true }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
-            #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+                CallableFunction::$abi(Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
+                    let ctx = ctx.unwrap();
+
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, $n, ctx, args);
+                    check_constant!($abi, $n, fn_name, no_const, args);
 
                     let mut drain = args.iter_mut();
                     $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     self(ctx, $($arg),*).map(Dynamic::from)
-                }))
+                }), true)
             }
         }
 

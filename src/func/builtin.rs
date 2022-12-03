@@ -71,12 +71,12 @@ fn is_numeric(type_id: TypeId) -> bool {
 
 /// A function that returns `true`.
 #[inline(always)]
-fn const_true_fn(_: NativeCallContext, _: &mut [&mut Dynamic]) -> RhaiResult {
+fn const_true_fn(_: Option<NativeCallContext>, _: &mut [&mut Dynamic]) -> RhaiResult {
     Ok(Dynamic::TRUE)
 }
 /// A function that returns `false`.
 #[inline(always)]
-fn const_false_fn(_: NativeCallContext, _: &mut [&mut Dynamic]) -> RhaiResult {
+fn const_false_fn(_: Option<NativeCallContext>, _: &mut [&mut Dynamic]) -> RhaiResult {
     Ok(Dynamic::FALSE)
 }
 
@@ -89,55 +89,55 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
     let type2 = y.type_id();
 
     macro_rules! impl_op {
-        ($xx:ident $op:tt $yy:ident) => { |_, args| {
+        ($xx:ident $op:tt $yy:ident) => { (|_, args| {
             let x = &*args[0].read_lock::<$xx>().expect(BUILTIN);
             let y = &*args[1].read_lock::<$yy>().expect(BUILTIN);
             Ok((x $op y).into())
-        } };
-        ($xx:ident . $func:ident ( $yy:ty )) => { |_, args| {
+        }, false) };
+        ($xx:ident . $func:ident ( $yy:ty )) => { (|_, args| {
             let x = &*args[0].read_lock::<$xx>().expect(BUILTIN);
             let y = &*args[1].read_lock::<$yy>().expect(BUILTIN);
             Ok(x.$func(y).into())
-        } };
-        ($xx:ident . $func:ident ( $yy:ident . $yyy:ident () )) => { |_, args| {
+        }, false) };
+        ($xx:ident . $func:ident ( $yy:ident . $yyy:ident () )) => { (|_, args| {
             let x = &*args[0].read_lock::<$xx>().expect(BUILTIN);
             let y = &*args[1].read_lock::<$yy>().expect(BUILTIN);
             Ok(x.$func(y.$yyy()).into())
-        } };
-        ($func:ident ( $op:tt )) => { |_, args| {
+        }, false) };
+        ($func:ident ( $op:tt )) => { (|_, args| {
             let (x, y) = $func(args);
             Ok((x $op y).into())
-        } };
-        ($base:ty => $xx:ident $op:tt $yy:ident) => { |_, args| {
+        }, false) };
+        ($base:ty => $xx:ident $op:tt $yy:ident) => { (|_, args| {
             let x = args[0].$xx().expect(BUILTIN) as $base;
             let y = args[1].$yy().expect(BUILTIN) as $base;
             Ok((x $op y).into())
-        } };
-        ($base:ty => $xx:ident . $func:ident ( $yy:ident as $yyy:ty)) => { |_, args| {
+        }, false) };
+        ($base:ty => $xx:ident . $func:ident ( $yy:ident as $yyy:ty)) => { (|_, args| {
             let x = args[0].$xx().expect(BUILTIN) as $base;
             let y = args[1].$yy().expect(BUILTIN) as $base;
             Ok(x.$func(y as $yyy).into())
-        } };
-        ($base:ty => $func:ident ( $xx:ident, $yy:ident )) => { |_, args| {
+        }, false) };
+        ($base:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
             let x = args[0].$xx().expect(BUILTIN) as $base;
             let y = args[1].$yy().expect(BUILTIN) as $base;
             $func(x, y).map(Into::into)
-        } };
-        (from $base:ty => $xx:ident $op:tt $yy:ident) => { |_, args| {
+        }, false) };
+        (from $base:ty => $xx:ident $op:tt $yy:ident) => { (|_, args| {
             let x = <$base>::from(args[0].$xx().expect(BUILTIN));
             let y = <$base>::from(args[1].$yy().expect(BUILTIN));
             Ok((x $op y).into())
-        } };
-        (from $base:ty => $xx:ident . $func:ident ( $yy:ident )) => { |_, args| {
+        }, false) };
+        (from $base:ty => $xx:ident . $func:ident ( $yy:ident )) => { (|_, args| {
             let x = <$base>::from(args[0].$xx().expect(BUILTIN));
             let y = <$base>::from(args[1].$yy().expect(BUILTIN));
             Ok(x.$func(y).into())
-        } };
-        (from $base:ty => $func:ident ( $xx:ident, $yy:ident )) => { |_, args| {
+        }, false) };
+        (from $base:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
             let x = <$base>::from(args[0].$xx().expect(BUILTIN));
             let y = <$base>::from(args[1].$yy().expect(BUILTIN));
             $func(x, y).map(Into::into)
-        } };
+        }, false) };
     }
 
     // Check for common patterns
@@ -206,16 +206,20 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
 
         if type1 == TypeId::of::<ImmutableString>() {
             return match op {
-                Plus => Some(|_ctx, args| {
-                    let s1 = &*args[0].read_lock::<ImmutableString>().expect(BUILTIN);
-                    let s2 = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
+                Plus => Some((
+                    |_ctx, args| {
+                        let s1 = &*args[0].read_lock::<ImmutableString>().expect(BUILTIN);
+                        let s2 = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
 
-                    #[cfg(not(feature = "unchecked"))]
-                    _ctx.engine()
-                        .raise_err_if_over_data_size_limit((0, 0, s1.len() + s2.len()))?;
+                        #[cfg(not(feature = "unchecked"))]
+                        _ctx.unwrap()
+                            .engine()
+                            .throw_on_size((0, 0, s1.len() + s2.len()))?;
 
-                    Ok((s1 + s2).into())
-                }),
+                        Ok((s1 + s2).into())
+                    },
+                    cfg!(not(feature = "unchecked")),
+                )),
                 Minus => Some(impl_op!(ImmutableString - ImmutableString)),
                 EqualsTo => Some(impl_op!(ImmutableString == ImmutableString)),
                 NotEqualsTo => Some(impl_op!(ImmutableString != ImmutableString)),
@@ -229,20 +233,22 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
 
         if type1 == TypeId::of::<char>() {
             return match op {
-                Plus => Some(|_ctx, args| {
-                    let x = args[0].as_char().expect(BUILTIN);
-                    let y = args[1].as_char().expect(BUILTIN);
+                Plus => Some((
+                    |_ctx, args| {
+                        let x = args[0].as_char().expect(BUILTIN);
+                        let y = args[1].as_char().expect(BUILTIN);
 
-                    let mut result = SmartString::new_const();
-                    result.push(x);
-                    result.push(y);
+                        let mut result = SmartString::new_const();
+                        result.push(x);
+                        result.push(y);
 
-                    #[cfg(not(feature = "unchecked"))]
-                    _ctx.engine()
-                        .raise_err_if_over_data_size_limit((0, 0, result.len()))?;
+                        #[cfg(not(feature = "unchecked"))]
+                        _ctx.unwrap().engine().throw_on_size((0, 0, result.len()))?;
 
-                    Ok(result.into())
-                }),
+                        Ok(result.into())
+                    },
+                    cfg!(not(feature = "unchecked")),
+                )),
                 EqualsTo => Some(impl_op!(char => as_char == as_char)),
                 NotEqualsTo => Some(impl_op!(char => as_char != as_char)),
                 GreaterThan => Some(impl_op!(char => as_char > as_char)),
@@ -258,24 +264,28 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
             use crate::Blob;
 
             return match op {
-                Plus => Some(|_ctx, args| {
-                    let b2 = &*args[1].read_lock::<Blob>().expect(BUILTIN);
-                    if b2.is_empty() {
-                        return Ok(args[0].flatten_clone());
-                    }
-                    let b1 = &*args[0].read_lock::<Blob>().expect(BUILTIN);
-                    if b1.is_empty() {
-                        return Ok(args[1].flatten_clone());
-                    }
+                Plus => Some((
+                    |_ctx, args| {
+                        let b2 = &*args[1].read_lock::<Blob>().expect(BUILTIN);
+                        if b2.is_empty() {
+                            return Ok(args[0].flatten_clone());
+                        }
+                        let b1 = &*args[0].read_lock::<Blob>().expect(BUILTIN);
+                        if b1.is_empty() {
+                            return Ok(args[1].flatten_clone());
+                        }
 
-                    #[cfg(not(feature = "unchecked"))]
-                    _ctx.engine()
-                        .raise_err_if_over_data_size_limit((b1.len() + b2.len(), 0, 0))?;
+                        #[cfg(not(feature = "unchecked"))]
+                        _ctx.unwrap()
+                            .engine()
+                            .throw_on_size((b1.len() + b2.len(), 0, 0))?;
 
-                    let mut blob = b1.clone();
-                    blob.extend(b2);
-                    Ok(Dynamic::from_blob(blob))
-                }),
+                        let mut blob = b1.clone();
+                        blob.extend(b2);
+                        Ok(Dynamic::from_blob(blob))
+                    },
+                    cfg!(not(feature = "unchecked")),
+                )),
                 EqualsTo => Some(impl_op!(Blob == Blob)),
                 NotEqualsTo => Some(impl_op!(Blob != Blob)),
                 _ => None,
@@ -284,9 +294,9 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
 
         if type1 == TypeId::of::<()>() {
             return match op {
-                EqualsTo => Some(const_true_fn),
+                EqualsTo => Some((const_true_fn, false)),
                 NotEqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo => {
-                    Some(const_false_fn)
+                    Some((const_false_fn, false))
                 }
                 _ => None,
             };
@@ -388,20 +398,22 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
         }
 
         return match op {
-            Plus => Some(|_ctx, args| {
-                let x = args[0].as_char().expect(BUILTIN);
-                let y = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
+            Plus => Some((
+                |_ctx, args| {
+                    let x = args[0].as_char().expect(BUILTIN);
+                    let y = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
 
-                let mut result = SmartString::new_const();
-                result.push(x);
-                result.push_str(y);
+                    let mut result = SmartString::new_const();
+                    result.push(x);
+                    result.push_str(y);
 
-                #[cfg(not(feature = "unchecked"))]
-                _ctx.engine()
-                    .raise_err_if_over_data_size_limit((0, 0, result.len()))?;
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.unwrap().engine().throw_on_size((0, 0, result.len()))?;
 
-                Ok(result.into())
-            }),
+                    Ok(result.into())
+                },
+                cfg!(not(feature = "unchecked")),
+            )),
             EqualsTo => Some(impl_op!(get_s1s2(==))),
             NotEqualsTo => Some(impl_op!(get_s1s2(!=))),
             GreaterThan => Some(impl_op!(get_s1s2(>))),
@@ -423,22 +435,27 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
         }
 
         return match op {
-            Plus => Some(|_ctx, args| {
-                let x = &*args[0].read_lock::<ImmutableString>().expect(BUILTIN);
-                let y = args[1].as_char().expect(BUILTIN);
-                let result = x + y;
+            Plus => Some((
+                |_ctx, args| {
+                    let x = &*args[0].read_lock::<ImmutableString>().expect(BUILTIN);
+                    let y = args[1].as_char().expect(BUILTIN);
+                    let result = x + y;
 
-                #[cfg(not(feature = "unchecked"))]
-                _ctx.engine()
-                    .raise_err_if_over_data_size_limit((0, 0, result.len()))?;
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.unwrap().engine().throw_on_size((0, 0, result.len()))?;
 
-                Ok(result.into())
-            }),
-            Minus => Some(|_, args| {
-                let x = &*args[0].read_lock::<ImmutableString>().expect(BUILTIN);
-                let y = args[1].as_char().expect(BUILTIN);
-                Ok((x - y).into())
-            }),
+                    Ok(result.into())
+                },
+                cfg!(not(feature = "unchecked")),
+            )),
+            Minus => Some((
+                |_, args| {
+                    let x = &*args[0].read_lock::<ImmutableString>().expect(BUILTIN);
+                    let y = args[1].as_char().expect(BUILTIN);
+                    Ok((x - y).into())
+                },
+                false,
+            )),
             EqualsTo => Some(impl_op!(get_s1s2(==))),
             NotEqualsTo => Some(impl_op!(get_s1s2(!=))),
             GreaterThan => Some(impl_op!(get_s1s2(>))),
@@ -451,22 +468,22 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
     // () op string
     if (type1, type2) == (TypeId::of::<()>(), TypeId::of::<ImmutableString>()) {
         return match op {
-            Plus => Some(|_, args| Ok(args[1].clone())),
+            Plus => Some((|_, args| Ok(args[1].clone()), false)),
             EqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo => {
-                Some(const_false_fn)
+                Some((const_false_fn, false))
             }
-            NotEqualsTo => Some(const_true_fn),
+            NotEqualsTo => Some((const_true_fn, false)),
             _ => None,
         };
     }
     // string op ()
     if (type1, type2) == (TypeId::of::<ImmutableString>(), TypeId::of::<()>()) {
         return match op {
-            Plus => Some(|_, args| Ok(args[0].clone())),
+            Plus => Some((|_, args| Ok(args[0].clone()), false)),
             EqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo => {
-                Some(const_false_fn)
+                Some((const_false_fn, false))
             }
-            NotEqualsTo => Some(const_true_fn),
+            NotEqualsTo => Some((const_true_fn, false)),
             _ => None,
         };
     }
@@ -478,21 +495,22 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
 
         if type2 == TypeId::of::<char>() {
             return match op {
-                Plus => Some(|_ctx, args| {
-                    let mut blob = args[0].read_lock::<Blob>().expect(BUILTIN).clone();
-                    let mut buf = [0_u8; 4];
-                    let x = args[1].as_char().expect(BUILTIN).encode_utf8(&mut buf);
+                Plus => Some((
+                    |_ctx, args| {
+                        let mut blob = args[0].read_lock::<Blob>().expect(BUILTIN).clone();
+                        let mut buf = [0_u8; 4];
+                        let x = args[1].as_char().expect(BUILTIN).encode_utf8(&mut buf);
 
-                    #[cfg(not(feature = "unchecked"))]
-                    _ctx.engine().raise_err_if_over_data_size_limit((
-                        blob.len() + x.len(),
-                        0,
-                        0,
-                    ))?;
+                        #[cfg(not(feature = "unchecked"))]
+                        _ctx.unwrap()
+                            .engine()
+                            .throw_on_size((blob.len() + x.len(), 0, 0))?;
 
-                    blob.extend(x.as_bytes());
-                    Ok(Dynamic::from_blob(blob))
-                }),
+                        blob.extend(x.as_bytes());
+                        Ok(Dynamic::from_blob(blob))
+                    },
+                    cfg!(not(feature = "unchecked")),
+                )),
                 _ => None,
             };
         }
@@ -511,8 +529,8 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
             )
     {
         return match op {
-            NotEqualsTo => Some(const_true_fn),
-            Equals => Some(const_false_fn),
+            NotEqualsTo => Some((const_true_fn, false)),
+            Equals => Some((const_false_fn, false)),
             _ => None,
         };
     }
@@ -542,9 +560,9 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
         } else if type1 != type2 {
             // If the types are not the same, default to not compare
             match op {
-                NotEqualsTo => Some(const_true_fn),
+                NotEqualsTo => Some((const_true_fn, false)),
                 EqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo => {
-                    Some(const_false_fn)
+                    Some((const_false_fn, false))
                 }
                 _ => None,
             }
@@ -557,9 +575,9 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
     // Default comparison operators for different types
     if type2 != type1 {
         return match op {
-            NotEqualsTo => Some(const_true_fn),
+            NotEqualsTo => Some((const_true_fn, false)),
             EqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo => {
-                Some(const_false_fn)
+                Some((const_false_fn, false))
             }
             _ => None,
         };
@@ -578,43 +596,43 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
     let type2 = y.type_id();
 
     macro_rules! impl_op {
-        ($x:ty = x $op:tt $yy:ident) => { |_, args| {
+        ($x:ty = x $op:tt $yy:ident) => { (|_, args| {
             let x = args[0].$yy().expect(BUILTIN);
             let y = args[1].$yy().expect(BUILTIN) as $x;
             Ok((*args[0].write_lock::<$x>().expect(BUILTIN) = x $op y).into())
-        } };
-        ($x:ident $op:tt $yy:ident) => { |_, args| {
+        }, false) };
+        ($x:ident $op:tt $yy:ident) => { (|_, args| {
             let y = args[1].$yy().expect(BUILTIN) as $x;
             Ok((*args[0].write_lock::<$x>().expect(BUILTIN) $op y).into())
-        } };
-        ($x:ident $op:tt $yy:ident as $yyy:ty) => { |_, args| {
+        }, false) };
+        ($x:ident $op:tt $yy:ident as $yyy:ty) => { (|_, args| {
             let y = args[1].$yy().expect(BUILTIN) as $yyy;
             Ok((*args[0].write_lock::<$x>().expect(BUILTIN) $op y).into())
-        } };
-        ($x:ty => $xx:ident . $func:ident ( $yy:ident as $yyy:ty )) => { |_, args| {
+        }, false) };
+        ($x:ty => $xx:ident . $func:ident ( $yy:ident as $yyy:ty )) => { (|_, args| {
             let x = args[0].$xx().expect(BUILTIN);
             let y = args[1].$yy().expect(BUILTIN) as $x;
             Ok((*args[0].write_lock::<$x>().expect(BUILTIN) = x.$func(y as $yyy)).into())
-        } };
-        ($x:ty => $func:ident ( $xx:ident, $yy:ident )) => { |_, args| {
+        }, false) };
+        ($x:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
             let x = args[0].$xx().expect(BUILTIN);
             let y = args[1].$yy().expect(BUILTIN) as $x;
             Ok((*args[0].write_lock().expect(BUILTIN) = $func(x, y)?).into())
-        } };
-        (from $x:ident $op:tt $yy:ident) => { |_, args| {
+        }, false) };
+        (from $x:ident $op:tt $yy:ident) => { (|_, args| {
             let y = <$x>::from(args[1].$yy().expect(BUILTIN));
             Ok((*args[0].write_lock::<$x>().expect(BUILTIN) $op y).into())
-        } };
-        (from $x:ty => $xx:ident . $func:ident ( $yy:ident )) => { |_, args| {
+        }, false) };
+        (from $x:ty => $xx:ident . $func:ident ( $yy:ident )) => { (|_, args| {
             let x = args[0].$xx().expect(BUILTIN);
             let y = <$x>::from(args[1].$yy().expect(BUILTIN));
             Ok((*args[0].write_lock::<$x>().expect(BUILTIN) = x.$func(y)).into())
-        } };
-        (from $x:ty => $func:ident ( $xx:ident, $yy:ident )) => { |_, args| {
+        }, false) };
+        (from $x:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
             let x = args[0].$xx().expect(BUILTIN);
             let y = <$x>::from(args[1].$yy().expect(BUILTIN));
             Ok((*args[0].write_lock().expect(BUILTIN) = $func(x, y)?).into())
-        } };
+        }, false) };
     }
 
     // Check for common patterns
@@ -668,42 +686,50 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
 
         if type1 == TypeId::of::<char>() {
             return match op {
-                PlusAssign => Some(|_, args| {
-                    let y = args[1].as_char().expect(BUILTIN);
-                    let x = &mut *args[0].write_lock::<Dynamic>().expect(BUILTIN);
+                PlusAssign => Some((
+                    |_, args| {
+                        let y = args[1].as_char().expect(BUILTIN);
+                        let x = &mut *args[0].write_lock::<Dynamic>().expect(BUILTIN);
 
-                    let mut buf = SmartString::new_const();
-                    write!(&mut buf, "{y}").unwrap();
-                    buf.push(y);
+                        let mut buf = SmartString::new_const();
+                        write!(&mut buf, "{y}").unwrap();
+                        buf.push(y);
 
-                    Ok((*x = buf.into()).into())
-                }),
+                        Ok((*x = buf.into()).into())
+                    },
+                    false,
+                )),
                 _ => None,
             };
         }
 
         if type1 == TypeId::of::<ImmutableString>() {
             return match op {
-                PlusAssign => Some(|_ctx, args| {
-                    let (first, second) = args.split_first_mut().expect(BUILTIN);
-                    let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
-                    let y = &*second[0].read_lock::<ImmutableString>().expect(BUILTIN);
+                PlusAssign => Some((
+                    |_ctx, args| {
+                        let (first, second) = args.split_first_mut().expect(BUILTIN);
+                        let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
+                        let y = &*second[0].read_lock::<ImmutableString>().expect(BUILTIN);
 
-                    #[cfg(not(feature = "unchecked"))]
-                    if !x.is_empty() && !y.is_empty() {
-                        let total_len = x.len() + y.len();
-                        _ctx.engine()
-                            .raise_err_if_over_data_size_limit((0, 0, total_len))?;
-                    }
+                        #[cfg(not(feature = "unchecked"))]
+                        if !x.is_empty() && !y.is_empty() {
+                            let total_len = x.len() + y.len();
+                            _ctx.unwrap().engine().throw_on_size((0, 0, total_len))?;
+                        }
 
-                    Ok((*x += y).into())
-                }),
-                MinusAssign => Some(|_, args| {
-                    let (first, second) = args.split_first_mut().expect(BUILTIN);
-                    let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
-                    let y = &*second[0].read_lock::<ImmutableString>().expect(BUILTIN);
-                    Ok((*x -= y).into())
-                }),
+                        Ok((*x += y).into())
+                    },
+                    cfg!(not(feature = "unchecked")),
+                )),
+                MinusAssign => Some((
+                    |_, args| {
+                        let (first, second) = args.split_first_mut().expect(BUILTIN);
+                        let x = &mut *first.write_lock::<ImmutableString>().expect(BUILTIN);
+                        let y = &*second[0].read_lock::<ImmutableString>().expect(BUILTIN);
+                        Ok((*x -= y).into())
+                    },
+                    false,
+                )),
                 _ => None,
             };
         }
@@ -715,27 +741,31 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
             use crate::Array;
 
             return match op {
-                PlusAssign => Some(|_ctx, args| {
-                    let x = std::mem::take(args[1]).into_array().expect(BUILTIN);
+                PlusAssign => Some((
+                    |_ctx, args| {
+                        let x = std::mem::take(args[1]).into_array().expect(BUILTIN);
 
-                    if x.is_empty() {
-                        return Ok(Dynamic::UNIT);
-                    }
+                        if x.is_empty() {
+                            return Ok(Dynamic::UNIT);
+                        }
 
-                    let _array_is_empty = args[0].read_lock::<Array>().expect(BUILTIN).is_empty();
+                        let _array_is_empty =
+                            args[0].read_lock::<Array>().expect(BUILTIN).is_empty();
 
-                    #[cfg(not(feature = "unchecked"))]
-                    if !_array_is_empty {
-                        _ctx.engine().check_data_size(
-                            &*args[0].read_lock().expect(BUILTIN),
-                            crate::Position::NONE,
-                        )?;
-                    }
+                        #[cfg(not(feature = "unchecked"))]
+                        if !_array_is_empty {
+                            _ctx.unwrap().engine().check_data_size(
+                                &*args[0].read_lock().expect(BUILTIN),
+                                crate::Position::NONE,
+                            )?;
+                        }
 
-                    let array = &mut *args[0].write_lock::<Array>().expect(BUILTIN);
+                        let array = &mut *args[0].write_lock::<Array>().expect(BUILTIN);
 
-                    Ok(append(array, x).into())
-                }),
+                        Ok(append(array, x).into())
+                    },
+                    cfg!(not(feature = "unchecked")),
+                )),
                 _ => None,
             };
         }
@@ -747,19 +777,20 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
             use crate::Blob;
 
             return match op {
-                PlusAssign => Some(|_ctx, args| {
-                    let blob2 = std::mem::take(args[1]).into_blob().expect(BUILTIN);
-                    let blob1 = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
+                PlusAssign => Some((
+                    |_ctx, args| {
+                        let blob2 = std::mem::take(args[1]).into_blob().expect(BUILTIN);
+                        let blob1 = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
 
-                    #[cfg(not(feature = "unchecked"))]
-                    _ctx.engine().raise_err_if_over_data_size_limit((
-                        blob1.len() + blob2.len(),
-                        0,
-                        0,
-                    ))?;
+                        #[cfg(not(feature = "unchecked"))]
+                        _ctx.unwrap()
+                            .engine()
+                            .throw_on_size((blob1.len() + blob2.len(), 0, 0))?;
 
-                    Ok(append(blob1, blob2).into())
-                }),
+                        Ok(append(blob1, blob2).into())
+                    },
+                    cfg!(not(feature = "unchecked")),
+                )),
                 _ => None,
             };
         }
@@ -833,17 +864,21 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
     // string op= char
     if (type1, type2) == (TypeId::of::<ImmutableString>(), TypeId::of::<char>()) {
         return match op {
-            PlusAssign => Some(|_ctx, args| {
-                let mut buf = [0_u8; 4];
-                let ch = &*args[1].as_char().expect(BUILTIN).encode_utf8(&mut buf);
-                let mut x = args[0].write_lock::<ImmutableString>().expect(BUILTIN);
+            PlusAssign => Some((
+                |_ctx, args| {
+                    let mut buf = [0_u8; 4];
+                    let ch = &*args[1].as_char().expect(BUILTIN).encode_utf8(&mut buf);
+                    let mut x = args[0].write_lock::<ImmutableString>().expect(BUILTIN);
 
-                #[cfg(not(feature = "unchecked"))]
-                _ctx.engine()
-                    .raise_err_if_over_data_size_limit((0, 0, x.len() + ch.len()))?;
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.unwrap()
+                        .engine()
+                        .throw_on_size((0, 0, x.len() + ch.len()))?;
 
-                Ok((*x += ch).into())
-            }),
+                    Ok((*x += ch).into())
+                },
+                cfg!(not(feature = "unchecked")),
+            )),
             MinusAssign => Some(impl_op!(ImmutableString -= as_char as char)),
             _ => None,
         };
@@ -851,28 +886,32 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
     // char op= string
     if (type1, type2) == (TypeId::of::<char>(), TypeId::of::<ImmutableString>()) {
         return match op {
-            PlusAssign => Some(|_ctx, args| {
-                let ch = {
-                    let s = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
+            PlusAssign => Some((
+                |_ctx, args| {
+                    let ch = {
+                        let s = &*args[1].read_lock::<ImmutableString>().expect(BUILTIN);
 
-                    if s.is_empty() {
-                        return Ok(Dynamic::UNIT);
-                    }
+                        if s.is_empty() {
+                            return Ok(Dynamic::UNIT);
+                        }
 
-                    let mut ch = args[0].as_char().expect(BUILTIN).to_string();
+                        let mut ch = args[0].as_char().expect(BUILTIN).to_string();
 
-                    #[cfg(not(feature = "unchecked"))]
-                    _ctx.engine()
-                        .raise_err_if_over_data_size_limit((0, 0, ch.len() + s.len()))?;
+                        #[cfg(not(feature = "unchecked"))]
+                        _ctx.unwrap()
+                            .engine()
+                            .throw_on_size((0, 0, ch.len() + s.len()))?;
 
-                    ch.push_str(s);
-                    ch
-                };
+                        ch.push_str(s);
+                        ch
+                    };
 
-                *args[0].write_lock::<Dynamic>().expect(BUILTIN) = ch.into();
+                    *args[0].write_lock::<Dynamic>().expect(BUILTIN) = ch.into();
 
-                Ok(Dynamic::UNIT)
-            }),
+                    Ok(Dynamic::UNIT)
+                },
+                cfg!(not(feature = "unchecked")),
+            )),
             _ => None,
         };
     }
@@ -885,21 +924,24 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
         use crate::Array;
 
         return match op {
-            PlusAssign => Some(|_ctx, args| {
-                {
-                    let x = std::mem::take(args[1]);
-                    let array = &mut *args[0].write_lock::<Array>().expect(BUILTIN);
-                    push(array, x);
-                }
+            PlusAssign => Some((
+                |_ctx, args| {
+                    {
+                        let x = std::mem::take(args[1]);
+                        let array = &mut *args[0].write_lock::<Array>().expect(BUILTIN);
+                        push(array, x);
+                    }
 
-                #[cfg(not(feature = "unchecked"))]
-                _ctx.engine().check_data_size(
-                    &*args[0].read_lock().expect(BUILTIN),
-                    crate::Position::NONE,
-                )?;
+                    #[cfg(not(feature = "unchecked"))]
+                    _ctx.unwrap().engine().check_data_size(
+                        &*args[0].read_lock().expect(BUILTIN),
+                        crate::Position::NONE,
+                    )?;
 
-                Ok(Dynamic::UNIT)
-            }),
+                    Ok(Dynamic::UNIT)
+                },
+                cfg!(not(feature = "unchecked")),
+            )),
             _ => None,
         };
     }
@@ -914,16 +956,20 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
             use crate::packages::blob_basic::blob_functions::*;
 
             return match op {
-                PlusAssign => Some(|_ctx, args| {
-                    let x = args[1].as_int().expect(BUILTIN);
-                    let blob = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
+                PlusAssign => Some((
+                    |_ctx, args| {
+                        let x = args[1].as_int().expect(BUILTIN);
+                        let blob = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
 
-                    #[cfg(not(feature = "unchecked"))]
-                    _ctx.engine()
-                        .raise_err_if_over_data_size_limit((blob.len() + 1, 0, 0))?;
+                        #[cfg(not(feature = "unchecked"))]
+                        _ctx.unwrap()
+                            .engine()
+                            .throw_on_size((blob.len() + 1, 0, 0))?;
 
-                    Ok(push(blob, x).into())
-                }),
+                        Ok(push(blob, x).into())
+                    },
+                    cfg!(not(feature = "unchecked")),
+                )),
                 _ => None,
             };
         }
@@ -934,16 +980,20 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
             use crate::packages::blob_basic::blob_functions::*;
 
             return match op {
-                PlusAssign => Some(|_ctx, args| {
-                    let x = args[1].as_char().expect(BUILTIN);
-                    let blob = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
+                PlusAssign => Some((
+                    |_ctx, args| {
+                        let x = args[1].as_char().expect(BUILTIN);
+                        let blob = &mut *args[0].write_lock::<Blob>().expect(BUILTIN);
 
-                    #[cfg(not(feature = "unchecked"))]
-                    _ctx.engine()
-                        .raise_err_if_over_data_size_limit((blob.len() + 1, 0, 0))?;
+                        #[cfg(not(feature = "unchecked"))]
+                        _ctx.unwrap()
+                            .engine()
+                            .throw_on_size((blob.len() + 1, 0, 0))?;
 
-                    Ok(append_char(blob, x).into())
-                }),
+                        Ok(append_char(blob, x).into())
+                    },
+                    cfg!(not(feature = "unchecked")),
+                )),
                 _ => None,
             };
         }
@@ -954,24 +1004,25 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
             use crate::packages::blob_basic::blob_functions::*;
 
             return match op {
-                PlusAssign => Some(|_ctx, args| {
-                    let (first, second) = args.split_first_mut().expect(BUILTIN);
-                    let blob = &mut *first.write_lock::<Blob>().expect(BUILTIN);
-                    let s = &*second[0].read_lock::<ImmutableString>().expect(BUILTIN);
+                PlusAssign => Some((
+                    |_ctx, args| {
+                        let (first, second) = args.split_first_mut().expect(BUILTIN);
+                        let blob = &mut *first.write_lock::<Blob>().expect(BUILTIN);
+                        let s = &*second[0].read_lock::<ImmutableString>().expect(BUILTIN);
 
-                    if s.is_empty() {
-                        return Ok(Dynamic::UNIT);
-                    }
+                        if s.is_empty() {
+                            return Ok(Dynamic::UNIT);
+                        }
 
-                    #[cfg(not(feature = "unchecked"))]
-                    _ctx.engine().raise_err_if_over_data_size_limit((
-                        blob.len() + s.len(),
-                        0,
-                        0,
-                    ))?;
+                        #[cfg(not(feature = "unchecked"))]
+                        _ctx.unwrap()
+                            .engine()
+                            .throw_on_size((blob.len() + s.len(), 0, 0))?;
 
-                    Ok(append_str(blob, s).into())
-                }),
+                        Ok(append_str(blob, s).into())
+                    },
+                    cfg!(not(feature = "unchecked")),
+                )),
                 _ => None,
             };
         }
