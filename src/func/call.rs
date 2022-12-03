@@ -401,19 +401,19 @@ impl Engine {
             let is_method = func.is_method();
             let src = source.as_ref().map(|s| s.as_str());
 
+            let context = if func.has_context() {
+                Some((self, name, src, &*global, pos).into())
+            } else {
+                None
+            };
+
             let mut _result = if let Some(f) = func.get_plugin_fn() {
                 if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
                 } else {
-                    let context = (self, name, src, &*global, pos).into();
                     f.call(context, args)
                 }
             } else if let Some(f) = func.get_native_fn() {
-                let context = if func.has_context() {
-                    Some((self, name, src, &*global, pos).into())
-                } else {
-                    None
-                };
                 f(context, args)
             } else {
                 unreachable!();
@@ -1390,8 +1390,12 @@ impl Engine {
             }
 
             Some(f) if f.is_plugin_fn() => {
-                let context = (self, fn_name, module.id(), &*global, pos).into();
                 let f = f.get_plugin_fn().expect("plugin function");
+                let context = if f.has_context() {
+                    Some((self, fn_name, module.id(), &*global, pos).into())
+                } else {
+                    None
+                };
                 if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
                 } else {

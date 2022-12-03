@@ -142,7 +142,8 @@ impl CallableFunction {
     pub fn has_context(&self) -> bool {
         match self {
             Self::Pure(.., ctx) | Self::Method(.., ctx) => *ctx,
-            Self::Plugin(..) | Self::Iterator(..) => false,
+            Self::Plugin(f) => f.has_context(),
+            Self::Iterator(..) => false,
             #[cfg(not(feature = "no_function"))]
             Self::Script(..) => false,
         }

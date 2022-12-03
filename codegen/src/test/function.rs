@@ -280,12 +280,13 @@ mod generate_tests {
                     #[inline(always)] pub fn param_types() -> [TypeId; 0usize] { [] }
                 }
                 impl PluginFunction for Token {
-                    #[inline(always)] fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    #[inline(always)] fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         Ok(Dynamic::from(do_nothing()))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -318,13 +319,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for Token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<usize>();
                         Ok(Dynamic::from(do_something(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -357,13 +359,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for Token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<usize>();
-                        Ok(Dynamic::from(do_something(context, arg0)))
+                        Ok(Dynamic::from(do_something(context.unwrap(), arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { true }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -399,12 +402,13 @@ mod generate_tests {
                 }
                 impl PluginFunction for Token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         Ok(Dynamic::from(return_dynamic()))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -432,13 +436,14 @@ mod generate_tests {
             }
             impl PluginFunction for TestStruct {
                 #[inline(always)]
-                fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                     let arg0 = mem::take(args[0usize]).cast::<usize>();
                     Ok(Dynamic::from(do_something(arg0)))
                 }
 
                 #[inline(always)] fn is_method_call(&self) -> bool { false }
                 #[inline(always)] fn is_pure(&self) -> bool { true }
+                #[inline(always)] fn has_context(&self) -> bool { false }
             }
         };
 
@@ -465,7 +470,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for Token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<usize>();
                         let arg1 = mem::take(args[1usize]).cast::<usize>();
                         Ok(Dynamic::from(add_together(arg0, arg1)))
@@ -473,6 +478,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -505,7 +511,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for Token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<usize>();
                         let arg0 = &mut args[0usize].write_lock::<usize>().unwrap();
                         Ok(Dynamic::from(increment(arg0, arg1)))
@@ -513,6 +519,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]
@@ -546,13 +553,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for Token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).into_immutable_string().unwrap();
                         Ok(Dynamic::from(special_print(&arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]
                 #[doc(hidden)]

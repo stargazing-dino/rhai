@@ -24,11 +24,15 @@ pub use rhai_codegen::{export_fn, register_exported_fn};
 /// Use the `#[export_module]` and `#[export_fn]` procedural attributes instead.
 pub trait PluginFunction {
     /// Call the plugin function with the arguments provided.
-    fn call(&self, context: NativeCallContext, args: &mut FnCallArgs) -> RhaiResult;
+    fn call(&self, context: Option<NativeCallContext>, args: &mut FnCallArgs) -> RhaiResult;
 
     /// Is this plugin function a method?
     #[must_use]
     fn is_method_call(&self) -> bool;
+
+    /// Does this plugin function contain a [`NativeCallContext`] parameter?
+    #[must_use]
+    fn has_context(&self) -> bool;
 
     /// Is this plugin function pure?
     ///

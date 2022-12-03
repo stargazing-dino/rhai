@@ -21,6 +21,12 @@ Deprecated API's
 * `Module::with_capacity` is deprecated.
 * The internal method `Engine::eval_statements_raw` is deprecated.
 
+Speed improvements
+------------------
+
+* The functions registration mechanism is revamped to take advantage of constant generics, among others.
+* This yields a 20% speed improvements on certain real-life, function-call-heavy workloads.
+
 Net features
 ------------
 
