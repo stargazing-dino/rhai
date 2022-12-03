@@ -26,13 +26,13 @@ use std::{
 ///
 /// # Examples
 ///
-/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, R, ()>` = `Fn(&mut A, B, &C) -> R`
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, false, R, false>` = `Fn(&mut A, B, &C) -> R`
 ///
-/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, R, NativeCallContext>` = `Fn(NativeCallContext, &mut A, B, &C) -> R`
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, true,  R, false>` = `Fn(NativeCallContext, &mut A, B, &C) -> R`
 ///
-/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, R, RhaiResultOf<()>>` = `Fn(&mut A, B, &C) -> Result<R, Box<EvalAltResult>>`
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, false, R, true>`  = `Fn(&mut A, B, &C) -> Result<R, Box<EvalAltResult>>`
 ///
-/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, R, RhaiResultOf<NativeCallContext>>` = `Fn(NativeCallContext, &mut A, B, &C) -> Result<R, Box<EvalAltResult>>`
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, true,  R, true>`  = `Fn(NativeCallContext, &mut A, B, &C) -> Result<R, Box<EvalAltResult>>`
 ///
 /// These types are not actually used anywhere.
 pub struct Mut<T>(T);
@@ -73,9 +73,10 @@ pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
 ///
 /// * `ARGS` - a tuple containing parameter types, with `&mut T` represented by `Mut<T>`.
 /// * `NUM` - a constant generic containing the number of parameters, must be consistent with `ARGS`.
+/// * `CTX` - a constant boolean generic indicating whether there is a `NativeCallContext` parameter.
 /// * `RET` - return type of the function; if the function returns `Result`, it is the unwrapped inner value type.
-/// * `RESULT` - a type to distinguish between multiple forms.  Must match the function signature.
-pub trait RegisterNativeFunction<ARGS, const NUM: usize, RET, RESULT> {
+/// * `FALL` - a constant boolean generic indicating whether the function is fallible (i.e. returns `Result<T, Box<EvalAltResult>>`).
+pub trait RegisterNativeFunction<ARGS, const NUM: usize, const CTX: bool, RET, const FALL: bool> {
     /// Convert this function into a [`CallableFunction`].
     #[must_use]
     fn into_callable_function(self) -> CallableFunction;
@@ -104,8 +105,6 @@ pub trait RegisterNativeFunction<ARGS, const NUM: usize, RET, RESULT> {
         type_name::<RET>()
     }
 }
-
-const EXPECT_ARGS: &str = "arguments";
 
 macro_rules! check_constant {
     ($abi:ident, $n:expr, $ctx:ident, $args:ident) => {
@@ -150,7 +149,7 @@ macro_rules! def_register {
             FN: Fn($($param),*) -> RET + SendSync + 'static,
             $($par: Variant + Clone,)*
             RET: Variant + Clone
-        > RegisterNativeFunction<($($mark,)*), $n, RET, ()> for FN {
+        > RegisterNativeFunction<($($mark,)*), $n, false, RET, false> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[inline(always)] fn num_params() -> usize { $n }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
@@ -161,7 +160,7 @@ macro_rules! def_register {
                     check_constant!($abi, $n, ctx, args);
 
                     let mut drain = args.iter_mut();
-                    $(let mut $par = $clone(drain.next().expect(EXPECT_ARGS)); )*
+                    $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     let r = self($($arg),*);
@@ -176,7 +175,7 @@ macro_rules! def_register {
             FN: for<'a> Fn(NativeCallContext<'a>, $($param),*) -> RET + SendSync + 'static,
             $($par: Variant + Clone,)*
             RET: Variant + Clone
-        > RegisterNativeFunction<($($mark,)*), $n, RET, NativeCallContext<'static>> for FN {
+        > RegisterNativeFunction<($($mark,)*), $n, true, RET, false> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[inline(always)] fn num_params() -> usize { $n }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
@@ -187,7 +186,7 @@ macro_rules! def_register {
                     check_constant!($abi, $n, ctx, args);
 
                     let mut drain = args.iter_mut();
-                    $(let mut $par = $clone(drain.next().expect(EXPECT_ARGS)); )*
+                    $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     let r = self(ctx, $($arg),*);
@@ -202,7 +201,7 @@ macro_rules! def_register {
             FN: Fn($($param),*) -> RhaiResultOf<RET> + SendSync + 'static,
             $($par: Variant + Clone,)*
             RET: Variant + Clone
-        > RegisterNativeFunction<($($mark,)*), $n, RET, RhaiResultOf<()>> for FN {
+        > RegisterNativeFunction<($($mark,)*), $n, false, RET, true> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[inline(always)] fn num_params() -> usize { $n }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
@@ -214,7 +213,7 @@ macro_rules! def_register {
                     check_constant!($abi, $n, ctx, args);
 
                     let mut drain = args.iter_mut();
-                    $(let mut $par = $clone(drain.next().expect(EXPECT_ARGS)); )*
+                    $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     self($($arg),*).map(Dynamic::from)
@@ -226,7 +225,7 @@ macro_rules! def_register {
             FN: for<'a> Fn(NativeCallContext<'a>, $($param),*) -> RhaiResultOf<RET> + SendSync + 'static,
             $($par: Variant + Clone,)*
             RET: Variant + Clone
-        > RegisterNativeFunction<($($mark,)*), $n, RET, RhaiResultOf<NativeCallContext<'static>>> for FN {
+        > RegisterNativeFunction<($($mark,)*), $n, true, RET, true> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[inline(always)] fn num_params() -> usize { $n }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
@@ -238,7 +237,7 @@ macro_rules! def_register {
                     check_constant!($abi, $n, ctx, args);
 
                     let mut drain = args.iter_mut();
-                    $(let mut $par = $clone(drain.next().expect(EXPECT_ARGS)); )*
+                    $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     self(ctx, $($arg),*).map(Dynamic::from)

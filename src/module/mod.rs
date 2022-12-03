@@ -1237,14 +1237,14 @@ impl Module {
     /// assert!(module.contains_fn(hash));
     /// ```
     #[inline(always)]
-    pub fn set_native_fn<A, const N: usize, T, F, S>(
+    pub fn set_native_fn<A, const N: usize, const C: bool, T, F>(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
         func: F,
     ) -> u64
     where
         T: Variant + Clone,
-        F: RegisterNativeFunction<A, N, T, RhaiResultOf<S>>,
+        F: RegisterNativeFunction<A, N, C, T, true>,
     {
         self.set_fn(
             name,
@@ -1276,11 +1276,11 @@ impl Module {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn set_getter_fn<A, T, F, S>(&mut self, name: impl AsRef<str>, func: F) -> u64
+    pub fn set_getter_fn<A, const C: bool, T, F>(&mut self, name: impl AsRef<str>, func: F) -> u64
     where
         A: Variant + Clone,
         T: Variant + Clone,
-        F: RegisterNativeFunction<(Mut<A>,), 1, T, RhaiResultOf<S>> + SendSync + 'static,
+        F: RegisterNativeFunction<(Mut<A>,), 1, C, T, true> + SendSync + 'static,
     {
         self.set_fn(
             crate::engine::make_getter(name.as_ref()).as_str(),
@@ -1317,11 +1317,11 @@ impl Module {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn set_setter_fn<A, T, F, S>(&mut self, name: impl AsRef<str>, func: F) -> u64
+    pub fn set_setter_fn<A, const C: bool, T, F>(&mut self, name: impl AsRef<str>, func: F) -> u64
     where
         A: Variant + Clone,
         T: Variant + Clone,
-        F: RegisterNativeFunction<(Mut<A>, T), 2, (), RhaiResultOf<S>> + SendSync + 'static,
+        F: RegisterNativeFunction<(Mut<A>, T), 2, C, (), true> + SendSync + 'static,
     {
         self.set_fn(
             crate::engine::make_setter(name.as_ref()).as_str(),
@@ -1363,11 +1363,16 @@ impl Module {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn set_getter_setter_fn<A: Variant + Clone, T: Variant + Clone, S1, S2>(
+    pub fn set_getter_setter_fn<
+        A: Variant + Clone,
+        const C1: bool,
+        const C2: bool,
+        T: Variant + Clone,
+    >(
         &mut self,
         name: impl AsRef<str>,
-        getter: impl RegisterNativeFunction<(Mut<A>,), 1, T, RhaiResultOf<S1>> + SendSync + 'static,
-        setter: impl RegisterNativeFunction<(Mut<A>, T), 2, (), RhaiResultOf<S2>> + SendSync + 'static,
+        getter: impl RegisterNativeFunction<(Mut<A>,), 1, C1, T, true> + SendSync + 'static,
+        setter: impl RegisterNativeFunction<(Mut<A>, T), 2, C2, (), true> + SendSync + 'static,
     ) -> (u64, u64) {
         (
             self.set_getter_fn(name.as_ref(), getter),
@@ -1404,12 +1409,12 @@ impl Module {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline]
-    pub fn set_indexer_get_fn<A, B, T, F, S>(&mut self, func: F) -> u64
+    pub fn set_indexer_get_fn<A, B, const C: bool, T, F>(&mut self, func: F) -> u64
     where
         A: Variant + Clone,
         B: Variant + Clone,
         T: Variant + Clone,
-        F: RegisterNativeFunction<(Mut<A>, B), 2, T, RhaiResultOf<S>> + SendSync + 'static,
+        F: RegisterNativeFunction<(Mut<A>, B), 2, C, T, true> + SendSync + 'static,
     {
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<A>() == TypeId::of::<crate::Array>() {
@@ -1465,12 +1470,12 @@ impl Module {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline]
-    pub fn set_indexer_set_fn<A, B, T, F, S>(&mut self, func: F) -> u64
+    pub fn set_indexer_set_fn<A, B, const C: bool, T, F>(&mut self, func: F) -> u64
     where
         A: Variant + Clone,
         B: Variant + Clone,
         T: Variant + Clone,
-        F: RegisterNativeFunction<(Mut<A>, B, T), 3, (), RhaiResultOf<S>> + SendSync + 'static,
+        F: RegisterNativeFunction<(Mut<A>, B, T), 3, C, (), true> + SendSync + 'static,
     {
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<A>() == TypeId::of::<crate::Array>() {
@@ -1537,15 +1542,13 @@ impl Module {
     pub fn set_indexer_get_set_fn<
         A: Variant + Clone,
         B: Variant + Clone,
+        const C1: bool,
+        const C2: bool,
         T: Variant + Clone,
-        S1,
-        S2,
     >(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<A>, B), 2, T, RhaiResultOf<S1>> + SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<A>, B, T), 3, (), RhaiResultOf<S2>>
-            + SendSync
-            + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<A>, B), 2, C1, T, true> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<A>, B, T), 3, C2, (), true> + SendSync + 'static,
     ) -> (u64, u64) {
         (
             self.set_indexer_get_fn(get_fn),
