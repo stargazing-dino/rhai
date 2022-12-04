@@ -1237,7 +1237,7 @@ impl Module {
     /// assert!(module.contains_fn(hash));
     /// ```
     #[inline(always)]
-    pub fn set_native_fn<A, const N: usize, const C: bool, T, F>(
+    pub fn set_native_fn<A: 'static, const N: usize, const C: bool, T, F>(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
         func: F,

@@ -7,7 +7,6 @@ use crate::ast::{
 };
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::types::dynamic::{AccessMode, Union};
-use crate::types::RestoreOnDrop;
 use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, ERR, INT};
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
@@ -43,9 +42,7 @@ impl Engine {
 
         // Restore scope at end of block if necessary
         let orig_scope_len = scope.len();
-        let scope = &mut *RestoreOnDrop::lock_if(restore_orig_state, scope, move |s| {
-            s.rewind(orig_scope_len);
-        });
+        auto_restore!(scope; restore_orig_state => move |s| { s.rewind(orig_scope_len); });
 
         // Restore global state at end of block if necessary
         let orig_always_search_scope = global.always_search_scope;
@@ -56,7 +53,7 @@ impl Engine {
             global.scope_level += 1;
         }
 
-        let global = &mut *RestoreOnDrop::lock_if(restore_orig_state, global, move |g| {
+        auto_restore!(global; restore_orig_state => move |g| {
             g.scope_level -= 1;
 
             #[cfg(not(feature = "no_module"))]
@@ -69,9 +66,7 @@ impl Engine {
 
         // Pop new function resolution caches at end of block
         let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
-        let caches = &mut *RestoreOnDrop::lock(caches, move |c| {
-            c.rewind_fn_resolution_caches(orig_fn_resolution_caches_len)
-        });
+        auto_restore!(caches => move |c| c.rewind_fn_resolution_caches(orig_fn_resolution_caches_len));
 
         // Run the statements
         statements.iter().try_fold(Dynamic::UNIT, |_, stmt| {
@@ -147,13 +142,10 @@ impl Engine {
                 {
                     // Built-in found
                     let op = op_assign_token.literal_syntax();
-
-                    let orig_level = global.level;
-                    global.level += 1;
-                    let global = &*RestoreOnDrop::lock(global, move |g| g.level = orig_level);
+                    auto_restore! { let orig_level = global.level; global.level += 1 }
 
                     let context = if ctx {
-                        Some((self, op, None, global, *op_pos).into())
+                        Some((self, op, None, &*global, *op_pos).into())
                     } else {
                         None
                     };
@@ -212,9 +204,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, stmt)?;
         #[cfg(feature = "debugging")]
-        let global = &mut *RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
-            g.debugger_mut().reset_status(reset)
-        });
+        auto_restore!(global; reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
@@ -526,10 +516,7 @@ impl Engine {
 
                 // Restore scope at end of statement
                 let orig_scope_len = scope.len();
-                let scope = &mut *RestoreOnDrop::lock(scope, move |s| {
-                    s.rewind(orig_scope_len);
-                });
-
+                auto_restore!(scope => move |s| { s.rewind(orig_scope_len); });
                 // Add the loop variables
                 let counter_index = if counter.is_empty() {
                     usize::MAX
@@ -657,10 +644,7 @@ impl Engine {
 
                         // Restore scope at end of block
                         let orig_scope_len = scope.len();
-                        let scope =
-                            &mut *RestoreOnDrop::lock_if(!catch_var.is_empty(), scope, move |s| {
-                                s.rewind(orig_scope_len);
-                            });
+                        auto_restore!(scope; !catch_var.is_empty() => move |s| { s.rewind(orig_scope_len); });
 
                         if !catch_var.is_empty() {
                             scope.push(catch_var.name.clone(), err_value);

@@ -9,7 +9,7 @@ use super::call::FnCallArgs;
 use super::callable_function::CallableFunction;
 use super::native::{SendSync, Shared};
 use crate::types::dynamic::{DynamicWriteLock, Variant};
-use crate::{reify, Dynamic, Identifier, NativeCallContext, RhaiResultOf};
+use crate::{Dynamic, Identifier, NativeCallContext, RhaiResultOf};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -70,44 +70,61 @@ pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
 ///
 /// # Type Parameters
 ///
-/// * `ARGS` - a tuple containing parameter types, with `&mut T` represented by `Mut<T>`.
-/// * `NUM` - a constant generic containing the number of parameters, must be consistent with `ARGS`.
-/// * `CTX` - a constant boolean generic indicating whether there is a `NativeCallContext` parameter.
-/// * `RET` - return type of the function; if the function returns `Result`, it is the unwrapped inner value type.
-/// * `FALL` - a constant boolean generic indicating whether the function is fallible (i.e. returns `Result<T, Box<EvalAltResult>>`).
-pub trait RegisterNativeFunction<ARGS, const NUM: usize, const CTX: bool, RET, const FALL: bool> {
+/// * `A` - a tuple containing parameter types, with `&mut T` represented by `Mut<T>`.
+/// * `N` - a constant generic containing the number of parameters, must be consistent with `ARGS`.
+/// * `X` - a constant boolean generic indicating whether there is a `NativeCallContext` parameter.
+/// * `R` - return type of the function; if the function returns `Result`, it is the unwrapped inner value type.
+/// * `F` - a constant boolean generic indicating whether the function is fallible (i.e. returns `Result<T, Box<EvalAltResult>>`).
+pub trait RegisterNativeFunction<
+    A: 'static,
+    const N: usize,
+    const X: bool,
+    R: 'static,
+    const F: bool,
+>
+{
     /// Convert this function into a [`CallableFunction`].
     #[must_use]
     fn into_callable_function(self, name: Identifier, no_const: bool) -> CallableFunction;
     /// Get the type ID's of this function's parameters.
     #[must_use]
-    fn param_types() -> [TypeId; NUM];
+    fn param_types() -> [TypeId; N];
     /// Get the number of parameters for this function.
     #[inline(always)]
     #[must_use]
     fn num_params() -> usize {
-        NUM
+        N
     }
     /// Is there a [`NativeCallContext`] parameter for this function?
+    #[inline(always)]
     #[must_use]
-    fn has_context() -> bool;
+    fn has_context() -> bool {
+        X
+    }
     /// _(metadata)_ Get the type names of this function's parameters.
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[must_use]
-    fn param_names() -> [&'static str; NUM];
+    fn param_names() -> [&'static str; N];
     /// _(metadata)_ Get the type ID of this function's return value.
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
+    #[inline(always)]
     #[must_use]
-    fn return_type() -> TypeId;
+    fn return_type() -> TypeId {
+        if F {
+            TypeId::of::<RhaiResultOf<R>>()
+        } else {
+            TypeId::of::<R>()
+        }
+    }
     /// _(metadata)_ Get the type name of this function's return value.
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[inline(always)]
     #[must_use]
     fn return_type_name() -> &'static str {
-        type_name::<RET>()
+        type_name::<R>()
     }
 }
 
@@ -143,9 +160,7 @@ macro_rules! def_register {
             RET: Variant + Clone,
         > RegisterNativeFunction<($($mark,)*), $n, false, RET, false> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
-            #[inline(always)] fn has_context() -> bool { false }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
             #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |_, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
@@ -169,9 +184,7 @@ macro_rules! def_register {
             RET: Variant + Clone,
         > RegisterNativeFunction<($($mark,)*), $n, true, RET, false> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
-            #[inline(always)] fn has_context() -> bool { true }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
             #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
                     let ctx = ctx.unwrap();
@@ -197,9 +210,7 @@ macro_rules! def_register {
             RET: Variant + Clone
         > RegisterNativeFunction<($($mark,)*), $n, false, RET, true> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
-            #[inline(always)] fn has_context() -> bool { false }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
             #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |_, args: &mut FnCallArgs| {
@@ -221,9 +232,7 @@ macro_rules! def_register {
             RET: Variant + Clone
         > RegisterNativeFunction<($($mark,)*), $n, true, RET, true> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
-            #[inline(always)] fn has_context() -> bool { true }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
             #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
                 CallableFunction::$abi(Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {

@@ -7,8 +7,8 @@ use crate::parser::ParseResult;
 use crate::tokenizer::{is_valid_identifier, Token, NO_TOKEN};
 use crate::types::dynamic::Variant;
 use crate::{
-    reify, Dynamic, Engine, EvalContext, Identifier, ImmutableString, LexError, Position,
-    RhaiResult, StaticVec,
+    Dynamic, Engine, EvalContext, Identifier, ImmutableString, LexError, Position, RhaiResult,
+    StaticVec,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;

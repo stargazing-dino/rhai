@@ -136,7 +136,7 @@ impl CallableFunction {
             Self::Script(..) => false,
         }
     }
-    /// Is there a [`NativeCallContext`] parameter?
+    /// Is there a [`NativeCallContext`][crate::NativeCallContext] parameter?
     #[inline]
     #[must_use]
     pub fn has_context(&self) -> bool {

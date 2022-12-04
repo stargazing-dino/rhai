@@ -1,5 +1,8 @@
 //! Module defining Rhai data types.
 
+#[macro_use]
+pub mod restore;
+
 pub mod bloom_filter;
 pub mod custom_types;
 pub mod dynamic;
@@ -11,7 +14,6 @@ pub mod interner;
 pub mod parse_error;
 pub mod position;
 pub mod position_none;
-pub mod restore;
 pub mod scope;
 pub mod variant;
 

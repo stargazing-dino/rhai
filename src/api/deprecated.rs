@@ -185,7 +185,7 @@ impl Engine {
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `register_fn` instead")]
     #[inline(always)]
-    pub fn register_result_fn<A, const N: usize, const C: bool, R: Variant + Clone>(
+    pub fn register_result_fn<A: 'static, const N: usize, const C: bool, R: Variant + Clone>(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
         func: impl RegisterNativeFunction<A, N, C, R, true>,
@@ -514,7 +514,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `with_fn` instead")]
     #[inline(always)]
-    pub fn with_result_fn<S, A, const N: usize, const C: bool, R, F>(
+    pub fn with_result_fn<S, A: 'static, const N: usize, const C: bool, R, F>(
         &mut self,
         name: S,
         method: F,

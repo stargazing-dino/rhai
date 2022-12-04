@@ -85,6 +85,11 @@ extern crate no_std_compat as std;
 use std::prelude::v1::*;
 
 // Internal modules
+#[macro_use]
+mod reify;
+#[macro_use]
+mod types;
+
 mod api;
 mod ast;
 pub mod config;
@@ -95,10 +100,8 @@ mod module;
 mod optimizer;
 pub mod packages;
 mod parser;
-mod reify;
 mod tests;
 mod tokenizer;
-mod types;
 
 /// Error encountered when parsing a script.
 type PERR = ParseErrorType;

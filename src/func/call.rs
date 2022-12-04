@@ -9,7 +9,6 @@ use crate::engine::{
 };
 use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token, NO_TOKEN};
-use crate::types::RestoreOnDrop;
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString,
     OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
@@ -381,9 +380,7 @@ impl Engine {
                 // Clone the first argument
                 backup.change_first_arg_to_copy(args);
             }
-
-            let args =
-                &mut *RestoreOnDrop::lock_if(swap, args, move |a| backup.restore_first_arg(a));
+            auto_restore!(args; swap => move |a| backup.restore_first_arg(a));
 
             #[cfg(feature = "debugging")]
             if self.is_debugger_registered() {
@@ -583,9 +580,7 @@ impl Engine {
         #[cfg(not(feature = "no_closure"))]
         ensure_no_data_race(fn_name, _args, is_ref_mut)?;
 
-        let orig_level = global.level;
-        global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
+        auto_restore! { let orig_level = global.level; global.level += 1 }
 
         // These may be redirected from method style calls.
         if hashes.is_native_only() {
@@ -664,7 +659,7 @@ impl Engine {
                 };
 
                 let orig_source = mem::replace(&mut global.source, source.clone());
-                let global = &mut *RestoreOnDrop::lock(global, move |g| g.source = orig_source);
+                auto_restore!(global => move |g| g.source = orig_source);
 
                 return if _is_method_call {
                     // Method call of script function - map first argument to `this`
@@ -684,9 +679,7 @@ impl Engine {
                         backup.change_first_arg_to_copy(_args);
                     }
 
-                    let args = &mut *RestoreOnDrop::lock_if(swap, _args, move |a| {
-                        backup.restore_first_arg(a)
-                    });
+                    auto_restore!(args = _args; swap => move |a| backup.restore_first_arg(a));
 
                     let mut this = Dynamic::NULL;
 
@@ -732,9 +725,7 @@ impl Engine {
             })
         });
         #[cfg(feature = "debugging")]
-        let global = &mut *RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
-            g.debugger_mut().reset_status(reset)
-        });
+        auto_restore!(global; reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
         self.eval_expr(global, caches, scope, this_ptr, arg_expr)
             .map(|r| (r, arg_expr.start_position()))
@@ -1370,9 +1361,7 @@ impl Engine {
             }
         }
 
-        let orig_level = global.level;
-        global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
+        auto_restore! { let orig_level = global.level; global.level += 1 }
 
         match func {
             #[cfg(not(feature = "no_function"))]
@@ -1382,7 +1371,7 @@ impl Engine {
                 let mut this = Dynamic::NULL;
 
                 let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
-                let global = &mut *RestoreOnDrop::lock(global, move |g| g.source = orig_source);
+                auto_restore!(global => move |g| g.source = orig_source);
 
                 self.call_script_fn(
                     global, caches, new_scope, &mut this, fn_def, &mut args, true, pos,
@@ -1534,12 +1523,10 @@ impl Engine {
                 get_builtin_binary_op_fn(op_token.clone(), operands[0], operands[1])
             {
                 // Built-in found
-                let orig_level = global.level;
-                global.level += 1;
-                let global = &*RestoreOnDrop::lock(global, move |g| g.level = orig_level);
+                auto_restore! { let orig_level = global.level; global.level += 1 }
 
                 let context = if ctx {
-                    Some((self, name.as_str(), None, global, pos).into())
+                    Some((self, name.as_str(), None, &*global, pos).into())
                 } else {
                     None
                 };

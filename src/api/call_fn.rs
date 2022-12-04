@@ -3,10 +3,8 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::types::dynamic::Variant;
-use crate::types::RestoreOnDrop;
 use crate::{
-    reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, StaticVec, AST,
-    ERR,
+    Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -241,9 +239,7 @@ impl Engine {
 
         let result = if options.eval_ast && !statements.is_empty() {
             let orig_scope_len = scope.len();
-            let scope = &mut *RestoreOnDrop::lock_if(rewind_scope, scope, move |s| {
-                s.rewind(orig_scope_len);
-            });
+            auto_restore!(scope; rewind_scope => move |s| { s.rewind(orig_scope_len); });
 
             self.eval_global_statements(global, caches, scope, statements)
         } else {

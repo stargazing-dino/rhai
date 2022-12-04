@@ -7,8 +7,8 @@ use crate::plugin::PluginFunction;
 use crate::tokenizer::{is_valid_function_name, Token, TokenizeState, NO_TOKEN};
 use crate::types::dynamic::Variant;
 use crate::{
-    calc_fn_hash, reify, Dynamic, Engine, EvalContext, FuncArgs, Position, RhaiResult,
-    RhaiResultOf, StaticVec, VarDefInfo, ERR,
+    calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Position, RhaiResult, RhaiResultOf,
+    StaticVec, VarDefInfo, ERR,
 };
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]

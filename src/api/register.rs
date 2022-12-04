@@ -57,7 +57,7 @@ impl Engine {
     /// ```
     #[inline]
     pub fn register_fn<
-        A,
+        A: 'static,
         const N: usize,
         const C: bool,
         R: Variant + Clone,

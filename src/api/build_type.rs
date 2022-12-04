@@ -117,7 +117,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
 
     /// Register a custom function.
     #[inline(always)]
-    pub fn with_fn<A, const N: usize, const C: bool, R: Variant + Clone, const L: bool>(
+    pub fn with_fn<A: 'static, const N: usize, const C: bool, R: Variant + Clone, const L: bool>(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
         method: impl RegisterNativeFunction<A, N, C, R, L>,

@@ -1,6 +1,6 @@
 //! Helper module which defines the [`Dynamic`] data type.
 
-use crate::{reify, ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, INT};
+use crate::{ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{

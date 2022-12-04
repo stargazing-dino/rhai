@@ -234,10 +234,7 @@ impl Engine {
             #[cfg(feature = "debugging")]
             let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
             #[cfg(feature = "debugging")]
-            let global =
-                &mut *crate::types::RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
-                    g.debugger_mut().reset_status(reset)
-                });
+            auto_restore!(global; reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
             self.track_operation(global, expr.position())?;
 
@@ -268,10 +265,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
         #[cfg(feature = "debugging")]
-        let global =
-            &mut *crate::types::RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
-                g.debugger_mut().reset_status(reset)
-            });
+        auto_restore!(global; reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
         self.track_operation(global, expr.position())?;
 

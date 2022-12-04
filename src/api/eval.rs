@@ -5,7 +5,7 @@ use crate::func::native::locked_write;
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
 use crate::{
-    reify, Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
+    Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;

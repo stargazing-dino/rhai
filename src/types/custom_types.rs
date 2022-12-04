@@ -1,7 +1,7 @@
 //! Collection of custom types.
 
 use crate::Identifier;
-use std::{any::type_name, collections::BTreeMap, fmt};
+use std::{any::type_name, collections::BTreeMap};
 
 /// _(internals)_ Information for a custom type.
 /// Exported under the `internals` feature only.
@@ -13,17 +13,8 @@ pub struct CustomTypeInfo {
 
 /// _(internals)_ A collection of custom types.
 /// Exported under the `internals` feature only.
-#[derive(Clone, Hash)]
+#[derive(Debug, Clone, Hash)]
 pub struct CustomTypesCollection(BTreeMap<Identifier, CustomTypeInfo>);
-
-impl fmt::Debug for CustomTypesCollection {
-    #[cold]
-    #[inline(never)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("CustomTypesCollection ")?;
-        f.debug_map().entries(self.0.iter()).finish()
-    }
-}
 
 impl Default for CustomTypesCollection {
     #[inline(always)]
@@ -50,7 +41,7 @@ impl CustomTypesCollection {
     }
     /// Register a custom type.
     #[inline(always)]
-    pub fn add_type<T>(&mut self, name: &str) {
+    pub fn add_type<T>(&mut self, name: impl Into<Identifier>) {
         self.add_raw(
             type_name::<T>(),
             CustomTypeInfo {

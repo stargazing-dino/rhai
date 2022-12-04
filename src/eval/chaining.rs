@@ -6,7 +6,7 @@ use crate::ast::{ASTFlags, Expr, OpAssignment};
 use crate::config::hashing::SusLock;
 use crate::engine::{FN_IDX_GET, FN_IDX_SET};
 use crate::tokenizer::NO_TOKEN;
-use crate::types::{dynamic::Union, RestoreOnDrop};
+use crate::types::dynamic::Union;
 use crate::{
     calc_fn_hash, Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, ERR,
 };
@@ -68,9 +68,7 @@ impl Engine {
         idx: &mut Dynamic,
         pos: Position,
     ) -> RhaiResultOf<Dynamic> {
-        let orig_level = global.level;
-        global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
+        auto_restore! { let orig_level = global.level; global.level += 1 }
 
         let hash = hash_idx().0;
         let args = &mut [target, idx];
@@ -91,9 +89,7 @@ impl Engine {
         is_ref_mut: bool,
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
-        let orig_level = global.level;
-        global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
+        auto_restore! { let orig_level = global.level; global.level += 1 }
 
         let hash = hash_idx().1;
         let args = &mut [target, idx, new_val];
@@ -688,10 +684,7 @@ impl Engine {
                         let reset =
                             self.run_debugger_with_reset(global, caches, scope, this_ptr, rhs)?;
                         #[cfg(feature = "debugging")]
-                        let global =
-                            &mut *RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
-                                g.debugger_mut().reset_status(reset)
-                            });
+                        auto_restore!(global; reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
                         let crate::ast::FnCallExpr {
                             name, hashes, args, ..
@@ -699,8 +692,7 @@ impl Engine {
 
                         // Truncate the index values upon exit
                         let offset = idx_values.len() - args.len();
-                        let idx_values =
-                            &mut *RestoreOnDrop::lock(idx_values, move |v| v.truncate(offset));
+                        auto_restore!(idx_values => move |v| v.truncate(offset));
 
                         let call_args = &mut idx_values[offset..];
                         let arg1_pos = args.get(0).map_or(Position::NONE, Expr::position);
@@ -862,11 +854,7 @@ impl Engine {
                                     global, caches, scope, this_ptr, _node,
                                 )?;
                                 #[cfg(feature = "debugging")]
-                                let global = &mut *RestoreOnDrop::lock_if(
-                                    reset.is_some(),
-                                    global,
-                                    move |g| g.debugger_mut().reset_status(reset),
-                                );
+                                auto_restore!(global; reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
                                 let crate::ast::FnCallExpr {
                                     name, hashes, args, ..
@@ -874,9 +862,7 @@ impl Engine {
 
                                 // Truncate the index values upon exit
                                 let offset = idx_values.len() - args.len();
-                                let idx_values = &mut *RestoreOnDrop::lock(idx_values, move |v| {
-                                    v.truncate(offset)
-                                });
+                                auto_restore!(idx_values => move |v| v.truncate(offset));
 
                                 let call_args = &mut idx_values[offset..];
                                 let arg1_pos = args.get(0).map_or(Position::NONE, Expr::position);
@@ -987,11 +973,7 @@ impl Engine {
                                         global, caches, scope, this_ptr, _node,
                                     )?;
                                     #[cfg(feature = "debugging")]
-                                    let global = &mut *RestoreOnDrop::lock_if(
-                                        reset.is_some(),
-                                        global,
-                                        move |g| g.debugger_mut().reset_status(reset),
-                                    );
+                                    auto_restore!(global; reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
                                     let crate::ast::FnCallExpr {
                                         name, hashes, args, ..
@@ -999,10 +981,7 @@ impl Engine {
 
                                     // Truncate the index values upon exit
                                     let offset = idx_values.len() - args.len();
-                                    let idx_values =
-                                        &mut *RestoreOnDrop::lock(idx_values, move |v| {
-                                            v.truncate(offset)
-                                        });
+                                    auto_restore!(idx_values => move |v| v.truncate(offset));
 
                                     let call_args = &mut idx_values[offset..];
                                     let pos1 = args.get(0).map_or(Position::NONE, Expr::position);
