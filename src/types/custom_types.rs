@@ -41,7 +41,7 @@ impl CustomTypesCollection {
     }
     /// Register a custom type.
     #[inline(always)]
-    pub fn add_type<T>(&mut self, name: impl Into<Identifier>) {
+    pub fn add_type<T>(&mut self, name: &str) {
         self.add_raw(
             type_name::<T>(),
             CustomTypeInfo {
