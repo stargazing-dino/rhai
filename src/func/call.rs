@@ -380,7 +380,7 @@ impl Engine {
                 // Clone the first argument
                 backup.change_first_arg_to_copy(args);
             }
-            auto_restore!(args; swap => move |a| backup.restore_first_arg(a));
+            auto_restore!(args if swap => move |a| backup.restore_first_arg(a));
 
             #[cfg(feature = "debugging")]
             if self.is_debugger_registered() {
@@ -679,7 +679,7 @@ impl Engine {
                         backup.change_first_arg_to_copy(_args);
                     }
 
-                    auto_restore!(args = _args; swap => move |a| backup.restore_first_arg(a));
+                    auto_restore!(args = (_args) if swap => move |a| backup.restore_first_arg(a));
 
                     let mut this = Dynamic::NULL;
 
@@ -725,7 +725,7 @@ impl Engine {
             })
         });
         #[cfg(feature = "debugging")]
-        auto_restore!(global; reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
+        auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
         self.eval_expr(global, caches, scope, this_ptr, arg_expr)
             .map(|r| (r, arg_expr.start_position()))

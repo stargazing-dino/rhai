@@ -352,7 +352,7 @@ fn test_call_fn_events() -> Result<(), Box<EvalAltResult>> {
 
     let mut handler = Handler::new();
     assert!(!handler.scope.get_value::<bool>("state").unwrap());
-    handler.on_event("update", 999);
+    let _ = handler.on_event("update", 999);
     assert!(handler.scope.get_value::<bool>("state").unwrap());
     assert_eq!(handler.on_event("start", 999).as_int().unwrap(), 1041);
 

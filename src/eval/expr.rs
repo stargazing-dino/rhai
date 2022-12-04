@@ -234,7 +234,7 @@ impl Engine {
             #[cfg(feature = "debugging")]
             let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
             #[cfg(feature = "debugging")]
-            auto_restore!(global; reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
+            auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
             self.track_operation(global, expr.position())?;
 
@@ -265,7 +265,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
         #[cfg(feature = "debugging")]
-        auto_restore!(global; reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
+        auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
         self.track_operation(global, expr.position())?;
 

@@ -14,16 +14,32 @@ macro_rules! auto_restore {
         $code
         auto_restore!($var => $restore);
     };
-    ($var:ident => $restore: expr) => {
+    ($var:ident => $restore:ident; let $temp:ident = $save:expr;) => {
+        auto_restore!($var => $restore; let $temp = $save; {});
+    };
+    ($var:ident if $guard:expr => $restore:ident; let $temp:ident = $save:expr;) => {
+        auto_restore!($var if $guard => $restore; let $temp = $save; {});
+    };
+    ($var:ident => $restore:ident; let $temp:ident = $save:expr; $code:stmt) => {
+        let $temp = $save;
+        $code
+        auto_restore!($var => move |v| { v.$restore($temp); });
+    };
+    ($var:ident if $guard:expr => $restore:ident; let $temp:ident = $save:expr; $code:stmt) => {
+        let $temp = $save;
+        $code
+        auto_restore!($var if $guard => move |v| { v.$restore($temp); });
+    };
+    ($var:ident => $restore:expr) => {
         auto_restore!($var = $var => $restore);
     };
-    ($var:ident = $value:expr => $restore: expr) => {
+    ($var:ident = $value:expr => $restore:expr) => {
         let $var = &mut *crate::types::RestoreOnDrop::lock($value, $restore);
     };
-    ($var:ident; $guard:expr => $restore: expr) => {
-        auto_restore!($var = $var; $guard => $restore);
+    ($var:ident if $guard:expr => $restore:expr) => {
+        auto_restore!($var = ($var) if $guard => $restore);
     };
-    ($var:ident = $value:expr; $guard:expr => $restore: expr) => {
+    ($var:ident = ( $value:expr ) if $guard:expr => $restore:expr) => {
         let mut __rx__;
         let $var = if $guard {
             __rx__ = crate::types::RestoreOnDrop::lock($value, $restore);

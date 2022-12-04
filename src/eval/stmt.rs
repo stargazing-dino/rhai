@@ -41,8 +41,10 @@ impl Engine {
         }
 
         // Restore scope at end of block if necessary
-        let orig_scope_len = scope.len();
-        auto_restore!(scope; restore_orig_state => move |s| { s.rewind(orig_scope_len); });
+        auto_restore! {
+            scope if restore_orig_state => rewind;
+            let orig_scope_len = scope.len();
+        }
 
         // Restore global state at end of block if necessary
         let orig_always_search_scope = global.always_search_scope;
@@ -53,7 +55,7 @@ impl Engine {
             global.scope_level += 1;
         }
 
-        auto_restore!(global; restore_orig_state => move |g| {
+        auto_restore!(global if restore_orig_state => move |g| {
             g.scope_level -= 1;
 
             #[cfg(not(feature = "no_module"))]
@@ -65,8 +67,10 @@ impl Engine {
         });
 
         // Pop new function resolution caches at end of block
-        let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
-        auto_restore!(caches => move |c| c.rewind_fn_resolution_caches(orig_fn_resolution_caches_len));
+        auto_restore! {
+            caches => rewind_fn_resolution_caches;
+            let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
+        }
 
         // Run the statements
         statements.iter().try_fold(Dynamic::UNIT, |_, stmt| {
@@ -204,7 +208,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, stmt)?;
         #[cfg(feature = "debugging")]
-        auto_restore!(global; reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
+        auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
@@ -515,8 +519,10 @@ impl Engine {
                 let iter_func = iter_func.ok_or_else(|| ERR::ErrorFor(expr.start_position()))?;
 
                 // Restore scope at end of statement
-                let orig_scope_len = scope.len();
-                auto_restore!(scope => move |s| { s.rewind(orig_scope_len); });
+                auto_restore! {
+                    scope => rewind;
+                    let orig_scope_len = scope.len();
+                }
                 // Add the loop variables
                 let counter_index = if counter.is_empty() {
                     usize::MAX
@@ -643,8 +649,10 @@ impl Engine {
                         };
 
                         // Restore scope at end of block
-                        let orig_scope_len = scope.len();
-                        auto_restore!(scope; !catch_var.is_empty() => move |s| { s.rewind(orig_scope_len); });
+                        auto_restore! {
+                            scope if !catch_var.is_empty() => rewind;
+                            let orig_scope_len = scope.len();
+                        }
 
                         if !catch_var.is_empty() {
                             scope.push(catch_var.name.clone(), err_value);

@@ -238,8 +238,10 @@ impl Engine {
         let rewind_scope = options.rewind_scope;
 
         let result = if options.eval_ast && !statements.is_empty() {
-            let orig_scope_len = scope.len();
-            auto_restore!(scope; rewind_scope => move |s| { s.rewind(orig_scope_len); });
+            auto_restore! {
+                scope if rewind_scope => rewind;
+                let orig_scope_len = scope.len();
+            }
 
             self.eval_global_statements(global, caches, scope, statements)
         } else {
