@@ -62,25 +62,22 @@ impl Engine {
             }
             Expr::Variable(v, None, ..) => match &**v {
                 // Normal variable access
-                #[cfg(not(feature = "no_module"))]
                 (_, ns, ..) if ns.is_empty() => {
                     self.search_scope_only(global, caches, scope, this_ptr, expr)
                 }
-                #[cfg(feature = "no_module")]
-                (_, (), ..) => self.search_scope_only(global, caches, scope, this_ptr, expr),
 
                 // Qualified variable access
                 #[cfg(not(feature = "no_module"))]
-                (_, namespace, hash_var, var_name) => {
+                (_, ns, hash_var, var_name) => {
                     // foo:bar::baz::VARIABLE
-                    if let Some(module) = self.search_imports(global, namespace) {
+                    if let Some(module) = self.search_imports(global, ns) {
                         return module.get_qualified_var(*hash_var).map_or_else(
                             || {
                                 let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
 
                                 Err(ERR::ErrorVariableNotFound(
-                                    format!("{namespace}{sep}{var_name}"),
-                                    namespace.position(),
+                                    format!("{ns}{sep}{var_name}"),
+                                    ns.position(),
                                 )
                                 .into())
                             },
@@ -94,7 +91,7 @@ impl Engine {
 
                     // global::VARIABLE
                     #[cfg(not(feature = "no_function"))]
-                    if namespace.len() == 1 && namespace.root() == crate::engine::KEYWORD_GLOBAL {
+                    if ns.len() == 1 && ns.root() == crate::engine::KEYWORD_GLOBAL {
                         if let Some(ref constants) = global.constants {
                             if let Some(value) =
                                 crate::func::locked_write(constants).get_mut(var_name.as_str())
@@ -109,17 +106,17 @@ impl Engine {
                         let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
 
                         return Err(ERR::ErrorVariableNotFound(
-                            format!("{namespace}{sep}{var_name}"),
-                            namespace.position(),
+                            format!("{ns}{sep}{var_name}"),
+                            ns.position(),
                         )
                         .into());
                     }
 
-                    Err(
-                        ERR::ErrorModuleNotFound(namespace.to_string(), namespace.position())
-                            .into(),
-                    )
+                    Err(ERR::ErrorModuleNotFound(ns.to_string(), ns.position()).into())
                 }
+
+                #[cfg(feature = "no_module")]
+                _ => unreachable!("Invalid expression {:?}", expr),
             },
             _ => unreachable!("Expr::Variable expected but gets {:?}", expr),
         }
@@ -142,14 +139,18 @@ impl Engine {
 
         let index = match expr {
             // Check if the variable is `this`
-            Expr::Variable(v, None, ..) if v.0.is_none() && v.3 == KEYWORD_THIS => {
+            Expr::Variable(v, None, ..)
+                if v.0.is_none() && v.1.is_empty() && v.3 == KEYWORD_THIS =>
+            {
                 return if this_ptr.is_null() {
                     Err(ERR::ErrorUnboundThis(expr.position()).into())
                 } else {
                     Ok(this_ptr.into())
                 };
             }
+
             _ if global.always_search_scope => 0,
+
             Expr::Variable(_, Some(i), ..) => i.get() as usize,
             // Scripted function with the same name
             #[cfg(not(feature = "no_function"))]
@@ -165,6 +166,7 @@ impl Engine {
                 return Ok(val.into());
             }
             Expr::Variable(v, None, ..) => v.0.map_or(0, NonZeroUsize::get),
+
             _ => unreachable!("Expr::Variable expected but gets {:?}", expr),
         };
 
@@ -232,10 +234,7 @@ impl Engine {
             #[cfg(feature = "debugging")]
             let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
             #[cfg(feature = "debugging")]
-            let global =
-                &mut *crate::types::RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
-                    g.debugger_mut().reset_status(reset)
-                });
+            auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
             self.track_operation(global, expr.position())?;
 
@@ -266,10 +265,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
         #[cfg(feature = "debugging")]
-        let global =
-            &mut *crate::types::RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
-                g.debugger_mut().reset_status(reset)
-            });
+        auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
         self.track_operation(global, expr.position())?;
 
@@ -327,7 +323,7 @@ impl Engine {
                                     total_data_sizes.1 + val_sizes.1,
                                     total_data_sizes.2 + val_sizes.2,
                                 );
-                                self.raise_err_if_over_data_size_limit(total_data_sizes)
+                                self.throw_on_size(total_data_sizes)
                                     .map_err(|err| err.fill_position(item_expr.position()))?;
                             }
 
@@ -358,7 +354,7 @@ impl Engine {
                                 total_data_sizes.1 + delta.1,
                                 total_data_sizes.2 + delta.2,
                             );
-                            self.raise_err_if_over_data_size_limit(total_data_sizes)
+                            self.throw_on_size(total_data_sizes)
                                 .map_err(|err| err.fill_position(value_expr.position()))?;
                         }
 

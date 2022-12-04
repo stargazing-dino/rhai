@@ -4,13 +4,36 @@ Rhai Release Notes
 Version 1.12.0
 ==============
 
-Buf fixes
+Bug fixes
 ---------
 
 * Integer numbers that are too large to deserialize into `INT` now fall back to `Decimal` or `FLOAT` instead of silently truncating.
+* Parsing deeply-nested closures (e.g. `||{||{||{||{||{||{||{...}}}}}}}`) no longer panics but will be confined to the nesting limit.
+
+Breaking API changes
+--------------------
+
+* The callback for initializing a debugger instance has changed to `Fn(&Engine, Debugger) -> Debugger`. This allows more control over the initial setup of the debugger.
+* The internal macro `reify!` is no longer available publicly.
+
+Deprecated API's
+----------------
+
+* `Module::with_capacity` is deprecated.
+* The internal method `Engine::eval_statements_raw` is deprecated.
+
+Speed improvements
+------------------
+
+* The functions registration mechanism is revamped to take advantage of constant generics, among others.
+* This yields a 10-20% speed improvements on certain real-life, function-call-heavy workloads.
 
 Net features
 ------------
+
+### `!in`
+
+* A new operator `!in` is added which maps to `!(... in ...)`.
 
 ### `Engine::call_fn_with_options`
 
@@ -21,11 +44,15 @@ Net features
 Enhancements
 ------------
 
+* Optimizations have been done to key data structures to minimize size and creation time, which involves turning rarely-used fields into `Option<Box<T>>`. This resulted in some speed improvements.
 * `CallableFunction` is exported under `internals`.
 * The `TypeBuilder` type and `CustomType` trait are no longer marked as volatile.
 * `FuncArgs` is also implemented for arrays.
 * `Engine::set_XXX` API can now be chained.
 * `EvalContext::scope_mut` now returns `&mut Scope` instead of `&mut &mut Scope`.
+* Line-style doc-comments are now merged into a single string to avoid creating many strings. Block-style doc-comments continue to be independent strings.
+* Block-style doc-comments are now "un-indented" for better formatting.
+* Doc-comments on plugin modules are now captured in the module's `doc` field.
 
 
 Version 1.11.0

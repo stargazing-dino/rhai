@@ -64,8 +64,8 @@ impl Engine {
 
         let (stream, tokenizer_control) = self.lex_raw(
             &scripts,
-            if has_null {
-                Some(&|token, _, _| {
+            Some(if has_null {
+                &|token, _, _| {
                     match token {
                         // `null` => `()`
                         Token::Reserved(s) if &*s == "null" => Token::Unit,
@@ -86,9 +86,9 @@ impl Engine {
                         // All others
                         _ => token,
                     }
-                })
+                }
             } else {
-                Some(&|token, _, _| {
+                &|token, _, _| {
                     match token {
                         Token::Reserved(s) if &*s == "null" => Token::LexError(
                             LexError::ImproperSymbol("null".to_string(), String::new()).into(),
@@ -97,34 +97,31 @@ impl Engine {
                         Token::LeftBrace => Token::MapStart,
                         // Disallowed syntax
                         t @ (Token::Unit | Token::MapStart) => Token::LexError(
-                            LexError::ImproperSymbol(
-                                t.literal_syntax().to_string(),
-                                "Invalid JSON syntax".to_string(),
-                            )
-                            .into(),
+                            LexError::ImproperSymbol(t.literal_syntax().to_string(), String::new())
+                                .into(),
                         ),
                         Token::InterpolatedString(..) => Token::LexError(
                             LexError::ImproperSymbol(
                                 "interpolated string".to_string(),
-                                "Invalid JSON syntax".to_string(),
+                                String::new(),
                             )
                             .into(),
                         ),
                         // All others
                         _ => token,
                     }
-                })
-            },
+                }
+            }),
         );
 
         let ast = {
             let scope = Scope::new();
             let interned_strings = &mut *locked_write(&self.interned_strings);
-            let mut state = ParseState::new(&scope, interned_strings, tokenizer_control);
+            let state = &mut ParseState::new(&scope, interned_strings, tokenizer_control);
 
             self.parse_global_expr(
-                &mut stream.peekable(),
-                &mut state,
+                stream.peekable(),
+                state,
                 |s| s.flags |= ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES,
                 #[cfg(not(feature = "no_optimize"))]
                 OptimizationLevel::None,

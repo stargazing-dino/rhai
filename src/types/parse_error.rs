@@ -19,7 +19,7 @@ pub enum LexError {
     UnexpectedInput(String),
     /// A string literal is not terminated before a new-line or EOF.
     UnterminatedString,
-    /// An identifier is in an invalid format.
+    /// An identifier or string literal is longer than the maximum allowed length.
     StringTooLong(usize),
     /// An string/character/numeric escape sequence is in an invalid format.
     MalformedEscapeSequence(String),
@@ -44,11 +44,7 @@ impl fmt::Display for LexError {
             Self::MalformedChar(s) => write!(f, "Invalid character: '{s}'"),
             Self::MalformedIdentifier(s) => write!(f, "Variable name is not proper: '{s}'"),
             Self::UnterminatedString => f.write_str("Open string is not terminated"),
-            Self::StringTooLong(max) => write!(
-                f,
-                "Length of string literal exceeds the maximum limit ({})",
-                max
-            ),
+            Self::StringTooLong(max) => write!(f, "String is too long (max {max})"),
             Self::ImproperSymbol(s, d) if d.is_empty() => {
                 write!(f, "Invalid symbol encountered: '{s}'")
             }
@@ -262,7 +258,7 @@ impl From<LexError> for ParseErrorType {
     fn from(err: LexError) -> Self {
         match err {
             LexError::StringTooLong(max) => {
-                Self::LiteralTooLarge("Length of string literal".to_string(), max)
+                Self::LiteralTooLarge("Length of string".to_string(), max)
             }
             _ => Self::BadInput(err),
         }

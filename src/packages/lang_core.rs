@@ -220,7 +220,7 @@ fn collect_fn_metadata(
                 "comments".into(),
                 func.comments
                     .iter()
-                    .map(|s| engine.get_interned_string(s.as_ref()).into())
+                    .map(|s| engine.get_interned_string(s.as_str()).into())
                     .collect::<Array>()
                     .into(),
             );
@@ -267,9 +267,10 @@ fn collect_fn_metadata(
     #[cfg(not(feature = "no_module"))]
     ctx.engine()
         .global_sub_modules
-        .iter()
-        .flat_map(|m| m.values())
-        .flat_map(|m| m.iter_script_fn())
+        .as_deref()
+        .into_iter()
+        .flatten()
+        .flat_map(|(_, m)| m.iter_script_fn())
         .filter(|(ns, a, n, p, f)| filter(*ns, *a, n, *p, f))
         .for_each(|(.., f)| {
             list.push(

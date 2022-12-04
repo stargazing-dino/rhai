@@ -1,15 +1,21 @@
 //! Module which defines the function registration mechanism.
 
 #![allow(non_snake_case)]
+#![allow(unused_imports)]
+#![allow(unused_mut)]
+#![allow(unused_variables)]
 
 use super::call::FnCallArgs;
 use super::callable_function::CallableFunction;
 use super::native::{SendSync, Shared};
 use crate::types::dynamic::{DynamicWriteLock, Variant};
-use crate::{reify, Dynamic, NativeCallContext, RhaiResultOf};
+use crate::{Dynamic, Identifier, NativeCallContext, RhaiResultOf};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{any::TypeId, mem};
+use std::{
+    any::{type_name, TypeId},
+    mem,
+};
 
 /// These types are used to build a unique _marker_ tuple type for each combination
 /// of function parameter types in order to make each trait implementation unique.
@@ -19,13 +25,13 @@ use std::{any::TypeId, mem};
 ///
 /// # Examples
 ///
-/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), R, ()>` = `Fn(&mut A, B, &C) -> R`
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, false, R, false>` = `Fn(&mut A, B, &C) -> R`
 ///
-/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), R, NativeCallContext>` = `Fn(NativeCallContext, &mut A, B, &C) -> R`
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, true,  R, false>` = `Fn(NativeCallContext, &mut A, B, &C) -> R`
 ///
-/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), R, RhaiResultOf<()>>` = `Fn(&mut A, B, &C) -> Result<R, Box<EvalAltResult>>`
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, false, R, true>`  = `Fn(&mut A, B, &C) -> Result<R, Box<EvalAltResult>>`
 ///
-/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), R, RhaiResultOf<NativeCallContext>>` = `Fn(NativeCallContext, &mut A, B, &C) -> Result<R, Box<EvalAltResult>>`
+/// `RegisterNativeFunction<(Mut<A>, B, Ref<C>), 3, true,  R, true>`  = `Fn(NativeCallContext, &mut A, B, &C) -> Result<R, Box<EvalAltResult>>`
 ///
 /// These types are not actually used anywhere.
 pub struct Mut<T>(T);
@@ -64,123 +70,137 @@ pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
 ///
 /// # Type Parameters
 ///
-/// * `ARGS` - a tuple containing parameter types, with `&mut T` represented by `Mut<T>`.
-/// * `RET` - return type of the function; if the function returns `Result`, it is the unwrapped inner value type.
-pub trait RegisterNativeFunction<ARGS, RET, RESULT> {
+/// * `A` - a tuple containing parameter types, with `&mut T` represented by `Mut<T>`.
+/// * `N` - a constant generic containing the number of parameters, must be consistent with `ARGS`.
+/// * `X` - a constant boolean generic indicating whether there is a `NativeCallContext` parameter.
+/// * `R` - return type of the function; if the function returns `Result`, it is the unwrapped inner value type.
+/// * `F` - a constant boolean generic indicating whether the function is fallible (i.e. returns `Result<T, Box<EvalAltResult>>`).
+pub trait RegisterNativeFunction<
+    A: 'static,
+    const N: usize,
+    const X: bool,
+    R: 'static,
+    const F: bool,
+>
+{
     /// Convert this function into a [`CallableFunction`].
     #[must_use]
-    fn into_callable_function(self) -> CallableFunction;
+    fn into_callable_function(self, name: Identifier, no_const: bool) -> CallableFunction;
     /// Get the type ID's of this function's parameters.
     #[must_use]
-    fn param_types() -> Box<[TypeId]>;
+    fn param_types() -> [TypeId; N];
+    /// Get the number of parameters for this function.
+    #[inline(always)]
+    #[must_use]
+    fn num_params() -> usize {
+        N
+    }
+    /// Is there a [`NativeCallContext`] parameter for this function?
+    #[inline(always)]
+    #[must_use]
+    fn has_context() -> bool {
+        X
+    }
     /// _(metadata)_ Get the type names of this function's parameters.
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[must_use]
-    fn param_names() -> Box<[&'static str]>;
+    fn param_names() -> [&'static str; N];
     /// _(metadata)_ Get the type ID of this function's return value.
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
+    #[inline(always)]
     #[must_use]
-    fn return_type() -> TypeId;
+    fn return_type() -> TypeId {
+        if F {
+            TypeId::of::<RhaiResultOf<R>>()
+        } else {
+            TypeId::of::<R>()
+        }
+    }
     /// _(metadata)_ Get the type name of this function's return value.
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[inline(always)]
     #[must_use]
     fn return_type_name() -> &'static str {
-        std::any::type_name::<RET>()
+        type_name::<R>()
     }
 }
 
-const EXPECT_ARGS: &str = "arguments";
-
 macro_rules! check_constant {
-    ($abi:ident, $ctx:ident, $args:ident) => {
+    ($abi:ident, $n:expr, $fn_name:ident, $no_const:ident, $args:ident) => {
         #[cfg(any(not(feature = "no_object"), not(feature = "no_index")))]
-        if stringify!($abi) == "Method" && !$args.is_empty() {
-            let deny = match $args.len() {
-                #[cfg(not(feature = "no_index"))]
-                3 if $ctx.fn_name() == crate::engine::FN_IDX_SET && $args[0].is_read_only() => true,
-                #[cfg(not(feature = "no_object"))]
-                2 if $ctx.fn_name().starts_with(crate::engine::FN_SET)
-                    && $args[0].is_read_only() =>
-                {
-                    true
-                }
-                _ => false,
-            };
-
-            if deny {
-                return Err(crate::ERR::ErrorNonPureMethodCallOnConstant(
-                    $ctx.fn_name().to_string(),
-                    crate::Position::NONE,
-                )
-                .into());
-            }
+        if stringify!($abi) == "Method" && $no_const && $args[0].is_read_only() {
+            return Err(crate::ERR::ErrorNonPureMethodCallOnConstant(
+                $fn_name.to_string(),
+                crate::Position::NONE,
+            )
+            .into());
         }
     };
 }
 
 macro_rules! def_register {
     () => {
-        def_register!(imp Pure :);
+        def_register!(imp Pure : 0;);
     };
-    (imp $abi:ident : $($par:ident => $arg:expr => $mark:ty => $param:ty => $let:stmt => $clone:expr),*) => {
+    (imp $abi:ident : $n:expr ; $($par:ident => $arg:expr => $mark:ty => $param:ty => $clone:expr),*) => {
     //   ^ function ABI type
-    //                  ^ function parameter generic type name (A, B, C etc.)
-    //                                ^ call argument(like A, *B, &mut C etc)
-    //                                             ^ function parameter marker type (A, Ref<B> or Mut<C>)
-    //                                                         ^ function parameter actual type (A, &B or &mut C)
-    //                                                                      ^ argument let statement
+    //                ^ number of parameters
+    //                            ^ function parameter generic type name (A, B, C etc.)
+    //                                          ^ call argument(like A, *B, &mut C etc)
+    //                                                       ^ function parameter marker type (A, Ref<B> or Mut<C>)
+    //                                                                   ^ function parameter actual type (A, &B or &mut C)
+    //                                                                                ^ parameter access function (by_value or by_ref)
 
         impl<
             FN: Fn($($param),*) -> RET + SendSync + 'static,
             $($par: Variant + Clone,)*
-            RET: Variant + Clone
-        > RegisterNativeFunction<($($mark,)*), RET, ()> for FN {
-            #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
-            #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |_ctx: NativeCallContext, args: &mut FnCallArgs| {
+            RET: Variant + Clone,
+        > RegisterNativeFunction<($($mark,)*), $n, false, RET, false> for FN {
+            #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
+            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+                CallableFunction::$abi(Shared::new(move |_, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, _ctx, args);
+                    check_constant!($abi, $n, fn_name, no_const, args);
 
-                    let mut _drain = args.iter_mut();
-                    $($let $par = ($clone)(_drain.next().expect(EXPECT_ARGS)); )*
+                    let mut drain = args.iter_mut();
+                    $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     let r = self($($arg),*);
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }))
+                }), false)
             }
         }
 
         impl<
             FN: for<'a> Fn(NativeCallContext<'a>, $($param),*) -> RET + SendSync + 'static,
             $($par: Variant + Clone,)*
-            RET: Variant + Clone
-        > RegisterNativeFunction<($($mark,)*), RET, NativeCallContext<'static>> for FN {
-            #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RET>() }
-            #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
-                    // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, ctx, args);
+            RET: Variant + Clone,
+        > RegisterNativeFunction<($($mark,)*), $n, true, RET, false> for FN {
+            #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
+            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+                CallableFunction::$abi(Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
+                    let ctx = ctx.unwrap();
 
-                    let mut _drain = args.iter_mut();
-                    $($let $par = ($clone)(_drain.next().expect(EXPECT_ARGS)); )*
+                    // The arguments are assumed to be of the correct number and types!
+                    check_constant!($abi, $n, fn_name, no_const, args);
+
+                    let mut drain = args.iter_mut();
+                    $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     let r = self(ctx, $($arg),*);
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }))
+                }), true)
             }
         }
 
@@ -188,22 +208,21 @@ macro_rules! def_register {
             FN: Fn($($param),*) -> RhaiResultOf<RET> + SendSync + 'static,
             $($par: Variant + Clone,)*
             RET: Variant + Clone
-        > RegisterNativeFunction<($($mark,)*), RET, RhaiResultOf<()>> for FN {
-            #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { std::any::type_name::<RhaiResultOf<RET>>() }
-            #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |_ctx: NativeCallContext, args: &mut FnCallArgs| {
+        > RegisterNativeFunction<($($mark,)*), $n, false, RET, true> for FN {
+            #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
+            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
+            #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+                CallableFunction::$abi(Shared::new(move |_, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, _ctx, args);
+                    check_constant!($abi, $n, fn_name, no_const, args);
 
-                    let mut _drain = args.iter_mut();
-                    $($let $par = ($clone)(_drain.next().expect(EXPECT_ARGS)); )*
+                    let mut drain = args.iter_mut();
+                    $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     self($($arg),*).map(Dynamic::from)
-                }))
+                }), false)
             }
         }
 
@@ -211,40 +230,41 @@ macro_rules! def_register {
             FN: for<'a> Fn(NativeCallContext<'a>, $($param),*) -> RhaiResultOf<RET> + SendSync + 'static,
             $($par: Variant + Clone,)*
             RET: Variant + Clone
-        > RegisterNativeFunction<($($mark,)*), RET, RhaiResultOf<NativeCallContext<'static>>> for FN {
-            #[inline(always)] fn param_types() -> Box<[TypeId]> { vec![$(TypeId::of::<$par>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> Box<[&'static str]> { vec![$(std::any::type_name::<$param>()),*].into_boxed_slice() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type() -> TypeId { TypeId::of::<RhaiResultOf<RET>>() }
-            #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { std::any::type_name::<RhaiResultOf<RET>>() }
-            #[inline(always)] fn into_callable_function(self) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |ctx: NativeCallContext, args: &mut FnCallArgs| {
-                    // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, ctx, args);
+        > RegisterNativeFunction<($($mark,)*), $n, true, RET, true> for FN {
+            #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
+            #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
+            #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+                CallableFunction::$abi(Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
+                    let ctx = ctx.unwrap();
 
-                    let mut _drain = args.iter_mut();
-                    $($let $par = ($clone)(_drain.next().expect(EXPECT_ARGS)); )*
+                    // The arguments are assumed to be of the correct number and types!
+                    check_constant!($abi, $n, fn_name, no_const, args);
+
+                    let mut drain = args.iter_mut();
+                    $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     self(ctx, $($arg),*).map(Dynamic::from)
-                }))
+                }), true)
             }
         }
 
         //def_register!(imp_pop $($par => $mark => $param),*);
     };
-    ($p0:ident $(, $p:ident)*) => {
-        def_register!(imp Pure   : $p0 => $p0      => $p0      => $p0      => let $p0     => by_value $(, $p => $p => $p => $p => let $p => by_value)*);
-        def_register!(imp Method : $p0 => &mut $p0 => Mut<$p0> => &mut $p0 => let mut $p0 => by_ref   $(, $p => $p => $p => $p => let $p => by_value)*);
+    ($p0:ident:$n0:expr $(, $p:ident: $n:expr)*) => {
+        def_register!(imp Pure   : $n0 ; $p0 => $p0      => $p0      => $p0      => by_value $(, $p => $p => $p => $p => by_value)*);
+        def_register!(imp Method : $n0 ; $p0 => &mut $p0 => Mut<$p0> => &mut $p0 => by_ref   $(, $p => $p => $p => $p => by_value)*);
         //                ^ CallableFunction constructor
-        //                                                             ^ first parameter passed through
-        //                                                                                                     ^ others passed by value (by_value)
+        //                         ^ number of arguments                            ^ first parameter passed through
+        //                                                                                       ^ others passed by value (by_value)
 
         // Currently does not support first argument which is a reference, as there will be
         // conflicting implementations since &T: Any and T: Any cannot be distinguished
         //def_register!(imp $p0 => Ref<$p0> => &$p0     => by_ref   $(, $p => $p => $p => by_value)*);
 
-        def_register!($($p),*);
+        def_register!($($p: $n),*);
     };
 }
 
-def_register!(A, B, C, D, E, F, G, H, J, K, L, M, N, P, Q, R, S, T, U, V);
+def_register!(A:20, B:19, C:18, D:17, E:16, F:15, G:14, H:13, J:12, K:11, L:10, M:9, N:8, P:7, Q:6, R:5, S:4, T:3, U:2, V:1);

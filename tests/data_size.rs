@@ -17,7 +17,7 @@ fn test_max_string_size() -> Result<(), Box<EvalAltResult>> {
             .compile(r#"let x = "hello, world!";"#)
             .expect_err("should error")
             .err_type(),
-        ParseErrorType::LiteralTooLarge("Length of string literal".to_string(), 10)
+        ParseErrorType::LiteralTooLarge("Length of string".to_string(), 10)
     );
 
     assert_eq!(
@@ -25,7 +25,7 @@ fn test_max_string_size() -> Result<(), Box<EvalAltResult>> {
             .compile(r#"let x = "朝に紅顔、暮に白骨";"#)
             .expect_err("should error")
             .err_type(),
-        ParseErrorType::LiteralTooLarge("Length of string literal".to_string(), 10)
+        ParseErrorType::LiteralTooLarge("Length of string".to_string(), 10)
     );
 
     assert!(matches!(

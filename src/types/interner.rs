@@ -24,7 +24,6 @@ pub const MAX_STRING_LEN: usize = 24;
 /// _(internals)_ A cache for interned strings.
 /// Exported under the `internals` feature only.
 #[derive(Clone)]
-#[must_use]
 pub struct StringsInterner {
     /// Cached strings.
     cache: StraightHashMap<ImmutableString>,
@@ -34,6 +33,7 @@ pub struct StringsInterner {
 
 impl Default for StringsInterner {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self::new()
     }
@@ -50,6 +50,7 @@ impl fmt::Debug for StringsInterner {
 impl StringsInterner {
     /// Create a new [`StringsInterner`].
     #[inline(always)]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             cache: StraightHashMap::default(),

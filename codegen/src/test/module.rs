@@ -92,10 +92,11 @@ mod module_tests {
                 .cloned()
                 .collect::<Vec<_>>(),
             vec![
-                "/// This is a doc-comment.",
-                "/// Another line.",
-                "/// block doc-comment ",
-                "/// Final line.",
+                "\
+                /// This is a doc-comment.\n\
+                /// Another line.\n\
+                /// block doc-comment \n\
+                /// Final line.",
                 "/** doc-comment\n                    in multiple lines\n                 */"
             ]
         );
@@ -385,12 +386,13 @@ mod generate_tests {
                 }
                 impl PluginFunction for get_mystic_number_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         Ok(Dynamic::from(get_mystic_number()))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -402,6 +404,12 @@ mod generate_tests {
     #[test]
     fn one_factory_fn_with_comments_module() {
         let input_tokens: TokenStream = quote! {
+            /// This is the one_fn module!
+            /** block doc-comment
+             *  multi-line
+             */
+            /// Another line!
+            /// Final line!
             pub mod one_fn {
                 /// This is a doc-comment.
                 /// Another line.
@@ -418,6 +426,12 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            /// This is the one_fn module!
+            /** block doc-comment
+             *  multi-line
+             */
+            /// Another line!
+            /// Final line!
             pub mod one_fn {
                 /// This is a doc-comment.
                 /// Another line.
@@ -436,6 +450,7 @@ mod generate_tests {
                 #[doc(hidden)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
+                    m.set_doc("/// This is the one_fn module!\n/** block doc-comment\n             *  multi-line\n             */\n/// Another line!\n/// Final line!");
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
@@ -444,11 +459,8 @@ mod generate_tests {
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
                     m.set_fn_with_comments("get_mystic_number", FnNamespace::Internal, FnAccess::Public,
-                             Some(get_mystic_number_token::PARAM_NAMES), &[], &[
-                                 "/// This is a doc-comment.",
-                                 "/// Another line.",
-                                 "/// block doc-comment ",
-                                 "/// Final line.",
+                             Some(get_mystic_number_token::PARAM_NAMES), [], [
+                                 "/// This is a doc-comment.\n/// Another line.\n/// block doc-comment \n/// Final line.",
                                  "/** doc-comment\n                    in multiple lines\n                 */"
                              ], get_mystic_number_token().into());
                     if flatten {} else {}
@@ -463,12 +475,13 @@ mod generate_tests {
                 }
                 impl PluginFunction for get_mystic_number_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         Ok(Dynamic::from(get_mystic_number()))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -521,13 +534,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for add_one_to_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
                         Ok(Dynamic::from(add_one_to(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -579,13 +593,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for add_one_to_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
                         Ok(Dynamic::from(add_one_to(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -651,13 +666,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for add_one_to_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
                         Ok(Dynamic::from(add_one_to(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
 
                 #[allow(non_camel_case_types)]
@@ -670,7 +686,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for add_n_to_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
                         let arg1 = mem::take(args[1usize]).cast::<INT>();
                         Ok(Dynamic::from(add_n_to(arg0, arg1)))
@@ -678,6 +694,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -729,7 +746,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for add_together_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
                         let arg1 = mem::take(args[1usize]).cast::<INT>();
                         Ok(Dynamic::from(add_together(arg0, arg1)))
@@ -737,6 +754,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -795,7 +813,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for add_together_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
                         let arg1 = mem::take(args[1usize]).cast::<INT>();
                         Ok(Dynamic::from(add_together(arg0, arg1)))
@@ -803,6 +821,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -871,13 +890,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for get_mystic_number_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = &mut args[0usize].write_lock::<Hello>().unwrap();
                         Ok(Dynamic::from(get_mystic_number(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1081,12 +1101,13 @@ mod generate_tests {
                 }
                 impl PluginFunction for get_mystic_number_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         Ok(Dynamic::from(get_mystic_number()))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1171,13 +1192,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for print_out_to_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).into_immutable_string().unwrap();
                         Ok(Dynamic::from(print_out_to(&arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1229,13 +1251,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for print_out_to_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).into_string().unwrap();
                         Ok(Dynamic::from(print_out_to(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1288,7 +1311,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for foo_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<INT>();
                         let arg0 = &mut args[0usize].write_lock::<FLOAT>().unwrap();
                         Ok(Dynamic::from(foo(arg0, arg1)))
@@ -1296,6 +1319,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1347,13 +1371,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for increment_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = &mut args[0usize].write_lock::<FLOAT>().unwrap();
                         Ok(Dynamic::from(increment(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1408,13 +1433,14 @@ mod generate_tests {
                     }
                     impl PluginFunction for increment_token {
                         #[inline(always)]
-                        fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                        fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                             let arg0 = &mut args[0usize].write_lock::<FLOAT>().unwrap();
                             Ok(Dynamic::from(increment(arg0)))
                         }
 
                         #[inline(always)] fn is_method_call(&self) -> bool { true }
                         #[inline(always)] fn is_pure(&self) -> bool { false }
+                        #[inline(always)] fn has_context(&self) -> bool { false }
                     }
                 }
                 #[allow(unused_imports)]
@@ -1492,13 +1518,14 @@ mod generate_tests {
                     }
                     impl PluginFunction for increment_token {
                         #[inline(always)]
-                        fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                        fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                             let arg0 = &mut args[0usize].write_lock::<FLOAT>().unwrap();
                             Ok(Dynamic::from(increment(arg0)))
                         }
 
                         #[inline(always)] fn is_method_call(&self) -> bool { true }
                         #[inline(always)] fn is_pure(&self) -> bool { false }
+                        #[inline(always)] fn has_context(&self) -> bool { false }
                     }
                 }
                 #[allow(unused_imports)]
@@ -1577,13 +1604,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for int_foo_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = &mut args[0usize].write_lock::<u64>().unwrap();
                         Ok(Dynamic::from(int_foo(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1639,13 +1667,14 @@ mod generate_tests {
                 }
                 impl PluginFunction for int_foo_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = &mut args[0usize].write_lock::<u64>().unwrap();
                         Ok(Dynamic::from(int_foo(arg0)))
                     }
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1698,7 +1727,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for int_foo_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg0 = &mut args[0usize].write_lock::<u64>().unwrap();
                         Ok(Dynamic::from(int_foo(arg0, arg1)))
@@ -1706,6 +1735,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1761,7 +1791,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for int_foo_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg0 = &mut args[0usize].write_lock::<u64>().unwrap();
                         Ok(Dynamic::from(int_foo(arg0, arg1)))
@@ -1769,6 +1799,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1821,7 +1852,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for get_by_index_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg0 = &mut args[0usize].write_lock::<MyCollection>().unwrap();
                         Ok(Dynamic::from(get_by_index(arg0, arg1)))
@@ -1829,6 +1860,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1889,7 +1921,7 @@ mod generate_tests {
                 #[cfg(hello)]
                 impl PluginFunction for get_by_index_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg0 = &mut args[0usize].write_lock::<MyCollection>().unwrap();
                         Ok(Dynamic::from(get_by_index(arg0, arg1)))
@@ -1897,6 +1929,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -1952,7 +1985,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for get_by_index_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg0 = &mut args[0usize].write_lock::<MyCollection>().unwrap();
                         Ok(Dynamic::from(get_by_index(arg0, arg1)))
@@ -1960,6 +1993,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -2012,7 +2046,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for set_by_index_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg2 = mem::take(args[2usize]).cast::<FLOAT>();
                         let arg0 = &mut args[0usize].write_lock::<MyCollection>().unwrap();
@@ -2021,6 +2055,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };
@@ -2076,7 +2111,7 @@ mod generate_tests {
                 }
                 impl PluginFunction for set_by_index_token {
                     #[inline(always)]
-                    fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                    fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
                         let arg2 = mem::take(args[2usize]).cast::<FLOAT>();
                         let arg0 = &mut args[0usize].write_lock::<MyCollection>().unwrap();
@@ -2085,6 +2120,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn has_context(&self) -> bool { false }
                 }
             }
         };

@@ -4,11 +4,11 @@
 use crate::ast::Expr;
 use crate::func::SendSync;
 use crate::parser::ParseResult;
-use crate::tokenizer::{is_valid_identifier, Token};
+use crate::tokenizer::{is_valid_identifier, Token, NO_TOKEN};
 use crate::types::dynamic::Variant;
 use crate::{
-    reify, Dynamic, Engine, EvalContext, Identifier, ImmutableString, LexError, Position,
-    RhaiResult, StaticVec,
+    Dynamic, Engine, EvalContext, Identifier, ImmutableString, LexError, Position, RhaiResult,
+    StaticVec,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -166,6 +166,7 @@ impl Deref for Expression<'_> {
     type Target = Expr;
 
     #[inline(always)]
+    #[must_use]
     fn deref(&self) -> &Self::Target {
         self.0
     }
@@ -230,11 +231,11 @@ impl Engine {
                 continue;
             }
 
-            let token = Token::lookup_symbol_from_syntax(s).or_else(|| {
+            let token = Token::lookup_symbol_from_syntax(s).unwrap_or_else(|| {
                 if Token::is_reserved_keyword(s) {
-                    Some(Token::Reserved(Box::new(s.into())))
+                    Token::Reserved(Box::new(s.into()))
                 } else {
-                    None
+                    NO_TOKEN
                 }
             });
 
@@ -255,16 +256,16 @@ impl Engine {
                 #[cfg(not(feature = "no_float"))]
                 CUSTOM_SYNTAX_MARKER_FLOAT if !segments.is_empty() => s.into(),
                 // Standard or reserved keyword/symbol not in first position
-                _ if !segments.is_empty() && token.is_some() => {
+                _ if !segments.is_empty() && token != NO_TOKEN => {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if (self
                         .disabled_symbols
-                        .as_ref()
+                        .as_deref()
                         .map_or(false, |m| m.contains(s))
-                        || token.map_or(false, |v| v.is_reserved()))
+                        || token.is_reserved())
                         && !self
                             .custom_keywords
-                            .as_ref()
+                            .as_deref()
                             .map_or(false, |m| m.contains_key(s))
                     {
                         self.custom_keywords
@@ -275,10 +276,10 @@ impl Engine {
                 }
                 // Standard keyword in first position but not disabled
                 _ if segments.is_empty()
-                    && token.as_ref().map_or(false, Token::is_standard_keyword)
+                    && token.is_standard_keyword()
                     && !self
                         .disabled_symbols
-                        .as_ref()
+                        .as_deref()
                         .map_or(false, |m| m.contains(s)) =>
                 {
                     return Err(LexError::ImproperSymbol(
@@ -295,12 +296,12 @@ impl Engine {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if self
                         .disabled_symbols
-                        .as_ref()
+                        .as_deref()
                         .map_or(false, |m| m.contains(s))
-                        || (token.map_or(false, |v| v.is_reserved())
+                        || (token.is_reserved()
                             && !self
                                 .custom_keywords
-                                .as_ref()
+                                .as_deref()
                                 .map_or(false, |m| m.contains_key(s)))
                     {
                         self.custom_keywords

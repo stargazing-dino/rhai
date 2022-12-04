@@ -100,17 +100,19 @@ fn print_error(input: &str, mut err: EvalAltResult) {
     // Print error position
     if pos.is_none() {
         // No position
-        println!("{err}");
+        println!("\x1b[31m{err}\x1b[39m");
     } else {
         // Specific position - print line text
         println!("{line_no}{}", lines[pos.line().unwrap() - 1]);
 
-        // Display position marker
-        println!(
-            "{0:>1$} {err}",
-            "^",
-            line_no.len() + pos.position().unwrap(),
-        );
+        for (i, err_line) in err.to_string().split('\n').enumerate() {
+            // Display position marker
+            println!(
+                "\x1b[31m{0:>1$}{err_line}\x1b[39m",
+                if i > 0 { "| " } else { "^ " },
+                line_no.len() + pos.position().unwrap() + 1,
+            );
+        }
     }
 }
 
@@ -237,7 +239,13 @@ fn debug_callback(
 ) -> Result<DebuggerCommand, Box<EvalAltResult>> {
     // Check event
     match event {
+        DebuggerEvent::Start if source.is_some() => {
+            println!("\x1b[32m! Script '{}' start\x1b[39m", source.unwrap())
+        }
         DebuggerEvent::Start => println!("\x1b[32m! Script start\x1b[39m"),
+        DebuggerEvent::End if source.is_some() => {
+            println!("\x1b[31m! Script '{}' end\x1b[39m", source.unwrap())
+        }
         DebuggerEvent::End => println!("\x1b[31m! Script end\x1b[39m"),
         DebuggerEvent::Step => (),
         DebuggerEvent::BreakPoint(n) => {
@@ -572,7 +580,7 @@ fn debug_callback(
                     break Err(EvalAltResult::ErrorRuntime(msg.trim().into(), pos).into());
                 }
                 ["run" | "r"] => {
-                    println!("Restarting script...");
+                    println!("Terminating current run...");
                     break Err(EvalAltResult::ErrorTerminated(Dynamic::UNIT, pos).into());
                 }
                 _ => eprintln!(
@@ -604,7 +612,10 @@ fn main() {
     #[allow(deprecated)]
     engine.register_debugger(
         // Store the current source in the debugger state
-        |_| "".into(),
+        |engine, mut debugger| {
+            debugger.set_state(engine.const_empty_string());
+            debugger
+        },
         // Main debugging interface
         move |context, event, node, source, pos| {
             debug_callback(context, event, node, source, pos, &lines)
@@ -627,10 +638,13 @@ fn main() {
     while let Err(err) = engine.run_ast_with_scope(&mut Scope::new(), &ast) {
         match *err {
             // Loop back to restart
-            EvalAltResult::ErrorTerminated(..) => (),
+            EvalAltResult::ErrorTerminated(..) => {
+                println!("Restarting script...");
+            }
             // Break evaluation
             _ => {
                 print_error(&script, *err);
+                println!();
                 break;
             }
         }

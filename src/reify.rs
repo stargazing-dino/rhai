@@ -8,7 +8,6 @@
 /// * `reify!(`_variable_ or _expression_`,|`_temp-variable_`: `_type_`|` _code_ `)`
 /// * `reify!(`_variable_ or _expression_ `=>` `Option<`_type_`>` `)`
 /// * `reify!(`_variable_ or _expression_ `=>` _type_ `)`
-#[macro_export]
 macro_rules! reify {
     ($old:ident, |$new:ident : $t:ty| $code:expr, || $fallback:expr) => {{
         #[allow(clippy::redundant_else)]

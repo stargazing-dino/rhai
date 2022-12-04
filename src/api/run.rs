@@ -58,14 +58,10 @@ impl Engine {
     pub fn run_with_scope(&self, scope: &mut Scope, script: &str) -> RhaiResultOf<()> {
         let scripts = [script];
         let ast = {
+            let (stream, tc) = self.lex_raw(&scripts, self.token_mapper.as_deref());
             let interned_strings = &mut *locked_write(&self.interned_strings);
-
-            let (stream, tokenizer_control) =
-                self.lex_raw(&scripts, self.token_mapper.as_ref().map(<_>::as_ref));
-
-            let mut state = ParseState::new(scope, interned_strings, tokenizer_control);
-
-            self.parse(&mut stream.peekable(), &mut state, self.optimization_level)?
+            let state = &mut ParseState::new(scope, interned_strings, tc);
+            self.parse(stream.peekable(), state, self.optimization_level)?
         };
         self.run_ast_with_scope(scope, &ast)
     }
@@ -131,19 +127,23 @@ impl Engine {
         }
 
         let statements = ast.statements();
-        if !statements.is_empty() {
-            self.eval_global_statements(global, caches, scope, statements)?;
-        }
+
+        let result = if !statements.is_empty() {
+            self.eval_global_statements(global, caches, scope, statements)
+                .map(|_| ())
+        } else {
+            Ok(())
+        };
 
         #[cfg(feature = "debugging")]
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
             global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
             let mut this = crate::Dynamic::NULL;
             let node = &crate::ast::Stmt::Noop(crate::Position::NONE);
             self.run_debugger(global, caches, scope, &mut this, node)?;
         }
 
-        Ok(())
+        result
     }
 }
 

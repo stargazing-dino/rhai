@@ -674,6 +674,7 @@ impl ExportedFn {
         let arg_count = self.arg_count();
         let is_method_call = self.mutable_receiver();
         let is_pure = !self.mutable_receiver() || self.params().pure.is_some();
+        let pass_context = self.pass_context;
 
         let mut unpack_statements = Vec::new();
         let mut unpack_exprs = Vec::new();
@@ -689,7 +690,7 @@ impl ExportedFn {
         let skip_first_arg;
 
         if self.pass_context {
-            unpack_exprs.push(syn::parse2::<syn::Expr>(quote! { context }).unwrap());
+            unpack_exprs.push(syn::parse2::<syn::Expr>(quote! { context.unwrap() }).unwrap());
         }
 
         // Handle the first argument separately if the function has a "method like" receiver
@@ -860,13 +861,14 @@ impl ExportedFn {
             #(#cfg_attrs)*
             impl PluginFunction for #type_name {
                 #[inline(always)]
-                fn call(&self, context: NativeCallContext, args: &mut [&mut Dynamic]) -> RhaiResult {
+                fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                     #(#unpack_statements)*
                     #return_expr
                 }
 
                 #[inline(always)] fn is_method_call(&self) -> bool { #is_method_call }
                 #[inline(always)] fn is_pure(&self) -> bool { #is_pure }
+                #[inline(always)] fn has_context(&self) -> bool { #pass_context }
             }
         }
     }

@@ -51,20 +51,14 @@ impl Engine {
     ) -> AST {
         let mut ast = ast;
 
-        #[cfg(not(feature = "no_function"))]
-        let functions = ast
-            .shared_lib()
-            .iter_fn()
-            .filter(|f| f.func.is_script())
-            .map(|f| f.func.get_script_fn_def().unwrap().clone())
-            .collect();
-
-        let mut _new_ast = crate::optimizer::optimize_into_ast(
-            self,
+        let mut _new_ast = self.optimize_into_ast(
             scope,
             ast.take_statements(),
             #[cfg(not(feature = "no_function"))]
-            functions,
+            ast.shared_lib()
+                .iter_fn()
+                .map(|f| f.func.get_script_fn_def().cloned().expect("`ScriptFnDef"))
+                .collect(),
             optimization_level,
         );
 

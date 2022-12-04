@@ -235,18 +235,18 @@ macro_rules! reg_range {
                     concat!("from: ", stringify!($y)),
                     concat!("to: ", stringify!($y)),
                     concat!("Iterator<", stringify!($y), ">"),
-            ], [
-                "/// Return an iterator over the exclusive range of `from..to`.",
-                "/// The value `to` is never included.",
-                "///",
-                "/// # Example",
-                "///",
-                "/// ```rhai",
-                "/// // prints all values from 8 to 17",
-                "/// for n in range(8, 18) {",
-                "///     print(n);",
-                "/// }",
-                "/// ```"
+            ], ["\
+                /// Return an iterator over the exclusive range of `from..to`.\n\
+                /// The value `to` is never included.\n\
+                ///\n\
+                /// # Example\n\
+                ///\n\
+                /// ```rhai\n\
+                /// // prints all values from 8 to 17\n\
+                /// for n in range(8, 18) {\n\
+                ///     print(n);\n\
+                /// }\n\
+                /// ```"
             ]);
 
             $lib.set_iterator::<RangeInclusive<$y>>();
@@ -269,27 +269,27 @@ macro_rules! reg_range {
                     concat!("to: ", stringify!($y)),
                     concat!("step: ", stringify!($y)),
                     concat!("Iterator<", stringify!($y), ">")
-            ], [
-                "/// Return an iterator over the exclusive range of `from..to`, each iteration increasing by `step`.",
-                "/// The value `to` is never included.",
-                "///",
-                "/// If `from` > `to` and `step` < 0, iteration goes backwards.",
-                "///",
-                "/// If `from` > `to` and `step` > 0 or `from` < `to` and `step` < 0, an empty iterator is returned.",
-                "///",
-                "/// # Example",
-                "///",
-                "/// ```rhai",
-                "/// // prints all values from 8 to 17 in steps of 3",
-                "/// for n in range(8, 18, 3) {",
-                "///     print(n);",
-                "/// }",
-                "///",
-                "/// // prints all values down from 18 to 9 in steps of -3",
-                "/// for n in range(18, 8, -3) {",
-                "///     print(n);",
-                "/// }",
-                "/// ```"
+            ], ["\
+                /// Return an iterator over the exclusive range of `from..to`, each iteration increasing by `step`.\n\
+                /// The value `to` is never included.\n\
+                ///\n\
+                /// If `from` > `to` and `step` < 0, iteration goes backwards.\n\
+                ///\n\
+                /// If `from` > `to` and `step` > 0 or `from` < `to` and `step` < 0, an empty iterator is returned.\n\
+                ///\n\
+                /// # Example\n\
+                ///\n\
+                /// ```rhai\n\
+                /// // prints all values from 8 to 17 in steps of 3\n\
+                /// for n in range(8, 18, 3) {\n\
+                ///     print(n);\n\
+                /// }\n\
+                ///\n\
+                /// // prints all values down from 18 to 9 in steps of -3\n\
+                /// for n in range(18, 8, -3) {\n\
+                ///     print(n);\n\
+                /// }\n\
+                /// ```"
             ]);
 
             let _hash = $lib.set_native_fn($x, |range: std::ops::Range<$y>, step: $y| StepRange::new(range.start, range.end, step, $add));
@@ -299,26 +299,26 @@ macro_rules! reg_range {
                     concat!("range: Range<", stringify!($y), ">"),
                     concat!("step: ", stringify!($y)),
                     concat!("Iterator<", stringify!($y), ">")
-            ], [
-                "/// Return an iterator over an exclusive range, each iteration increasing by `step`.",
-                "///",
-                "/// If `range` is reversed and `step` < 0, iteration goes backwards.",
-                "///",
-                "/// Otherwise, if `range` is empty, an empty iterator is returned.",
-                "///",
-                "/// # Example",
-                "///",
-                "/// ```rhai",
-                "/// // prints all values from 8 to 17 in steps of 3",
-                "/// for n in range(8..18, 3) {",
-                "///     print(n);",
-                "/// }",
-                "///",
-                "/// // prints all values down from 18 to 9 in steps of -3",
-                "/// for n in range(18..8, -3) {",
-                "///     print(n);",
-                "/// }",
-                "/// ```"
+            ], ["\
+                /// Return an iterator over an exclusive range, each iteration increasing by `step`.\n\
+                ///\n\
+                /// If `range` is reversed and `step` < 0, iteration goes backwards.\n\
+                ///\n\
+                /// Otherwise, if `range` is empty, an empty iterator is returned.\n\
+                ///\n\
+                /// # Example\n\
+                ///\n\
+                /// ```rhai\n\
+                /// // prints all values from 8 to 17 in steps of 3\n\
+                /// for n in range(8..18, 3) {\n\
+                ///     print(n);\n\
+                /// }\n\
+                ///\n\
+                /// // prints all values down from 18 to 9 in steps of -3\n\
+                /// for n in range(18..8, -3) {\n\
+                ///     print(n);\n\
+                /// }\n\
+                /// ```"
             ]);
         )*
     };
@@ -665,6 +665,7 @@ mod range_functions {
     }
     /// Return true if the range contains no items.
     #[rhai_fn(get = "is_empty", name = "is_empty", pure)]
+    #[allow(unstable_name_collisions)]
     pub fn is_empty_exclusive(range: &mut ExclusiveRange) -> bool {
         range.is_empty()
     }

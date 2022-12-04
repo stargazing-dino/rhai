@@ -4,11 +4,11 @@ use super::call::FnCallArgs;
 use crate::ast::FnCallHashes;
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::plugin::PluginFunction;
-use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
+use crate::tokenizer::{is_valid_function_name, Token, TokenizeState, NO_TOKEN};
 use crate::types::dynamic::Variant;
 use crate::{
-    calc_fn_hash, reify, Dynamic, Engine, EvalContext, FuncArgs, Position, RhaiResult,
-    RhaiResultOf, StaticVec, VarDefInfo, ERR,
+    calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Position, RhaiResult, RhaiResultOf,
+    StaticVec, VarDefInfo, ERR,
 };
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
@@ -424,8 +424,7 @@ impl<'a> NativeCallContext<'a> {
         let caches = &mut Caches::new();
 
         let fn_name = fn_name.as_ref();
-        let op_token = Token::lookup_symbol_from_syntax(fn_name);
-        let op_token = op_token.as_ref();
+        let op_token = Token::lookup_symbol_from_syntax(fn_name).unwrap_or(NO_TOKEN);
         let args_len = args.len();
 
         global.level += 1;
@@ -547,13 +546,16 @@ pub fn locked_write<T>(value: &Locked<T>) -> LockGuardMut<T> {
 
 /// General Rust function trail object.
 #[cfg(not(feature = "sync"))]
-pub type FnAny = dyn Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult;
+pub type FnAny = dyn Fn(Option<NativeCallContext>, &mut FnCallArgs) -> RhaiResult;
 /// General Rust function trail object.
 #[cfg(feature = "sync")]
-pub type FnAny = dyn Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult + Send + Sync;
+pub type FnAny = dyn Fn(Option<NativeCallContext>, &mut FnCallArgs) -> RhaiResult + Send + Sync;
 
 /// Built-in function trait object.
-pub type FnBuiltin = fn(NativeCallContext, &mut FnCallArgs) -> RhaiResult;
+pub type FnBuiltin = (
+    fn(Option<NativeCallContext>, &mut FnCallArgs) -> RhaiResult,
+    bool,
+);
 
 /// Function that gets an iterator from a type.
 #[cfg(not(feature = "sync"))]

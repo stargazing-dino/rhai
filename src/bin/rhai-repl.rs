@@ -31,12 +31,14 @@ fn print_error(input: &str, mut err: EvalAltResult) {
         // Specific position - print line text
         println!("{line_no}{}", lines[pos.line().unwrap() - 1]);
 
-        // Display position marker
-        println!(
-            "{0:>1$} {err}",
-            "^",
-            line_no.len() + pos.position().unwrap(),
-        );
+        for (i, err_line) in err.to_string().split('\n').enumerate() {
+            // Display position marker
+            println!(
+                "{0:>1$}{err_line}",
+                if i > 0 { "| " } else { "^ " },
+                line_no.len() + pos.position().unwrap() + 1,
+            );
+        }
     }
 }
 
@@ -245,6 +247,7 @@ fn setup_editor() -> Editor<()> {
     rl
 }
 
+/// Module containing sample functions.
 #[export_module]
 mod sample_functions {
     /// This is a sample function.

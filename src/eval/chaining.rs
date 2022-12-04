@@ -5,8 +5,8 @@ use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, Expr, OpAssignment};
 use crate::config::hashing::SusLock;
 use crate::engine::{FN_IDX_GET, FN_IDX_SET};
+use crate::tokenizer::NO_TOKEN;
 use crate::types::dynamic::Union;
-use crate::types::RestoreOnDrop;
 use crate::{
     calc_fn_hash, Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, ERR,
 };
@@ -68,21 +68,13 @@ impl Engine {
         idx: &mut Dynamic,
         pos: Position,
     ) -> RhaiResultOf<Dynamic> {
-        let orig_level = global.level;
-        global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
+        auto_restore! { let orig_level = global.level; global.level += 1 }
 
-        self.exec_native_fn_call(
-            global,
-            caches,
-            FN_IDX_GET,
-            None,
-            hash_idx().0,
-            &mut [target, idx],
-            true,
-            pos,
-        )
-        .map(|(r, ..)| r)
+        let hash = hash_idx().0;
+        let args = &mut [target, idx];
+
+        self.exec_native_fn_call(global, caches, FN_IDX_GET, NO_TOKEN, hash, args, true, pos)
+            .map(|(r, ..)| r)
     }
 
     /// Call a set indexer.
@@ -97,19 +89,13 @@ impl Engine {
         is_ref_mut: bool,
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
-        let orig_level = global.level;
-        global.level += 1;
-        let global = &mut *RestoreOnDrop::lock(global, move |g| g.level = orig_level);
+        auto_restore! { let orig_level = global.level; global.level += 1 }
+
+        let hash = hash_idx().1;
+        let args = &mut [target, idx, new_val];
 
         self.exec_native_fn_call(
-            global,
-            caches,
-            FN_IDX_SET,
-            None,
-            hash_idx().1,
-            &mut [target, idx, new_val],
-            is_ref_mut,
-            pos,
+            global, caches, FN_IDX_SET, NO_TOKEN, hash, args, is_ref_mut, pos,
         )
     }
 
@@ -599,13 +585,15 @@ impl Engine {
                             // Try to call index setter if value is changed
                             let idx = &mut idx_val_for_setter;
                             let new_val = &mut new_val;
-                            self.call_indexer_set(
-                                global, caches, target, idx, new_val, is_ref_mut, op_pos,
-                            )
-                            .or_else(|e| match *e {
-                                ERR::ErrorIndexingType(..) => Ok((Dynamic::UNIT, false)),
-                                _ => Err(e),
-                            })?;
+                            // The return value of a indexer setter (usually `()`) is thrown away and not used.
+                            let _ = self
+                                .call_indexer_set(
+                                    global, caches, target, idx, new_val, is_ref_mut, op_pos,
+                                )
+                                .or_else(|e| match *e {
+                                    ERR::ErrorIndexingType(..) => Ok((Dynamic::UNIT, false)),
+                                    _ => Err(e),
+                                })?;
                         }
 
                         Ok(result)
@@ -659,8 +647,8 @@ impl Engine {
 
                             // Try to call index setter
                             let new_val = &mut new_val;
-
-                            self.call_indexer_set(
+                            // The return value of a indexer setter (usually `()`) is thrown away and not used.
+                            let _ = self.call_indexer_set(
                                 global, caches, target, idx_val, new_val, is_ref_mut, op_pos,
                             )?;
                         }
@@ -696,19 +684,17 @@ impl Engine {
                         let reset =
                             self.run_debugger_with_reset(global, caches, scope, this_ptr, rhs)?;
                         #[cfg(feature = "debugging")]
-                        let global =
-                            &mut *RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
-                                g.debugger_mut().reset_status(reset)
-                            });
+                        auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
                         let crate::ast::FnCallExpr {
                             name, hashes, args, ..
                         } = &**x;
 
                         // Truncate the index values upon exit
-                        let offset = idx_values.len() - args.len();
-                        let idx_values =
-                            &mut *RestoreOnDrop::lock(idx_values, move |v| v.truncate(offset));
+                        auto_restore! {
+                            idx_values => truncate;
+                            let offset = idx_values.len() - args.len();
+                        }
 
                         let call_args = &mut idx_values[offset..];
                         let arg1_pos = args.get(0).map_or(Position::NONE, Expr::position);
@@ -764,9 +750,11 @@ impl Engine {
 
                         if op_info.is_op_assignment() {
                             let args = &mut [target.as_mut()];
+
                             let (mut orig_val, ..) = self
                                 .exec_native_fn_call(
-                                    global, caches, getter, None, *hash_get, args, is_ref_mut, *pos,
+                                    global, caches, getter, NO_TOKEN, *hash_get, args, is_ref_mut,
+                                    *pos,
                                 )
                                 .or_else(|err| match *err {
                                     // Try an indexer if property does not exist
@@ -798,8 +786,9 @@ impl Engine {
                         }
 
                         let args = &mut [target.as_mut(), &mut new_val];
+
                         self.exec_native_fn_call(
-                            global, caches, setter, None, *hash_set, args, is_ref_mut, *pos,
+                            global, caches, setter, NO_TOKEN, *hash_set, args, is_ref_mut, *pos,
                         )
                         .or_else(|err| match *err {
                             // Try an indexer if property does not exist
@@ -824,8 +813,9 @@ impl Engine {
 
                         let ((getter, hash_get), _, name) = &**x;
                         let args = &mut [target.as_mut()];
+
                         self.exec_native_fn_call(
-                            global, caches, getter, None, *hash_get, args, is_ref_mut, *pos,
+                            global, caches, getter, NO_TOKEN, *hash_get, args, is_ref_mut, *pos,
                         )
                         .map_or_else(
                             |err| match *err {
@@ -866,21 +856,17 @@ impl Engine {
                                     global, caches, scope, this_ptr, _node,
                                 )?;
                                 #[cfg(feature = "debugging")]
-                                let global = &mut *RestoreOnDrop::lock_if(
-                                    reset.is_some(),
-                                    global,
-                                    move |g| g.debugger_mut().reset_status(reset),
-                                );
+                                auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
                                 let crate::ast::FnCallExpr {
                                     name, hashes, args, ..
                                 } = &**x;
 
                                 // Truncate the index values upon exit
-                                let offset = idx_values.len() - args.len();
-                                let idx_values = &mut *RestoreOnDrop::lock(idx_values, move |v| {
-                                    v.truncate(offset)
-                                });
+                                auto_restore! {
+                                    idx_values => truncate;
+                                    let offset = idx_values.len() - args.len();
+                                }
 
                                 let call_args = &mut idx_values[offset..];
                                 let arg1_pos = args.get(0).map_or(Position::NONE, Expr::position);
@@ -915,14 +901,13 @@ impl Engine {
                                 self.run_debugger(global, caches, scope, this_ptr, _node)?;
 
                                 let ((getter, hash_get), (setter, hash_set), name) = &**p;
-                                let mut arg_values = [target.as_mut(), &mut Dynamic::UNIT.clone()];
-                                let args = &mut arg_values[..1];
+                                let args = &mut [target.as_mut()];
 
                                 // Assume getters are always pure
                                 let (mut val, ..) = self
                                     .exec_native_fn_call(
-                                        global, caches, getter, None, *hash_get, args, is_ref_mut,
-                                        pos,
+                                        global, caches, getter, NO_TOKEN, *hash_get, args,
+                                        is_ref_mut, pos,
                                     )
                                     .or_else(|err| match *err {
                                         // Try an indexer if property does not exist
@@ -952,14 +937,15 @@ impl Engine {
                                 // Feed the value back via a setter just in case it has been updated
                                 if may_be_changed {
                                     // Re-use args because the first &mut parameter will not be consumed
-                                    let mut arg_values = [target.as_mut(), val.as_mut()];
-                                    let args = &mut arg_values;
-                                    self.exec_native_fn_call(
-                                        global, caches, setter, None, *hash_set, args, is_ref_mut,
-                                        pos,
-                                    )
-                                    .or_else(
-                                        |err| match *err {
+                                    let args = &mut [target.as_mut(), val.as_mut()];
+
+                                    // The return value is thrown away and not used.
+                                    let _ = self
+                                        .exec_native_fn_call(
+                                            global, caches, setter, NO_TOKEN, *hash_set, args,
+                                            is_ref_mut, pos,
+                                        )
+                                        .or_else(|err| match *err {
                                             // Try an indexer if property does not exist
                                             ERR::ErrorDotExpr(..) => {
                                                 let idx = &mut name.into();
@@ -978,8 +964,7 @@ impl Engine {
                                                 })
                                             }
                                             _ => Err(err),
-                                        },
-                                    )?;
+                                        })?;
                                 }
 
                                 Ok((result, may_be_changed))
@@ -992,22 +977,17 @@ impl Engine {
                                         global, caches, scope, this_ptr, _node,
                                     )?;
                                     #[cfg(feature = "debugging")]
-                                    let global = &mut *RestoreOnDrop::lock_if(
-                                        reset.is_some(),
-                                        global,
-                                        move |g| g.debugger_mut().reset_status(reset),
-                                    );
+                                    auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
                                     let crate::ast::FnCallExpr {
                                         name, hashes, args, ..
                                     } = &**f;
 
                                     // Truncate the index values upon exit
-                                    let offset = idx_values.len() - args.len();
-                                    let idx_values =
-                                        &mut *RestoreOnDrop::lock(idx_values, move |v| {
-                                            v.truncate(offset)
-                                        });
+                                    auto_restore! {
+                                        idx_values => truncate;
+                                        let offset = idx_values.len() - args.len();
+                                    }
 
                                     let call_args = &mut idx_values[offset..];
                                     let pos1 = args.get(0).map_or(Position::NONE, Expr::position);

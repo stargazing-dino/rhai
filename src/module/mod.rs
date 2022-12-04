@@ -9,8 +9,8 @@ use crate::func::{
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypesCollection};
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Identifier, ImmutableString, NativeCallContext,
-    RhaiResultOf, Shared, SharedModule, SmartString, StaticVec,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, FnArgsVec, Identifier, ImmutableString,
+    NativeCallContext, RhaiResultOf, Shared, SharedModule, SmartString,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -72,20 +72,20 @@ pub struct FuncInfoMetadata {
     /// Function access mode.
     pub access: FnAccess,
     /// Function name.
-    pub name: ImmutableString,
+    pub name: Identifier,
     /// Number of parameters.
     pub num_params: usize,
     /// Parameter types (if applicable).
-    pub param_types: StaticVec<TypeId>,
+    pub param_types: FnArgsVec<TypeId>,
     /// Parameter names and types (if available).
     #[cfg(feature = "metadata")]
-    pub params_info: StaticVec<Identifier>,
+    pub params_info: FnArgsVec<Identifier>,
     /// Return type name.
     #[cfg(feature = "metadata")]
     pub return_type: Identifier,
     /// Comments.
     #[cfg(feature = "metadata")]
-    pub comments: Box<[Box<str>]>,
+    pub comments: Box<[Identifier]>,
 }
 
 /// A type containing a single registered function.
@@ -115,7 +115,7 @@ impl FuncInfo {
                 }
             }
         } else {
-            let params: StaticVec<_> = self
+            let params: FnArgsVec<_> = self
                 .metadata
                 .params_info
                 .iter()
@@ -231,7 +231,8 @@ impl fmt::Debug for Module {
                 "modules",
                 &self
                     .modules
-                    .iter()
+                    .as_deref()
+                    .into_iter()
                     .flat_map(|m| m.keys())
                     .map(SmartString::as_str)
                     .collect::<Vec<_>>(),
@@ -392,7 +393,7 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn doc(&self) -> &str {
-        self.doc.as_ref().map_or("", |s| s.as_str())
+        self.doc.as_deref().map_or("", SmartString::as_str)
     }
 
     /// Set the documentation of the [`Module`].
@@ -542,16 +543,28 @@ impl Module {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         !self.flags.contains(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS)
-            && self.functions.as_ref().map_or(true, |m| m.is_empty())
-            && self.variables.as_ref().map_or(true, |m| m.is_empty())
-            && self.modules.as_ref().map_or(true, |m| m.is_empty())
-            && self.type_iterators.as_ref().map_or(true, |t| t.is_empty())
-            && self.all_functions.as_ref().map_or(true, |m| m.is_empty())
-            && self.all_variables.as_ref().map_or(true, |m| m.is_empty())
+            && self
+                .functions
+                .as_ref()
+                .map_or(true, StraightHashMap::is_empty)
+            && self.variables.as_deref().map_or(true, BTreeMap::is_empty)
+            && self.modules.as_deref().map_or(true, BTreeMap::is_empty)
+            && self
+                .type_iterators
+                .as_deref()
+                .map_or(true, BTreeMap::is_empty)
+            && self
+                .all_functions
+                .as_deref()
+                .map_or(true, StraightHashMap::is_empty)
+            && self
+                .all_variables
+                .as_deref()
+                .map_or(true, StraightHashMap::is_empty)
             && self
                 .all_type_iterators
-                .as_ref()
-                .map_or(true, |m| m.is_empty())
+                .as_deref()
+                .map_or(true, BTreeMap::is_empty)
     }
 
     /// Is the [`Module`] indexed?
@@ -710,7 +723,7 @@ impl Module {
                         namespace: FnNamespace::Internal,
                         access: fn_def.access,
                         num_params,
-                        param_types: StaticVec::new_const(),
+                        param_types: FnArgsVec::new_const(),
                         #[cfg(feature = "metadata")]
                         params_info,
                         #[cfg(feature = "metadata")]
@@ -866,16 +879,12 @@ impl Module {
     /// In other words, the number of entries should be one larger than the number of parameters.
     #[cfg(feature = "metadata")]
     #[inline]
-    pub fn update_fn_metadata<S: AsRef<str>>(
+    pub fn update_fn_metadata<S: Into<Identifier>>(
         &mut self,
         hash_fn: u64,
-        arg_names: impl AsRef<[S]>,
+        arg_names: impl IntoIterator<Item = S>,
     ) -> &mut Self {
-        let mut param_names: StaticVec<_> = arg_names
-            .as_ref()
-            .iter()
-            .map(|s| s.as_ref().into())
-            .collect();
+        let mut param_names: FnArgsVec<_> = arg_names.into_iter().map(Into::into).collect();
 
         if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
             let (param_names, return_type_name) = if param_names.len() > f.metadata.num_params {
@@ -907,32 +916,30 @@ impl Module {
     ///
     /// ## Comments
     ///
-    /// Block doc-comments should be kept in a single line.
+    /// Block doc-comments should be kept in a separate string slice.
     ///
-    /// Line doc-comments should be kept in one string slice per line without the termination line-break.
+    /// Line doc-comments should be merged, with line-breaks, into a single string slice without a final termination line-break.
     ///
     /// Leading white-spaces should be stripped, and each string slice always starts with the corresponding
     /// doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
     #[inline]
-    pub fn update_fn_metadata_with_comments<A: AsRef<str>, C: AsRef<str>>(
+    pub fn update_fn_metadata_with_comments<A: Into<Identifier>, C: Into<Identifier>>(
         &mut self,
         hash_fn: u64,
-        arg_names: impl AsRef<[A]>,
-        comments: impl AsRef<[C]>,
+        arg_names: impl IntoIterator<Item = A>,
+        comments: impl IntoIterator<Item = C>,
     ) -> &mut Self {
         self.update_fn_metadata(hash_fn, arg_names);
 
-        let comments = comments.as_ref();
-
-        if !comments.is_empty() {
-            let f = self
-                .functions
-                .as_mut()
-                .and_then(|m| m.get_mut(&hash_fn))
-                .unwrap();
-            f.metadata.comments = comments.iter().map(|s| s.as_ref().into()).collect();
-        }
+        self.functions
+            .as_mut()
+            .and_then(|m| m.get_mut(&hash_fn))
+            .unwrap()
+            .metadata
+            .comments = comments.into_iter().map(Into::into).collect();
 
         self
     }
@@ -997,12 +1004,11 @@ impl Module {
         let _arg_names = arg_names;
         let is_method = func.is_method();
 
-        let mut param_types: StaticVec<_> = arg_types
+        let mut param_types: FnArgsVec<_> = arg_types
             .as_ref()
             .iter()
-            .copied()
             .enumerate()
-            .map(|(i, type_id)| Self::map_type(!is_method || i > 0, type_id))
+            .map(|(i, &type_id)| Self::map_type(!is_method || i > 0, type_id))
             .collect();
         param_types.shrink_to_fit();
 
@@ -1013,11 +1019,11 @@ impl Module {
         #[cfg(feature = "metadata")]
         let (param_names, return_type_name) = {
             let mut names = _arg_names
-                .iter()
-                .flat_map(|&p| p.iter())
+                .into_iter()
+                .flatten()
                 .map(|&s| s.into())
-                .collect::<StaticVec<_>>();
-            let return_type = if names.len() > arg_types.as_ref().len() {
+                .collect::<FnArgsVec<_>>();
+            let return_type = if names.len() > param_types.len() {
                 names.pop().unwrap()
             } else {
                 crate::SmartString::new_const()
@@ -1086,12 +1092,14 @@ impl Module {
     ///
     /// ## Comments
     ///
-    /// Block doc-comments should be kept in a single line.
+    /// Block doc-comments should be kept in a separate string slice.
     ///
-    /// Line doc-comments should be kept in one string slice per line without the termination line-break.
+    /// Line doc-comments should be merged, with line-breaks, into a single string slice without a final termination line-break.
     ///
     /// Leading white-spaces should be stripped, and each string slice always starts with the corresponding
     /// doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
     #[inline]
     pub fn set_fn_with_comments<S: AsRef<str>>(
@@ -1101,17 +1109,18 @@ impl Module {
         access: FnAccess,
         arg_names: Option<&[&str]>,
         arg_types: impl AsRef<[TypeId]>,
-        comments: impl AsRef<[S]>,
+        comments: impl IntoIterator<Item = S>,
         func: CallableFunction,
     ) -> u64 {
         let hash = self.set_fn(name, namespace, access, arg_names, arg_types, func);
 
-        let comments = comments.as_ref();
-
-        if !comments.is_empty() {
-            let f = self.functions.as_mut().unwrap().get_mut(&hash).unwrap();
-            f.metadata.comments = comments.iter().map(|s| s.as_ref().into()).collect();
-        }
+        self.functions
+            .as_mut()
+            .unwrap()
+            .get_mut(&hash)
+            .unwrap()
+            .metadata
+            .comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
 
         hash
     }
@@ -1191,8 +1200,9 @@ impl Module {
         arg_types: impl AsRef<[TypeId]>,
         func: impl Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResultOf<T> + SendSync + 'static,
     ) -> u64 {
-        let f =
-            move |ctx: NativeCallContext, args: &mut FnCallArgs| func(ctx, args).map(Dynamic::from);
+        let f = move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
+            func(ctx.unwrap(), args).map(Dynamic::from)
+        };
 
         self.set_fn(
             name,
@@ -1200,7 +1210,7 @@ impl Module {
             access,
             None,
             arg_types,
-            CallableFunction::Method(Shared::new(f)),
+            CallableFunction::Method(Shared::new(f), true),
         )
     }
 
@@ -1227,22 +1237,33 @@ impl Module {
     /// assert!(module.contains_fn(hash));
     /// ```
     #[inline(always)]
-    pub fn set_native_fn<A, T, F, S>(
+    pub fn set_native_fn<A: 'static, const N: usize, const C: bool, T, F>(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
         func: F,
     ) -> u64
     where
         T: Variant + Clone,
-        F: RegisterNativeFunction<A, T, RhaiResultOf<S>>,
+        F: RegisterNativeFunction<A, N, C, T, true>,
     {
+        let fn_name = name.into();
+        let no_const = false;
+
+        #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+        let no_const = no_const || (F::num_params() == 3 && fn_name == crate::engine::FN_IDX_SET);
+        #[cfg(not(feature = "no_object"))]
+        let no_const =
+            no_const || (F::num_params() == 2 && fn_name.starts_with(crate::engine::FN_SET));
+
+        let func = func.into_callable_function(fn_name.clone(), no_const);
+
         self.set_fn(
-            name,
+            fn_name,
             FnNamespace::Internal,
             FnAccess::Public,
             None,
-            &F::param_types(),
-            func.into_callable_function(),
+            F::param_types(),
+            func,
         )
     }
 
@@ -1266,19 +1287,22 @@ impl Module {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn set_getter_fn<A, T, F, S>(&mut self, name: impl AsRef<str>, func: F) -> u64
+    pub fn set_getter_fn<A, const C: bool, T, F>(&mut self, name: impl AsRef<str>, func: F) -> u64
     where
         A: Variant + Clone,
         T: Variant + Clone,
-        F: RegisterNativeFunction<(Mut<A>,), T, RhaiResultOf<S>> + SendSync + 'static,
+        F: RegisterNativeFunction<(Mut<A>,), 1, C, T, true> + SendSync + 'static,
     {
+        let fn_name = crate::engine::make_getter(name.as_ref());
+        let func = func.into_callable_function(fn_name.clone(), false);
+
         self.set_fn(
-            crate::engine::make_getter(name.as_ref()).as_str(),
+            fn_name,
             FnNamespace::Global,
             FnAccess::Public,
             None,
-            &F::param_types(),
-            func.into_callable_function(),
+            F::param_types(),
+            func,
         )
     }
 
@@ -1307,19 +1331,22 @@ impl Module {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn set_setter_fn<A, T, F, S>(&mut self, name: impl AsRef<str>, func: F) -> u64
+    pub fn set_setter_fn<A, const C: bool, T, F>(&mut self, name: impl AsRef<str>, func: F) -> u64
     where
         A: Variant + Clone,
         T: Variant + Clone,
-        F: RegisterNativeFunction<(Mut<A>, T), (), RhaiResultOf<S>> + SendSync + 'static,
+        F: RegisterNativeFunction<(Mut<A>, T), 2, C, (), true> + SendSync + 'static,
     {
+        let fn_name = crate::engine::make_setter(name.as_ref());
+        let func = func.into_callable_function(fn_name.clone(), true);
+
         self.set_fn(
-            crate::engine::make_setter(name.as_ref()).as_str(),
+            fn_name,
             FnNamespace::Global,
             FnAccess::Public,
             None,
-            &F::param_types(),
-            func.into_callable_function(),
+            F::param_types(),
+            func,
         )
     }
 
@@ -1353,11 +1380,16 @@ impl Module {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn set_getter_setter_fn<A: Variant + Clone, T: Variant + Clone, S1, S2>(
+    pub fn set_getter_setter_fn<
+        A: Variant + Clone,
+        const C1: bool,
+        const C2: bool,
+        T: Variant + Clone,
+    >(
         &mut self,
         name: impl AsRef<str>,
-        getter: impl RegisterNativeFunction<(Mut<A>,), T, RhaiResultOf<S1>> + SendSync + 'static,
-        setter: impl RegisterNativeFunction<(Mut<A>, T), (), RhaiResultOf<S2>> + SendSync + 'static,
+        getter: impl RegisterNativeFunction<(Mut<A>,), 1, C1, T, true> + SendSync + 'static,
+        setter: impl RegisterNativeFunction<(Mut<A>, T), 2, C2, (), true> + SendSync + 'static,
     ) -> (u64, u64) {
         (
             self.set_getter_fn(name.as_ref(), getter),
@@ -1394,12 +1426,12 @@ impl Module {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline]
-    pub fn set_indexer_get_fn<A, B, T, F, S>(&mut self, func: F) -> u64
+    pub fn set_indexer_get_fn<A, B, const C: bool, T, F>(&mut self, func: F) -> u64
     where
         A: Variant + Clone,
         B: Variant + Clone,
         T: Variant + Clone,
-        F: RegisterNativeFunction<(Mut<A>, B), T, RhaiResultOf<S>> + SendSync + 'static,
+        F: RegisterNativeFunction<(Mut<A>, B), 2, C, T, true> + SendSync + 'static,
     {
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<A>() == TypeId::of::<crate::Array>() {
@@ -1421,8 +1453,8 @@ impl Module {
             FnNamespace::Global,
             FnAccess::Public,
             None,
-            &F::param_types(),
-            func.into_callable_function(),
+            F::param_types(),
+            func.into_callable_function(crate::engine::FN_IDX_GET.into(), false),
         )
     }
 
@@ -1455,12 +1487,12 @@ impl Module {
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline]
-    pub fn set_indexer_set_fn<A, B, T, F, S>(&mut self, func: F) -> u64
+    pub fn set_indexer_set_fn<A, B, const C: bool, T, F>(&mut self, func: F) -> u64
     where
         A: Variant + Clone,
         B: Variant + Clone,
         T: Variant + Clone,
-        F: RegisterNativeFunction<(Mut<A>, B, T), (), RhaiResultOf<S>> + SendSync + 'static,
+        F: RegisterNativeFunction<(Mut<A>, B, T), 3, C, (), true> + SendSync + 'static,
     {
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<A>() == TypeId::of::<crate::Array>() {
@@ -1482,8 +1514,8 @@ impl Module {
             FnNamespace::Global,
             FnAccess::Public,
             None,
-            &F::param_types(),
-            func.into_callable_function(),
+            F::param_types(),
+            func.into_callable_function(crate::engine::FN_IDX_SET.into(), true),
         )
     }
 
@@ -1527,13 +1559,13 @@ impl Module {
     pub fn set_indexer_get_set_fn<
         A: Variant + Clone,
         B: Variant + Clone,
+        const C1: bool,
+        const C2: bool,
         T: Variant + Clone,
-        S1,
-        S2,
     >(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<A>, B), T, RhaiResultOf<S1>> + SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<A>, B, T), (), RhaiResultOf<S2>> + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<A>, B), 2, C1, T, true> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<A>, B, T), 3, C2, (), true> + SendSync + 'static,
     ) -> (u64, u64) {
         (
             self.set_indexer_get_fn(get_fn),
@@ -1633,8 +1665,8 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
-            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+        if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
+            if !self.doc.as_deref().map_or(true, SmartString::is_empty) {
                 self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
@@ -1689,8 +1721,8 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
-            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+        if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
+            if !self.doc.as_deref().map_or(true, SmartString::is_empty) {
                 self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
@@ -1754,8 +1786,8 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
-            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+        if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
+            if !self.doc.as_deref().map_or(true, SmartString::is_empty) {
                 self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
@@ -1837,8 +1869,8 @@ impl Module {
         self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
 
         #[cfg(feature = "metadata")]
-        if !other.doc.as_ref().map_or(true, |s| s.is_empty()) {
-            if !self.doc.as_ref().map_or(true, |s| s.is_empty()) {
+        if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
+            if !self.doc.as_deref().map_or(true, SmartString::is_empty) {
                 self.doc.get_or_insert_with(Default::default).push('\n');
             }
             self.doc
@@ -1886,9 +1918,9 @@ impl Module {
     #[must_use]
     pub fn count(&self) -> (usize, usize, usize) {
         (
-            self.variables.as_ref().map_or(0, |m| m.len()),
-            self.functions.as_ref().map_or(0, |m| m.len()),
-            self.type_iterators.as_ref().map_or(0, |t| t.len()),
+            self.variables.as_deref().map_or(0, BTreeMap::len),
+            self.functions.as_ref().map_or(0, StraightHashMap::len),
+            self.type_iterators.as_deref().map_or(0, BTreeMap::len),
         )
     }
 
@@ -1896,16 +1928,20 @@ impl Module {
     #[inline]
     pub fn iter_sub_modules(&self) -> impl Iterator<Item = (&str, &SharedModule)> {
         self.modules
-            .iter()
-            .flat_map(|m| m.iter().map(|(k, m)| (k.as_str(), m)))
+            .as_deref()
+            .into_iter()
+            .flatten()
+            .map(|(k, m)| (k.as_str(), m))
     }
 
     /// Get an iterator to the variables in the [`Module`].
     #[inline]
     pub fn iter_var(&self) -> impl Iterator<Item = (&str, &Dynamic)> {
         self.variables
-            .iter()
-            .flat_map(|m| m.iter().map(|(k, v)| (k.as_str(), v)))
+            .as_deref()
+            .into_iter()
+            .flatten()
+            .map(|(k, v)| (k.as_str(), v))
     }
 
     /// Get an iterator to the functions in the [`Module`].
@@ -2065,7 +2101,7 @@ impl Module {
         let mut module = Module::new();
 
         // Extra modules left become sub-modules
-        let mut imports = StaticVec::new_const();
+        let mut imports = crate::StaticVec::new_const();
 
         if result.is_ok() {
             global
@@ -2088,7 +2124,8 @@ impl Module {
 
         global.source = orig_source;
 
-        result?;
+        // The return value is thrown away and not used
+        let _ = result?;
 
         // Variables with an alias left in the scope become module variables
         for (_name, value, mut aliases) in scope {
@@ -2223,7 +2260,7 @@ impl Module {
             }
 
             // Index all Rust functions
-            for (&hash, f) in module.functions.iter().flat_map(|m| m.iter()) {
+            for (&hash, f) in module.functions.iter().flatten() {
                 match f.metadata.namespace {
                     FnNamespace::Global => {
                         // Flatten all functions with global namespace
@@ -2260,11 +2297,11 @@ impl Module {
         if !self.is_indexed() {
             let mut path = Vec::with_capacity(4);
             let mut variables = StraightHashMap::with_capacity_and_hasher(
-                self.variables.as_ref().map_or(0, |m| m.len()),
+                self.variables.as_deref().map_or(0, BTreeMap::len),
                 Default::default(),
             );
             let mut functions = StraightHashMap::with_capacity_and_hasher(
-                self.functions.as_ref().map_or(0, |m| m.len()),
+                self.functions.as_ref().map_or(0, StraightHashMap::len),
                 Default::default(),
             );
             let mut type_iterators = BTreeMap::new();

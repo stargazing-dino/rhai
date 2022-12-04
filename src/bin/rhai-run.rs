@@ -8,11 +8,15 @@ fn eprint_error(input: &str, mut err: EvalAltResult) {
         let line_no = format!("{line}: ");
 
         eprintln!("{line_no}{}", lines[line - 1]);
-        eprintln!(
-            "{:>1$} {err_msg}",
-            "^",
-            line_no.len() + pos.position().unwrap(),
-        );
+
+        for (i, err_line) in err_msg.to_string().split('\n').enumerate() {
+            // Display position marker
+            println!(
+                "{0:>1$}{err_line}",
+                if i > 0 { "| " } else { "^ " },
+                line_no.len() + pos.position().unwrap() + 1,
+            );
+        }
         eprintln!();
     }
 

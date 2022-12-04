@@ -29,6 +29,7 @@ impl Engine {
     /// # }
     /// ```
     #[inline(always)]
+    #[must_use]
     pub fn definitions(&self) -> Definitions {
         Definitions {
             engine: self,
@@ -55,6 +56,7 @@ impl Engine {
     /// # }
     /// ```
     #[inline(always)]
+    #[must_use]
     pub fn definitions_with_scope<'e>(&'e self, scope: &'e Scope<'e>) -> Definitions<'e> {
         Definitions {
             engine: self,
@@ -67,7 +69,6 @@ impl Engine {
 /// Internal configuration for module generation.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[non_exhaustive]
-#[must_use]
 pub struct DefinitionsConfig {
     /// Write `module ...` headers in definition files (default `false`).
     pub write_headers: bool,
@@ -77,6 +78,7 @@ pub struct DefinitionsConfig {
 
 impl Default for DefinitionsConfig {
     #[inline(always)]
+    #[must_use]
     fn default() -> Self {
         Self {
             write_headers: false,
@@ -89,7 +91,6 @@ impl Default for DefinitionsConfig {
 /// contents of an [`Engine`].
 /// Exported under the `internals` and `metadata` feature only.
 #[derive(Debug, Clone)]
-#[must_use]
 pub struct Definitions<'e> {
     /// The [`Engine`].
     engine: &'e Engine,
@@ -104,12 +105,14 @@ impl Definitions<'_> {
     /// Headers are always present in content that is expected to be written to a file
     /// (i.e. `write_to*` and `*_file` methods).
     #[inline(always)]
+    #[must_use]
     pub const fn with_headers(mut self, headers: bool) -> Self {
         self.config.write_headers = headers;
         self
     }
     /// Include standard packages when writing definition files.
     #[inline(always)]
+    #[must_use]
     pub const fn include_standard_packages(mut self, include_standard_packages: bool) -> Self {
         self.config.include_standard_packages = include_standard_packages;
         self
@@ -128,6 +131,7 @@ impl Definitions<'_> {
     }
     /// Get the configuration.
     #[inline(always)]
+    #[must_use]
     pub(crate) const fn config(&self) -> &DefinitionsConfig {
         &self.config
     }
@@ -368,8 +372,9 @@ impl Definitions<'_> {
         let mut m = self
             .engine
             .global_sub_modules
-            .iter()
-            .flat_map(|m| m.iter())
+            .as_deref()
+            .into_iter()
+            .flatten()
             .map(move |(name, module)| {
                 (
                     name.to_string(),
@@ -391,6 +396,7 @@ impl Definitions<'_> {
 impl Module {
     /// Return definitions for all items inside the [`Module`].
     #[cfg(not(feature = "no_module"))]
+    #[must_use]
     fn definition(&self, def: &Definitions) -> String {
         let mut s = String::new();
         self.write_definition(&mut s, def).unwrap();
@@ -455,7 +461,7 @@ impl Module {
                     || def
                         .engine
                         .custom_keywords
-                        .as_ref()
+                        .as_deref()
                         .map_or(false, |m| m.contains_key(f.metadata.name.as_str()));
 
                 f.write_definition(writer, def, operator)?;
@@ -536,6 +542,7 @@ impl FuncInfo {
 /// It tries to flatten types, removing `&` and `&mut`, and paths, while keeping generics.
 ///
 /// Associated generic types are also rewritten into regular generic type parameters.
+#[must_use]
 fn def_type_name<'a>(ty: &'a str, engine: &'a Engine) -> Cow<'a, str> {
     let ty = engine.format_type_name(ty).replace("crate::", "");
     let ty = ty.strip_prefix("&mut").unwrap_or(&*ty).trim();

@@ -81,6 +81,7 @@ pub fn calc_index<E>(
 
 /// A type that encapsulates a mutation target for an expression with side effects.
 #[derive(Debug)]
+#[must_use]
 pub enum Target<'a> {
     /// The target is a mutable reference to a [`Dynamic`].
     RefMut(&'a mut Dynamic),
@@ -88,9 +89,9 @@ pub enum Target<'a> {
     #[cfg(not(feature = "no_closure"))]
     SharedValue {
         /// Lock guard to the shared [`Dynamic`].
-        source: crate::types::dynamic::DynamicWriteLock<'a, Dynamic>,
-        /// Copy of the value.
-        value: Dynamic,
+        guard: crate::types::dynamic::DynamicWriteLock<'a, Dynamic>,
+        /// Copy of the shared value.
+        shared_value: Dynamic,
     },
     /// The target is a temporary [`Dynamic`] value (i.e. its mutation can cause no side effects).
     TempValue(Dynamic),
@@ -177,13 +178,12 @@ impl<'a> Target<'a> {
         }
     }
     /// Is the [`Target`] a shared value?
-    #[cfg(not(feature = "no_closure"))]
     #[inline]
     #[must_use]
     pub fn is_shared(&self) -> bool {
-        match self {
+        #[cfg(not(feature = "no_closure"))]
+        return match self {
             Self::RefMut(r) => r.is_shared(),
-            #[cfg(not(feature = "no_closure"))]
             Self::SharedValue { .. } => true,
             Self::TempValue(value) => value.is_shared(),
             #[cfg(not(feature = "no_index"))]
@@ -191,16 +191,17 @@ impl<'a> Target<'a> {
             | Self::BitField { .. }
             | Self::BlobByte { .. }
             | Self::StringChar { .. } => false,
-        }
+        };
+        #[cfg(feature = "no_closure")]
+        return false;
     }
     /// Get the value of the [`Target`] as a [`Dynamic`], cloning a referenced value if necessary.
     #[inline]
-    #[must_use]
     pub fn take_or_clone(self) -> Dynamic {
         match self {
             Self::RefMut(r) => r.clone(), // Referenced value is cloned
             #[cfg(not(feature = "no_closure"))]
-            Self::SharedValue { value, .. } => value, // Original shared value is simply taken
+            Self::SharedValue { shared_value, .. } => shared_value, // Original shared value is simply taken
             Self::TempValue(value) => value, // Owned value is simply taken
             #[cfg(not(feature = "no_index"))]
             Self::Bit { value, .. } => value, // boolean is taken
@@ -223,12 +224,11 @@ impl<'a> Target<'a> {
     }
     /// Convert a shared or reference [`Target`] into a target with an owned value.
     #[inline(always)]
-    #[must_use]
     pub fn into_owned(self) -> Self {
         match self {
             Self::RefMut(r) => Self::TempValue(r.clone()),
             #[cfg(not(feature = "no_closure"))]
-            Self::SharedValue { value, .. } => Self::TempValue(value),
+            Self::SharedValue { shared_value, .. } => Self::TempValue(shared_value),
             _ => self,
         }
     }
@@ -240,7 +240,7 @@ impl<'a> Target<'a> {
         match self {
             Self::RefMut(r) => r,
             #[cfg(not(feature = "no_closure"))]
-            Self::SharedValue { source, .. } => source,
+            Self::SharedValue { guard, .. } => guard,
             Self::TempValue(value) => value,
             #[cfg(not(feature = "no_index"))]
             Self::Bit { source, .. } => source,
@@ -366,9 +366,12 @@ impl<'a> From<&'a mut Dynamic> for Target<'a> {
         #[cfg(not(feature = "no_closure"))]
         if value.is_shared() {
             // Cloning is cheap for a shared value
-            let val = value.clone();
-            let source = value.write_lock::<Dynamic>().expect("`Dynamic`");
-            return Self::SharedValue { source, value: val };
+            let shared_value = value.clone();
+            let guard = value.write_lock::<Dynamic>().expect("`Dynamic`");
+            return Self::SharedValue {
+                guard,
+                shared_value,
+            };
         }
 
         Self::RefMut(value)
@@ -383,7 +386,7 @@ impl Deref for Target<'_> {
         match self {
             Self::RefMut(r) => r,
             #[cfg(not(feature = "no_closure"))]
-            Self::SharedValue { source, .. } => source,
+            Self::SharedValue { guard, .. } => guard,
             Self::TempValue(ref value) => value,
             #[cfg(not(feature = "no_index"))]
             Self::Bit { ref value, .. }
@@ -416,7 +419,7 @@ impl DerefMut for Target<'_> {
         match self {
             Self::RefMut(r) => r,
             #[cfg(not(feature = "no_closure"))]
-            Self::SharedValue { source, .. } => &mut *source,
+            Self::SharedValue { guard, .. } => &mut *guard,
             Self::TempValue(ref mut value) => value,
             #[cfg(not(feature = "no_index"))]
             Self::Bit { ref mut value, .. }
@@ -437,7 +440,6 @@ impl AsMut<Dynamic> for Target<'_> {
 
 impl<T: Into<Dynamic>> From<T> for Target<'_> {
     #[inline(always)]
-    #[must_use]
     fn from(value: T) -> Self {
         Self::TempValue(value.into())
     }

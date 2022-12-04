@@ -135,22 +135,20 @@ impl fmt::Display for EvalAltResult {
 
             #[cfg(not(feature = "no_function"))]
             Self::ErrorInFunctionCall(s, src, err, ..) if crate::parser::is_anonymous_fn(s) => {
-                write!(f, "{err} in call to closure")?;
+                write!(f, "{err}\nin closure call")?;
                 if !src.is_empty() {
                     write!(f, " @ '{src}'")?;
                 }
             }
             Self::ErrorInFunctionCall(s, src, err, ..) => {
-                write!(f, "{err} in call to function {s}")?;
+                write!(f, "{err}\nin call to function '{s}'")?;
                 if !src.is_empty() {
                     write!(f, " @ '{src}'")?;
                 }
             }
 
-            Self::ErrorInModule(s, err, ..) if s.is_empty() => {
-                write!(f, "Error in module > {err}")?
-            }
-            Self::ErrorInModule(s, err, ..) => write!(f, "Error in module '{s}' > {err}")?,
+            Self::ErrorInModule(s, err, ..) if s.is_empty() => write!(f, "{err}\nin module")?,
+            Self::ErrorInModule(s, err, ..) => write!(f, "{err}\nin module '{s}'")?,
 
             Self::ErrorVariableExists(s, ..) => write!(f, "Variable already defined: {s}")?,
             Self::ErrorForbiddenVariable(s, ..) => write!(f, "Forbidden variable name: {s}")?,
@@ -159,16 +157,14 @@ impl fmt::Display for EvalAltResult {
             Self::ErrorIndexNotFound(s, ..) => write!(f, "Invalid index: {s}")?,
             Self::ErrorFunctionNotFound(s, ..) => write!(f, "Function not found: {s}")?,
             Self::ErrorModuleNotFound(s, ..) => write!(f, "Module not found: {s}")?,
-            Self::ErrorDataRace(s, ..) => {
-                write!(f, "Data race detected when accessing variable: {s}")?
-            }
+            Self::ErrorDataRace(s, ..) => write!(f, "Data race detected on variable '{s}'")?,
 
             Self::ErrorDotExpr(s, ..) if s.is_empty() => f.write_str("Malformed dot expression")?,
             Self::ErrorDotExpr(s, ..) => f.write_str(s)?,
 
             Self::ErrorIndexingType(s, ..) => write!(f, "Indexer unavailable: {s}")?,
             Self::ErrorUnboundThis(..) => f.write_str("'this' not bound")?,
-            Self::ErrorFor(..) => f.write_str("For loop expects an iterable type")?,
+            Self::ErrorFor(..) => f.write_str("For loop expects iterable type")?,
             Self::ErrorTooManyOperations(..) => f.write_str("Too many operations")?,
             Self::ErrorTooManyModules(..) => f.write_str("Too many modules imported")?,
             Self::ErrorStackOverflow(..) => f.write_str("Stack overflow")?,
@@ -188,31 +184,25 @@ impl fmt::Display for EvalAltResult {
                 if s.starts_with(crate::engine::FN_GET) =>
             {
                 let prop = &s[crate::engine::FN_GET.len()..];
-                write!(
-                    f,
-                    "Property {prop} is not pure and cannot be accessed on a constant"
-                )?
+                write!(f, "Non-pure property {prop} cannot be accessed on constant")?
             }
             #[cfg(not(feature = "no_object"))]
             Self::ErrorNonPureMethodCallOnConstant(s, ..)
                 if s.starts_with(crate::engine::FN_SET) =>
             {
                 let prop = &s[crate::engine::FN_SET.len()..];
-                write!(f, "Cannot modify property '{prop}' of a constant")?
+                write!(f, "Cannot modify property '{prop}' of constant")?
             }
             #[cfg(not(feature = "no_index"))]
             Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == crate::engine::FN_IDX_GET => {
-                write!(
-                    f,
-                    "Indexer is not pure and cannot be accessed on a constant"
-                )?
+                write!(f, "Non-pure indexer cannot be accessed on constant")?
             }
             #[cfg(not(feature = "no_index"))]
             Self::ErrorNonPureMethodCallOnConstant(s, ..) if s == crate::engine::FN_IDX_SET => {
-                write!(f, "Cannot assign to the indexer of a constant")?
+                write!(f, "Cannot assign to indexer of constant")?
             }
             Self::ErrorNonPureMethodCallOnConstant(s, ..) => {
-                write!(f, "Non-pure method '{s}' cannot be called on a constant")?
+                write!(f, "Non-pure method '{s}' cannot be called on constant")?
             }
 
             Self::ErrorAssignmentToConstant(s, ..) => write!(f, "Cannot modify constant {s}")?,
@@ -230,8 +220,8 @@ impl fmt::Display for EvalAltResult {
             Self::ErrorArithmetic(s, ..) if s.is_empty() => f.write_str("Arithmetic error")?,
             Self::ErrorArithmetic(s, ..) => f.write_str(s)?,
 
-            Self::LoopBreak(true, ..) => f.write_str("'break' must be inside a loop")?,
-            Self::LoopBreak(false, ..) => f.write_str("'continue' must be inside a loop")?,
+            Self::LoopBreak(true, ..) => f.write_str("'break' must be within a loop")?,
+            Self::LoopBreak(false, ..) => f.write_str("'continue' must be within a loop")?,
 
             Self::Return(..) => f.write_str("NOT AN ERROR - function returns value")?,
 
@@ -261,7 +251,7 @@ impl fmt::Display for EvalAltResult {
                 f,
                 "Bit-field index {index} out of bounds: only {max} bits in bit-field",
             )?,
-            Self::ErrorDataTooLarge(typ, ..) => write!(f, "{typ} exceeds maximum limit")?,
+            Self::ErrorDataTooLarge(typ, ..) => write!(f, "{typ} too large")?,
 
             Self::ErrorCustomSyntax(s, tokens, ..) => write!(f, "{s}: {}", tokens.join(" "))?,
         }

@@ -12,7 +12,7 @@ use std::prelude::v1::*;
 /// Trait to create a Rust closure from a script.
 ///
 /// Not available under `no_function`.
-pub trait Func<ARGS, RET> {
+pub trait Func<A, R> {
     /// The closure's output type.
     type Output;
 
@@ -91,14 +91,14 @@ macro_rules! def_anonymous_fn {
         impl<$($par: Variant + Clone,)* RET: Variant + Clone> Func<($($par,)*), RET> for Engine
         {
             #[cfg(feature = "sync")]
-            type Output = Box<dyn Fn($($par),*) -> RhaiResultOf<RET> + Send + Sync>;
+            type Output = Box<dyn Fn($($par,)*) -> RhaiResultOf<RET> + Send + Sync>;
             #[cfg(not(feature = "sync"))]
-            type Output = Box<dyn Fn($($par),*) -> RhaiResultOf<RET>>;
+            type Output = Box<dyn Fn($($par,)*) -> RhaiResultOf<RET>>;
 
             #[inline]
             fn create_from_ast(self, ast: AST, entry_point: &str) -> Self::Output {
                 let fn_name: SmartString = entry_point.into();
-                Box::new(move |$($par),*| self.call_fn(&mut Scope::new(), &ast, &fn_name, ($($par,)*)))
+                Box::new(move |$($par,)*| self.call_fn(&mut Scope::new(), &ast, &fn_name, ($($par,)*)))
             }
 
             #[inline]

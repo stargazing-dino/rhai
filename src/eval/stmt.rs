@@ -3,15 +3,27 @@
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::api::events::VarDefInfo;
 use crate::ast::{
-    ASTFlags, BinaryExpr, Expr, Ident, OpAssignment, Stmt, SwitchCasesCollection, TryCatchBlock,
+    ASTFlags, BinaryExpr, Expr, OpAssignment, Stmt, SwitchCasesCollection, TryCatchBlock,
 };
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
-use crate::types::dynamic::AccessMode;
-use crate::types::RestoreOnDrop;
+use crate::types::dynamic::{AccessMode, Union};
 use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, ERR, INT};
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+
+impl Dynamic {
+    /// If the value is a string, intern it.
+    #[inline(always)]
+    fn intern_string(self, engine: &Engine) -> Self {
+        match self.0 {
+            Union::Str(..) => engine
+                .get_interned_string(self.into_immutable_string().expect("`ImmutableString`"))
+                .into(),
+            _ => self,
+        }
+    }
+}
 
 impl Engine {
     /// Evaluate a statements block.
@@ -29,10 +41,10 @@ impl Engine {
         }
 
         // Restore scope at end of block if necessary
-        let orig_scope_len = scope.len();
-        let scope = &mut *RestoreOnDrop::lock_if(restore_orig_state, scope, move |s| {
-            s.rewind(orig_scope_len);
-        });
+        auto_restore! {
+            scope if restore_orig_state => rewind;
+            let orig_scope_len = scope.len();
+        }
 
         // Restore global state at end of block if necessary
         let orig_always_search_scope = global.always_search_scope;
@@ -43,7 +55,7 @@ impl Engine {
             global.scope_level += 1;
         }
 
-        let global = &mut *RestoreOnDrop::lock_if(restore_orig_state, global, move |g| {
+        auto_restore!(global if restore_orig_state => move |g| {
             g.scope_level -= 1;
 
             #[cfg(not(feature = "no_module"))]
@@ -55,10 +67,10 @@ impl Engine {
         });
 
         // Pop new function resolution caches at end of block
-        let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
-        let caches = &mut *RestoreOnDrop::lock(caches, move |c| {
-            c.rewind_fn_resolution_caches(orig_fn_resolution_caches_len)
-        });
+        auto_restore! {
+            caches => rewind_fn_resolution_caches;
+            let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
+        }
 
         // Run the statements
         statements.iter().try_fold(Dynamic::UNIT, |_, stmt| {
@@ -129,23 +141,25 @@ impl Engine {
             let args = &mut [&mut *lock_guard, &mut new_val];
 
             if self.fast_operators() {
-                if let Some(func) = get_builtin_op_assignment_fn(op_assign_token, args[0], args[1])
+                if let Some((func, ctx)) =
+                    get_builtin_op_assignment_fn(op_assign_token.clone(), args[0], args[1])
                 {
                     // Built-in found
                     let op = op_assign_token.literal_syntax();
+                    auto_restore! { let orig_level = global.level; global.level += 1 }
 
-                    let orig_level = global.level;
-                    global.level += 1;
-                    let global = &*RestoreOnDrop::lock(global, move |g| g.level = orig_level);
-
-                    let context = (self, op, None, global, *op_pos).into();
+                    let context = if ctx {
+                        Some((self, op, None, &*global, *op_pos).into())
+                    } else {
+                        None
+                    };
                     return func(context, args).map(|_| ());
                 }
             }
 
             let op_assign = op_assign_token.literal_syntax();
             let op = op_token.literal_syntax();
-            let token = Some(op_assign_token);
+            let token = op_assign_token.clone();
 
             match self
                 .exec_native_fn_call(global, caches, op_assign, token, hash, args, true, *op_pos)
@@ -154,7 +168,7 @@ impl Engine {
                 Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
                 {
                     // Expand to `var = var op rhs`
-                    let token = Some(op_token);
+                    let token = op_token.clone();
 
                     *args[0] = self
                         .exec_native_fn_call(
@@ -168,14 +182,14 @@ impl Engine {
             self.check_data_size(&*args[0], root.position())?;
         } else {
             // Normal assignment
-
-            // If value is a string, intern it
-            if new_val.is_string() {
-                let value = new_val.into_immutable_string().expect("`ImmutableString`");
-                new_val = self.get_interned_string(value).into();
+            match target {
+                // Lock it again just in case it is shared
+                Target::RefMut(_) | Target::TempValue(_) => {
+                    *target.write_lock::<Dynamic>().unwrap() = new_val
+                }
+                #[allow(unreachable_patterns)]
+                _ => **target = new_val,
             }
-
-            *target.write_lock::<Dynamic>().unwrap() = new_val;
         }
 
         target.propagate_changed_value(op_info.pos)
@@ -194,9 +208,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, stmt)?;
         #[cfg(feature = "debugging")]
-        let global = &mut *RestoreOnDrop::lock_if(reset.is_some(), global, move |g| {
-            g.debugger_mut().reset_status(reset)
-        });
+        auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
 
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
@@ -223,14 +235,13 @@ impl Engine {
 
                 let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
 
+                let is_temp_result = !target.is_ref();
                 let var_name = x.3.as_str();
 
                 #[cfg(not(feature = "no_closure"))]
                 // Also handle case where target is a `Dynamic` shared value
                 // (returned by a variable resolver, for example)
-                let is_temp_result = !target.is_ref() && !target.is_shared();
-                #[cfg(feature = "no_closure")]
-                let is_temp_result = !target.is_ref();
+                let is_temp_result = is_temp_result && !target.is_shared();
 
                 // Cannot assign to temp result from expression
                 if is_temp_result {
@@ -250,36 +261,31 @@ impl Engine {
 
             #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
             {
-                let mut rhs_val = self
+                let rhs_val = self
                     .eval_expr(global, caches, scope, this_ptr, rhs)?
-                    .flatten();
-
-                // If value is a string, intern it
-                if rhs_val.is_string() {
-                    let value = rhs_val.into_immutable_string().expect("`ImmutableString`");
-                    rhs_val = self.get_interned_string(value).into();
-                }
+                    .flatten()
+                    .intern_string(self);
 
                 let _new_val = Some((rhs_val, op_info));
 
-                // Must be either `var[index] op= val` or `var.prop op= val`
-                match lhs {
-                    // name op= rhs (handled above)
-                    Expr::Variable(..) => {
-                        unreachable!("Expr::Variable case is already handled")
-                    }
-                    // idx_lhs[idx_expr] op= rhs
-                    #[cfg(not(feature = "no_index"))]
-                    Expr::Index(..) => {
-                        self.eval_dot_index_chain(global, caches, scope, this_ptr, lhs, _new_val)
-                    }
-                    // dot_lhs.dot_rhs op= rhs
-                    #[cfg(not(feature = "no_object"))]
-                    Expr::Dot(..) => {
-                        self.eval_dot_index_chain(global, caches, scope, this_ptr, lhs, _new_val)
-                    }
-                    _ => unreachable!("cannot assign to expression: {:?}", lhs),
-                }?;
+                // Must be either `var[index] op= val` or `var.prop op= val`.
+                // The return value of any op-assignment (should be `()`) is thrown away and not used.
+                let _ =
+                    match lhs {
+                        // name op= rhs (handled above)
+                        Expr::Variable(..) => {
+                            unreachable!("Expr::Variable case is already handled")
+                        }
+                        // idx_lhs[idx_expr] op= rhs
+                        #[cfg(not(feature = "no_index"))]
+                        Expr::Index(..) => self
+                            .eval_dot_index_chain(global, caches, scope, this_ptr, lhs, _new_val),
+                        // dot_lhs.dot_rhs op= rhs
+                        #[cfg(not(feature = "no_object"))]
+                        Expr::Dot(..) => self
+                            .eval_dot_index_chain(global, caches, scope, this_ptr, lhs, _new_val),
+                        _ => unreachable!("cannot assign to expression: {:?}", lhs),
+                    }?;
 
                 return Ok(Dynamic::UNIT);
             }
@@ -494,27 +500,29 @@ impl Engine {
                 // 2) Global modules - packages
                 // 3) Imported modules - functions marked with global namespace
                 // 4) Global sub-modules - functions marked with global namespace
-                let func = self
+                let iter_func = self
                     .global_modules
                     .iter()
                     .find_map(|m| m.get_iter(iter_type));
 
                 #[cfg(not(feature = "no_module"))]
-                let func = func.or_else(|| global.get_iter(iter_type)).or_else(|| {
-                    self.global_sub_modules
-                        .iter()
-                        .flat_map(|m| m.values())
-                        .find_map(|m| m.get_qualified_iter(iter_type))
-                });
+                let iter_func = iter_func
+                    .or_else(|| global.get_iter(iter_type))
+                    .or_else(|| {
+                        self.global_sub_modules
+                            .as_deref()
+                            .into_iter()
+                            .flatten()
+                            .find_map(|(_, m)| m.get_qualified_iter(iter_type))
+                    });
 
-                let func = func.ok_or_else(|| ERR::ErrorFor(expr.start_position()))?;
+                let iter_func = iter_func.ok_or_else(|| ERR::ErrorFor(expr.start_position()))?;
 
                 // Restore scope at end of statement
-                let orig_scope_len = scope.len();
-                let scope = &mut *RestoreOnDrop::lock(scope, move |s| {
-                    s.rewind(orig_scope_len);
-                });
-
+                auto_restore! {
+                    scope => rewind;
+                    let orig_scope_len = scope.len();
+                }
                 // Add the loop variables
                 let counter_index = if counter.is_empty() {
                     usize::MAX
@@ -528,7 +536,7 @@ impl Engine {
 
                 let mut result = Dynamic::UNIT;
 
-                for (x, iter_value) in func(iter_obj).enumerate() {
+                for (x, iter_value) in iter_func(iter_obj).enumerate() {
                     // Increment counter
                     if counter_index < usize::MAX {
                         // As the variable increments from 0, this should always work
@@ -596,10 +604,7 @@ impl Engine {
             Stmt::TryCatch(x, ..) => {
                 let TryCatchBlock {
                     try_block,
-                    catch_var:
-                        Ident {
-                            name: catch_var, ..
-                        },
+                    catch_var,
                     catch_block,
                 } = &**x;
 
@@ -644,14 +649,13 @@ impl Engine {
                         };
 
                         // Restore scope at end of block
-                        let orig_scope_len = scope.len();
-                        let scope =
-                            &mut *RestoreOnDrop::lock_if(!catch_var.is_empty(), scope, move |s| {
-                                s.rewind(orig_scope_len);
-                            });
+                        auto_restore! {
+                            scope if !catch_var.is_empty() => rewind;
+                            let orig_scope_len = scope.len();
+                        }
 
                         if !catch_var.is_empty() {
-                            scope.push(catch_var.clone(), err_value);
+                            scope.push(catch_var.name.clone(), err_value);
                         }
 
                         self.eval_stmt_block(global, caches, scope, this_ptr, catch_block, true)
@@ -721,7 +725,8 @@ impl Engine {
                 // Evaluate initial value
                 let mut value = self
                     .eval_expr(global, caches, scope, this_ptr, expr)?
-                    .flatten();
+                    .flatten()
+                    .intern_string(self);
 
                 let _alias = if !rewind_scope {
                     // Put global constants into global module
@@ -759,7 +764,7 @@ impl Engine {
 
                 #[cfg(not(feature = "no_module"))]
                 if let Some(alias) = _alias {
-                    scope.add_alias_by_index(scope.len() - 1, alias.name.as_str().into());
+                    scope.add_alias_by_index(scope.len() - 1, alias.as_str().into());
                 }
 
                 Ok(Dynamic::UNIT)
@@ -826,6 +831,7 @@ impl Engine {
             // Export statement
             #[cfg(not(feature = "no_module"))]
             Stmt::Export(x, ..) => {
+                use crate::ast::Ident;
                 let (Ident { name, pos, .. }, Ident { name: alias, .. }) = &**x;
                 // Mark scope variables as public
                 scope.search(name).map_or_else(

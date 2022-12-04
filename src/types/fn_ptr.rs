@@ -4,8 +4,8 @@ use crate::eval::GlobalRuntimeState;
 use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
-    reify, Dynamic, Engine, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError,
-    RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
+    Dynamic, Engine, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError, RhaiResult,
+    RhaiResultOf, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;

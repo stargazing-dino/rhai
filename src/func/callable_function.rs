@@ -14,10 +14,10 @@ use std::prelude::v1::*;
 #[non_exhaustive]
 pub enum CallableFunction {
     /// A pure native Rust function with all arguments passed by value.
-    Pure(Shared<FnAny>),
+    Pure(Shared<FnAny>, bool),
     /// A native Rust object method with the first argument passed by reference,
     /// and the rest passed by value.
-    Method(Shared<FnAny>),
+    Method(Shared<FnAny>, bool),
     /// An iterator function.
     Iterator(Shared<IteratorFn>),
     /// A plugin function,
@@ -136,6 +136,18 @@ impl CallableFunction {
             Self::Script(..) => false,
         }
     }
+    /// Is there a [`NativeCallContext`][crate::NativeCallContext] parameter?
+    #[inline]
+    #[must_use]
+    pub fn has_context(&self) -> bool {
+        match self {
+            Self::Pure(.., ctx) | Self::Method(.., ctx) => *ctx,
+            Self::Plugin(f) => f.has_context(),
+            Self::Iterator(..) => false,
+            #[cfg(not(feature = "no_function"))]
+            Self::Script(..) => false,
+        }
+    }
     /// Get the access mode.
     #[inline]
     #[must_use]
@@ -156,7 +168,7 @@ impl CallableFunction {
     #[must_use]
     pub fn get_native_fn(&self) -> Option<&Shared<FnAny>> {
         match self {
-            Self::Pure(f) | Self::Method(f) => Some(f),
+            Self::Pure(f, ..) | Self::Method(f, ..) => Some(f),
             Self::Iterator(..) | Self::Plugin(..) => None,
 
             #[cfg(not(feature = "no_function"))]
@@ -204,16 +216,16 @@ impl CallableFunction {
 #[cfg(not(feature = "no_function"))]
 impl From<crate::ast::ScriptFnDef> for CallableFunction {
     #[inline(always)]
-    fn from(_func: crate::ast::ScriptFnDef) -> Self {
-        Self::Script(_func.into())
+    fn from(func: crate::ast::ScriptFnDef) -> Self {
+        Self::Script(func.into())
     }
 }
 
 #[cfg(not(feature = "no_function"))]
 impl From<Shared<crate::ast::ScriptFnDef>> for CallableFunction {
     #[inline(always)]
-    fn from(_func: Shared<crate::ast::ScriptFnDef>) -> Self {
-        Self::Script(_func)
+    fn from(func: Shared<crate::ast::ScriptFnDef>) -> Self {
+        Self::Script(func)
     }
 }
 

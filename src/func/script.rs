@@ -4,7 +4,7 @@
 use super::call::FnCallArgs;
 use crate::ast::ScriptFnDef;
 use crate::eval::{Caches, GlobalRuntimeState};
-use crate::{Dynamic, Engine, Position, RhaiError, RhaiResult, Scope, ERR};
+use crate::{Dynamic, Engine, Position, RhaiResult, Scope, ERR};
 use std::mem;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -33,32 +33,6 @@ impl Engine {
         rewind_scope: bool,
         pos: Position,
     ) -> RhaiResult {
-        #[cold]
-        #[inline(never)]
-        fn make_error(
-            name: String,
-            _fn_def: &ScriptFnDef,
-            global: &GlobalRuntimeState,
-            err: RhaiError,
-            pos: Position,
-        ) -> RhaiResult {
-            #[cfg(not(feature = "no_module"))]
-            let source = _fn_def
-                .environ
-                .as_ref()
-                .and_then(|environ| environ.lib.id().map(str::to_string));
-            #[cfg(feature = "no_module")]
-            let source = None;
-
-            Err(ERR::ErrorInFunctionCall(
-                name,
-                source.unwrap_or_else(|| global.source().unwrap_or("").to_string()),
-                err,
-                pos,
-            )
-            .into())
-        }
-
         assert!(fn_def.params.len() == args.len());
 
         self.track_operation(global, pos)?;
@@ -69,7 +43,7 @@ impl Engine {
         }
 
         #[cfg(feature = "debugging")]
-        if self.debugger.is_none() && fn_def.body.is_empty() {
+        if self.debugger_interface.is_none() && fn_def.body.is_empty() {
             return Ok(Dynamic::UNIT);
         }
         #[cfg(not(feature = "debugging"))]
@@ -96,15 +70,14 @@ impl Engine {
 
         // Push a new call stack frame
         #[cfg(feature = "debugging")]
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
+            let fn_name = fn_def.name.clone();
+            let args = scope.iter().skip(orig_scope_len).map(|(.., v)| v).collect();
             let source = global.source.clone();
 
-            global.debugger_mut().push_call_stack_frame(
-                fn_def.name.clone(),
-                scope.iter().skip(orig_scope_len).map(|(.., v)| v).collect(),
-                source,
-                pos,
-            );
+            global
+                .debugger_mut()
+                .push_call_stack_frame(fn_name, args, source, pos);
         }
 
         // Merge in encapsulated environment, if any
@@ -131,37 +104,42 @@ impl Engine {
         };
 
         #[cfg(feature = "debugging")]
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
             let node = crate::ast::Stmt::Noop(fn_def.body.position());
             self.run_debugger(global, caches, scope, this_ptr, &node)?;
         }
 
         // Evaluate the function
-        let mut _result = self
+        let mut _result: RhaiResult = self
             .eval_stmt_block(global, caches, scope, this_ptr, &fn_def.body, rewind_scope)
             .or_else(|err| match *err {
                 // Convert return statement to return value
                 ERR::Return(x, ..) => Ok(x),
-                // Error in sub function call
-                ERR::ErrorInFunctionCall(name, src, err, ..) => {
-                    let fn_name = if src.is_empty() {
-                        format!("{name} < {}", fn_def.name)
-                    } else {
-                        format!("{name} @ '{src}' < {}", fn_def.name)
-                    };
-                    make_error(fn_name, fn_def, global, err, pos)
-                }
                 // System errors are passed straight-through
                 mut err if err.is_system_exception() => {
                     err.set_position(pos);
                     Err(err.into())
                 }
                 // Other errors are wrapped in `ErrorInFunctionCall`
-                _ => make_error(fn_def.name.to_string(), fn_def, global, err, pos),
+                _ => Err(ERR::ErrorInFunctionCall(
+                    fn_def.name.to_string(),
+                    #[cfg(not(feature = "no_module"))]
+                    fn_def
+                        .environ
+                        .as_deref()
+                        .and_then(|environ| environ.lib.id())
+                        .unwrap_or_else(|| global.source().unwrap_or(""))
+                        .to_string(),
+                    #[cfg(feature = "no_module")]
+                    global.source().unwrap_or("").to_string(),
+                    err,
+                    pos,
+                )
+                .into()),
             });
 
         #[cfg(feature = "debugging")]
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
             let trigger = match global.debugger_mut().status {
                 crate::eval::DebuggerStatus::FunctionExit(n) => n >= global.level,
                 crate::eval::DebuggerStatus::Next(.., true) => true,
@@ -236,7 +214,9 @@ impl Engine {
             // Then check imported modules
             global.contains_qualified_fn(hash_script)
             // Then check sub-modules
-            || self.global_sub_modules.iter().flat_map(|m| m.values()).any(|m| m.contains_qualified_fn(hash_script));
+            || self.global_sub_modules.as_deref().map_or(false, |m| {
+                m.values().any(|m| m.contains_qualified_fn(hash_script))
+            });
 
         if !result && !cache.filter.is_absent_and_set(hash_script) {
             // Do not cache "one-hit wonders"

@@ -145,6 +145,7 @@ pub fn inner_item_attributes<T: ExportedParams>(
 pub fn doc_attributes(attrs: &[syn::Attribute]) -> syn::Result<Vec<String>> {
     // Find the #[doc] attribute which will turn be read for function documentation.
     let mut comments = Vec::new();
+    let mut buf = String::new();
 
     for attr in attrs {
         if let Some(i) = attr.path.get_ident() {
@@ -158,17 +159,28 @@ pub fn doc_attributes(attrs: &[syn::Attribute]) -> syn::Result<Vec<String>> {
 
                     if line.contains('\n') {
                         // Must be a block comment `/** ... */`
+                        if !buf.is_empty() {
+                            comments.push(buf.clone());
+                            buf.clear();
+                        }
                         line.insert_str(0, "/**");
                         line.push_str("*/");
+                        comments.push(line);
                     } else {
                         // Single line - assume it is `///`
-                        line.insert_str(0, "///");
+                        if !buf.is_empty() {
+                            buf.push('\n');
+                        }
+                        buf.push_str("///");
+                        buf.push_str(&line);
                     }
-
-                    comments.push(line);
                 }
             }
         }
+    }
+
+    if !buf.is_empty() {
+        comments.push(buf);
     }
 
     Ok(comments)

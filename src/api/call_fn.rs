@@ -3,10 +3,8 @@
 
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::types::dynamic::Variant;
-use crate::types::RestoreOnDrop;
 use crate::{
-    reify, Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, StaticVec, AST,
-    ERR,
+    Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -81,7 +79,7 @@ impl Engine {
     ///
     /// The [`AST`] is evaluated before calling the function.
     /// This allows a script to load the necessary modules.
-    /// This is usually desired. If not, use [`call_fn_with_options`] instead.
+    /// This is usually desired. If not, use [`call_fn_with_options`][Engine::call_fn_with_options] instead.
     ///
     /// # Example
     ///
@@ -240,10 +238,10 @@ impl Engine {
         let rewind_scope = options.rewind_scope;
 
         let result = if options.eval_ast && !statements.is_empty() {
-            let orig_scope_len = scope.len();
-            let scope = &mut *RestoreOnDrop::lock_if(rewind_scope, scope, move |s| {
-                s.rewind(orig_scope_len);
-            });
+            auto_restore! {
+                scope if rewind_scope => rewind;
+                let orig_scope_len = scope.len();
+            }
 
             self.eval_global_statements(global, caches, scope, statements)
         } else {
@@ -254,7 +252,7 @@ impl Engine {
 
             // Check for data race.
             #[cfg(not(feature = "no_closure"))]
-            crate::func::ensure_no_data_race(name, args, false).map(|_| Dynamic::UNIT)?;
+            crate::func::ensure_no_data_race(name, args, false)?;
 
             ast.shared_lib()
                 .get_script_fn(name, args.len())
@@ -276,7 +274,7 @@ impl Engine {
         });
 
         #[cfg(feature = "debugging")]
-        if self.debugger.is_some() {
+        if self.is_debugger_registered() {
             global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
             self.run_debugger(global, caches, scope, this_ptr, node)?;

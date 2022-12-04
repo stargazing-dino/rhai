@@ -34,6 +34,15 @@ fn test_loop() -> Result<(), Box<EvalAltResult>> {
         ParseErrorType::LoopBreak
     );
 
+    #[cfg(not(feature = "no_function"))]
+    assert_eq!(
+        *engine
+            .compile("loop { let f = || { break;  } }")
+            .expect_err("should error")
+            .err_type(),
+        ParseErrorType::LoopBreak
+    );
+
     assert_eq!(
         *engine
             .compile("let x = 0; if x > 0 { continue; }")

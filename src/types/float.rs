@@ -15,6 +15,7 @@ use num_traits::float::FloatCore as Float;
 ///
 /// Not available under `no_float`.
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd)]
+#[must_use]
 pub struct FloatWrapper<F>(F);
 
 impl Hash for FloatWrapper<crate::FLOAT> {
@@ -108,7 +109,6 @@ impl<F: Float> FloatWrapper<F> {
 
     /// Create a new [`FloatWrapper`].
     #[inline(always)]
-    #[must_use]
     pub const fn new(value: F) -> Self {
         Self(value)
     }

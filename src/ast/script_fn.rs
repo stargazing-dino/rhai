@@ -16,7 +16,6 @@ use std::{fmt, hash::Hash};
 ///
 /// Not available under `no_module` or `no_function`.
 #[cfg(not(feature = "no_module"))]
-#[cfg(not(feature = "no_function"))]
 #[derive(Debug, Clone)]
 pub struct EncapsulatedEnviron {
     /// Functions defined within the same [`AST`][crate::AST].
@@ -24,7 +23,7 @@ pub struct EncapsulatedEnviron {
     /// Imported [modules][crate::Module].
     pub imports: Box<[(ImmutableString, crate::SharedModule)]>,
     /// Globally-defined constants.
-    pub constants: Option<crate::eval::GlobalConstants>,
+    pub constants: Option<crate::eval::SharedGlobalConstants>,
 }
 
 /// _(internals)_ A type containing information on a script-defined function.
@@ -35,7 +34,6 @@ pub struct ScriptFnDef {
     pub body: StmtBlock,
     /// Encapsulated AST environment, if any.
     #[cfg(not(feature = "no_module"))]
-    #[cfg(not(feature = "no_function"))]
     pub environ: Option<crate::Shared<EncapsulatedEnviron>>,
     /// Function name.
     pub name: ImmutableString,
@@ -51,12 +49,14 @@ pub struct ScriptFnDef {
     ///
     /// Block doc-comments are kept in a single string slice with line-breaks within.
     ///
-    /// Line doc-comments are kept in one string slice per line without the termination line-break.
+    /// Line doc-comments are merged, with line-breaks, into a single string slice without a termination line-break.
     ///
     /// Leading white-spaces are stripped, and each string slice always starts with the
     /// corresponding doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments starts with `///`.
     #[cfg(feature = "metadata")]
-    pub comments: Box<[Box<str>]>,
+    pub comments: Box<[crate::Identifier]>,
 }
 
 impl fmt::Display for ScriptFnDef {
@@ -100,10 +100,12 @@ pub struct ScriptFnMetadata<'a> {
     ///
     /// Block doc-comments are kept in a single string slice with line-breaks within.
     ///
-    /// Line doc-comments are kept in one string slice per line without the termination line-break.
+    /// Line doc-comments are merged, with line-breaks, into a single string slice without a termination line-break.
     ///
     /// Leading white-spaces are stripped, and each string slice always starts with the
     /// corresponding doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments starts with `///`.
     #[cfg(feature = "metadata")]
     pub comments: Vec<&'a str>,
 }

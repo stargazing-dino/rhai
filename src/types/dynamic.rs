@@ -1,6 +1,6 @@
 //! Helper module which defines the [`Dynamic`] data type.
 
-use crate::{reify, ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, INT};
+use crate::{ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -49,11 +49,13 @@ pub type Tag = i16;
 const DEFAULT_TAG_VALUE: Tag = 0;
 
 /// Dynamic type containing any value.
+#[must_use]
 pub struct Dynamic(pub(crate) Union);
 
 /// Internal [`Dynamic`] representation.
 ///
 /// Most variants are boxed to reduce the size.
+#[must_use]
 pub enum Union {
     /// An error value which should not exist.
     Null,
@@ -107,10 +109,12 @@ pub enum Union {
 /// This type provides transparent interoperability between normal [`Dynamic`] and shared
 /// [`Dynamic`] values.
 #[derive(Debug)]
+#[must_use]
 pub struct DynamicReadLock<'d, T: Clone>(DynamicReadLockInner<'d, T>);
 
 /// Different types of read guards for [`DynamicReadLock`].
 #[derive(Debug)]
+#[must_use]
 enum DynamicReadLockInner<'d, T: Clone> {
     /// A simple reference to a non-shared value.
     Reference(&'d T),
@@ -139,10 +143,12 @@ impl<'d, T: Any + Clone> Deref for DynamicReadLock<'d, T> {
 /// This type provides transparent interoperability between normal [`Dynamic`] and shared
 /// [`Dynamic`] values.
 #[derive(Debug)]
+#[must_use]
 pub struct DynamicWriteLock<'d, T: Clone>(DynamicWriteLockInner<'d, T>);
 
 /// Different types of write guards for [`DynamicReadLock`].
 #[derive(Debug)]
+#[must_use]
 enum DynamicWriteLockInner<'d, T: Clone> {
     /// A simple mutable reference to a non-shared value.
     Reference(&'d mut T),
@@ -686,7 +692,6 @@ impl Clone for Dynamic {
 
 impl Default for Dynamic {
     #[inline(always)]
-    #[must_use]
     fn default() -> Self {
         Self::UNIT
     }
@@ -852,19 +857,16 @@ impl Dynamic {
 
     /// Create a new [`Dynamic`] from a [`bool`].
     #[inline(always)]
-    #[must_use]
     pub const fn from_bool(value: bool) -> Self {
         Self(Union::Bool(value, DEFAULT_TAG_VALUE, ReadWrite))
     }
     /// Create a new [`Dynamic`] from an [`INT`].
     #[inline(always)]
-    #[must_use]
     pub const fn from_int(value: INT) -> Self {
         Self(Union::Int(value, DEFAULT_TAG_VALUE, ReadWrite))
     }
     /// Create a new [`Dynamic`] from a [`char`].
     #[inline(always)]
-    #[must_use]
     pub const fn from_char(value: char) -> Self {
         Self(Union::Char(value, DEFAULT_TAG_VALUE, ReadWrite))
     }
@@ -873,7 +875,6 @@ impl Dynamic {
     /// Not available under `no_float`.
     #[cfg(not(feature = "no_float"))]
     #[inline(always)]
-    #[must_use]
     pub const fn from_float(value: crate::FLOAT) -> Self {
         Self(Union::Float(
             super::FloatWrapper::new(value),
@@ -886,28 +887,24 @@ impl Dynamic {
     /// Exported under the `decimal` feature only.
     #[cfg(feature = "decimal")]
     #[inline(always)]
-    #[must_use]
     pub fn from_decimal(value: rust_decimal::Decimal) -> Self {
         Self(Union::Decimal(value.into(), DEFAULT_TAG_VALUE, ReadWrite))
     }
     /// Create a [`Dynamic`] from an [`Array`][crate::Array].
     #[cfg(not(feature = "no_index"))]
     #[inline(always)]
-    #[must_use]
     pub fn from_array(array: crate::Array) -> Self {
         Self(Union::Array(array.into(), DEFAULT_TAG_VALUE, ReadWrite))
     }
     /// Create a [`Dynamic`] from a [`Blob`][crate::Blob].
     #[cfg(not(feature = "no_index"))]
     #[inline(always)]
-    #[must_use]
     pub fn from_blob(blob: crate::Blob) -> Self {
         Self(Union::Blob(blob.into(), DEFAULT_TAG_VALUE, ReadWrite))
     }
     /// Create a [`Dynamic`] from a [`Map`][crate::Map].
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    #[must_use]
     pub fn from_map(map: crate::Map) -> Self {
         Self(Union::Map(map.into(), DEFAULT_TAG_VALUE, ReadWrite))
     }
@@ -916,7 +913,6 @@ impl Dynamic {
     /// Not available under `no-std` or `no_time`.
     #[cfg(not(feature = "no_time"))]
     #[inline(always)]
-    #[must_use]
     pub fn from_timestamp(value: Instant) -> Self {
         Self(Union::TimeStamp(value.into(), DEFAULT_TAG_VALUE, ReadWrite))
     }
@@ -991,7 +987,6 @@ impl Dynamic {
     }
     /// Make this [`Dynamic`] read-only (i.e. a constant).
     #[inline(always)]
-    #[must_use]
     pub fn into_read_only(self) -> Self {
         let mut value = self;
         value.set_access_mode(AccessMode::ReadOnly);
@@ -1085,7 +1080,6 @@ impl Dynamic {
     /// assert_eq!(new_result.to_string(), "hello");
     /// ```
     #[inline]
-    #[must_use]
     pub fn from<T: Variant + Clone>(value: T) -> Self {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
 
@@ -1143,7 +1137,6 @@ impl Dynamic {
     /// If the [`Dynamic`] value is already shared, this method returns itself.
     #[cfg(not(feature = "no_closure"))]
     #[inline]
-    #[must_use]
     pub fn into_shared(self) -> Self {
         let _access = self.access_mode();
 
@@ -1182,6 +1175,7 @@ impl Dynamic {
     /// ```
     #[inline]
     #[must_use]
+    #[allow(unused_mut)]
     pub fn try_cast<T: Any>(mut self) -> Option<T> {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
 
@@ -1365,7 +1359,6 @@ impl Dynamic {
     ///
     /// If the [`Dynamic`] is a shared value, it returns a cloned copy of the shared value.
     #[inline]
-    #[must_use]
     pub fn flatten_clone(&self) -> Self {
         match self.0 {
             #[cfg(not(feature = "no_closure"))]
@@ -1380,7 +1373,6 @@ impl Dynamic {
     /// If the [`Dynamic`] is a shared value, it returns the shared value if there are no
     /// outstanding references, or a cloned copy.
     #[inline]
-    #[must_use]
     pub fn flatten(self) -> Self {
         match self.0 {
             #[cfg(not(feature = "no_closure"))]
@@ -1451,7 +1443,6 @@ impl Dynamic {
     /// Under the `sync` feature, this call may deadlock, or [panic](https://doc.rust-lang.org/std/sync/struct.RwLock.html#panics-1).
     /// Otherwise, this call panics if the data is currently borrowed for write.
     #[inline]
-    #[must_use]
     pub fn read_lock<T: Any + Clone>(&self) -> Option<DynamicReadLock<T>> {
         match self.0 {
             #[cfg(not(feature = "no_closure"))]
@@ -1483,7 +1474,6 @@ impl Dynamic {
     /// Under the `sync` feature, this call may deadlock, or [panic](https://doc.rust-lang.org/std/sync/struct.RwLock.html#panics-1).
     /// Otherwise, this call panics if the data is currently borrowed for write.
     #[inline]
-    #[must_use]
     pub fn write_lock<T: Any + Clone>(&mut self) -> Option<DynamicWriteLock<T>> {
         match self.0 {
             #[cfg(not(feature = "no_closure"))]

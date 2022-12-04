@@ -168,10 +168,12 @@ pub fn gen_metadata_to_json(
     include_standard_packages: bool,
 ) -> serde_json::Result<String> {
     let _ast = ast;
+    #[cfg(feature = "metadata")]
+    let mut global_doc = String::new();
     let mut global = ModuleMetadata::new();
 
     #[cfg(not(feature = "no_module"))]
-    for (name, m) in engine.global_sub_modules.iter().flat_map(|m| m.iter()) {
+    for (name, m) in engine.global_sub_modules.as_deref().into_iter().flatten() {
         global.modules.insert(name, m.as_ref().into());
     }
 
@@ -185,7 +187,16 @@ pub fn gen_metadata_to_json(
         .global_modules
         .iter()
         .filter(|m| !m.flags.contains(exclude_flags))
-        .flat_map(|m| m.iter_fn())
+        .flat_map(|m| {
+            #[cfg(feature = "metadata")]
+            if !m.doc().is_empty() {
+                if !global_doc.is_empty() {
+                    global_doc.push('\n');
+                }
+                global_doc.push_str(m.doc());
+            }
+            m.iter_fn()
+        })
         .for_each(|f| {
             #[allow(unused_mut)]
             let mut meta: FnMetadata = f.into();
@@ -213,7 +224,17 @@ pub fn gen_metadata_to_json(
 
     #[cfg(feature = "metadata")]
     if let Some(ast) = _ast {
-        global.doc = ast.doc();
+        if !ast.doc().is_empty() {
+            if !global_doc.is_empty() {
+                global_doc.push('\n');
+            }
+            global_doc.push_str(ast.doc());
+        }
+    }
+
+    #[cfg(feature = "metadata")]
+    {
+        global.doc = &global_doc;
     }
 
     serde_json::to_string_pretty(&global)

@@ -5,7 +5,7 @@ use crate::engine::{
     KEYWORD_FN_PTR_CURRY, KEYWORD_IS_DEF_VAR, KEYWORD_PRINT, KEYWORD_THIS, KEYWORD_TYPE_OF,
 };
 use crate::func::native::OnParseTokenCallback;
-use crate::{Engine, Identifier, LexError, SmartString, StaticVec, INT, UNSIGNED_INT};
+use crate::{Engine, Identifier, LexError, Position, SmartString, StaticVec, INT, UNSIGNED_INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -13,7 +13,6 @@ use std::{
     char, fmt,
     iter::{FusedIterator, Peekable},
     num::NonZeroUsize,
-    ops::{Add, AddAssign},
     rc::Rc,
     str::{Chars, FromStr},
 };
@@ -24,9 +23,9 @@ pub struct TokenizerControlBlock {
     /// Is the current tokenizer position within an interpolated text string?
     /// This flag allows switching the tokenizer back to _text_ parsing after an interpolation stream.
     pub is_within_text: bool,
-    /// Collection of global comments.
+    /// Global comments.
     #[cfg(feature = "metadata")]
-    pub global_comments: Vec<SmartString>,
+    pub global_comments: String,
 }
 
 impl TokenizerControlBlock {
@@ -37,7 +36,7 @@ impl TokenizerControlBlock {
         Self {
             is_within_text: false,
             #[cfg(feature = "metadata")]
-            global_comments: Vec::new(),
+            global_comments: String::new(),
         }
     }
 }
@@ -50,325 +49,11 @@ type LERR = LexError;
 /// Separator character for numbers.
 const NUMBER_SEPARATOR: char = '_';
 
+/// No token.
+pub const NO_TOKEN: Token = Token::NONE;
+
 /// A stream of tokens.
 pub type TokenStream<'a> = Peekable<TokenIterator<'a>>;
-
-/// A location (line number + character position) in the input script.
-///
-/// # Limitations
-///
-/// In order to keep footprint small, both line number and character position have 16-bit resolution,
-/// meaning they go up to a maximum of 65,535 lines and 65,535 characters per line.
-///
-/// Advancing beyond the maximum line length or maximum number of lines is not an error but has no effect.
-#[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
-pub struct Position {
-    /// Line number: 0 = none
-    #[cfg(not(feature = "no_position"))]
-    line: u16,
-    /// Character position: 0 = BOL
-    #[cfg(not(feature = "no_position"))]
-    pos: u16,
-}
-
-impl Position {
-    /// A [`Position`] representing no position.
-    pub const NONE: Self = Self {
-        #[cfg(not(feature = "no_position"))]
-        line: 0,
-        #[cfg(not(feature = "no_position"))]
-        pos: 0,
-    };
-    /// A [`Position`] representing the first position.
-    pub const START: Self = Self {
-        #[cfg(not(feature = "no_position"))]
-        line: 1,
-        #[cfg(not(feature = "no_position"))]
-        pos: 0,
-    };
-
-    /// Create a new [`Position`].
-    ///
-    /// `line` must not be zero.
-    ///
-    /// If `position` is zero, then it is at the beginning of a line.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `line` is zero.
-    #[inline]
-    #[must_use]
-    pub const fn new(line: u16, position: u16) -> Self {
-        assert!(line != 0, "line cannot be zero");
-
-        let _pos = position;
-
-        Self {
-            #[cfg(not(feature = "no_position"))]
-            line,
-            #[cfg(not(feature = "no_position"))]
-            pos: _pos,
-        }
-    }
-    /// Get the line number (1-based), or [`None`] if there is no position.
-    #[inline]
-    #[must_use]
-    pub const fn line(self) -> Option<usize> {
-        #[cfg(not(feature = "no_position"))]
-        return if self.is_none() {
-            None
-        } else {
-            Some(self.line as usize)
-        };
-
-        #[cfg(feature = "no_position")]
-        return None;
-    }
-    /// Get the character position (1-based), or [`None`] if at beginning of a line.
-    #[inline]
-    #[must_use]
-    pub const fn position(self) -> Option<usize> {
-        #[cfg(not(feature = "no_position"))]
-        return if self.is_none() || self.pos == 0 {
-            None
-        } else {
-            Some(self.pos as usize)
-        };
-
-        #[cfg(feature = "no_position")]
-        return None;
-    }
-    /// Advance by one character position.
-    #[inline]
-    pub(crate) fn advance(&mut self) {
-        #[cfg(not(feature = "no_position"))]
-        {
-            assert!(!self.is_none(), "cannot advance Position::none");
-
-            // Advance up to maximum position
-            if self.pos < u16::MAX {
-                self.pos += 1;
-            }
-        }
-    }
-    /// Go backwards by one character position.
-    ///
-    /// # Panics
-    ///
-    /// Panics if already at beginning of a line - cannot rewind to a previous line.
-    #[inline]
-    pub(crate) fn rewind(&mut self) {
-        #[cfg(not(feature = "no_position"))]
-        {
-            assert!(!self.is_none(), "cannot rewind Position::none");
-            assert!(self.pos > 0, "cannot rewind at position 0");
-            self.pos -= 1;
-        }
-    }
-    /// Advance to the next line.
-    #[inline]
-    pub(crate) fn new_line(&mut self) {
-        #[cfg(not(feature = "no_position"))]
-        {
-            assert!(!self.is_none(), "cannot advance Position::none");
-
-            // Advance up to maximum position
-            if self.line < u16::MAX {
-                self.line += 1;
-                self.pos = 0;
-            }
-        }
-    }
-    /// Is this [`Position`] at the beginning of a line?
-    #[inline]
-    #[must_use]
-    pub const fn is_beginning_of_line(self) -> bool {
-        #[cfg(not(feature = "no_position"))]
-        return self.pos == 0 && !self.is_none();
-        #[cfg(feature = "no_position")]
-        return false;
-    }
-    /// Is there no [`Position`]?
-    #[inline]
-    #[must_use]
-    pub const fn is_none(self) -> bool {
-        #[cfg(not(feature = "no_position"))]
-        return self.line == 0 && self.pos == 0;
-        #[cfg(feature = "no_position")]
-        return true;
-    }
-    /// Returns an fallback [`Position`] if it is [`NONE`][Position::NONE]?
-    #[inline]
-    #[must_use]
-    pub const fn or_else(self, pos: Self) -> Self {
-        if self.is_none() {
-            pos
-        } else {
-            self
-        }
-    }
-    /// Print this [`Position`] for debug purposes.
-    #[inline]
-    pub(crate) fn debug_print(self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !self.is_none() {
-            write!(_f, " @ {:?}", self)?;
-        }
-        Ok(())
-    }
-}
-
-impl Default for Position {
-    #[inline(always)]
-    #[must_use]
-    fn default() -> Self {
-        Self::START
-    }
-}
-
-impl fmt::Display for Position {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_none() {
-            write!(f, "none")?;
-        } else {
-            #[cfg(not(feature = "no_position"))]
-            write!(f, "line {}, position {}", self.line, self.pos)?;
-            #[cfg(feature = "no_position")]
-            unreachable!("no position");
-        }
-
-        Ok(())
-    }
-}
-
-impl fmt::Debug for Position {
-    #[cold]
-    #[inline(never)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_none() {
-            f.write_str("none")
-        } else {
-            #[cfg(not(feature = "no_position"))]
-            if self.is_beginning_of_line() {
-                write!(f, "{}", self.line)
-            } else {
-                write!(f, "{}:{}", self.line, self.pos)
-            }
-
-            #[cfg(feature = "no_position")]
-            unreachable!("no position");
-        }
-    }
-}
-
-impl Add for Position {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        if rhs.is_none() {
-            self
-        } else {
-            #[cfg(not(feature = "no_position"))]
-            return Self {
-                line: self.line + rhs.line - 1,
-                pos: if rhs.is_beginning_of_line() {
-                    self.pos
-                } else {
-                    self.pos + rhs.pos - 1
-                },
-            };
-            #[cfg(feature = "no_position")]
-            unreachable!("no position");
-        }
-    }
-}
-
-impl AddAssign for Position {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-
-/// _(internals)_ A span consisting of a starting and an ending [positions][Position].
-/// Exported under the `internals` feature only.
-#[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
-pub struct Span {
-    /// Starting [position][Position].
-    start: Position,
-    /// Ending [position][Position].
-    end: Position,
-}
-
-impl Default for Span {
-    #[inline(always)]
-    #[must_use]
-    fn default() -> Self {
-        Self::NONE
-    }
-}
-
-impl Span {
-    /// Empty [`Span`].
-    pub const NONE: Self = Self::new(Position::NONE, Position::NONE);
-
-    /// Create a new [`Span`].
-    #[inline(always)]
-    #[must_use]
-    pub const fn new(start: Position, end: Position) -> Self {
-        Self { start, end }
-    }
-    /// Is this [`Span`] non-existent?
-    #[inline]
-    #[must_use]
-    pub const fn is_none(&self) -> bool {
-        self.start.is_none() && self.end.is_none()
-    }
-    /// Get the [`Span`]'s starting [position][Position].
-    #[inline(always)]
-    #[must_use]
-    pub const fn start(&self) -> Position {
-        self.start
-    }
-    /// Get the [`Span`]'s ending [position][Position].
-    #[inline(always)]
-    #[must_use]
-    pub const fn end(&self) -> Position {
-        self.end
-    }
-}
-
-impl fmt::Display for Span {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let _f = f;
-
-        #[cfg(not(feature = "no_position"))]
-        match (self.start(), self.end()) {
-            (Position::NONE, Position::NONE) => write!(_f, "{:?}", Position::NONE),
-            (Position::NONE, end) => write!(_f, "..{:?}", end),
-            (start, Position::NONE) => write!(_f, "{:?}", start),
-            (start, end) if start.line() != end.line() => {
-                write!(_f, "{:?}-{:?}", start, end)
-            }
-            (start, end) => write!(
-                _f,
-                "{}:{}-{}",
-                start.line().unwrap(),
-                start.position().unwrap_or(0),
-                end.position().unwrap_or(0)
-            ),
-        }
-
-        #[cfg(feature = "no_position")]
-        Ok(())
-    }
-}
-
-impl fmt::Debug for Span {
-    #[cold]
-    #[inline(never)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self, f)
-    }
-}
 
 /// _(internals)_ A Rhai language token.
 /// Exported under the `internals` feature only.
@@ -489,6 +174,8 @@ pub enum Token {
     For,
     /// `in`
     In,
+    /// `!in`
+    NotIn,
     /// `<`
     LessThan,
     /// `>`
@@ -575,7 +262,7 @@ pub enum Token {
     /// A lexer error.
     LexError(Box<LexError>),
     /// A comment block.
-    Comment(Box<SmartString>),
+    Comment(Box<String>),
     /// A reserved symbol.
     Reserved(Box<SmartString>),
     /// A custom keyword.
@@ -584,7 +271,10 @@ pub enum Token {
     #[cfg(not(feature = "no_custom_syntax"))]
     Custom(Box<SmartString>),
     /// End of the input stream.
+    /// Used as a placeholder for the end of input.
     EOF,
+    /// Placeholder to indicate the lack of a token.
+    NONE,
 }
 
 impl fmt::Display for Token {
@@ -610,6 +300,7 @@ impl fmt::Display for Token {
             Comment(s) => f.write_str(s),
 
             EOF => f.write_str("{EOF}"),
+            NONE => f.write_str("{NONE}"),
 
             token => f.write_str(token.literal_syntax()),
         }
@@ -638,7 +329,7 @@ impl Token {
             Custom(..) => false,
             LexError(..) | Comment(..) => false,
 
-            EOF => false,
+            EOF | NONE => false,
 
             _ => true,
         }
@@ -696,6 +387,7 @@ impl Token {
             Loop => "loop",
             For => "for",
             In => "in",
+            NotIn => "!in",
             LessThan => "<",
             GreaterThan => ">",
             Bang => "!",
@@ -750,37 +442,43 @@ impl Token {
     #[inline]
     #[must_use]
     pub const fn is_op_assignment(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
+        use Token::*;
+
         matches!(
             self,
-            Self::PlusAssign
-                | Self::MinusAssign
-                | Self::MultiplyAssign
-                | Self::DivideAssign
-                | Self::LeftShiftAssign
-                | Self::RightShiftAssign
-                | Self::ModuloAssign
-                | Self::PowerOfAssign
-                | Self::AndAssign
-                | Self::OrAssign
-                | Self::XOrAssign
+            PlusAssign
+                | MinusAssign
+                | MultiplyAssign
+                | DivideAssign
+                | LeftShiftAssign
+                | RightShiftAssign
+                | ModuloAssign
+                | PowerOfAssign
+                | AndAssign
+                | OrAssign
+                | XOrAssign
         )
     }
 
     /// Get the corresponding operator of the token if it is an op-assignment operator.
     #[must_use]
     pub const fn get_base_op_from_assignment(&self) -> Option<Self> {
+        #[allow(clippy::enum_glob_use)]
+        use Token::*;
+
         Some(match self {
-            Self::PlusAssign => Self::Plus,
-            Self::MinusAssign => Self::Minus,
-            Self::MultiplyAssign => Self::Multiply,
-            Self::DivideAssign => Self::Divide,
-            Self::LeftShiftAssign => Self::LeftShift,
-            Self::RightShiftAssign => Self::RightShift,
-            Self::ModuloAssign => Self::Modulo,
-            Self::PowerOfAssign => Self::PowerOf,
-            Self::AndAssign => Self::Ampersand,
-            Self::OrAssign => Self::Pipe,
-            Self::XOrAssign => Self::XOr,
+            PlusAssign => Plus,
+            MinusAssign => Minus,
+            MultiplyAssign => Multiply,
+            DivideAssign => Divide,
+            LeftShiftAssign => LeftShift,
+            RightShiftAssign => RightShift,
+            ModuloAssign => Modulo,
+            PowerOfAssign => PowerOf,
+            AndAssign => Ampersand,
+            OrAssign => Pipe,
+            XOrAssign => XOr,
             _ => return None,
         })
     }
@@ -789,37 +487,42 @@ impl Token {
     #[inline]
     #[must_use]
     pub const fn has_op_assignment(&self) -> bool {
+        #[allow(clippy::enum_glob_use)]
+        use Token::*;
+
         matches!(
             self,
-            Self::Plus
-                | Self::Minus
-                | Self::Multiply
-                | Self::Divide
-                | Self::LeftShift
-                | Self::RightShift
-                | Self::Modulo
-                | Self::PowerOf
-                | Self::Ampersand
-                | Self::Pipe
-                | Self::XOr
+            Plus | Minus
+                | Multiply
+                | Divide
+                | LeftShift
+                | RightShift
+                | Modulo
+                | PowerOf
+                | Ampersand
+                | Pipe
+                | XOr
         )
     }
 
     /// Get the corresponding op-assignment operator of the token.
     #[must_use]
     pub const fn convert_to_op_assignment(&self) -> Option<Self> {
+        #[allow(clippy::enum_glob_use)]
+        use Token::*;
+
         Some(match self {
-            Self::Plus => Self::PlusAssign,
-            Self::Minus => Self::MinusAssign,
-            Self::Multiply => Self::MultiplyAssign,
-            Self::Divide => Self::DivideAssign,
-            Self::LeftShift => Self::LeftShiftAssign,
-            Self::RightShift => Self::RightShiftAssign,
-            Self::Modulo => Self::ModuloAssign,
-            Self::PowerOf => Self::PowerOfAssign,
-            Self::Ampersand => Self::AndAssign,
-            Self::Pipe => Self::OrAssign,
-            Self::XOr => Self::XOrAssign,
+            Plus => PlusAssign,
+            Minus => MinusAssign,
+            Multiply => MultiplyAssign,
+            Divide => DivideAssign,
+            LeftShift => LeftShiftAssign,
+            RightShift => RightShiftAssign,
+            Modulo => ModuloAssign,
+            PowerOf => PowerOfAssign,
+            Ampersand => AndAssign,
+            Pipe => OrAssign,
+            XOr => XOrAssign,
             _ => return None,
         })
     }
@@ -871,6 +574,7 @@ impl Token {
             "loop" => Loop,
             "for" => For,
             "in" => In,
+            "!in" => NotIn,
             "<" => LessThan,
             ">" => GreaterThan,
             "!" => Bang,
@@ -956,13 +660,6 @@ impl Token {
         }
     }
 
-    /// Is this token [`EOF`][Token::EOF]?
-    #[inline(always)]
-    #[must_use]
-    pub const fn is_eof(&self) -> bool {
-        matches!(self, Self::EOF)
-    }
-
     /// If another operator is after these, it's probably a unary operator
     /// (not sure about `fn` name).
     #[must_use]
@@ -1018,6 +715,7 @@ impl Token {
             While            |
             Until            |
             In               |
+            NotIn            |
             And              |
             AndAssign        |
             Or               |
@@ -1049,7 +747,7 @@ impl Token {
 
             EqualsTo | NotEqualsTo => 90,
 
-            In => 110,
+            In | NotIn => 110,
 
             LessThan | LessThanEqualsTo | GreaterThan | GreaterThanEqualsTo => 130,
 
@@ -1170,7 +868,7 @@ impl From<Token> for String {
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct TokenizeState {
     /// Maximum length of a string.
-    pub max_string_size: Option<NonZeroUsize>,
+    pub max_string_len: Option<NonZeroUsize>,
     /// Can the next token be a unary operator?
     pub next_token_cannot_be_unary: bool,
     /// Shared object to allow controlling the tokenizer externally.
@@ -1195,6 +893,18 @@ pub trait InputStream {
     /// Peek the next character in the `InputStream`.
     #[must_use]
     fn peek_next(&mut self) -> Option<char>;
+}
+
+/// Return error if the string is longer than the maximum length.
+#[inline]
+fn ensure_string_len_within_limit(max: Option<NonZeroUsize>, value: &str) -> Result<(), LexError> {
+    if let Some(max) = max {
+        if value.len() > max.get() {
+            return Err(LexError::StringTooLong(max.get()));
+        }
+    }
+
+    Ok(())
 }
 
 /// _(internals)_ Parse a string literal ended by a specified termination character.
@@ -1286,11 +996,8 @@ pub fn parse_string_literal(
             break;
         }
 
-        if let Some(max) = state.max_string_size {
-            if result.len() > max.get() {
-                return Err((LexError::StringTooLong(max.get()), *pos));
-            }
-        }
+        ensure_string_len_within_limit(state.max_string_len, &result)
+            .map_err(|err| (err, start))?;
 
         // Close wrapper
         if termination_char == next_char && escape.is_empty() {
@@ -1425,11 +1132,7 @@ pub fn parse_string_literal(
         }
     }
 
-    if let Some(max) = state.max_string_size {
-        if result.len() > max.get() {
-            return Err((LexError::StringTooLong(max.get()), *pos));
-        }
-    }
+    ensure_string_len_within_limit(state.max_string_len, &result).map_err(|err| (err, start))?;
 
     Ok((result, interpolated, first_char))
 }
@@ -1446,7 +1149,7 @@ fn scan_block_comment(
     stream: &mut impl InputStream,
     level: usize,
     pos: &mut Position,
-    comment: Option<&mut SmartString>,
+    comment: Option<&mut String>,
 ) -> usize {
     let mut level = level;
     let mut comment = comment;
@@ -1541,7 +1244,7 @@ fn get_next_token_inner(
     if state.comment_level > 0 {
         let start_pos = *pos;
         let mut comment = if state.include_comments {
-            Some(SmartString::new_const())
+            Some(String::new())
         } else {
             None
         };
@@ -1748,11 +1451,17 @@ fn get_next_token_inner(
             // letter or underscore ...
             #[cfg(not(feature = "unicode-xid-ident"))]
             ('a'..='z' | '_' | 'A'..='Z', ..) => {
-                return Some(get_token_as_identifier(stream, pos, start_pos, c));
+                return Some(
+                    parse_identifier_token(stream, pos, start_pos, c)
+                        .unwrap_or_else(|err| (Token::LexError(err.into()), start_pos)),
+                );
             }
             #[cfg(feature = "unicode-xid-ident")]
             (ch, ..) if unicode_xid::UnicodeXID::is_xid_start(ch) || ch == '_' => {
-                return Some(get_token_as_identifier(stream, pos, start_pos, c));
+                return Some(
+                    parse_identifier_token(stream, pos, start_pos, c)
+                        .unwrap_or_else(|err| (Token::LexError(err.into()), start_pos)),
+                );
             }
 
             // " - string literal
@@ -1928,7 +1637,7 @@ fn get_next_token_inner(
             ('/', '/') => {
                 eat_next(stream, pos);
 
-                let mut comment: Option<SmartString> = match stream.peek_next() {
+                let mut comment: Option<String> = match stream.peek_next() {
                     #[cfg(not(feature = "no_function"))]
                     #[cfg(feature = "metadata")]
                     Some('/') => {
@@ -1971,11 +1680,13 @@ fn get_next_token_inner(
                 if let Some(comment) = comment {
                     match comment {
                         #[cfg(feature = "metadata")]
-                        _ if comment.starts_with("//!") => state
-                            .tokenizer_control
-                            .borrow_mut()
-                            .global_comments
-                            .push(comment),
+                        _ if comment.starts_with("//!") => {
+                            let g = &mut state.tokenizer_control.borrow_mut().global_comments;
+                            if !g.is_empty() {
+                                g.push('\n');
+                            }
+                            g.push_str(&comment);
+                        }
                         _ => return Some((Token::Comment(comment.into()), start_pos)),
                     }
                 }
@@ -1984,7 +1695,7 @@ fn get_next_token_inner(
                 state.comment_level = 1;
                 eat_next(stream, pos);
 
-                let mut comment: Option<SmartString> = match stream.peek_next() {
+                let mut comment: Option<String> = match stream.peek_next() {
                     #[cfg(not(feature = "no_function"))]
                     #[cfg(feature = "metadata")]
                     Some('*') => {
@@ -2119,6 +1830,15 @@ fn get_next_token_inner(
             }
             ('>', ..) => return Some((Token::GreaterThan, start_pos)),
 
+            ('!', 'i') => {
+                eat_next(stream, pos);
+                if stream.peek_next() == Some('n') {
+                    eat_next(stream, pos);
+                    return Some((Token::NotIn, start_pos));
+                }
+                stream.unget('i');
+                return Some((Token::Bang, start_pos));
+            }
             ('!', '=') => {
                 eat_next(stream, pos);
 
@@ -2220,12 +1940,12 @@ fn get_next_token_inner(
 }
 
 /// Get the next token, parsing it as an identifier.
-fn get_token_as_identifier(
+fn parse_identifier_token(
     stream: &mut impl InputStream,
     pos: &mut Position,
     start_pos: Position,
     first_char: char,
-) -> (Token, Position) {
+) -> Result<(Token, Position), LexError> {
     let mut identifier = SmartString::new_const();
     identifier.push(first_char);
 
@@ -2240,19 +1960,20 @@ fn get_token_as_identifier(
     }
 
     if let Some(token) = Token::lookup_symbol_from_syntax(&identifier) {
-        return (token, start_pos);
-    } else if Token::is_reserved_keyword(&identifier) {
-        return (Token::Reserved(Box::new(identifier)), start_pos);
+        return Ok((token, start_pos));
+    }
+    if Token::is_reserved_keyword(&identifier) {
+        return Ok((Token::Reserved(Box::new(identifier)), start_pos));
     }
 
     if !is_valid_identifier(&identifier) {
-        return (
+        return Ok((
             Token::LexError(LERR::MalformedIdentifier(identifier.to_string()).into()),
             start_pos,
-        );
+        ));
     }
 
-    (Token::Identifier(identifier.into()), start_pos)
+    Ok((Token::Identifier(identifier.into()), start_pos))
 }
 
 /// Is a keyword allowed as a function?
@@ -2435,7 +2156,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             Some((Token::Reserved(s), pos)) => (match
                 (s.as_str(),
                     #[cfg(not(feature = "no_custom_syntax"))]
-                    self.engine.custom_keywords.as_ref().map_or(false, |m| m.contains_key(&*s)),
+                    self.engine.custom_keywords.as_deref().map_or(false, |m| m.contains_key(&*s)),
                     #[cfg(feature = "no_custom_syntax")]
                     false
                 )
@@ -2472,7 +2193,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 #[cfg(feature = "no_custom_syntax")]
                 (.., true) => unreachable!("no custom operators"),
                 // Reserved keyword that is not custom and disabled.
-                (token, false) if self.engine.disabled_symbols.as_ref().map_or(false,|m| m.contains(token)) => {
+                (token, false) if self.engine.disabled_symbols.as_deref().map_or(false,|m| m.contains(token)) => {
                     let msg = format!("reserved {} '{token}' is disabled", if is_valid_identifier(token) { "keyword"} else {"symbol"});
                     Token::LexError(LERR::ImproperSymbol(s.to_string(), msg).into())
                 },
@@ -2481,13 +2202,13 @@ impl<'a> Iterator for TokenIterator<'a> {
             }, pos),
             // Custom keyword
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((Token::Identifier(s), pos)) if self.engine.custom_keywords.as_ref().map_or(false,|m| m.contains_key(&*s)) => {
+            Some((Token::Identifier(s), pos)) if self.engine.custom_keywords.as_deref().map_or(false,|m| m.contains_key(&*s)) => {
                 (Token::Custom(s), pos)
             }
             // Custom keyword/symbol - must be disabled
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((token, pos)) if token.is_literal() && self.engine.custom_keywords.as_ref().map_or(false,|m| m.contains_key(token.literal_syntax())) => {
-                if self.engine.disabled_symbols.as_ref().map_or(false,|m| m.contains(token.literal_syntax())) {
+            Some((token, pos)) if token.is_literal() && self.engine.custom_keywords.as_deref().map_or(false,|m| m.contains_key(token.literal_syntax())) => {
+                if self.engine.disabled_symbols.as_deref().map_or(false,|m| m.contains(token.literal_syntax())) {
                     // Disabled standard keyword/symbol
                     (Token::Custom(Box::new(token.literal_syntax().into())), pos)
                 } else {
@@ -2496,7 +2217,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 }
             }
             // Disabled symbol
-            Some((token, pos)) if token.is_literal() && self.engine.disabled_symbols.as_ref().map_or(false,|m| m.contains(token.literal_syntax())) => {
+            Some((token, pos)) if token.is_literal() && self.engine.disabled_symbols.as_deref().map_or(false,|m| m.contains(token.literal_syntax())) => {
                 (Token::Reserved(Box::new(token.literal_syntax().into())), pos)
             }
             // Normal symbol
@@ -2554,10 +2275,7 @@ impl Engine {
             TokenIterator {
                 engine: self,
                 state: TokenizeState {
-                    #[cfg(not(feature = "unchecked"))]
-                    max_string_size: self.limits.max_string_size,
-                    #[cfg(feature = "unchecked")]
-                    max_string_size: None,
+                    max_string_len: NonZeroUsize::new(self.max_string_size()),
                     next_token_cannot_be_unary: false,
                     tokenizer_control: buffer,
                     comment_level: 0,
