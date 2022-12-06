@@ -3845,8 +3845,6 @@ impl Engine {
         let mut functions = StraightHashMap::default();
 
         let options = self.options & !LangOptions::STMT_EXPR & !LangOptions::LOOP_EXPR;
-        #[cfg(not(feature = "no_function"))]
-        let options = options & !LangOptions::ANON_FN;
 
         let mut settings = ParseSettings {
             level: 0,
@@ -3861,6 +3859,7 @@ impl Engine {
 
         let expr = self.parse_expr(&mut input, state, &mut functions, settings)?;
 
+        #[cfg(feature = "no_function")]
         assert!(functions.is_empty());
 
         match input.peek().expect(NEVER_ENDS) {
@@ -3877,7 +3876,7 @@ impl Engine {
             state.scope,
             statements,
             #[cfg(not(feature = "no_function"))]
-            StaticVec::new_const(),
+            functions.into_iter().map(|(.., v)| v).collect(),
             _optimization_level,
         ));
 
@@ -3885,7 +3884,7 @@ impl Engine {
         return Ok(AST::new(
             statements,
             #[cfg(not(feature = "no_function"))]
-            crate::Module::new(),
+            functions.into_iter().map(|(.., v)| v).collect(),
         ));
     }
 

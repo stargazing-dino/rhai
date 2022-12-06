@@ -9,6 +9,7 @@ Bug fixes
 
 * Integer numbers that are too large to deserialize into `INT` now fall back to `Decimal` or `FLOAT` instead of silently truncating.
 * Parsing deeply-nested closures (e.g. `||{||{||{||{||{||{||{...}}}}}}}`) no longer panics but will be confined to the nesting limit.
+* Closures containing a single expression are now allowed in `Engine::eval_expression` etc.
 
 Breaking API changes
 --------------------
