@@ -253,6 +253,17 @@ impl fmt::Debug for Module {
     }
 }
 
+#[cfg(not(feature = "no_function"))]
+impl<T: IntoIterator<Item = Shared<crate::ast::ScriptFnDef>>> From<T> for Module {
+    fn from(iter: T) -> Self {
+        let mut module = Self::new();
+        iter.into_iter().for_each(|fn_def| {
+            module.set_script_fn(fn_def);
+        });
+        module
+    }
+}
+
 impl<M: AsRef<Module>> Add<M> for &Module {
     type Output = Module;
 

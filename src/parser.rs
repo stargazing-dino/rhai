@@ -3884,7 +3884,7 @@ impl Engine {
         return Ok(AST::new(
             statements,
             #[cfg(not(feature = "no_function"))]
-            functions.into_iter().map(|(.., v)| v).collect(),
+            crate::Module::from(functions.into_iter().map(|(.., v)| v)),
         ));
     }
 
