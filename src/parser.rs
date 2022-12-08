@@ -343,14 +343,15 @@ impl ParseSettings {
     /// Create a new `ParseSettings` with one higher expression level.
     #[inline]
     pub fn level_up(&self) -> ParseResult<Self> {
-        let level = self.level + 1;
-
         #[cfg(not(feature = "unchecked"))]
-        if self.max_expr_depth > 0 && level > self.max_expr_depth {
+        if self.max_expr_depth > 0 && self.level >= self.max_expr_depth {
             return Err(PERR::ExprTooDeep.into_err(self.pos));
         }
 
-        Ok(Self { level, ..*self })
+        Ok(Self {
+            level: self.level + 1,
+            ..*self
+        })
     }
 }
 
@@ -537,50 +538,7 @@ fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position
     }
 }
 
-/// Parse a symbol.
-#[cfg(not(feature = "no_custom_syntax"))]
-fn parse_symbol(input: &mut TokenStream) -> ParseResult<(SmartString, Position)> {
-    match input.next().expect(NEVER_ENDS) {
-        // Symbol
-        (token, pos) if token.is_standard_symbol() => Ok((token.literal_syntax().into(), pos)),
-        // Reserved symbol
-        (Token::Reserved(s), pos) if !is_valid_identifier(s.as_str()) => Ok((*s, pos)),
-        // Bad symbol
-        (Token::LexError(err), pos) => Err(err.into_err(pos)),
-        // Not a symbol
-        (.., pos) => Err(PERR::MissingSymbol(String::new()).into_err(pos)),
-    }
-}
-
 impl Engine {
-    /// Parse `(` expr `)`
-    fn parse_paren_expr(
-        &self,
-        input: &mut TokenStream,
-        state: &mut ParseState,
-        lib: &mut FnLib,
-        settings: ParseSettings,
-    ) -> ParseResult<Expr> {
-        // ( ...
-        let mut settings = settings;
-        settings.pos = eat_token(input, Token::LeftParen);
-
-        let expr = self.parse_expr(input, state, lib, settings.level_up()?)?;
-
-        match input.next().expect(NEVER_ENDS) {
-            // ( ... )
-            (Token::RightParen, ..) => Ok(expr),
-            // ( <error>
-            (Token::LexError(err), pos) => Err(err.into_err(pos)),
-            // ( ... ???
-            (.., pos) => Err(PERR::MissingToken(
-                Token::RightParen.into(),
-                "for a matching ( in this expression".into(),
-            )
-            .into_err(pos)),
-        }
-    }
-
     /// Parse a function call.
     fn parse_fn_call(
         &self,
@@ -974,10 +932,7 @@ impl Engine {
                     )
                     .into_err(*pos))
                 }
-                _ => {
-                    let expr = self.parse_expr(input, state, lib, settings.level_up()?)?;
-                    array.push(expr);
-                }
+                _ => array.push(self.parse_expr(input, state, lib, settings.level_up()?)?),
             }
 
             match input.peek().expect(NEVER_ENDS) {
@@ -1139,10 +1094,10 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // switch ...
-        let mut settings = settings;
+        let mut settings = settings.level_up()?;
         settings.pos = eat_token(input, Token::Switch);
 
-        let item = self.parse_expr(input, state, lib, settings.level_up()?)?;
+        let item = self.parse_expr(input, state, lib, settings)?;
 
         match input.next().expect(NEVER_ENDS) {
             (Token::LeftBrace, ..) => (),
@@ -1201,7 +1156,7 @@ impl Engine {
                     loop {
                         let filter = state.expr_filter;
                         state.expr_filter = |t| t != &Token::Pipe;
-                        let expr = self.parse_expr(input, state, lib, settings.level_up()?);
+                        let expr = self.parse_expr(input, state, lib, settings);
                         state.expr_filter = filter;
 
                         match expr {
@@ -1219,7 +1174,7 @@ impl Engine {
                     let condition = if match_token(input, Token::If).0 {
                         ensure_not_statement_expr(input, "a boolean")?;
                         let guard = self
-                            .parse_expr(input, state, lib, settings.level_up()?)?
+                            .parse_expr(input, state, lib, settings)?
                             .ensure_bool_expr()?;
                         ensure_not_assignment(input)?;
                         guard
@@ -1244,16 +1199,13 @@ impl Engine {
 
             let (action_expr, need_comma) =
                 if !settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
-                    let stmt = self.parse_stmt(input, state, lib, settings.level_up()?)?;
+                    let stmt = self.parse_stmt(input, state, lib, settings)?;
                     let need_comma = !stmt.is_self_terminated();
 
                     let stmt_block: StmtBlock = stmt.into();
                     (Expr::Stmt(stmt_block.into()), need_comma)
                 } else {
-                    (
-                        self.parse_expr(input, state, lib, settings.level_up()?)?,
-                        true,
-                    )
+                    (self.parse_expr(input, state, lib, settings)?, true)
                 };
             let has_condition = !matches!(condition, Expr::BoolConstant(true, ..));
 
@@ -1410,7 +1362,26 @@ impl Engine {
             }
 
             // ( - grouped expression
-            Token::LeftParen => self.parse_paren_expr(input, state, lib, settings.level_up()?)?,
+            Token::LeftParen => {
+                settings.pos = eat_token(input, Token::LeftParen);
+
+                let expr = self.parse_expr(input, state, lib, settings.level_up()?)?;
+
+                match input.next().expect(NEVER_ENDS) {
+                    // ( ... )
+                    (Token::RightParen, ..) => expr,
+                    // ( <error>
+                    (Token::LexError(err), pos) => return Err(err.into_err(pos)),
+                    // ( ... ???
+                    (.., pos) => {
+                        return Err(PERR::MissingToken(
+                            Token::RightParen.into(),
+                            "for a matching ( in this expression".into(),
+                        )
+                        .into_err(pos))
+                    }
+                }
+            }
 
             // If statement is allowed to act as expressions
             Token::If if settings.has_option(LangOptions::IF_EXPR) => Expr::Stmt(Box::new(
@@ -1528,6 +1499,7 @@ impl Engine {
             // Interpolated string
             Token::InterpolatedString(..) => {
                 let mut segments = StaticVec::<Expr>::new();
+                let settings = settings.level_up()?;
 
                 match input.next().expect(NEVER_ENDS) {
                     (Token::InterpolatedString(s), ..) if s.is_empty() => (),
@@ -1540,7 +1512,7 @@ impl Engine {
                 }
 
                 loop {
-                    let expr = match self.parse_block(input, state, lib, settings.level_up()?)? {
+                    let expr = match self.parse_block(input, state, lib, settings)? {
                         block @ Stmt::Block(..) => Expr::Stmt(Box::new(block.into())),
                         stmt => unreachable!("Stmt::Block expected but gets {:?}", stmt),
                     };
@@ -1784,7 +1756,6 @@ impl Engine {
 
                     let (.., ns, _, name) = *x;
                     settings.pos = pos;
-                    let settings = settings.level_up()?;
                     self.parse_fn_call(input, state, lib, name, no_args, true, ns, settings)?
                 }
                 // Function call
@@ -1792,7 +1763,6 @@ impl Engine {
                     let (.., ns, _, name) = *x;
                     let no_args = t == Token::Unit;
                     settings.pos = pos;
-                    let settings = settings.level_up()?;
                     self.parse_fn_call(input, state, lib, name, no_args, false, ns, settings)?
                 }
                 // module access
@@ -2014,7 +1984,7 @@ impl Engine {
             // <EOF>
             Token::EOF => Err(PERR::UnexpectedEOF.into_err(settings.pos)),
             // All other tokens
-            _ => self.parse_primary(input, state, lib, false, settings.level_up()?),
+            _ => self.parse_primary(input, state, lib, false, settings),
         }
     }
 
@@ -2121,33 +2091,6 @@ impl Engine {
             // expr = rhs
             _ => Err(PERR::AssignmentToInvalidLHS(String::new()).into_err(lhs.position())),
         }
-    }
-
-    /// Parse an operator-assignment expression (if any).
-    fn parse_op_assignment_stmt(
-        &self,
-        input: &mut TokenStream,
-        state: &mut ParseState,
-        lib: &mut FnLib,
-        lhs: Expr,
-        settings: ParseSettings,
-    ) -> ParseResult<Stmt> {
-        let (op, pos) = match input.peek().expect(NEVER_ENDS) {
-            // var = ...
-            (Token::Equals, ..) => (NO_TOKEN, eat_token(input, Token::Equals)),
-            // var op= ...
-            (token, ..) if token.is_op_assignment() => {
-                input.next().map(|(op, pos)| (op, pos)).expect(NEVER_ENDS)
-            }
-            // Not op-assignment
-            _ => return Ok(Stmt::Expr(lhs.into())),
-        };
-
-        let mut settings = settings;
-        settings.pos = pos;
-
-        let rhs = self.parse_expr(input, state, lib, settings.level_up()?)?;
-        Self::make_assignment_stmt(op, state, lhs, rhs, pos)
     }
 
     /// Make a dot expression.
@@ -2545,7 +2488,20 @@ impl Engine {
                     inputs.push(Expr::Variable((None, ns, 0, name).into(), None, pos));
                 }
                 CUSTOM_SYNTAX_MARKER_SYMBOL => {
-                    let (symbol, pos) = parse_symbol(input)?;
+                    let (symbol, pos) = match input.next().expect(NEVER_ENDS) {
+                        // Standard symbol
+                        (token, pos) if token.is_standard_symbol() => {
+                            Ok((token.literal_syntax().into(), pos))
+                        }
+                        // Reserved symbol
+                        (Token::Reserved(s), pos) if !is_valid_identifier(s.as_str()) => {
+                            Ok((*s, pos))
+                        }
+                        // Bad symbol
+                        (Token::LexError(err), pos) => Err(err.into_err(pos)),
+                        // Not a symbol
+                        (.., pos) => Err(PERR::MissingSymbol(String::new()).into_err(pos)),
+                    }?;
                     let symbol = state.get_interned_string(symbol);
                     segments.push(symbol.clone());
                     tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_SYMBOL));
@@ -2677,8 +2633,9 @@ impl Engine {
 
         // Parse expression normally.
         let precedence = Precedence::new(1);
-        let lhs = self.parse_unary(input, state, lib, settings.level_up()?)?;
-        self.parse_binary_op(input, state, lib, precedence, lhs, settings.level_up()?)
+        let settings = settings.level_up()?;
+        let lhs = self.parse_unary(input, state, lib, settings)?;
+        self.parse_binary_op(input, state, lib, precedence, lhs, settings)
     }
 
     /// Parse an if statement.
@@ -2690,25 +2647,25 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // if ...
-        let mut settings = settings;
+        let mut settings = settings.level_up()?;
         settings.pos = eat_token(input, Token::If);
 
         // if guard { if_body }
         ensure_not_statement_expr(input, "a boolean")?;
         let guard = self
-            .parse_expr(input, state, lib, settings.level_up()?)?
+            .parse_expr(input, state, lib, settings)?
             .ensure_bool_expr()?;
         ensure_not_assignment(input)?;
-        let if_body = self.parse_block(input, state, lib, settings.level_up()?)?;
+        let if_body = self.parse_block(input, state, lib, settings)?;
 
         // if guard { if_body } else ...
         let else_body = if match_token(input, Token::Else).0 {
             if let (Token::If, ..) = input.peek().expect(NEVER_ENDS) {
                 // if guard { if_body } else if ...
-                self.parse_if(input, state, lib, settings.level_up()?)?
+                self.parse_if(input, state, lib, settings)?
             } else {
                 // if guard { if_body } else { else-body }
-                self.parse_block(input, state, lib, settings.level_up()?)?
+                self.parse_block(input, state, lib, settings)?
             }
         } else {
             Stmt::Noop(Position::NONE)
@@ -2728,14 +2685,14 @@ impl Engine {
         lib: &mut FnLib,
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
-        let mut settings = settings;
+        let mut settings = settings.level_up()?;
 
         // while|loops ...
         let (guard, token_pos) = match input.next().expect(NEVER_ENDS) {
             (Token::While, pos) => {
                 ensure_not_statement_expr(input, "a boolean")?;
                 let expr = self
-                    .parse_expr(input, state, lib, settings.level_up()?)?
+                    .parse_expr(input, state, lib, settings)?
                     .ensure_bool_expr()?;
                 ensure_not_assignment(input)?;
                 (expr, pos)
@@ -2746,7 +2703,7 @@ impl Engine {
         settings.pos = token_pos;
         settings.flags |= ParseSettingFlags::BREAKABLE;
 
-        let body = self.parse_block(input, state, lib, settings.level_up()?)?;
+        let body = self.parse_block(input, state, lib, settings)?;
 
         Ok(Stmt::While((guard, body.into()).into(), settings.pos))
     }
@@ -2760,7 +2717,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // do ...
-        let mut settings = settings;
+        let mut settings = settings.level_up()?;
         let orig_breakable = settings.flags.contains(ParseSettingFlags::BREAKABLE);
         settings.flags |= ParseSettingFlags::BREAKABLE;
 
@@ -2768,7 +2725,7 @@ impl Engine {
 
         // do { body } [while|until] guard
 
-        let body = self.parse_block(input, state, lib, settings.level_up()?)?;
+        let body = self.parse_block(input, state, lib, settings)?;
 
         let negated = match input.next().expect(NEVER_ENDS) {
             (Token::While, ..) => ASTFlags::NONE,
@@ -2787,7 +2744,7 @@ impl Engine {
 
         ensure_not_statement_expr(input, "a boolean")?;
         let guard = self
-            .parse_expr(input, state, lib, settings.level_up()?)?
+            .parse_expr(input, state, lib, settings)?
             .ensure_bool_expr()?;
         ensure_not_assignment(input)?;
 
@@ -2803,7 +2760,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // for ...
-        let mut settings = settings;
+        let mut settings = settings.level_up()?;
         settings.pos = eat_token(input, Token::For);
 
         // for name ...
@@ -2856,7 +2813,7 @@ impl Engine {
         // for name in expr { body }
         ensure_not_statement_expr(input, "a boolean")?;
         let expr = self
-            .parse_expr(input, state, lib, settings.level_up()?)?
+            .parse_expr(input, state, lib, settings)?
             .ensure_iterable()?;
 
         let counter_var = Ident {
@@ -2883,7 +2840,7 @@ impl Engine {
         };
 
         settings.flags |= ParseSettingFlags::BREAKABLE;
-        let body = self.parse_block(input, state, lib, settings.level_up()?)?;
+        let body = self.parse_block(input, state, lib, settings)?;
 
         state.stack.as_deref_mut().unwrap().rewind(prev_stack_len);
 
@@ -3008,11 +2965,11 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // import ...
-        let mut settings = settings;
+        let mut settings = settings.level_up()?;
         settings.pos = eat_token(input, Token::Import);
 
         // import expr ...
-        let expr = self.parse_expr(input, state, lib, settings.level_up()?)?;
+        let expr = self.parse_expr(input, state, lib, settings)?;
 
         let export = if match_token(input, Token::As).0 {
             // import expr as name ...
@@ -3052,6 +3009,7 @@ impl Engine {
         match input.peek().expect(NEVER_ENDS) {
             (Token::Let, pos) => {
                 let pos = *pos;
+                let settings = settings.level_up()?;
                 let mut stmt =
                     self.parse_let(input, state, lib, AccessMode::ReadWrite, true, settings)?;
                 stmt.set_position(pos);
@@ -3059,6 +3017,7 @@ impl Engine {
             }
             (Token::Const, pos) => {
                 let pos = *pos;
+                let settings = settings.level_up()?;
                 let mut stmt =
                     self.parse_let(input, state, lib, AccessMode::ReadOnly, true, settings)?;
                 stmt.set_position(pos);
@@ -3099,7 +3058,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // Must start with {
-        let mut settings = settings;
+        let mut settings = settings.level_up()?;
         settings.pos = match input.next().expect(NEVER_ENDS) {
             (Token::LeftBrace, pos) => pos,
             (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -3115,7 +3074,7 @@ impl Engine {
         let mut statements = StaticVec::new_const();
 
         if settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
-            let stmt = self.parse_expr_stmt(input, state, lib, settings.level_up()?)?;
+            let stmt = self.parse_expr_stmt(input, state, lib, settings)?;
             statements.push(stmt);
 
             // Must end with }
@@ -3153,7 +3112,7 @@ impl Engine {
             // Parse statements inside the block
             settings.flags &= !ParseSettingFlags::GLOBAL_LEVEL;
 
-            let stmt = self.parse_stmt(input, state, lib, settings.level_up()?)?;
+            let stmt = self.parse_stmt(input, state, lib, settings)?;
 
             if stmt.is_noop() {
                 continue;
@@ -3215,9 +3174,24 @@ impl Engine {
         let mut settings = settings;
         settings.pos = input.peek().expect(NEVER_ENDS).1;
 
-        let expr = self.parse_expr(input, state, lib, settings.level_up()?)?;
-        let stmt = self.parse_op_assignment_stmt(input, state, lib, expr, settings.level_up()?)?;
-        Ok(stmt)
+        let expr = self.parse_expr(input, state, lib, settings)?;
+
+        let (op, pos) = match input.peek().expect(NEVER_ENDS) {
+            // var = ...
+            (Token::Equals, ..) => (NO_TOKEN, eat_token(input, Token::Equals)),
+            // var op= ...
+            (token, ..) if token.is_op_assignment() => {
+                input.next().map(|(op, pos)| (op, pos)).expect(NEVER_ENDS)
+            }
+            // Not op-assignment
+            _ => return Ok(Stmt::Expr(expr.into())),
+        };
+
+        settings.pos = pos;
+
+        let rhs = self.parse_expr(input, state, lib, settings)?;
+
+        Self::make_assignment_stmt(op, state, expr, rhs, pos)
     }
 
     /// Parse a single statement.
@@ -3292,6 +3266,7 @@ impl Engine {
             (Token::EOF, pos) => return Ok(Stmt::Noop(*pos)),
             (x, pos) => (x, *pos),
         };
+
         settings.pos = token_pos;
 
         match token {
@@ -3503,11 +3478,11 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // try ...
-        let mut settings = settings;
+        let mut settings = settings.level_up()?;
         settings.pos = eat_token(input, Token::Try);
 
         // try { try_block }
-        let try_block = self.parse_block(input, state, lib, settings.level_up()?)?;
+        let try_block = self.parse_block(input, state, lib, settings)?;
 
         // try { try_block } catch
         let (matched, catch_pos) = match_token(input, Token::Catch);
@@ -3546,7 +3521,7 @@ impl Engine {
         };
 
         // try { try_block } catch ( var ) { catch_block }
-        let catch_block = self.parse_block(input, state, lib, settings.level_up()?)?;
+        let catch_block = self.parse_block(input, state, lib, settings)?;
 
         if !catch_var.is_empty() {
             // Remove the error variable from the stack
@@ -3575,7 +3550,7 @@ impl Engine {
         settings: ParseSettings,
         #[cfg(feature = "metadata")] comments: impl IntoIterator<Item = Identifier>,
     ) -> ParseResult<ScriptFnDef> {
-        let settings = settings;
+        let settings = settings.level_up()?;
 
         let (token, pos) = input.next().expect(NEVER_ENDS);
 
@@ -3642,7 +3617,7 @@ impl Engine {
 
         // Parse function body
         let body = match input.peek().expect(NEVER_ENDS) {
-            (Token::LeftBrace, ..) => self.parse_block(input, state, lib, settings.level_up()?)?,
+            (Token::LeftBrace, ..) => self.parse_block(input, state, lib, settings)?,
             (.., pos) => return Err(PERR::FnMissingBody(name.into()).into_err(*pos)),
         }
         .into();
@@ -3734,7 +3709,7 @@ impl Engine {
         lib: &mut FnLib,
         settings: ParseSettings,
     ) -> ParseResult<(Expr, ScriptFnDef)> {
-        let settings = settings;
+        let settings = settings.level_up()?;
         let mut params_list = StaticVec::<ImmutableString>::new_const();
 
         if input.next().expect(NEVER_ENDS).0 != Token::Or && !match_token(input, Token::Pipe).0 {
@@ -3781,7 +3756,7 @@ impl Engine {
         }
 
         // Parse function body
-        let body = self.parse_stmt(input, state, lib, settings.level_up()?)?;
+        let body = self.parse_stmt(input, state, lib, settings)?;
 
         // External variables may need to be processed in a consistent order,
         // so extract them into a list.

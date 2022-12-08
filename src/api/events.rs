@@ -6,6 +6,7 @@ use crate::{Dynamic, Engine, EvalContext, Position, RhaiResultOf};
 use std::prelude::v1::*;
 
 /// Information on a variable definition.
+#[derive(Debug, Hash)]
 #[non_exhaustive]
 pub struct VarDefInfo<'a> {
     /// Name of the variable to be defined.

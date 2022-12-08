@@ -55,7 +55,8 @@ fn test_stack_overflow_parsing() -> Result<(), Box<EvalAltResult>> {
         "
             1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
             1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0
+            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+            1
         ",
     )?;
 
@@ -67,7 +68,7 @@ fn test_stack_overflow_parsing() -> Result<(), Box<EvalAltResult>> {
                     1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
                     1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
                     1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-                    1
+                    1 + 2
                 "
             )
             .expect_err("should error")
@@ -92,7 +93,7 @@ fn test_stack_overflow_parsing() -> Result<(), Box<EvalAltResult>> {
             1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
             1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
             1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8
+            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9
         ",
     )?;
 
@@ -109,7 +110,7 @@ fn test_stack_overflow_parsing() -> Result<(), Box<EvalAltResult>> {
                     1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
                     1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
                     1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-                    1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9
+                    1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0
                 "
             )
             .expect_err("should error")
