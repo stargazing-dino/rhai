@@ -205,12 +205,12 @@ impl Engine {
         }
 
         // First check script-defined functions
-        let result = global.lib.iter().any(|m| m.contains_fn(hash_script))
+        let r = global.lib.iter().any(|m| m.contains_fn(hash_script))
             // Then check the global namespace and packages
             || self.global_modules.iter().any(|m| m.contains_fn(hash_script));
 
         #[cfg(not(feature = "no_module"))]
-        let result = result ||
+        let r = r ||
             // Then check imported modules
             global.contains_qualified_fn(hash_script)
             // Then check sub-modules
@@ -218,11 +218,11 @@ impl Engine {
                 m.values().any(|m| m.contains_qualified_fn(hash_script))
             });
 
-        if !result && !cache.filter.is_absent_and_set(hash_script) {
+        if !r && !cache.filter.is_absent_and_set(hash_script) {
             // Do not cache "one-hit wonders"
             cache.map.insert(hash_script, None);
         }
 
-        result
+        r
     }
 }

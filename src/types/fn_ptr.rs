@@ -158,18 +158,18 @@ impl FnPtr {
 
         let ctx = (engine, self.fn_name(), None, &*global, Position::NONE).into();
 
-        let result = self.call_raw(&ctx, None, arg_values)?;
+        self.call_raw(&ctx, None, arg_values).and_then(|result| {
+            // Bail out early if the return type needs no cast
+            if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+                return Ok(reify!(result => T));
+            }
 
-        // Bail out early if the return type needs no cast
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-            return Ok(reify!(result => T));
-        }
+            let typ = engine.map_type_name(result.type_name());
 
-        let typ = engine.map_type_name(result.type_name());
-
-        result.try_cast().ok_or_else(|| {
-            let t = engine.map_type_name(type_name::<T>()).into();
-            ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            result.try_cast().ok_or_else(|| {
+                let t = engine.map_type_name(type_name::<T>()).into();
+                ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            })
         })
     }
     /// Call the function pointer with curried arguments (if any).
@@ -187,18 +187,18 @@ impl FnPtr {
         let mut arg_values = crate::StaticVec::new_const();
         args.parse(&mut arg_values);
 
-        let result = self.call_raw(context, None, arg_values)?;
+        self.call_raw(context, None, arg_values).and_then(|result| {
+            // Bail out early if the return type needs no cast
+            if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+                return Ok(reify!(result => T));
+            }
 
-        // Bail out early if the return type needs no cast
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-            return Ok(reify!(result => T));
-        }
+            let typ = context.engine().map_type_name(result.type_name());
 
-        let typ = context.engine().map_type_name(result.type_name());
-
-        result.try_cast().ok_or_else(|| {
-            let t = context.engine().map_type_name(type_name::<T>()).into();
-            ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            result.try_cast().ok_or_else(|| {
+                let t = context.engine().map_type_name(type_name::<T>()).into();
+                ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            })
         })
     }
     /// Call the function pointer with curried arguments (if any).

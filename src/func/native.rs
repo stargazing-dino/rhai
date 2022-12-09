@@ -303,19 +303,20 @@ impl<'a> NativeCallContext<'a> {
 
         let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
-        let result = self._call_fn_raw(fn_name, &mut args, false, false, false)?;
+        self._call_fn_raw(fn_name, &mut args, false, false, false)
+            .and_then(|result| {
+                // Bail out early if the return type needs no cast
+                if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+                    return Ok(reify!(result => T));
+                }
 
-        // Bail out early if the return type needs no cast
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-            return Ok(reify!(result => T));
-        }
+                let typ = self.engine().map_type_name(result.type_name());
 
-        let typ = self.engine().map_type_name(result.type_name());
-
-        result.try_cast().ok_or_else(|| {
-            let t = self.engine().map_type_name(type_name::<T>()).into();
-            ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
-        })
+                result.try_cast().ok_or_else(|| {
+                    let t = self.engine().map_type_name(type_name::<T>()).into();
+                    ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+                })
+            })
     }
     /// Call a registered native Rust function inside the call context with the provided arguments.
     ///
@@ -333,19 +334,20 @@ impl<'a> NativeCallContext<'a> {
 
         let mut args: StaticVec<_> = arg_values.iter_mut().collect();
 
-        let result = self._call_fn_raw(fn_name, &mut args, true, false, false)?;
+        self._call_fn_raw(fn_name, &mut args, true, false, false)
+            .and_then(|result| {
+                // Bail out early if the return type needs no cast
+                if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+                    return Ok(reify!(result => T));
+                }
 
-        // Bail out early if the return type needs no cast
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-            return Ok(reify!(result => T));
-        }
+                let typ = self.engine().map_type_name(result.type_name());
 
-        let typ = self.engine().map_type_name(result.type_name());
-
-        result.try_cast().ok_or_else(|| {
-            let t = self.engine().map_type_name(type_name::<T>()).into();
-            ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
-        })
+                result.try_cast().ok_or_else(|| {
+                    let t = self.engine().map_type_name(type_name::<T>()).into();
+                    ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+                })
+            })
     }
     /// Call a function (native Rust or scripted) inside the call context.
     ///

@@ -233,34 +233,29 @@ impl Engine {
             ast.resolver().cloned(),
         );
 
-        let statements = ast.statements();
+        auto_restore!(global => move |g| {
+            #[cfg(not(feature = "no_module"))]
+            {
+                g.embedded_module_resolver = orig_embedded_module_resolver;
+            }
 
-        if statements.is_empty() {
-            return Ok(Dynamic::UNIT);
-        }
+            #[cfg(not(feature = "no_function"))]
+            g.lib.truncate(orig_lib_len);
 
-        let result = self.eval_global_statements(global, caches, scope, statements);
+            g.source = orig_source;
+        });
 
-        #[cfg(feature = "debugging")]
-        if self.is_debugger_registered() {
-            global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
-            let mut this = Dynamic::NULL;
-            let node = &crate::ast::Stmt::Noop(Position::NONE);
-
-            self.run_debugger(global, caches, scope, &mut this, node)?;
-        }
-
-        #[cfg(not(feature = "no_module"))]
-        {
-            global.embedded_module_resolver = orig_embedded_module_resolver;
-        }
-
-        #[cfg(not(feature = "no_function"))]
-        global.lib.truncate(orig_lib_len);
-
-        global.source = orig_source;
-
-        result
+        self.eval_global_statements(global, caches, scope, ast.statements())
+            .and_then(|r| {
+                #[cfg(feature = "debugging")]
+                if self.is_debugger_registered() {
+                    global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
+                    let mut this = Dynamic::NULL;
+                    let node = &crate::ast::Stmt::Noop(Position::NONE);
+                    self.run_debugger(global, caches, scope, &mut this, node)?;
+                }
+                Ok(r)
+            })
     }
 }
 

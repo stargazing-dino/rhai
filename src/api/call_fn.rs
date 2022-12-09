@@ -171,7 +171,7 @@ impl Engine {
         let mut arg_values = StaticVec::new_const();
         args.parse(&mut arg_values);
 
-        let result = self._call_fn(
+        self._call_fn(
             options,
             scope,
             &mut GlobalRuntimeState::new(self),
@@ -179,19 +179,20 @@ impl Engine {
             ast,
             name.as_ref(),
             arg_values.as_mut(),
-        )?;
+        )
+        .and_then(|result| {
+            // Bail out early if the return type needs no cast
+            if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+                return Ok(reify!(result => T));
+            }
 
-        // Bail out early if the return type needs no cast
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-            return Ok(reify!(result => T));
-        }
+            // Cast return type
+            let typ = self.map_type_name(result.type_name());
 
-        // Cast return type
-        let typ = self.map_type_name(result.type_name());
-
-        result.try_cast().ok_or_else(|| {
-            let t = self.map_type_name(type_name::<T>()).into();
-            ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            result.try_cast().ok_or_else(|| {
+                let t = self.map_type_name(type_name::<T>()).into();
+                ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            })
         })
     }
     /// Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
