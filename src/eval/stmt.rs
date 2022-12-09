@@ -882,9 +882,9 @@ impl Engine {
         scope: &mut Scope,
         statements: &[Stmt],
     ) -> RhaiResult {
-        let mut this = Dynamic::NULL;
+        let mut this_ptr = Dynamic::NULL;
 
-        self.eval_stmt_block(global, caches, scope, &mut this, statements, false)
+        self.eval_stmt_block(global, caches, scope, &mut this_ptr, statements, false)
             .or_else(|err| match *err {
                 ERR::Return(out, ..) => Ok(out),
                 ERR::LoopBreak(..) => {

@@ -392,13 +392,19 @@ impl Engine {
                 self.run_debugger(global, caches, scope, this_ptr, lhs)?;
                 self.track_operation(global, *var_pos)?;
 
-                let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
-
-                let obj_ptr = &mut target;
-                let mut this = Dynamic::NULL;
+                let target = &mut self.search_namespace(global, caches, scope, this_ptr, lhs)?;
+                let mut this_ptr = Dynamic::NULL;
 
                 self.eval_dot_index_chain_raw(
-                    global, caches, &mut this, lhs, expr, obj_ptr, rhs, idx_values, new_val,
+                    global,
+                    caches,
+                    &mut this_ptr,
+                    lhs,
+                    expr,
+                    target,
+                    rhs,
+                    idx_values,
+                    new_val,
                 )
             }
             // {expr}.??? = ??? or {expr}[???] = ???

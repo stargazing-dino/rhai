@@ -167,13 +167,13 @@ impl Engine {
         };
 
         self._call_fn(
-            options,
             scope,
             &mut crate::eval::GlobalRuntimeState::new(self),
             &mut crate::eval::Caches::new(),
             ast,
             name.as_ref(),
             arg_values.as_mut(),
+            options,
         )
     }
     /// Register a custom fallible function with the [`Engine`].

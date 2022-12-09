@@ -18,9 +18,9 @@ use std::{
 #[non_exhaustive]
 #[must_use]
 pub struct CallFnOptions<'t> {
-    /// A value for binding to the `this` pointer (if any).
+    /// A value for binding to the `this` pointer (if any). Default [`None`].
     pub this_ptr: Option<&'t mut Dynamic>,
-    /// The custom state of this evaluation run (if any), overrides [`Engine::default_tag`].
+    /// The custom state of this evaluation run (if any), overrides [`Engine::default_tag`]. Default [`None`].
     pub tag: Option<Dynamic>,
     /// Evaluate the [`AST`] to load necessary modules before calling the function? Default `true`.
     pub eval_ast: bool,
@@ -172,13 +172,13 @@ impl Engine {
         args.parse(&mut arg_values);
 
         self._call_fn(
-            options,
             scope,
             &mut GlobalRuntimeState::new(self),
             &mut Caches::new(),
             ast,
             name.as_ref(),
             arg_values.as_mut(),
+            options,
         )
         .and_then(|result| {
             // Bail out early if the return type needs no cast
@@ -207,13 +207,13 @@ impl Engine {
     #[inline(always)]
     pub(crate) fn _call_fn(
         &self,
-        options: CallFnOptions,
         scope: &mut Scope,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         ast: &AST,
         name: &str,
         arg_values: &mut [Dynamic],
+        options: CallFnOptions,
     ) -> RhaiResult {
         let statements = ast.statements();
 

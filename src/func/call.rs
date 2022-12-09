@@ -429,7 +429,7 @@ impl Engine {
                 };
                 if trigger {
                     let scope = &mut Scope::new();
-                    let mut this = Dynamic::NULL;
+                    let mut this_ptr = Dynamic::NULL;
                     let node = crate::ast::Stmt::Noop(pos);
                     let node = (&node).into();
                     let event = match _result {
@@ -438,7 +438,7 @@ impl Engine {
                     };
 
                     if let Err(err) =
-                        self.run_debugger_raw(global, caches, scope, &mut this, node, event)
+                        self.run_debugger_raw(global, caches, scope, &mut this_ptr, node, event)
                     {
                         _result = Err(err);
                     }
@@ -681,9 +681,9 @@ impl Engine {
 
                     auto_restore!(args = (_args) if swap => move |a| backup.restore_first_arg(a));
 
-                    let mut this = Dynamic::NULL;
+                    let mut this_ptr = Dynamic::NULL;
 
-                    self.call_script_fn(global, caches, scope, &mut this, func, args, true, pos)
+                    self.call_script_fn(global, caches, scope, &mut this_ptr, func, args, true, pos)
                 }
                 .map(|r| (r, false));
             }
@@ -1248,7 +1248,7 @@ impl Engine {
         pos: Position,
     ) -> RhaiResult {
         let mut arg_values = FnArgsVec::with_capacity(args_expr.len());
-        let mut args = FnArgsVec::with_capacity(args_expr.len());
+        let args = &mut FnArgsVec::with_capacity(args_expr.len());
         let mut first_arg_value = None;
 
         if args_expr.is_empty() {
@@ -1366,16 +1366,14 @@ impl Engine {
         match func {
             #[cfg(not(feature = "no_function"))]
             Some(f) if f.is_script() => {
-                let fn_def = f.get_script_fn_def().expect("script-defined function");
-                let new_scope = &mut Scope::new();
-                let mut this = Dynamic::NULL;
+                let f = f.get_script_fn_def().expect("script-defined function");
+                let scope = &mut Scope::new();
+                let mut this_ptr = Dynamic::NULL;
 
                 let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
                 auto_restore!(global => move |g| g.source = orig_source);
 
-                self.call_script_fn(
-                    global, caches, new_scope, &mut this, fn_def, &mut args, true, pos,
-                )
+                self.call_script_fn(global, caches, scope, &mut this_ptr, f, args, true, pos)
             }
 
             Some(f) if f.is_plugin_fn() => {
@@ -1388,7 +1386,7 @@ impl Engine {
                 if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
                 } else {
-                    f.call(context, &mut args)
+                    f.call(context, args)
                         .and_then(|r| self.check_data_size(r, pos))
                 }
             }
@@ -1400,19 +1398,19 @@ impl Engine {
                 } else {
                     None
                 };
-                func(context, &mut args).and_then(|r| self.check_data_size(r, pos))
+                func(context, args).and_then(|r| self.check_data_size(r, pos))
             }
 
             Some(f) => unreachable!("unknown function type: {:?}", f),
 
             None => {
                 let sig = if namespace.is_empty() {
-                    self.gen_fn_call_signature(fn_name, &args)
+                    self.gen_fn_call_signature(fn_name, args)
                 } else {
                     format!(
                         "{namespace}{}{}",
                         crate::tokenizer::Token::DoubleColon.literal_syntax(),
-                        self.gen_fn_call_signature(fn_name, &args)
+                        self.gen_fn_call_signature(fn_name, args)
                     )
                 };
 
