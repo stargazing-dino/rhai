@@ -1083,38 +1083,35 @@ impl Dynamic {
     pub fn from<T: Variant + Clone>(value: T) -> Self {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
 
-        reify!(value, |v: Self| return v);
-        reify!(value, |v: INT| return v.into());
+        reify! { value => |v: Self| return v }
+        reify! { value => |v: INT| return v.into() }
 
         #[cfg(not(feature = "no_float"))]
-        reify!(value, |v: crate::FLOAT| return v.into());
+        reify! { value => |v: crate::FLOAT| return v.into() }
 
         #[cfg(feature = "decimal")]
-        reify!(value, |v: rust_decimal::Decimal| return v.into());
+        reify! { value => |v: rust_decimal::Decimal| return v.into() }
 
-        reify!(value, |v: bool| return v.into());
-        reify!(value, |v: char| return v.into());
-        reify!(value, |v: ImmutableString| return v.into());
-        reify!(value, |v: String| return v.into());
-        reify!(value, |v: &str| return v.into());
-        reify!(value, |v: ()| return v.into());
+        reify! { value => |v: bool| return v.into() }
+        reify! { value => |v: char| return v.into() }
+        reify! { value => |v: ImmutableString| return v.into() }
+        reify! { value => |v: String| return v.into() }
+        reify! { value => |v: &str| return v.into() }
+        reify! { value => |v: ()| return v.into() }
 
         #[cfg(not(feature = "no_index"))]
-        reify!(value, |v: crate::Array| return v.into());
+        reify! { value => |v: crate::Array| return v.into() }
         #[cfg(not(feature = "no_index"))]
-        reify!(value, |v: crate::Blob| {
-            // don't use blob.into() because it'll be converted into an Array
-            return Self::from_blob(v);
-        });
+        // don't use blob.into() because it'll be converted into an Array
+        reify! { value => |v: crate::Blob| return Self::from_blob(v) }
         #[cfg(not(feature = "no_object"))]
-        reify!(value, |v: crate::Map| return v.into());
-        reify!(value, |v: FnPtr| return v.into());
+        reify! { value => |v: crate::Map| return v.into() }
+        reify! { value => |v: FnPtr| return v.into() }
 
         #[cfg(not(feature = "no_time"))]
-        reify!(value, |v: Instant| return v.into());
+        reify! { value => |v: Instant| return v.into() }
         #[cfg(not(feature = "no_closure"))]
-        reify!(value, |v: crate::Shared<crate::Locked<Self>>| return v
-            .into());
+        reify! { value => |v: crate::Shared<crate::Locked<Self>>| return v.into() }
 
         Self(Union::Variant(
             Box::new(Box::new(value)),
@@ -1183,89 +1180,89 @@ impl Dynamic {
         self.flatten_in_place();
 
         if TypeId::of::<T>() == TypeId::of::<Self>() {
-            return Some(reify!(self => T));
+            return Some(reify! { self => T });
         }
         if TypeId::of::<T>() == TypeId::of::<()>() {
             return match self.0 {
-                Union::Unit(..) => Some(reify!(() => T)),
+                Union::Unit(..) => Some(reify! { () => T }),
                 _ => None,
             };
         }
         if TypeId::of::<T>() == TypeId::of::<INT>() {
             return match self.0 {
-                Union::Int(n, ..) => Some(reify!(n => T)),
+                Union::Int(n, ..) => Some(reify! { n => T }),
                 _ => None,
             };
         }
         #[cfg(not(feature = "no_float"))]
         if TypeId::of::<T>() == TypeId::of::<crate::FLOAT>() {
             return match self.0 {
-                Union::Float(v, ..) => Some(reify!(*v => T)),
+                Union::Float(v, ..) => Some(reify! { *v => T }),
                 _ => None,
             };
         }
         #[cfg(feature = "decimal")]
         if TypeId::of::<T>() == TypeId::of::<rust_decimal::Decimal>() {
             return match self.0 {
-                Union::Decimal(v, ..) => Some(reify!(*v => T)),
+                Union::Decimal(v, ..) => Some(reify! { *v => T }),
                 _ => None,
             };
         }
         if TypeId::of::<T>() == TypeId::of::<bool>() {
             return match self.0 {
-                Union::Bool(b, ..) => Some(reify!(b => T)),
+                Union::Bool(b, ..) => Some(reify! { b => T }),
                 _ => None,
             };
         }
         if TypeId::of::<T>() == TypeId::of::<ImmutableString>() {
             return match self.0 {
-                Union::Str(s, ..) => Some(reify!(s => T)),
+                Union::Str(s, ..) => Some(reify! { s => T }),
                 _ => None,
             };
         }
         if TypeId::of::<T>() == TypeId::of::<String>() {
             return match self.0 {
-                Union::Str(s, ..) => Some(reify!(s.to_string() => T)),
+                Union::Str(s, ..) => Some(reify! { s.to_string() => T }),
                 _ => None,
             };
         }
         if TypeId::of::<T>() == TypeId::of::<char>() {
             return match self.0 {
-                Union::Char(c, ..) => Some(reify!(c => T)),
+                Union::Char(c, ..) => Some(reify! { c => T }),
                 _ => None,
             };
         }
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<T>() == TypeId::of::<crate::Array>() {
             return match self.0 {
-                Union::Array(a, ..) => Some(reify!(*a => T)),
+                Union::Array(a, ..) => Some(reify! { *a => T }),
                 _ => None,
             };
         }
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<T>() == TypeId::of::<crate::Blob>() {
             return match self.0 {
-                Union::Blob(b, ..) => Some(reify!(*b => T)),
+                Union::Blob(b, ..) => Some(reify! { *b => T }),
                 _ => None,
             };
         }
         #[cfg(not(feature = "no_object"))]
         if TypeId::of::<T>() == TypeId::of::<crate::Map>() {
             return match self.0 {
-                Union::Map(m, ..) => Some(reify!(*m => T)),
+                Union::Map(m, ..) => Some(reify! { *m => T }),
                 _ => None,
             };
         }
         if TypeId::of::<T>() == TypeId::of::<FnPtr>() {
             return match self.0 {
-                Union::FnPtr(f, ..) => Some(reify!(*f => T)),
+                Union::FnPtr(f, ..) => Some(reify! { *f => T }),
                 _ => None,
             };
         }
         #[cfg(not(feature = "no_time"))]
         if TypeId::of::<T>() == TypeId::of::<Instant>() {
             return match self.0 {
-                Union::TimeStamp(t, ..) => Some(reify!(*t => T)),
+                Union::TimeStamp(t, ..) => Some(reify! { *t => T }),
                 _ => None,
             };
         }
@@ -1305,7 +1302,7 @@ impl Dynamic {
     pub fn cast<T: Any + Clone>(self) -> T {
         // Bail out early if the return type needs no cast
         if TypeId::of::<T>() == TypeId::of::<Self>() {
-            return reify!(self => T);
+            return reify! { self => T };
         }
 
         #[cfg(not(feature = "no_closure"))]
@@ -2039,7 +2036,7 @@ impl Dynamic {
                 })
                 .collect(),
             Union::Blob(b, ..) if TypeId::of::<T>() == TypeId::of::<u8>() => {
-                Ok(reify!(*b => Vec<T>))
+                Ok(reify! { *b => Vec<T> })
             }
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) => {
@@ -2062,7 +2059,7 @@ impl Dynamic {
                             .collect()
                     }
                     Union::Blob(ref b, ..) if TypeId::of::<T>() == TypeId::of::<u8>() => {
-                        Ok(reify!(b.clone() => Vec<T>))
+                        Ok(reify! { b.clone() => Vec<T> })
                     }
                     _ => Err(cell.type_name()),
                 }

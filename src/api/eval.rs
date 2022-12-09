@@ -200,7 +200,7 @@ impl Engine {
 
         // Bail out early if the return type needs no cast
         if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-            return Ok(reify!(result => T));
+            return Ok(reify! { result => T });
         }
 
         let typ = self.map_type_name(result.type_name());

@@ -4,12 +4,12 @@
 ///
 /// # Syntax
 ///
-/// * `reify!(`_variable_ or _expression_`,|`_temp-variable_`: `_type_`|` _code_`,` `||` _fallback_ `)`
-/// * `reify!(`_variable_ or _expression_`,|`_temp-variable_`: `_type_`|` _code_ `)`
-/// * `reify!(`_variable_ or _expression_ `=>` `Option<`_type_`>` `)`
-/// * `reify!(`_variable_ or _expression_ `=>` _type_ `)`
+/// * `reify! { `_variable_ or _expression_` => |`_temp-variable_`: `_type_`|` _code_`,` `||` _fallback_ `)`
+/// * `reify! { `_variable_ or _expression_` => |`_temp-variable_`: `_type_`|` _code_ `)`
+/// * `reify! { `_variable_ or _expression_ `=>` `Option<`_type_`>` `)`
+/// * `reify! { `_variable_ or _expression_ `=>` _type_ `)`
 macro_rules! reify {
-    ($old:ident, |$new:ident : $t:ty| $code:expr, || $fallback:expr) => {{
+    ($old:ident => |$new:ident : $t:ty| $code:expr, || $fallback:expr) => {{
         #[allow(clippy::redundant_else)]
         if std::any::TypeId::of::<$t>() == std::any::Any::type_id(&$old) {
             // SAFETY: This is safe because we already checked to make sure the two types
@@ -20,29 +20,29 @@ macro_rules! reify {
             $fallback
         }
     }};
-    ($old:expr, |$new:ident : $t:ty| $code:expr, || $fallback:expr) => {{
+    ($old:expr => |$new:ident : $t:ty| $code:expr, || $fallback:expr) => {{
         let old = $old;
-        reify!(old, |$new: $t| $code, || $fallback)
+        reify! { old => |$new: $t| $code, || $fallback }
     }};
 
-    ($old:ident, |$new:ident : $t:ty| $code:expr) => {
-        reify!($old, |$new: $t| $code, || ())
+    ($old:ident => |$new:ident : $t:ty| $code:expr) => {
+        reify! { $old => |$new: $t| $code, || () }
     };
-    ($old:expr, |$new:ident : $t:ty| $code:expr) => {
-        reify!($old, |$new: $t| $code, || ())
+    ($old:expr => |$new:ident : $t:ty| $code:expr) => {
+        reify! { $old => |$new: $t| $code, || () }
     };
 
     ($old:ident => Option<$t:ty>) => {
-        reify!($old, |v: $t| Some(v), || None)
+        reify! { $old => |v: $t| Some(v), || None }
     };
     ($old:expr => Option<$t:ty>) => {
-        reify!($old, |v: $t| Some(v), || None)
+        reify! { $old => |v: $t| Some(v), || None }
     };
 
     ($old:ident => $t:ty) => {
-        reify!($old, |v: $t| v, || unreachable!())
+        reify! { $old => |v: $t| v, || unreachable!() }
     };
     ($old:expr => $t:ty) => {
-        reify!($old, |v: $t| v, || unreachable!())
+        reify! { $old => |v: $t| v, || unreachable!() }
     };
 }

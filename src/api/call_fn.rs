@@ -183,7 +183,7 @@ impl Engine {
         .and_then(|result| {
             // Bail out early if the return type needs no cast
             if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-                return Ok(reify!(result => T));
+                return Ok(reify! { result => T });
             }
 
             // Cast return type

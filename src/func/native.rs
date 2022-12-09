@@ -307,7 +307,7 @@ impl<'a> NativeCallContext<'a> {
             .and_then(|result| {
                 // Bail out early if the return type needs no cast
                 if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-                    return Ok(reify!(result => T));
+                    return Ok(reify! { result => T });
                 }
 
                 let typ = self.engine().map_type_name(result.type_name());
@@ -338,7 +338,7 @@ impl<'a> NativeCallContext<'a> {
             .and_then(|result| {
                 // Bail out early if the return type needs no cast
                 if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-                    return Ok(reify!(result => T));
+                    return Ok(reify! { result => T });
                 }
 
                 let typ = self.engine().map_type_name(result.type_name());

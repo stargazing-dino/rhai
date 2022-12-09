@@ -75,8 +75,7 @@ pub mod blob_functions {
         len: INT,
         value: INT,
     ) -> RhaiResultOf<Blob> {
-        let len = len.min(MAX_USIZE_INT);
-        let len = if len < 0 { 0 } else { len as usize };
+        let len = len.min(MAX_USIZE_INT).max(0) as usize;
         let _ctx = ctx;
 
         // Check if blob will be over max size limit

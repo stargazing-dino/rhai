@@ -161,7 +161,7 @@ impl FnPtr {
         self.call_raw(&ctx, None, arg_values).and_then(|result| {
             // Bail out early if the return type needs no cast
             if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-                return Ok(reify!(result => T));
+                return Ok(reify! { result => T });
             }
 
             let typ = engine.map_type_name(result.type_name());
@@ -190,7 +190,7 @@ impl FnPtr {
         self.call_raw(context, None, arg_values).and_then(|result| {
             // Bail out early if the return type needs no cast
             if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-                return Ok(reify!(result => T));
+                return Ok(reify! { result => T });
             }
 
             let typ = context.engine().map_type_name(result.type_name());
