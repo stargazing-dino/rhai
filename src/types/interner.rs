@@ -92,14 +92,7 @@ impl StringsInterner {
 
         let result = match self.cache.entry(hash) {
             Entry::Occupied(e) => return e.get().clone(),
-            Entry::Vacant(e) => {
-                let value = mapper(text);
-
-                if value.strong_count() > 1 {
-                    return value;
-                }
-                e.insert(value).clone()
-            }
+            Entry::Vacant(e) => e.insert(mapper(text)).clone(),
         };
 
         // Throttle the cache upon exit

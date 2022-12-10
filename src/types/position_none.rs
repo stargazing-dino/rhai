@@ -10,7 +10,7 @@ use std::{
 };
 
 /// A location (line number + character position) in the input script.
-#[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy, Default)]
 pub struct Position;
 
 impl Position {
@@ -81,14 +81,6 @@ impl Position {
     }
 }
 
-impl Default for Position {
-    #[inline(always)]
-    #[must_use]
-    fn default() -> Self {
-        Self
-    }
-}
-
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "none")
@@ -119,16 +111,8 @@ impl AddAssign for Position {
 
 /// _(internals)_ A span consisting of a starting and an ending [positions][Position].
 /// Exported under the `internals` feature only.
-#[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy, Default)]
 pub struct Span;
-
-impl Default for Span {
-    #[inline(always)]
-    #[must_use]
-    fn default() -> Self {
-        Self
-    }
-}
 
 impl Span {
     /// Empty [`Span`].

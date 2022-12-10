@@ -725,7 +725,7 @@ impl Engine {
             })
         });
         #[cfg(feature = "debugging")]
-        auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
+        auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
 
         self.eval_expr(global, caches, scope, this_ptr, arg_expr)
             .map(|r| (r, arg_expr.start_position()))
@@ -1549,14 +1549,14 @@ impl Engine {
         }
 
         // Normal function call
-        let (first_arg, args) = args.split_first().map_or_else(
+        let (first_arg, rest_args) = args.split_first().map_or_else(
             || (None, args.as_ref()),
             |(first, rest)| (Some(first), rest),
         );
 
         self.make_function_call(
-            global, caches, scope, this_ptr, name, op_token, first_arg, args, *hashes, *capture,
-            pos,
+            global, caches, scope, this_ptr, name, op_token, first_arg, rest_args, *hashes,
+            *capture, pos,
         )
     }
 }
