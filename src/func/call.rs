@@ -747,9 +747,35 @@ impl Engine {
         let is_ref_mut = target.is_ref();
 
         let (result, updated) = match fn_name {
+            // Handle fn_ptr.call(...)
             KEYWORD_FN_PTR_CALL if target.is_fnptr() => {
-                // FnPtr call
                 let fn_ptr = target.read_lock::<FnPtr>().expect("`FnPtr`");
+
+                // Arguments are passed as-is, adding the curried arguments
+                let mut curry = FnArgsVec::with_capacity(fn_ptr.curry().len());
+                curry.extend(fn_ptr.curry().iter().cloned());
+                let args = &mut FnArgsVec::with_capacity(curry.len() + call_args.len());
+                args.extend(curry.iter_mut());
+                args.extend(call_args.iter_mut());
+
+                // Linked to scripted function?
+                #[cfg(not(feature = "no_function"))]
+                if let Some(fn_def) = fn_ptr.fn_def() {
+                    let mut this_ptr = Dynamic::NULL;
+
+                    return self
+                        .call_script_fn(
+                            global,
+                            caches,
+                            &mut Scope::new(),
+                            &mut this_ptr,
+                            fn_def,
+                            args,
+                            true,
+                            fn_call_pos,
+                        )
+                        .map(|v| (v, false));
+                }
 
                 #[cfg(not(feature = "no_function"))]
                 let is_anon = fn_ptr.is_anonymous();
@@ -759,18 +785,11 @@ impl Engine {
                 // Redirect function name
                 let fn_name = fn_ptr.fn_name();
                 // Recalculate hashes
-                let args_len = call_args.len() + fn_ptr.curry().len();
                 let new_hash = if !is_anon && !is_valid_function_name(fn_name) {
-                    FnCallHashes::from_native(calc_fn_hash(None, fn_name, args_len))
+                    FnCallHashes::from_native(calc_fn_hash(None, fn_name, args.len()))
                 } else {
-                    calc_fn_hash(None, fn_name, args_len).into()
+                    calc_fn_hash(None, fn_name, args.len()).into()
                 };
-                // Arguments are passed as-is, adding the curried arguments
-                let mut curry = FnArgsVec::with_capacity(fn_ptr.curry().len());
-                curry.extend(fn_ptr.curry().iter().cloned());
-                let mut args = FnArgsVec::with_capacity(curry.len() + call_args.len());
-                args.extend(curry.iter_mut());
-                args.extend(call_args.iter_mut());
 
                 // Map it to name(args) in function-call style
                 self.exec_fn_call(
@@ -780,12 +799,14 @@ impl Engine {
                     fn_name,
                     NO_TOKEN,
                     new_hash,
-                    &mut args,
+                    args,
                     false,
                     false,
                     fn_call_pos,
                 )
             }
+
+            // Handle obj.call(fn_ptr, ...)
             KEYWORD_FN_PTR_CALL => {
                 if call_args.is_empty() {
                     let typ = self.map_type_name(target.type_name());
@@ -799,32 +820,60 @@ impl Engine {
                 let fn_ptr = mem::take(&mut call_args[0]).cast::<FnPtr>();
 
                 #[cfg(not(feature = "no_function"))]
-                let is_anon = fn_ptr.is_anonymous();
+                let (fn_name, is_anon, fn_curry, fn_def) = {
+                    let is_anon = fn_ptr.is_anonymous();
+                    let (fn_name, fn_curry, fn_def) = fn_ptr.take_data();
+                    (fn_name, is_anon, fn_curry, fn_def)
+                };
                 #[cfg(feature = "no_function")]
-                let is_anon = false;
+                let (fn_name, is_anon, fn_curry) = {
+                    let (fn_name, fn_curry, fn_def) = fn_ptr.take_data();
+                    (fn_name, false, fn_curry)
+                };
 
+                // Replace the first argument with the object pointer, adding the curried arguments
                 call_args = &mut call_args[1..];
 
-                // Redirect function name
-                let (fn_name, fn_curry) = fn_ptr.take_data();
+                let mut curry = FnArgsVec::with_capacity(fn_curry.len());
+                curry.extend(fn_curry.into_iter());
+                let args = &mut FnArgsVec::with_capacity(curry.len() + call_args.len() + 1);
+                args.extend(curry.iter_mut());
+                args.extend(call_args.iter_mut());
+
+                // Linked to scripted function?
+                #[cfg(not(feature = "no_function"))]
+                if let Some(fn_def) = fn_def {
+                    // Check for data race.
+                    #[cfg(not(feature = "no_closure"))]
+                    ensure_no_data_race(&fn_def.name, args, false)?;
+
+                    return self
+                        .call_script_fn(
+                            global,
+                            caches,
+                            &mut Scope::new(),
+                            target,
+                            &fn_def,
+                            args,
+                            true,
+                            fn_call_pos,
+                        )
+                        .map(|v| (v, false));
+                }
+
+                // Add the first argument with the object pointer
+                args.insert(0, target.as_mut());
+
                 // Recalculate hash
-                let args_len = call_args.len() + fn_curry.len();
                 let new_hash = if !is_anon && !is_valid_function_name(&fn_name) {
-                    FnCallHashes::from_native(calc_fn_hash(None, &fn_name, args_len + 1))
+                    FnCallHashes::from_native(calc_fn_hash(None, &fn_name, args.len()))
                 } else {
                     FnCallHashes::from_all(
                         #[cfg(not(feature = "no_function"))]
-                        calc_fn_hash(None, &fn_name, args_len),
-                        calc_fn_hash(None, &fn_name, args_len + 1),
+                        calc_fn_hash(None, &fn_name, args.len() - 1),
+                        calc_fn_hash(None, &fn_name, args.len()),
                     )
                 };
-                // Replace the first argument with the object pointer, adding the curried arguments
-                let mut curry = FnArgsVec::with_capacity(fn_curry.len());
-                curry.extend(fn_curry.into_iter());
-                let mut args = FnArgsVec::with_capacity(curry.len() + call_args.len() + 1);
-                args.push(target.as_mut());
-                args.extend(curry.iter_mut());
-                args.extend(call_args.iter_mut());
 
                 // Map it to name(args) in function-call style
                 self.exec_fn_call(
@@ -834,7 +883,7 @@ impl Engine {
                     &fn_name,
                     NO_TOKEN,
                     new_hash,
-                    &mut args,
+                    args,
                     is_ref_mut,
                     true,
                     fn_call_pos,
@@ -975,7 +1024,7 @@ impl Engine {
         match name {
             _ if op_token != NO_TOKEN => (),
 
-            // Handle call()
+            // Handle call(fn_ptr, ...)
             KEYWORD_FN_PTR_CALL if total_args >= 1 => {
                 let arg = first_arg.unwrap();
                 let (arg_value, arg_pos) =
@@ -989,12 +1038,46 @@ impl Engine {
                 let fn_ptr = arg_value.cast::<FnPtr>();
 
                 #[cfg(not(feature = "no_function"))]
-                let is_anon = fn_ptr.is_anonymous();
+                let (fn_name, is_anon, fn_curry, fn_def) = {
+                    let is_anon = fn_ptr.is_anonymous();
+                    let (fn_name, fn_curry, fn_def) = fn_ptr.take_data();
+                    (fn_name, is_anon, fn_curry, fn_def)
+                };
                 #[cfg(feature = "no_function")]
-                let is_anon = false;
+                let (fn_name, is_anon, fn_curry) = {
+                    let (fn_name, fn_curry, fn_def) = fn_ptr.take_data();
+                    (fn_name, false, fn_curry)
+                };
 
-                let (fn_name, fn_curry) = fn_ptr.take_data();
                 curry.extend(fn_curry.into_iter());
+
+                // Linked to scripted function?
+                #[cfg(not(feature = "no_function"))]
+                if let Some(fn_def) = fn_def {
+                    // Evaluate arguments
+                    let mut arg_values = curry
+                        .into_iter()
+                        .map(Ok)
+                        .chain(a_expr.iter().map(|expr| -> Result<_, RhaiError> {
+                            self.get_arg_value(global, caches, scope, this_ptr, expr)
+                                .map(|(v, ..)| v)
+                        }))
+                        .collect::<RhaiResultOf<FnArgsVec<_>>>()?;
+                    let args = &mut arg_values.iter_mut().collect::<FnArgsVec<_>>();
+
+                    let mut this_ptr = Dynamic::NULL;
+
+                    return self.call_script_fn(
+                        global,
+                        caches,
+                        &mut Scope::new(),
+                        &mut this_ptr,
+                        &fn_def,
+                        args,
+                        true,
+                        pos,
+                    );
+                }
 
                 // Redirect function name
                 redirected = fn_name;
@@ -1042,16 +1125,16 @@ impl Engine {
                     return Err(self.make_type_mismatch_err::<FnPtr>(typ, arg_pos));
                 }
 
-                let (name, fn_curry) = arg_value.cast::<FnPtr>().take_data();
+                let mut fn_ptr = arg_value.cast::<FnPtr>();
 
                 // Append the new curried arguments to the existing list.
-                let fn_curry = a_expr.iter().try_fold(fn_curry, |mut curried, expr| {
+                a_expr.iter().try_for_each(|expr| -> Result<_, RhaiError> {
                     let (value, ..) = self.get_arg_value(global, caches, scope, this_ptr, expr)?;
-                    curried.push(value);
-                    Ok::<_, RhaiError>(curried)
+                    fn_ptr.add_curry(value);
+                    Ok(())
                 })?;
 
-                return Ok(FnPtr::new_unchecked(name, fn_curry).into());
+                return Ok(fn_ptr.into());
             }
 
             // Handle is_shared()

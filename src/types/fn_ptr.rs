@@ -12,15 +12,34 @@ use std::prelude::v1::*;
 use std::{
     any::{type_name, TypeId},
     convert::{TryFrom, TryInto},
-    fmt, mem,
+    fmt,
+    hash::Hash,
+    mem,
 };
 
 /// A general function pointer, which may carry additional (i.e. curried) argument values
 /// to be passed onto a function during a call.
-#[derive(Clone, Hash)]
+#[derive(Clone)]
 pub struct FnPtr {
     name: ImmutableString,
     curry: StaticVec<Dynamic>,
+    #[cfg(not(feature = "no_function"))]
+    fn_def: Option<crate::Shared<crate::ast::ScriptFnDef>>,
+}
+
+impl Hash for FnPtr {
+    #[inline(always)]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.curry.hash(state);
+
+        // Hash the linked [`ScriptFnDef`][crate::ast::ScriptFnDef] by hashing its shared pointer.
+        #[cfg(not(feature = "no_function"))]
+        self.fn_def
+            .as_ref()
+            .map(|f| crate::Shared::as_ptr(f))
+            .hash(state);
+    }
 }
 
 impl fmt::Debug for FnPtr {
@@ -56,6 +75,8 @@ impl FnPtr {
         Self {
             name: name.into(),
             curry,
+            #[cfg(not(feature = "no_function"))]
+            fn_def: None,
         }
     }
     /// Get the name of the function.
@@ -71,6 +92,20 @@ impl FnPtr {
         &self.name
     }
     /// Get the underlying data of the function pointer.
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn take_data(
+        self,
+    ) -> (
+        ImmutableString,
+        StaticVec<Dynamic>,
+        Option<crate::Shared<crate::ast::ScriptFnDef>>,
+    ) {
+        (self.name, self.curry, self.fn_def)
+    }
+    /// Get the underlying data of the function pointer.
+    #[cfg(feature = "no_function")]
     #[inline(always)]
     #[must_use]
     pub(crate) fn take_data(self) -> (ImmutableString, StaticVec<Dynamic>) {
@@ -247,6 +282,13 @@ impl FnPtr {
 
         context.call_fn_raw(self.fn_name(), is_method, is_method, &mut args)
     }
+    /// Get a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn fn_def(&self) -> Option<&crate::Shared<crate::ast::ScriptFnDef>> {
+        self.fn_def.as_ref()
+    }
 }
 
 impl fmt::Display for FnPtr {
@@ -264,9 +306,25 @@ impl TryFrom<ImmutableString> for FnPtr {
             Ok(Self {
                 name: value,
                 curry: StaticVec::new_const(),
+                #[cfg(not(feature = "no_function"))]
+                fn_def: None,
             })
         } else {
             Err(ERR::ErrorFunctionNotFound(value.to_string(), Position::NONE).into())
+        }
+    }
+}
+
+#[cfg(not(feature = "no_function"))]
+impl<T: Into<crate::Shared<crate::ast::ScriptFnDef>>> From<T> for FnPtr {
+    #[inline(always)]
+    fn from(value: T) -> Self {
+        let fn_def = value.into();
+
+        Self {
+            name: fn_def.name.clone(),
+            curry: StaticVec::new_const(),
+            fn_def: Some(fn_def),
         }
     }
 }

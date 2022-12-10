@@ -33,7 +33,7 @@ impl Engine {
         rewind_scope: bool,
         pos: Position,
     ) -> RhaiResult {
-        assert!(fn_def.params.len() == args.len());
+        assert_eq!(fn_def.params.len(), args.len());
 
         self.track_operation(global, pos)?;
 

@@ -1464,7 +1464,7 @@ impl Engine {
                 // Restore the strings interner by swapping it back
                 std::mem::swap(state.interned_strings, new_state.interned_strings);
 
-                let (expr, f) = result?;
+                let (expr, fn_def) = result?;
 
                 #[cfg(not(feature = "no_closure"))]
                 new_state
@@ -1490,8 +1490,8 @@ impl Engine {
                         }
                     })?;
 
-                let hash_script = calc_fn_hash(None, &f.name, f.params.len());
-                lib.insert(hash_script, f.into());
+                let hash_script = calc_fn_hash(None, &fn_def.name, fn_def.params.len());
+                lib.insert(hash_script, fn_def);
 
                 expr
             }
@@ -3707,7 +3707,7 @@ impl Engine {
         _parent: &mut ParseState,
         lib: &mut FnLib,
         settings: ParseSettings,
-    ) -> ParseResult<(Expr, ScriptFnDef)> {
+    ) -> ParseResult<(Expr, Shared<ScriptFnDef>)> {
         let settings = settings.level_up()?;
         let mut params_list = StaticVec::<ImmutableString>::new_const();
 
@@ -3786,7 +3786,7 @@ impl Engine {
         let fn_name = state.get_interned_string(make_anonymous_fn(hash));
 
         // Define the function
-        let script = ScriptFnDef {
+        let script = Shared::new(ScriptFnDef {
             name: fn_name.clone(),
             access: crate::FnAccess::Public,
             params,
@@ -3796,9 +3796,9 @@ impl Engine {
             #[cfg(not(feature = "no_function"))]
             #[cfg(feature = "metadata")]
             comments: Box::default(),
-        };
+        });
 
-        let fn_ptr = crate::FnPtr::new_unchecked(fn_name, StaticVec::new_const());
+        let fn_ptr = crate::FnPtr::from(script.clone());
         let expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), settings.pos);
 
         #[cfg(not(feature = "no_closure"))]

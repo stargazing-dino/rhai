@@ -152,20 +152,18 @@ impl Engine {
             _ if global.always_search_scope => 0,
 
             Expr::Variable(_, Some(i), ..) => i.get() as usize,
-            // Scripted function with the same name
-            #[cfg(not(feature = "no_function"))]
-            Expr::Variable(v, None, ..)
-                if global
-                    .lib
-                    .iter()
-                    .flat_map(|m| m.iter_script_fn())
-                    .any(|(_, _, f, ..)| f == v.3.as_str()) =>
-            {
-                let val: Dynamic =
-                    crate::FnPtr::new_unchecked(v.3.as_str(), crate::StaticVec::default()).into();
-                return Ok(val.into());
+            Expr::Variable(v, None, ..) => {
+                // Scripted function with the same name
+                #[cfg(not(feature = "no_function"))]
+                if let Some(fn_def) = global.lib.iter().flat_map(|m| m.iter_script_fn()).find_map(
+                    |(_, _, f, _, func)| if f == v.3.as_str() { Some(func) } else { None },
+                ) {
+                    let val: Dynamic = crate::FnPtr::from(fn_def.clone()).into();
+                    return Ok(val.into());
+                }
+
+                v.0.map_or(0, NonZeroUsize::get)
             }
-            Expr::Variable(v, None, ..) => v.0.map_or(0, NonZeroUsize::get),
 
             _ => unreachable!("Expr::Variable expected but gets {:?}", expr),
         };
