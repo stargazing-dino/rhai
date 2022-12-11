@@ -22,7 +22,7 @@ bitflags! {
         /// Is looping allowed?
         const LOOPING = 0b_0000_0010_0000;
         /// Is variables shadowing allowed?
-        const SHADOW = 0b_0000_0100_0000;
+        const SHADOWING = 0b_0000_0100_0000;
         /// Strict variables mode?
         const STRICT_VAR = 0b_0000_1000_0000;
         /// Raise error if an object map property does not exist?
@@ -43,7 +43,7 @@ impl LangOptions {
             | Self::SWITCH_EXPR
             | Self::STMT_EXPR
             | Self::LOOPING
-            | Self::SHADOW
+            | Self::SHADOWING
             | Self::FAST_OPS
             | {
                 #[cfg(not(feature = "no_function"))]
@@ -148,12 +148,12 @@ impl Engine {
     #[inline(always)]
     #[must_use]
     pub const fn allow_shadowing(&self) -> bool {
-        self.options.contains(LangOptions::SHADOW)
+        self.options.contains(LangOptions::SHADOWING)
     }
     /// Set whether variables shadowing is allowed.
     #[inline(always)]
     pub fn set_allow_shadowing(&mut self, enable: bool) -> &mut Self {
-        self.options.set(LangOptions::SHADOW, enable);
+        self.options.set(LangOptions::SHADOWING, enable);
         self
     }
     /// Is strict variables mode enabled?

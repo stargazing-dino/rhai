@@ -16,6 +16,24 @@ fn test_expressions() -> Result<(), Box<EvalAltResult>> {
         engine.eval_expression_with_scope::<INT>(&mut scope, "if x > 0 { 42 } else { 123 }")?,
         42
     );
+    #[cfg(not(feature = "no_index"))]
+    #[cfg(not(feature = "no_object"))]
+    #[cfg(not(feature = "no_function"))]
+    {
+        assert_eq!(
+            engine.eval_expression_with_scope::<INT>(
+                &mut scope,
+                "[1, 2, 3, 4].map(|x| x * x).reduce(|a, v| a + v, 0)"
+            )?,
+            30
+        );
+        assert!(engine
+            .eval_expression_with_scope::<INT>(
+                &mut scope,
+                "[1, 2, 3, 4].map(|x| { let r = 2; x * r }).reduce(|a, v| a + v, 0)"
+            )
+            .is_err());
+    }
     assert!(engine
         .eval_expression_with_scope::<INT>(&mut scope, "if x > 0 { let y = 42; y } else { 123 }")
         .is_err());

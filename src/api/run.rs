@@ -126,24 +126,17 @@ impl Engine {
             global.embedded_module_resolver = ast.resolver().cloned();
         }
 
-        let statements = ast.statements();
-
-        let result = if !statements.is_empty() {
-            self.eval_global_statements(global, caches, scope, statements)
-                .map(|_| ())
-        } else {
-            Ok(())
-        };
-
-        #[cfg(feature = "debugging")]
-        if self.is_debugger_registered() {
-            global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
-            let mut this = crate::Dynamic::NULL;
-            let node = &crate::ast::Stmt::Noop(crate::Position::NONE);
-            self.run_debugger(global, caches, scope, &mut this, node)?;
-        }
-
-        result
+        self.eval_global_statements(global, caches, scope, ast.statements())
+            .and_then(|_| {
+                #[cfg(feature = "debugging")]
+                if self.is_debugger_registered() {
+                    global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
+                    let mut this_ptr = crate::Dynamic::NULL;
+                    let node = &crate::ast::Stmt::Noop(crate::Position::NONE);
+                    self.run_debugger(global, caches, scope, &mut this_ptr, node)?;
+                }
+                Ok(())
+            })
     }
 }
 

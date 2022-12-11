@@ -41,10 +41,7 @@ impl Engine {
         }
 
         // Restore scope at end of block if necessary
-        auto_restore! {
-            scope if restore_orig_state => rewind;
-            let orig_scope_len = scope.len();
-        }
+        auto_restore! { scope if restore_orig_state => rewind; let orig_scope_len = scope.len(); }
 
         // Restore global state at end of block if necessary
         let orig_always_search_scope = global.always_search_scope;
@@ -208,7 +205,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, stmt)?;
         #[cfg(feature = "debugging")]
-        auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
+        auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
 
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
@@ -519,10 +516,8 @@ impl Engine {
                 let iter_func = iter_func.ok_or_else(|| ERR::ErrorFor(expr.start_position()))?;
 
                 // Restore scope at end of statement
-                auto_restore! {
-                    scope => rewind;
-                    let orig_scope_len = scope.len();
-                }
+                auto_restore! { scope => rewind; let orig_scope_len = scope.len(); }
+
                 // Add the loop variables
                 let counter_index = if counter.is_empty() {
                     usize::MAX
@@ -649,10 +644,7 @@ impl Engine {
                         };
 
                         // Restore scope at end of block
-                        auto_restore! {
-                            scope if !catch_var.is_empty() => rewind;
-                            let orig_scope_len = scope.len();
-                        }
+                        auto_restore! { scope if !catch_var.is_empty() => rewind; let orig_scope_len = scope.len(); }
 
                         if !catch_var.is_empty() {
                             scope.push(catch_var.name.clone(), err_value);
@@ -882,9 +874,9 @@ impl Engine {
         scope: &mut Scope,
         statements: &[Stmt],
     ) -> RhaiResult {
-        let mut this = Dynamic::NULL;
+        let mut this_ptr = Dynamic::NULL;
 
-        self.eval_stmt_block(global, caches, scope, &mut this, statements, false)
+        self.eval_stmt_block(global, caches, scope, &mut this_ptr, statements, false)
             .or_else(|err| match *err {
                 ERR::Return(out, ..) => Ok(out),
                 ERR::LoopBreak(..) => {

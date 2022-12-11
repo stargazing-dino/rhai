@@ -314,14 +314,12 @@ impl Debugger {
             None
         }
     }
-    /// Override the status of this [`Debugger`] if it is [`Some`] the current status is
+    /// Override the status of this [`Debugger`] if the current status is
     /// [`CONTINUE`][DebuggerStatus::CONTINUE].
     #[inline(always)]
-    pub(crate) fn reset_status(&mut self, status: Option<DebuggerStatus>) {
+    pub(crate) fn reset_status(&mut self, status: DebuggerStatus) {
         if self.status == DebuggerStatus::CONTINUE {
-            if let Some(cmd) = status {
-                self.status = cmd;
-            }
+            self.status = status;
         }
     }
     /// Returns the first break-point triggered by a particular [`AST` Node][ASTNode].

@@ -4,23 +4,42 @@ use crate::eval::GlobalRuntimeState;
 use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError, RhaiResult,
-    RhaiResultOf, StaticVec, AST, ERR,
+    Dynamic, Engine, FnArgsVec, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError,
+    RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
     any::{type_name, TypeId},
     convert::{TryFrom, TryInto},
-    fmt, mem,
+    fmt,
+    hash::Hash,
+    mem,
 };
 
 /// A general function pointer, which may carry additional (i.e. curried) argument values
 /// to be passed onto a function during a call.
-#[derive(Clone, Hash)]
+#[derive(Clone)]
 pub struct FnPtr {
     name: ImmutableString,
     curry: StaticVec<Dynamic>,
+    #[cfg(not(feature = "no_function"))]
+    fn_def: Option<crate::Shared<crate::ast::ScriptFnDef>>,
+}
+
+impl Hash for FnPtr {
+    #[inline(always)]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.curry.hash(state);
+
+        // Hash the linked [`ScriptFnDef`][crate::ast::ScriptFnDef] by hashing its shared pointer.
+        #[cfg(not(feature = "no_function"))]
+        self.fn_def
+            .as_ref()
+            .map(|f| crate::Shared::as_ptr(f))
+            .hash(state);
+    }
 }
 
 impl fmt::Debug for FnPtr {
@@ -56,6 +75,8 @@ impl FnPtr {
         Self {
             name: name.into(),
             curry,
+            #[cfg(not(feature = "no_function"))]
+            fn_def: None,
         }
     }
     /// Get the name of the function.
@@ -71,6 +92,20 @@ impl FnPtr {
         &self.name
     }
     /// Get the underlying data of the function pointer.
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn take_data(
+        self,
+    ) -> (
+        ImmutableString,
+        StaticVec<Dynamic>,
+        Option<crate::Shared<crate::ast::ScriptFnDef>>,
+    ) {
+        (self.name, self.curry, self.fn_def)
+    }
+    /// Get the underlying data of the function pointer.
+    #[cfg(feature = "no_function")]
     #[inline(always)]
     #[must_use]
     pub(crate) fn take_data(self) -> (ImmutableString, StaticVec<Dynamic>) {
@@ -158,18 +193,18 @@ impl FnPtr {
 
         let ctx = (engine, self.fn_name(), None, &*global, Position::NONE).into();
 
-        let result = self.call_raw(&ctx, None, arg_values)?;
+        self.call_raw(&ctx, None, arg_values).and_then(|result| {
+            // Bail out early if the return type needs no cast
+            if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+                return Ok(reify! { result => T });
+            }
 
-        // Bail out early if the return type needs no cast
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-            return Ok(reify!(result => T));
-        }
+            let typ = engine.map_type_name(result.type_name());
 
-        let typ = engine.map_type_name(result.type_name());
-
-        result.try_cast().ok_or_else(|| {
-            let t = engine.map_type_name(type_name::<T>()).into();
-            ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            result.try_cast().ok_or_else(|| {
+                let t = engine.map_type_name(type_name::<T>()).into();
+                ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            })
         })
     }
     /// Call the function pointer with curried arguments (if any).
@@ -187,18 +222,18 @@ impl FnPtr {
         let mut arg_values = crate::StaticVec::new_const();
         args.parse(&mut arg_values);
 
-        let result = self.call_raw(context, None, arg_values)?;
+        self.call_raw(context, None, arg_values).and_then(|result| {
+            // Bail out early if the return type needs no cast
+            if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+                return Ok(reify! { result => T });
+            }
 
-        // Bail out early if the return type needs no cast
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-            return Ok(reify!(result => T));
-        }
+            let typ = context.engine().map_type_name(result.type_name());
 
-        let typ = context.engine().map_type_name(result.type_name());
-
-        result.try_cast().ok_or_else(|| {
-            let t = context.engine().map_type_name(type_name::<T>()).into();
-            ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            result.try_cast().ok_or_else(|| {
+                let t = context.engine().map_type_name(type_name::<T>()).into();
+                ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            })
         })
     }
     /// Call the function pointer with curried arguments (if any).
@@ -231,21 +266,61 @@ impl FnPtr {
         let mut args_data;
 
         if self.is_curried() {
-            args_data = StaticVec::with_capacity(self.curry().len() + arg_values.len());
+            args_data = FnArgsVec::with_capacity(self.curry().len() + arg_values.len());
             args_data.extend(self.curry().iter().cloned());
             args_data.extend(arg_values.iter_mut().map(mem::take));
             arg_values = &mut *args_data;
         };
 
-        let is_method = this_ptr.is_some();
-
-        let mut args = StaticVec::with_capacity(arg_values.len() + 1);
-        if let Some(obj) = this_ptr {
-            args.push(obj);
-        }
+        let args = &mut StaticVec::with_capacity(arg_values.len() + 1);
         args.extend(arg_values.iter_mut());
 
-        context.call_fn_raw(self.fn_name(), is_method, is_method, &mut args)
+        // Linked to scripted function?
+        #[cfg(not(feature = "no_function"))]
+        if let Some(fn_def) = self.fn_def() {
+            if fn_def.params.len() == args.len() {
+                let global = &mut context.global_runtime_state().clone();
+                global.level += 1;
+
+                let caches = &mut crate::eval::Caches::new();
+                let mut null_ptr = Dynamic::NULL;
+
+                return context.engine().call_script_fn(
+                    global,
+                    caches,
+                    &mut crate::Scope::new(),
+                    this_ptr.unwrap_or(&mut null_ptr),
+                    &fn_def,
+                    args,
+                    true,
+                    context.position(),
+                );
+            }
+        }
+
+        let is_method = this_ptr.is_some();
+
+        if let Some(obj) = this_ptr {
+            args.insert(0, obj);
+        }
+
+        context.call_fn_raw(self.fn_name(), is_method, is_method, args)
+    }
+    /// Get a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn fn_def(&self) -> Option<&crate::Shared<crate::ast::ScriptFnDef>> {
+        self.fn_def.as_ref()
+    }
+    /// Set a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    pub(crate) fn set_fn_def(
+        &mut self,
+        value: Option<impl Into<crate::Shared<crate::ast::ScriptFnDef>>>,
+    ) {
+        self.fn_def = value.map(Into::into);
     }
 }
 
@@ -264,9 +339,25 @@ impl TryFrom<ImmutableString> for FnPtr {
             Ok(Self {
                 name: value,
                 curry: StaticVec::new_const(),
+                #[cfg(not(feature = "no_function"))]
+                fn_def: None,
             })
         } else {
             Err(ERR::ErrorFunctionNotFound(value.to_string(), Position::NONE).into())
+        }
+    }
+}
+
+#[cfg(not(feature = "no_function"))]
+impl<T: Into<crate::Shared<crate::ast::ScriptFnDef>>> From<T> for FnPtr {
+    #[inline(always)]
+    fn from(value: T) -> Self {
+        let fn_def = value.into();
+
+        Self {
+            name: fn_def.name.clone(),
+            curry: StaticVec::new_const(),
+            fn_def: Some(fn_def),
         }
     }
 }

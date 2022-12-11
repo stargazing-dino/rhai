@@ -35,7 +35,14 @@ fn check_struct_sizes() {
     #[cfg(target_pointer_width = "64")]
     {
         assert_eq!(size_of::<Scope>(), 536);
-        assert_eq!(size_of::<FnPtr>(), 64);
+        assert_eq!(
+            size_of::<FnPtr>(),
+            if cfg!(feature = "no_function") {
+                64
+            } else {
+                72
+            }
+        );
         assert_eq!(size_of::<LexError>(), 56);
         assert_eq!(
             size_of::<ParseError>(),

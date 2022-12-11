@@ -18,9 +18,9 @@ use std::{
 #[non_exhaustive]
 #[must_use]
 pub struct CallFnOptions<'t> {
-    /// A value for binding to the `this` pointer (if any).
+    /// A value for binding to the `this` pointer (if any). Default [`None`].
     pub this_ptr: Option<&'t mut Dynamic>,
-    /// The custom state of this evaluation run (if any), overrides [`Engine::default_tag`].
+    /// The custom state of this evaluation run (if any), overrides [`Engine::default_tag`]. Default [`None`].
     pub tag: Option<Dynamic>,
     /// Evaluate the [`AST`] to load necessary modules before calling the function? Default `true`.
     pub eval_ast: bool,
@@ -171,27 +171,28 @@ impl Engine {
         let mut arg_values = StaticVec::new_const();
         args.parse(&mut arg_values);
 
-        let result = self._call_fn(
-            options,
+        self._call_fn(
             scope,
             &mut GlobalRuntimeState::new(self),
             &mut Caches::new(),
             ast,
             name.as_ref(),
             arg_values.as_mut(),
-        )?;
+            options,
+        )
+        .and_then(|result| {
+            // Bail out early if the return type needs no cast
+            if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
+                return Ok(reify! { result => T });
+            }
 
-        // Bail out early if the return type needs no cast
-        if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-            return Ok(reify!(result => T));
-        }
+            // Cast return type
+            let typ = self.map_type_name(result.type_name());
 
-        // Cast return type
-        let typ = self.map_type_name(result.type_name());
-
-        result.try_cast().ok_or_else(|| {
-            let t = self.map_type_name(type_name::<T>()).into();
-            ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            result.try_cast().ok_or_else(|| {
+                let t = self.map_type_name(type_name::<T>()).into();
+                ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            })
         })
     }
     /// Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
@@ -206,13 +207,13 @@ impl Engine {
     #[inline(always)]
     pub(crate) fn _call_fn(
         &self,
-        options: CallFnOptions,
         scope: &mut Scope,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         ast: &AST,
         name: &str,
         arg_values: &mut [Dynamic],
+        options: CallFnOptions,
     ) -> RhaiResult {
         let statements = ast.statements();
 

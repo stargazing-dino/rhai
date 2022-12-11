@@ -130,16 +130,16 @@ impl Expression<'_> {
     pub fn get_literal_value<T: Variant>(&self) -> Option<T> {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
         match self.0 {
-            Expr::IntegerConstant(x, ..) => reify!(*x => Option<T>),
+            Expr::IntegerConstant(x, ..) => reify! { *x => Option<T> },
 
             #[cfg(not(feature = "no_float"))]
-            Expr::FloatConstant(x, ..) => reify!(*x => Option<T>),
+            Expr::FloatConstant(x, ..) => reify! { *x => Option<T> },
 
-            Expr::CharConstant(x, ..) => reify!(*x => Option<T>),
-            Expr::StringConstant(x, ..) => reify!(x.clone() => Option<T>),
-            Expr::Variable(x, ..) => reify!(x.3.clone() => Option<T>),
-            Expr::BoolConstant(x, ..) => reify!(*x => Option<T>),
-            Expr::Unit(..) => reify!(() => Option<T>),
+            Expr::CharConstant(x, ..) => reify! { *x => Option<T> },
+            Expr::StringConstant(x, ..) => reify! { x.clone() => Option<T> },
+            Expr::Variable(x, ..) => reify! { x.3.clone() => Option<T> },
+            Expr::BoolConstant(x, ..) => reify! { *x => Option<T> },
+            Expr::Unit(..) => reify! { () => Option<T> },
 
             _ => None,
         }

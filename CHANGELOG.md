@@ -9,6 +9,7 @@ Bug fixes
 
 * Integer numbers that are too large to deserialize into `INT` now fall back to `Decimal` or `FLOAT` instead of silently truncating.
 * Parsing deeply-nested closures (e.g. `||{||{||{||{||{||{||{...}}}}}}}`) no longer panics but will be confined to the nesting limit.
+* Closures containing a single expression are now allowed in `Engine::eval_expression` etc.
 
 Breaking API changes
 --------------------
@@ -30,6 +31,12 @@ Speed improvements
 
 Net features
 ------------
+
+### First class functions (sort of)
+
+* A function pointer created via a closure definition now links to the particular anonymous function itself.
+* This avoids a potentially expensive function lookup when the function pointer is called, speeding up closures.
+* It does _not_, however, allow the function pointer to be `export`ed as a constant from a script module because the closure may cross-call other functions defined in the module and the function pointer won't keep the fully encapsulated environment.
 
 ### `!in`
 
@@ -53,6 +60,7 @@ Enhancements
 * Line-style doc-comments are now merged into a single string to avoid creating many strings. Block-style doc-comments continue to be independent strings.
 * Block-style doc-comments are now "un-indented" for better formatting.
 * Doc-comments on plugin modules are now captured in the module's `doc` field.
+* Expression nesting levels is refined such that it grows less excessively for common patterns.
 
 
 Version 1.11.0

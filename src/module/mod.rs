@@ -253,6 +253,17 @@ impl fmt::Debug for Module {
     }
 }
 
+#[cfg(not(feature = "no_function"))]
+impl<T: IntoIterator<Item = Shared<crate::ast::ScriptFnDef>>> From<T> for Module {
+    fn from(iter: T) -> Self {
+        let mut module = Self::new();
+        iter.into_iter().for_each(|fn_def| {
+            module.set_script_fn(fn_def);
+        });
+        module
+    }
+}
+
 impl<M: AsRef<Module>> Add<M> for &Module {
     type Output = Module;
 
@@ -2129,7 +2140,11 @@ impl Module {
 
         // Variables with an alias left in the scope become module variables
         for (_name, value, mut aliases) in scope {
-            // It is an error to export function pointers that refer to encapsulated local functions
+            // It is an error to export function pointers that refer to encapsulated local functions.
+            //
+            // Even if the function pointer already links to a scripted function definition, it may
+            // cross-call other functions inside the module and won't have the full encapsulated
+            // environment available.
             #[cfg(not(feature = "no_function"))]
             if let Some(fn_ptr) = value.downcast_ref::<crate::FnPtr>() {
                 if ast.iter_fn_def().any(|f| f.name == fn_ptr.fn_name()) {

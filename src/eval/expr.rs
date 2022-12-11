@@ -152,20 +152,21 @@ impl Engine {
             _ if global.always_search_scope => 0,
 
             Expr::Variable(_, Some(i), ..) => i.get() as usize,
-            // Scripted function with the same name
-            #[cfg(not(feature = "no_function"))]
-            Expr::Variable(v, None, ..)
-                if global
-                    .lib
-                    .iter()
-                    .flat_map(|m| m.iter_script_fn())
-                    .any(|(_, _, f, ..)| f == v.3.as_str()) =>
-            {
-                let val: Dynamic =
-                    crate::FnPtr::new_unchecked(v.3.as_str(), crate::StaticVec::default()).into();
-                return Ok(val.into());
+            Expr::Variable(v, None, ..) => {
+                // Scripted function with the same name
+                #[cfg(not(feature = "no_function"))]
+                if let Some(fn_def) = global.lib.iter().flat_map(|m| m.iter_script_fn()).find_map(
+                    |(_, _, f, _, func)| if f == v.3.as_str() { Some(func) } else { None },
+                ) {
+                    let mut fn_ptr =
+                        crate::FnPtr::new_unchecked(v.3.clone(), crate::StaticVec::new_const());
+                    fn_ptr.set_fn_def(Some(fn_def.clone()));
+                    let val: Dynamic = fn_ptr.into();
+                    return Ok(val.into());
+                }
+
+                v.0.map_or(0, NonZeroUsize::get)
             }
-            Expr::Variable(v, None, ..) => v.0.map_or(0, NonZeroUsize::get),
 
             _ => unreachable!("Expr::Variable expected but gets {:?}", expr),
         };
@@ -234,7 +235,7 @@ impl Engine {
             #[cfg(feature = "debugging")]
             let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
             #[cfg(feature = "debugging")]
-            auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
+            auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
 
             self.track_operation(global, expr.position())?;
 
@@ -265,7 +266,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
         #[cfg(feature = "debugging")]
-        auto_restore!(global if reset.is_some() => move |g| g.debugger_mut().reset_status(reset));
+        auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
 
         self.track_operation(global, expr.position())?;
 

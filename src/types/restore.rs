@@ -36,6 +36,18 @@ macro_rules! auto_restore {
     ($var:ident = $value:expr => $restore:expr) => {
         let $var = &mut *crate::types::RestoreOnDrop::lock($value, $restore);
     };
+    ($var:ident if Some($guard:ident) => $restore:expr) => {
+        auto_restore!($var = ($var) if Some($guard) => $restore);
+    };
+    ($var:ident = ( $value:expr ) if Some($guard:ident) => $restore:expr) => {
+        let mut __rx__;
+        let $var = if let Some($guard) = $guard {
+            __rx__ = crate::types::RestoreOnDrop::lock($value, $restore);
+            &mut *__rx__
+        } else {
+            &mut *$value
+        };
+    };
     ($var:ident if $guard:expr => $restore:expr) => {
         auto_restore!($var = ($var) if $guard => $restore);
     };
