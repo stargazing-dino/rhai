@@ -34,7 +34,7 @@ macro_rules! auto_restore {
         auto_restore!($var = $var => $restore);
     };
     ($var:ident = $value:expr => $restore:expr) => {
-        let $var = &mut *crate::types::RestoreOnDrop::lock($value, $restore);
+        let $var = &mut *crate::RestoreOnDrop::lock($value, $restore);
     };
     ($var:ident if Some($guard:ident) => $restore:expr) => {
         auto_restore!($var = ($var) if Some($guard) => $restore);
@@ -42,7 +42,7 @@ macro_rules! auto_restore {
     ($var:ident = ( $value:expr ) if Some($guard:ident) => $restore:expr) => {
         let mut __rx__;
         let $var = if let Some($guard) = $guard {
-            __rx__ = crate::types::RestoreOnDrop::lock($value, $restore);
+            __rx__ = crate::RestoreOnDrop::lock($value, $restore);
             &mut *__rx__
         } else {
             &mut *$value
@@ -54,7 +54,7 @@ macro_rules! auto_restore {
     ($var:ident = ( $value:expr ) if $guard:expr => $restore:expr) => {
         let mut __rx__;
         let $var = if $guard {
-            __rx__ = crate::types::RestoreOnDrop::lock($value, $restore);
+            __rx__ = crate::RestoreOnDrop::lock($value, $restore);
             &mut *__rx__
         } else {
             &mut *$value

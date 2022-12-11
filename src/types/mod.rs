@@ -1,8 +1,5 @@
 //! Module defining Rhai data types.
 
-#[macro_use]
-pub mod restore;
-
 pub mod bloom_filter;
 pub mod custom_types;
 pub mod dynamic;
@@ -35,6 +32,5 @@ pub use position::{Position, Span};
 #[cfg(feature = "no_position")]
 pub use position_none::{Position, Span};
 
-pub use restore::RestoreOnDrop;
 pub use scope::Scope;
 pub use variant::Variant;

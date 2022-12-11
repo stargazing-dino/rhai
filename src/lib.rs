@@ -88,6 +88,8 @@ use std::prelude::v1::*;
 #[macro_use]
 mod reify;
 #[macro_use]
+mod restore;
+#[macro_use]
 mod types;
 
 mod api;
@@ -100,6 +102,8 @@ mod module;
 mod optimizer;
 pub mod packages;
 mod parser;
+#[cfg(feature = "serde")]
+pub mod serde;
 mod tests;
 mod tokenizer;
 
@@ -201,6 +205,8 @@ type InclusiveRange = std::ops::RangeInclusive<INT>;
 
 #[allow(deprecated)]
 pub use api::build_type::{CustomType, TypeBuilder};
+#[cfg(not(feature = "no_custom_syntax"))]
+pub use api::custom_syntax::Expression;
 #[cfg(not(feature = "no_std"))]
 #[cfg(not(target_family = "wasm"))]
 pub use api::files::{eval_file, run_file};
@@ -208,17 +214,17 @@ pub use api::{eval::eval, events::VarDefInfo, run::run};
 pub use ast::{FnAccess, AST};
 pub use engine::{Engine, OP_CONTAINS, OP_EQUALS};
 pub use eval::EvalContext;
-pub use func::{NativeCallContext, RegisterNativeFunction};
+use func::{calc_fn_hash, calc_fn_hash_full, calc_var_hash};
+pub use func::{plugin, FuncArgs, NativeCallContext, RegisterNativeFunction};
 pub use module::{FnNamespace, Module};
+use restore::RestoreOnDrop;
+pub use rhai_codegen::*;
 #[cfg(not(feature = "no_time"))]
 pub use types::Instant;
-pub use types::Position;
 pub use types::{
-    Dynamic, EvalAltResult, FnPtr, ImmutableString, LexError, ParseError, ParseErrorType, Scope,
+    Dynamic, EvalAltResult, FnPtr, ImmutableString, LexError, ParseError, ParseErrorType, Position,
+    Scope,
 };
-
-#[cfg(not(feature = "no_custom_syntax"))]
-pub use api::custom_syntax::Expression;
 
 /// _(debugging)_ Module containing types for debugging.
 /// Exported under the `debugging` feature only.
@@ -245,14 +251,8 @@ pub use func::Shared;
 /// Alias to [`RefCell`][std::cell::RefCell] or [`RwLock`][std::sync::RwLock] depending on the `sync` feature flag.
 pub use func::Locked;
 
-use func::{calc_fn_hash, calc_fn_hash_full, calc_var_hash};
-
 /// A shared [`Module`].
 type SharedModule = Shared<Module>;
-
-pub use rhai_codegen::*;
-
-pub use func::{plugin, FuncArgs};
 
 #[cfg(not(feature = "no_function"))]
 pub use func::Func;
@@ -293,9 +293,6 @@ pub use module::ModuleResolver;
 /// Module containing all built-in _module resolvers_ available to Rhai.
 #[cfg(not(feature = "no_module"))]
 pub use module::resolvers as module_resolvers;
-
-#[cfg(feature = "serde")]
-pub mod serde;
 
 #[cfg(not(feature = "no_optimize"))]
 pub use optimizer::OptimizationLevel;
