@@ -422,14 +422,14 @@ impl<'a> NativeCallContext<'a> {
         is_ref_mut: bool,
         is_method_call: bool,
     ) -> RhaiResult {
-        let mut global = &mut self.global.clone();
+        let global = &mut self.global.clone();
+        global.level += 1;
+
         let caches = &mut Caches::new();
 
         let fn_name = fn_name.as_ref();
         let op_token = Token::lookup_symbol_from_syntax(fn_name).unwrap_or(NO_TOKEN);
         let args_len = args.len();
-
-        global.level += 1;
 
         if native_only {
             return self

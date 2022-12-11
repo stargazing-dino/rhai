@@ -761,20 +761,22 @@ impl Engine {
                 // Linked to scripted function?
                 #[cfg(not(feature = "no_function"))]
                 if let Some(fn_def) = fn_ptr.fn_def() {
-                    let mut this_ptr = Dynamic::NULL;
+                    if fn_def.params.len() == args.len() {
+                        let mut this_ptr = Dynamic::NULL;
 
-                    return self
-                        .call_script_fn(
-                            global,
-                            caches,
-                            &mut Scope::new(),
-                            &mut this_ptr,
-                            fn_def,
-                            args,
-                            true,
-                            fn_call_pos,
-                        )
-                        .map(|v| (v, false));
+                        return self
+                            .call_script_fn(
+                                global,
+                                caches,
+                                &mut Scope::new(),
+                                &mut this_ptr,
+                                fn_def,
+                                args,
+                                true,
+                                fn_call_pos,
+                            )
+                            .map(|v| (v, false));
+                    }
                 }
 
                 #[cfg(not(feature = "no_function"))]
@@ -827,7 +829,7 @@ impl Engine {
                 };
                 #[cfg(feature = "no_function")]
                 let (fn_name, is_anon, fn_curry) = {
-                    let (fn_name, fn_curry, fn_def) = fn_ptr.take_data();
+                    let (fn_name, fn_curry) = fn_ptr.take_data();
                     (fn_name, false, fn_curry)
                 };
 
@@ -843,22 +845,24 @@ impl Engine {
                 // Linked to scripted function?
                 #[cfg(not(feature = "no_function"))]
                 if let Some(fn_def) = fn_def {
-                    // Check for data race.
-                    #[cfg(not(feature = "no_closure"))]
-                    ensure_no_data_race(&fn_def.name, args, false)?;
+                    if fn_def.params.len() == args.len() {
+                        // Check for data race.
+                        #[cfg(not(feature = "no_closure"))]
+                        ensure_no_data_race(&fn_def.name, args, false)?;
 
-                    return self
-                        .call_script_fn(
-                            global,
-                            caches,
-                            &mut Scope::new(),
-                            target,
-                            &fn_def,
-                            args,
-                            true,
-                            fn_call_pos,
-                        )
-                        .map(|v| (v, false));
+                        return self
+                            .call_script_fn(
+                                global,
+                                caches,
+                                &mut Scope::new(),
+                                target,
+                                &fn_def,
+                                args,
+                                true,
+                                fn_call_pos,
+                            )
+                            .map(|v| (v, false));
+                    }
                 }
 
                 // Add the first argument with the object pointer
@@ -895,26 +899,14 @@ impl Engine {
                     return Err(self.make_type_mismatch_err::<FnPtr>(typ, fn_call_pos));
                 }
 
-                let fn_ptr = target.read_lock::<FnPtr>().expect("`FnPtr`");
+                let mut fn_ptr = target.read_lock::<FnPtr>().expect("`FnPtr`").clone();
 
-                // Curry call
-                Ok((
-                    if call_args.is_empty() {
-                        fn_ptr.clone()
-                    } else {
-                        FnPtr::new_unchecked(
-                            fn_ptr.fn_name_raw().clone(),
-                            fn_ptr
-                                .curry()
-                                .iter()
-                                .cloned()
-                                .chain(call_args.iter_mut().map(mem::take))
-                                .collect(),
-                        )
-                    }
-                    .into(),
-                    false,
-                ))
+                // Append the new curried arguments to the existing list.
+                call_args.iter_mut().map(mem::take).for_each(|value| {
+                    fn_ptr.add_curry(value);
+                });
+
+                Ok((fn_ptr.into(), false))
             }
 
             // Handle is_shared()
@@ -1045,7 +1037,7 @@ impl Engine {
                 };
                 #[cfg(feature = "no_function")]
                 let (fn_name, is_anon, fn_curry) = {
-                    let (fn_name, fn_curry, fn_def) = fn_ptr.take_data();
+                    let (fn_name, fn_curry) = fn_ptr.take_data();
                     (fn_name, false, fn_curry)
                 };
 
@@ -1054,29 +1046,30 @@ impl Engine {
                 // Linked to scripted function?
                 #[cfg(not(feature = "no_function"))]
                 if let Some(fn_def) = fn_def {
-                    // Evaluate arguments
-                    let mut arg_values = curry
-                        .into_iter()
-                        .map(Ok)
-                        .chain(a_expr.iter().map(|expr| -> Result<_, RhaiError> {
-                            self.get_arg_value(global, caches, scope, this_ptr, expr)
-                                .map(|(v, ..)| v)
-                        }))
-                        .collect::<RhaiResultOf<FnArgsVec<_>>>()?;
-                    let args = &mut arg_values.iter_mut().collect::<FnArgsVec<_>>();
+                    if fn_def.params.len() == curry.len() + a_expr.len() {
+                        // Evaluate arguments
+                        let mut arg_values = curry
+                            .into_iter()
+                            .map(Ok)
+                            .chain(a_expr.iter().map(|expr| -> Result<_, RhaiError> {
+                                self.get_arg_value(global, caches, scope, this_ptr, expr)
+                                    .map(|(v, ..)| v)
+                            }))
+                            .collect::<RhaiResultOf<FnArgsVec<_>>>()?;
+                        let args = &mut arg_values.iter_mut().collect::<FnArgsVec<_>>();
+                        let mut this_ptr = Dynamic::NULL;
 
-                    let mut this_ptr = Dynamic::NULL;
-
-                    return self.call_script_fn(
-                        global,
-                        caches,
-                        &mut Scope::new(),
-                        &mut this_ptr,
-                        &fn_def,
-                        args,
-                        true,
-                        pos,
-                    );
+                        return self.call_script_fn(
+                            global,
+                            caches,
+                            &mut Scope::new(),
+                            &mut this_ptr,
+                            &fn_def,
+                            args,
+                            true,
+                            pos,
+                        );
+                    }
                 }
 
                 // Redirect function name

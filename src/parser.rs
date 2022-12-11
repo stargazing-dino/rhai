@@ -3798,7 +3798,8 @@ impl Engine {
             comments: Box::default(),
         });
 
-        let fn_ptr = crate::FnPtr::from(script.clone());
+        let mut fn_ptr = crate::FnPtr::new_unchecked(fn_name, StaticVec::new_const());
+        fn_ptr.set_fn_def(Some(script.clone()));
         let expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), settings.pos);
 
         #[cfg(not(feature = "no_closure"))]

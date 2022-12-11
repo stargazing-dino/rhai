@@ -1,11 +1,11 @@
 //! The `FnPtr` type.
 
-use crate::eval::GlobalRuntimeState;
+use crate::eval::{Caches, GlobalRuntimeState};
 use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError, RhaiResult,
-    RhaiResultOf, StaticVec, AST, ERR,
+    Dynamic, Engine, FnArgsVec, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError,
+    RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -266,21 +266,45 @@ impl FnPtr {
         let mut args_data;
 
         if self.is_curried() {
-            args_data = StaticVec::with_capacity(self.curry().len() + arg_values.len());
+            args_data = FnArgsVec::with_capacity(self.curry().len() + arg_values.len());
             args_data.extend(self.curry().iter().cloned());
             args_data.extend(arg_values.iter_mut().map(mem::take));
             arg_values = &mut *args_data;
         };
 
-        let is_method = this_ptr.is_some();
-
-        let mut args = StaticVec::with_capacity(arg_values.len() + 1);
-        if let Some(obj) = this_ptr {
-            args.push(obj);
-        }
+        let args = &mut StaticVec::with_capacity(arg_values.len() + 1);
         args.extend(arg_values.iter_mut());
 
-        context.call_fn_raw(self.fn_name(), is_method, is_method, &mut args)
+        // Linked to scripted function?
+        #[cfg(not(feature = "no_function"))]
+        if let Some(fn_def) = self.fn_def() {
+            if fn_def.params.len() == args.len() {
+                let global = &mut context.global_runtime_state().clone();
+                global.level += 1;
+
+                let caches = &mut Caches::new();
+                let mut null_ptr = Dynamic::NULL;
+
+                return context.engine().call_script_fn(
+                    global,
+                    caches,
+                    &mut crate::Scope::new(),
+                    this_ptr.unwrap_or(&mut null_ptr),
+                    &fn_def,
+                    args,
+                    true,
+                    context.position(),
+                );
+            }
+        }
+
+        let is_method = this_ptr.is_some();
+
+        if let Some(obj) = this_ptr {
+            args.insert(0, obj);
+        }
+
+        context.call_fn_raw(self.fn_name(), is_method, is_method, args)
     }
     /// Get a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
     #[cfg(not(feature = "no_function"))]
@@ -288,6 +312,15 @@ impl FnPtr {
     #[must_use]
     pub(crate) fn fn_def(&self) -> Option<&crate::Shared<crate::ast::ScriptFnDef>> {
         self.fn_def.as_ref()
+    }
+    /// Set a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    pub(crate) fn set_fn_def(
+        &mut self,
+        value: Option<impl Into<crate::Shared<crate::ast::ScriptFnDef>>>,
+    ) {
+        self.fn_def = value.map(Into::into);
     }
 }
 
