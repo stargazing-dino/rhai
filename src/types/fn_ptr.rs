@@ -1,6 +1,6 @@
 //! The `FnPtr` type.
 
-use crate::eval::{Caches, GlobalRuntimeState};
+use crate::eval::GlobalRuntimeState;
 use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
@@ -282,7 +282,7 @@ impl FnPtr {
                 let global = &mut context.global_runtime_state().clone();
                 global.level += 1;
 
-                let caches = &mut Caches::new();
+                let caches = &mut crate::eval::Caches::new();
                 let mut null_ptr = Dynamic::NULL;
 
                 return context.engine().call_script_fn(

@@ -271,6 +271,14 @@ impl<'a> NativeCallContext<'a> {
     pub const fn global_runtime_state(&self) -> &GlobalRuntimeState {
         self.global
     }
+    /// _(internals)_ The current [`GlobalRuntimeState`], if any.
+    #[cfg(not(feature = "internals"))]
+    #[inline(always)]
+    #[must_use]
+    #[allow(dead_code)]
+    pub(crate) const fn global_runtime_state(&self) -> &GlobalRuntimeState {
+        self.global
+    }
     /// Get an iterator over the namespaces containing definitions of all script-defined functions
     /// in reverse order (i.e. parent namespaces are iterated after child namespaces).
     ///

@@ -35,36 +35,39 @@ fn make_dual_arity_fn_ptr_call<const N: usize>(
     items: [Dynamic; N],
     number: usize,
 ) -> RhaiResult {
-    let arity = fn_ptr.fn_def().map(|f| f.params.len()).unwrap_or(0);
+    #[cfg(not(feature = "no_function"))]
+    {
+        let arity = fn_ptr.fn_def().map(|f| f.params.len()).unwrap_or(0);
 
-    if arity == N {
-        fn_ptr.call_raw(&ctx, None, items)
-    } else if arity == N + 1 {
-        let mut items2 = crate::StaticVec::new_const();
-        items2.extend(IntoIterator::into_iter(items));
-        items2.push((number as INT).into());
-        fn_ptr.call_raw(&ctx, None, items2)
-    } else {
-        fn_ptr
-            .call_raw(&ctx, None, items.clone())
-            .or_else(|err| match *err {
-                ERR::ErrorFunctionNotFound(sig, ..) if sig.starts_with(fn_ptr.fn_name()) => {
-                    let mut items2 = crate::StaticVec::new_const();
-                    items2.extend(IntoIterator::into_iter(items));
-                    items2.push((number as INT).into());
-                    fn_ptr.call_raw(&ctx, None, items2)
-                }
-                _ => Err(err),
-            })
-            .map_err(|err| {
-                Box::new(ERR::ErrorInFunctionCall(
-                    fn_name.to_string(),
-                    ctx.source().unwrap_or("").to_string(),
-                    err,
-                    Position::NONE,
-                ))
-            })
+        if arity == N {
+            return fn_ptr.call_raw(&ctx, None, items);
+        } else if arity == N + 1 {
+            let mut items2 = crate::StaticVec::new_const();
+            items2.extend(IntoIterator::into_iter(items));
+            items2.push((number as INT).into());
+            return fn_ptr.call_raw(&ctx, None, items2);
+        }
     }
+
+    fn_ptr
+        .call_raw(&ctx, None, items.clone())
+        .or_else(|err| match *err {
+            ERR::ErrorFunctionNotFound(sig, ..) if sig.starts_with(fn_ptr.fn_name()) => {
+                let mut items2 = crate::StaticVec::new_const();
+                items2.extend(IntoIterator::into_iter(items));
+                items2.push((number as INT).into());
+                fn_ptr.call_raw(&ctx, None, items2)
+            }
+            _ => Err(err),
+        })
+        .map_err(|err| {
+            Box::new(ERR::ErrorInFunctionCall(
+                fn_name.to_string(),
+                ctx.source().unwrap_or("").to_string(),
+                err,
+                Position::NONE,
+            ))
+        })
 }
 
 #[export_module]
@@ -1590,7 +1593,13 @@ pub mod array_functions {
             .rev()
             .enumerate()
             .try_fold(initial, |result, (i, item)| {
-                make_dual_arity_fn_ptr_call("reduce_rev", &reducer, &ctx, [result, item.clone()], array.len() - 1 - i)
+                make_dual_arity_fn_ptr_call(
+                    "reduce_rev",
+                    &reducer,
+                    &ctx,
+                    [result, item.clone()],
+                    array.len() - 1 - i,
+                )
             })
     }
     /// Reduce an array by iterating through all elements, in _reverse_ order,
