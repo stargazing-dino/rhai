@@ -2138,30 +2138,19 @@ impl Module {
         // The return value is thrown away and not used
         let _ = result?;
 
+        // Encapsulated environment
+        #[cfg(not(feature = "no_function"))]
+        let environ = Shared::new(crate::func::EncapsulatedEnviron {
+            lib: ast.shared_lib().clone(),
+            imports: imports.into_boxed_slice(),
+            constants,
+        });
+
         // Variables with an alias left in the scope become module variables
-        for (_name, value, mut aliases) in scope {
-            // It is an error to export function pointers that refer to encapsulated local functions.
-            //
-            // Even if the function pointer already links to a scripted function definition, it may
-            // cross-call other functions inside the module and won't have the full encapsulated
-            // environment available.
+        for (_name, mut value, mut aliases) in scope {
             #[cfg(not(feature = "no_function"))]
-            if let Some(fn_ptr) = value.downcast_ref::<crate::FnPtr>() {
-                if ast.iter_fn_def().any(|f| f.name == fn_ptr.fn_name()) {
-                    return Err(crate::ERR::ErrorMismatchDataType(
-                        String::new(),
-                        if fn_ptr.is_anonymous() {
-                            format!("cannot export closure in variable {_name}")
-                        } else {
-                            format!(
-                                "cannot export function pointer to local function '{}' in variable {_name}",
-                                fn_ptr.fn_name()
-                            )
-                        },
-                        crate::Position::NONE,
-                    )
-                    .into());
-                }
+            if let Some(mut fn_ptr) = value.write_lock::<crate::FnPtr>() {
+                fn_ptr.set_encapsulated_environ(Some(environ.clone()));
             }
 
             match aliases.len() {
@@ -2183,29 +2172,21 @@ impl Module {
 
         // Non-private functions defined become module functions
         #[cfg(not(feature = "no_function"))]
-        {
-            let environ = Shared::new(crate::func::EncapsulatedEnviron {
-                lib: ast.shared_lib().clone(),
-                imports: imports.into_boxed_slice(),
-                constants,
+        ast.iter_fn_def()
+            .filter(|&f| match f.access {
+                FnAccess::Public => true,
+                FnAccess::Private => false,
+            })
+            .for_each(|f| {
+                let hash = module.set_script_fn(f.clone());
+                let f = module.functions.as_mut().unwrap().get_mut(&hash).unwrap();
+
+                // Encapsulate AST environment
+                match f.func {
+                    CallableFunction::Script(.., ref mut e) => *e = Some(environ.clone()),
+                    _ => (),
+                }
             });
-
-            ast.iter_fn_def()
-                .filter(|&f| match f.access {
-                    FnAccess::Public => true,
-                    FnAccess::Private => false,
-                })
-                .for_each(|f| {
-                    let hash = module.set_script_fn(f.clone());
-                    let f = module.functions.as_mut().unwrap().get_mut(&hash).unwrap();
-
-                    // Encapsulate AST environment
-                    match f.func {
-                        CallableFunction::Script(.., ref mut e) => *e = Some(environ.clone()),
-                        _ => (),
-                    }
-                });
-        }
 
         module.id = ast.source_raw().cloned();
 

@@ -36,7 +36,7 @@ Net features
 
 * A function pointer created via a closure definition now links to the particular anonymous function itself.
 * This avoids a potentially expensive function lookup when the function pointer is called, speeding up closures.
-* It does _not_, however, allow the function pointer to be `export`ed as a constant from a script module because the closure may cross-call other functions defined in the module and the function pointer won't keep the fully encapsulated environment.
+* An additional benefit is that function pointers can now be `export`ed from modules!
 
 ### `!in`
 

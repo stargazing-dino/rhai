@@ -23,6 +23,7 @@ use std::{
 pub struct FnPtr {
     name: ImmutableString,
     curry: StaticVec<Dynamic>,
+    environ: Option<crate::Shared<crate::func::EncapsulatedEnviron>>,
     #[cfg(not(feature = "no_function"))]
     fn_def: Option<crate::Shared<crate::ast::ScriptFnDef>>,
 }
@@ -75,6 +76,7 @@ impl FnPtr {
         Self {
             name: name.into(),
             curry,
+            environ: None,
             #[cfg(not(feature = "no_function"))]
             fn_def: None,
         }
@@ -100,16 +102,23 @@ impl FnPtr {
     ) -> (
         ImmutableString,
         StaticVec<Dynamic>,
+        Option<crate::Shared<crate::func::EncapsulatedEnviron>>,
         Option<crate::Shared<crate::ast::ScriptFnDef>>,
     ) {
-        (self.name, self.curry, self.fn_def)
+        (self.name, self.curry, self.environ, self.fn_def)
     }
     /// Get the underlying data of the function pointer.
     #[cfg(feature = "no_function")]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn take_data(self) -> (ImmutableString, StaticVec<Dynamic>) {
-        (self.name, self.curry)
+    pub(crate) fn take_data(
+        self,
+    ) -> (
+        ImmutableString,
+        StaticVec<Dynamic>,
+        Option<crate::Shared<crate::func::EncapsulatedEnviron>>,
+    ) {
+        (self.name, self.curry, self.environ)
     }
     /// Get the curried arguments.
     #[inline(always)]
@@ -290,7 +299,7 @@ impl FnPtr {
                     caches,
                     &mut crate::Scope::new(),
                     this_ptr.unwrap_or(&mut null_ptr),
-                    None,
+                    self.encapsulated_environ(),
                     &fn_def,
                     args,
                     true,
@@ -306,6 +315,20 @@ impl FnPtr {
         }
 
         context.call_fn_raw(self.fn_name(), is_method, is_method, args)
+    }
+    /// Get a reference to the [encapsulated environment][crate::func::EncapsulatedEnviron].
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn encapsulated_environ(&self) -> Option<&crate::func::EncapsulatedEnviron> {
+        self.environ.as_deref()
+    }
+    /// Set a reference to the [encapsulated environment][crate::func::EncapsulatedEnviron].
+    #[inline(always)]
+    pub(crate) fn set_encapsulated_environ(
+        &mut self,
+        value: Option<impl Into<crate::Shared<crate::func::EncapsulatedEnviron>>>,
+    ) {
+        self.environ = value.map(Into::into);
     }
     /// Get a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
     #[cfg(not(feature = "no_function"))]
@@ -340,6 +363,7 @@ impl TryFrom<ImmutableString> for FnPtr {
             Ok(Self {
                 name: value,
                 curry: StaticVec::new_const(),
+                environ: None,
                 #[cfg(not(feature = "no_function"))]
                 fn_def: None,
             })
@@ -358,6 +382,7 @@ impl<T: Into<crate::Shared<crate::ast::ScriptFnDef>>> From<T> for FnPtr {
         Self {
             name: fn_def.name.clone(),
             curry: StaticVec::new_const(),
+            environ: None,
             fn_def: Some(fn_def),
         }
     }

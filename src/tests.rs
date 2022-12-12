@@ -50,9 +50,9 @@ fn check_struct_sizes() {
         assert_eq!(
             size_of::<FnPtr>(),
             if cfg!(feature = "no_function") {
-                64
-            } else {
                 72
+            } else {
+                80
             }
         );
         assert_eq!(size_of::<LexError>(), 56);
