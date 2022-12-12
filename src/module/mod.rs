@@ -2184,31 +2184,32 @@ impl Module {
         // Non-private functions defined become module functions
         #[cfg(not(feature = "no_function"))]
         {
-            let environ = Shared::new(crate::ast::EncapsulatedEnviron {
+            let environ = Shared::new(crate::func::EncapsulatedEnviron {
                 lib: ast.shared_lib().clone(),
                 imports: imports.into_boxed_slice(),
                 constants,
             });
 
-            ast.shared_lib()
-                .iter_fn()
-                .filter(|&f| match f.metadata.access {
+            ast.iter_fn_def()
+                .filter(|&f| match f.access {
                     FnAccess::Public => true,
                     FnAccess::Private => false,
                 })
-                .filter(|&f| f.func.is_script())
                 .for_each(|f| {
-                    let mut func = f
-                        .func
-                        .get_script_fn_def()
-                        .expect("script-defined function")
-                        .as_ref()
-                        .clone();
+                    let hash = module.set_script_fn(f.clone());
 
                     // Encapsulate AST environment
-                    func.environ = Some(environ.clone());
-
-                    module.set_script_fn(func);
+                    match module
+                        .functions
+                        .as_mut()
+                        .unwrap()
+                        .get_mut(&hash)
+                        .unwrap()
+                        .func
+                    {
+                        CallableFunction::Script(.., ref mut e) => *e = Some(environ.clone()),
+                        _ => (),
+                    }
                 });
         }
 

@@ -265,6 +265,7 @@ impl Engine {
                             caches,
                             scope,
                             this_ptr,
+                            None,
                             fn_def,
                             args,
                             rewind_scope,

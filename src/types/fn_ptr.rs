@@ -290,6 +290,7 @@ impl FnPtr {
                     caches,
                     &mut crate::Scope::new(),
                     this_ptr.unwrap_or(&mut null_ptr),
+                    None,
                     &fn_def,
                     args,
                     true,

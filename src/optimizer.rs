@@ -1344,8 +1344,6 @@ impl Engine {
                         access: fn_def.access,
                         body: crate::ast::StmtBlock::NONE,
                         params: fn_def.params.clone(),
-                        #[cfg(not(feature = "no_module"))]
-                        environ: None,
                         #[cfg(not(feature = "no_function"))]
                         #[cfg(feature = "metadata")]
                         comments: Box::default(),

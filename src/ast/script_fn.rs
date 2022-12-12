@@ -7,34 +7,12 @@ use crate::{FnArgsVec, ImmutableString};
 use std::prelude::v1::*;
 use std::{fmt, hash::Hash};
 
-/// _(internals)_ Encapsulated AST environment.
-/// Exported under the `internals` feature only.
-///
-/// 1) other functions defined within the same AST
-/// 2) the stack of imported [modules][crate::Module]
-/// 3) global constants
-///
-/// Not available under `no_module` or `no_function`.
-#[cfg(not(feature = "no_module"))]
-#[derive(Debug, Clone)]
-pub struct EncapsulatedEnviron {
-    /// Functions defined within the same [`AST`][crate::AST].
-    pub lib: crate::SharedModule,
-    /// Imported [modules][crate::Module].
-    pub imports: Box<[(ImmutableString, crate::SharedModule)]>,
-    /// Globally-defined constants.
-    pub constants: Option<crate::eval::SharedGlobalConstants>,
-}
-
 /// _(internals)_ A type containing information on a script-defined function.
 /// Exported under the `internals` feature only.
 #[derive(Debug, Clone)]
 pub struct ScriptFnDef {
     /// Function body.
     pub body: StmtBlock,
-    /// Encapsulated AST environment, if any.
-    #[cfg(not(feature = "no_module"))]
-    pub environ: Option<crate::Shared<EncapsulatedEnviron>>,
     /// Function name.
     pub name: ImmutableString,
     /// Function access mode.

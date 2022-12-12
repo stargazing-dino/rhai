@@ -18,7 +18,7 @@ pub use call::ensure_no_data_race;
 #[cfg(not(feature = "no_function"))]
 pub use call::is_anonymous_fn;
 pub use call::FnCallArgs;
-pub use callable_function::CallableFunction;
+pub use callable_function::{CallableFunction, EncapsulatedEnviron};
 #[cfg(not(feature = "no_function"))]
 pub use func::Func;
 pub use hashing::{calc_fn_hash, calc_fn_hash_full, calc_var_hash, get_hasher, StraightHashMap};

@@ -338,9 +338,7 @@ pub use ast::CustomExpr;
 pub use ast::Namespace;
 
 #[cfg(feature = "internals")]
-#[cfg(not(feature = "no_module"))]
-#[cfg(not(feature = "no_function"))]
-pub use ast::EncapsulatedEnviron;
+pub use func::EncapsulatedEnviron;
 
 #[cfg(feature = "internals")]
 pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeState};

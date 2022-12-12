@@ -8,6 +8,26 @@ use std::fmt;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
+/// _(internals)_ Encapsulated AST environment.
+/// Exported under the `internals` feature only.
+///
+/// 1) functions defined within the same AST
+/// 2) the stack of imported [modules][crate::Module]
+/// 3) global constants
+#[derive(Debug, Clone)]
+pub struct EncapsulatedEnviron {
+    /// Functions defined within the same [`AST`][crate::AST].
+    #[cfg(not(feature = "no_function"))]
+    pub lib: crate::SharedModule,
+    /// Imported [modules][crate::Module].
+    #[cfg(not(feature = "no_module"))]
+    pub imports: Box<[(crate::ImmutableString, crate::SharedModule)]>,
+    /// Globally-defined constants.
+    #[cfg(not(feature = "no_module"))]
+    #[cfg(not(feature = "no_function"))]
+    pub constants: Option<crate::eval::SharedGlobalConstants>,
+}
+
 /// _(internals)_ A type encapsulating a function callable by Rhai.
 /// Exported under the `internals` feature only.
 #[derive(Clone)]
@@ -24,7 +44,10 @@ pub enum CallableFunction {
     Plugin(Shared<FnPlugin>),
     /// A script-defined function.
     #[cfg(not(feature = "no_function"))]
-    Script(Shared<crate::ast::ScriptFnDef>),
+    Script(
+        Shared<crate::ast::ScriptFnDef>,
+        Option<Shared<EncapsulatedEnviron>>,
+    ),
 }
 
 impl fmt::Debug for CallableFunction {
@@ -38,7 +61,7 @@ impl fmt::Debug for CallableFunction {
             Self::Plugin(..) => f.write_str("PluginFunction"),
 
             #[cfg(not(feature = "no_function"))]
-            Self::Script(fn_def) => fmt::Debug::fmt(fn_def, f),
+            Self::Script(fn_def, ..) => fmt::Debug::fmt(fn_def, f),
         }
     }
 }
@@ -52,7 +75,7 @@ impl fmt::Display for CallableFunction {
             Self::Plugin(..) => f.write_str("PluginFunction"),
 
             #[cfg(not(feature = "no_function"))]
-            Self::Script(s) => fmt::Display::fmt(s, f),
+            Self::Script(fn_def, ..) => fmt::Display::fmt(fn_def, f),
         }
     }
 }
@@ -160,7 +183,7 @@ impl CallableFunction {
             Self::Plugin(..) | Self::Pure(..) | Self::Method(..) | Self::Iterator(..) => {
                 FnAccess::Public
             }
-            Self::Script(f) => f.access,
+            Self::Script(f, ..) => f.access,
         }
     }
     /// Get a shared reference to a native Rust function.
@@ -184,7 +207,20 @@ impl CallableFunction {
     pub const fn get_script_fn_def(&self) -> Option<&Shared<crate::ast::ScriptFnDef>> {
         match self {
             Self::Pure(..) | Self::Method(..) | Self::Iterator(..) | Self::Plugin(..) => None,
-            Self::Script(f) => Some(f),
+            Self::Script(f, ..) => Some(f),
+        }
+    }
+    /// Get a reference to the shared encapsulated environment of the function definition.
+    ///
+    /// Not available under `no_function` or `no_module`.
+    #[inline]
+    #[must_use]
+    pub fn get_encapsulated_environ(&self) -> Option<&EncapsulatedEnviron> {
+        match self {
+            Self::Pure(..) | Self::Method(..) | Self::Iterator(..) | Self::Plugin(..) => None,
+
+            #[cfg(not(feature = "no_function"))]
+            Self::Script(.., environ) => environ.as_deref(),
         }
     }
     /// Get a reference to an iterator function.
@@ -217,7 +253,7 @@ impl CallableFunction {
 impl From<crate::ast::ScriptFnDef> for CallableFunction {
     #[inline(always)]
     fn from(func: crate::ast::ScriptFnDef) -> Self {
-        Self::Script(func.into())
+        Self::Script(func.into(), None)
     }
 }
 
@@ -225,7 +261,7 @@ impl From<crate::ast::ScriptFnDef> for CallableFunction {
 impl From<Shared<crate::ast::ScriptFnDef>> for CallableFunction {
     #[inline(always)]
     fn from(func: Shared<crate::ast::ScriptFnDef>) -> Self {
-        Self::Script(func)
+        Self::Script(func, None)
     }
 }
 

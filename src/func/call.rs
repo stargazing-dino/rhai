@@ -644,9 +644,10 @@ impl Engine {
                 // Script function call
                 assert!(func.is_script());
 
-                let func = func.get_script_fn_def().expect("script-defined function");
+                let f = func.get_script_fn_def().expect("script-defined function");
+                let environ = func.get_encapsulated_environ();
 
-                if func.body.is_empty() {
+                if f.body.is_empty() {
                     return Ok((Dynamic::UNIT, false));
                 }
 
@@ -666,7 +667,7 @@ impl Engine {
                     let (first_arg, rest_args) = _args.split_first_mut().unwrap();
 
                     self.call_script_fn(
-                        global, caches, scope, first_arg, func, rest_args, true, pos,
+                        global, caches, scope, first_arg, environ, f, rest_args, true, pos,
                     )
                 } else {
                     // Normal call of script function
@@ -683,7 +684,17 @@ impl Engine {
 
                     let mut this_ptr = Dynamic::NULL;
 
-                    self.call_script_fn(global, caches, scope, &mut this_ptr, func, args, true, pos)
+                    self.call_script_fn(
+                        global,
+                        caches,
+                        scope,
+                        &mut this_ptr,
+                        environ,
+                        f,
+                        args,
+                        true,
+                        pos,
+                    )
                 }
                 .map(|r| (r, false));
             }
@@ -770,6 +781,7 @@ impl Engine {
                                 caches,
                                 &mut Scope::new(),
                                 &mut this_ptr,
+                                None,
                                 fn_def,
                                 args,
                                 true,
@@ -856,6 +868,7 @@ impl Engine {
                                 caches,
                                 &mut Scope::new(),
                                 target,
+                                None,
                                 &fn_def,
                                 args,
                                 true,
@@ -1064,6 +1077,7 @@ impl Engine {
                             caches,
                             &mut Scope::new(),
                             &mut this_ptr,
+                            None,
                             &fn_def,
                             args,
                             true,
@@ -1441,15 +1455,27 @@ impl Engine {
 
         match func {
             #[cfg(not(feature = "no_function"))]
-            Some(f) if f.is_script() => {
-                let f = f.get_script_fn_def().expect("script-defined function");
+            Some(func) if func.is_script() => {
+                let f = func.get_script_fn_def().expect("script-defined function");
+                let environ = func.get_encapsulated_environ();
+
                 let scope = &mut Scope::new();
                 let mut this_ptr = Dynamic::NULL;
 
                 let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
                 auto_restore!(global => move |g| g.source = orig_source);
 
-                self.call_script_fn(global, caches, scope, &mut this_ptr, f, args, true, pos)
+                self.call_script_fn(
+                    global,
+                    caches,
+                    scope,
+                    &mut this_ptr,
+                    environ,
+                    f,
+                    args,
+                    true,
+                    pos,
+                )
             }
 
             Some(f) if f.is_plugin_fn() => {
