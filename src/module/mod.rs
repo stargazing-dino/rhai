@@ -2197,16 +2197,10 @@ impl Module {
                 })
                 .for_each(|f| {
                     let hash = module.set_script_fn(f.clone());
+                    let f = module.functions.as_mut().unwrap().get_mut(&hash).unwrap();
 
                     // Encapsulate AST environment
-                    match module
-                        .functions
-                        .as_mut()
-                        .unwrap()
-                        .get_mut(&hash)
-                        .unwrap()
-                        .func
-                    {
+                    match f.func {
                         CallableFunction::Script(.., ref mut e) => *e = Some(environ.clone()),
                         _ => (),
                     }

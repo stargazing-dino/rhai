@@ -31,14 +31,18 @@ fn check_struct_sizes() {
         size_of::<Option<ast::Stmt>>(),
         if IS_32_BIT { 12 } else { 16 }
     );
-    assert_eq!(
-        size_of::<CallableFunction>(),
-        if IS_32_BIT { 12 } else { 24 }
-    );
-    assert_eq!(
-        size_of::<module::FuncInfo>(),
-        if IS_32_BIT { 16 } else { 32 }
-    );
+
+    #[cfg(feature = "internals")]
+    {
+        assert_eq!(
+            size_of::<CallableFunction>(),
+            if IS_32_BIT { 12 } else { 24 }
+        );
+        assert_eq!(
+            size_of::<module::FuncInfo>(),
+            if IS_32_BIT { 16 } else { 32 }
+        );
+    }
 
     #[cfg(target_pointer_width = "64")]
     {
