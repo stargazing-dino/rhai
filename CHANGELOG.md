@@ -61,6 +61,8 @@ Enhancements
 * Block-style doc-comments are now "un-indented" for better formatting.
 * Doc-comments on plugin modules are now captured in the module's `doc` field.
 * Expression nesting levels is refined such that it grows less excessively for common patterns.
+* The traits `Index` and `IndexMut` are added to `FnPtr`.
+* `FnPtr::iter_curry` and `FnPtr::iter_curry_mut` are added.
 
 
 Version 1.11.0

@@ -16,6 +16,7 @@ use std::{
     fmt,
     hash::{Hash, Hasher},
     mem,
+    ops::{Index, IndexMut},
 };
 
 /// A general function pointer, which may carry additional (i.e. curried) argument values
@@ -126,6 +127,16 @@ impl FnPtr {
     #[must_use]
     pub fn curry(&self) -> &[Dynamic] {
         self.curry.as_ref()
+    }
+    /// Iterate the curried arguments.
+    #[inline(always)]
+    pub fn iter_curry(&self) -> impl Iterator<Item = &Dynamic> {
+        self.curry.iter()
+    }
+    /// Mutably-iterate the curried arguments.
+    #[inline(always)]
+    pub fn iter_curry_mut(&mut self) -> impl Iterator<Item = &mut Dynamic> {
+        self.curry.iter_mut()
     }
     /// Add a new curried argument.
     #[inline(always)]
@@ -385,5 +396,21 @@ impl<T: Into<Shared<crate::ast::ScriptFnDef>>> From<T> for FnPtr {
             environ: None,
             fn_def: Some(fn_def),
         }
+    }
+}
+
+impl Index<usize> for FnPtr {
+    type Output = Dynamic;
+
+    #[inline(always)]
+    fn index(&self, index: usize) -> &Self::Output {
+        self.curry.index(index)
+    }
+}
+
+impl IndexMut<usize> for FnPtr {
+    #[inline(always)]
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.curry.index_mut(index)
     }
 }
