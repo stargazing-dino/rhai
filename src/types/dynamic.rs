@@ -2084,6 +2084,27 @@ impl Dynamic {
             _ => Err(self.type_name()),
         }
     }
+
+    /// Recursively scan for [`Dynamic`] values within this [`Dynamic`] (e.g. items in an array or map),
+    /// calling a filter function on each.
+    ///
+    /// Shared values are _NOT_ scanned.
+    #[inline]
+    pub fn deep_scan(&mut self, mut filter: impl FnMut(&mut Self)) {
+        fn scan_inner(value: &mut Dynamic, filter: &mut impl FnMut(&mut Dynamic)) {
+            match &mut value.0 {
+                #[cfg(not(feature = "no_index"))]
+                Union::Array(a, ..) => a.iter_mut().for_each(|v| scan_inner(v, filter)),
+                #[cfg(not(feature = "no_object"))]
+                Union::Map(m, ..) => m.values_mut().for_each(|v| scan_inner(v, filter)),
+                Union::FnPtr(f, ..) => f.iter_curry_mut().for_each(|v| scan_inner(v, filter)),
+                _ => (),
+            }
+        }
+
+        filter(self);
+        scan_inner(self, &mut filter);
+    }
 }
 
 impl From<()> for Dynamic {

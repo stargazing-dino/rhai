@@ -9,7 +9,7 @@ use crate::func::{
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypesCollection};
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, FnArgsVec, Identifier, ImmutableString,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, FnArgsVec, FnPtr, Identifier, ImmutableString,
     NativeCallContext, RhaiResultOf, Shared, SharedModule, SmartString,
 };
 use bitflags::bitflags;
@@ -2147,29 +2147,13 @@ impl Module {
             constants,
         });
 
-        fn update_encapsulated_environ(
-            value: &mut Dynamic,
-            environ: &Shared<crate::func::EncapsulatedEnviron>,
-        ) {
-            match value.0 {
-                #[cfg(not(feature = "no_index"))]
-                crate::types::dynamic::Union::Array(ref mut a, _, _) => a
-                    .iter_mut()
-                    .for_each(|v| update_encapsulated_environ(v, environ)),
-                #[cfg(not(feature = "no_object"))]
-                crate::types::dynamic::Union::Map(ref mut map, _, _) => map
-                    .values_mut()
-                    .for_each(|v| update_encapsulated_environ(v, environ)),
-                crate::types::dynamic::Union::FnPtr(ref mut fn_ptr, _, _) => {
-                    fn_ptr.set_encapsulated_environ(Some(environ.clone()))
-                }
-                _ => (),
-            }
-        }
-
         // Variables with an alias left in the scope become module variables
         for (_name, mut value, mut aliases) in scope {
-            update_encapsulated_environ(&mut value, &environ);
+            value.deep_scan(|v| {
+                if let Some(fn_ptr) = v.downcast_mut::<FnPtr>() {
+                    fn_ptr.set_encapsulated_environ(Some(environ.clone()));
+                }
+            });
 
             match aliases.len() {
                 0 => (),

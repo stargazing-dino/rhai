@@ -63,6 +63,7 @@ Enhancements
 * Expression nesting levels is refined such that it grows less excessively for common patterns.
 * The traits `Index` and `IndexMut` are added to `FnPtr`.
 * `FnPtr::iter_curry` and `FnPtr::iter_curry_mut` are added.
+* `Dynamic::deep_scan` is added to recursively scan for `Dynamic` values.
 
 
 Version 1.11.0
