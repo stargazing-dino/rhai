@@ -1,11 +1,12 @@
 //! The `FnPtr` type.
 
 use crate::eval::GlobalRuntimeState;
+use crate::func::EncapsulatedEnviron;
 use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
     Dynamic, Engine, FnArgsVec, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError,
-    RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
+    RhaiResult, RhaiResultOf, Shared, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -13,7 +14,7 @@ use std::{
     any::{type_name, TypeId},
     convert::{TryFrom, TryInto},
     fmt,
-    hash::Hash,
+    hash::{Hash, Hasher},
     mem,
 };
 
@@ -23,23 +24,23 @@ use std::{
 pub struct FnPtr {
     name: ImmutableString,
     curry: StaticVec<Dynamic>,
-    environ: Option<crate::Shared<crate::func::EncapsulatedEnviron>>,
+    environ: Option<Shared<EncapsulatedEnviron>>,
     #[cfg(not(feature = "no_function"))]
-    fn_def: Option<crate::Shared<crate::ast::ScriptFnDef>>,
+    fn_def: Option<Shared<crate::ast::ScriptFnDef>>,
 }
 
 impl Hash for FnPtr {
     #[inline(always)]
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         self.curry.hash(state);
 
+        // Hash the shared [`EncapsulatedEnviron`] by hashing its shared pointer.
+        self.environ.as_ref().map(|e| Shared::as_ptr(e)).hash(state);
+
         // Hash the linked [`ScriptFnDef`][crate::ast::ScriptFnDef] by hashing its shared pointer.
         #[cfg(not(feature = "no_function"))]
-        self.fn_def
-            .as_ref()
-            .map(|f| crate::Shared::as_ptr(f))
-            .hash(state);
+        self.fn_def.as_ref().map(|f| Shared::as_ptr(f)).hash(state);
     }
 }
 
@@ -102,8 +103,8 @@ impl FnPtr {
     ) -> (
         ImmutableString,
         StaticVec<Dynamic>,
-        Option<crate::Shared<crate::func::EncapsulatedEnviron>>,
-        Option<crate::Shared<crate::ast::ScriptFnDef>>,
+        Option<Shared<EncapsulatedEnviron>>,
+        Option<Shared<crate::ast::ScriptFnDef>>,
     ) {
         (self.name, self.curry, self.environ, self.fn_def)
     }
@@ -116,7 +117,7 @@ impl FnPtr {
     ) -> (
         ImmutableString,
         StaticVec<Dynamic>,
-        Option<crate::Shared<crate::func::EncapsulatedEnviron>>,
+        Option<Shared<EncapsulatedEnviron>>,
     ) {
         (self.name, self.curry, self.environ)
     }
@@ -192,7 +193,7 @@ impl FnPtr {
         args: impl FuncArgs,
     ) -> RhaiResultOf<T> {
         let _ast = ast;
-        let mut arg_values = crate::StaticVec::new_const();
+        let mut arg_values = StaticVec::new_const();
         args.parse(&mut arg_values);
 
         let global = &mut GlobalRuntimeState::new(engine);
@@ -228,7 +229,7 @@ impl FnPtr {
         context: &NativeCallContext,
         args: impl FuncArgs,
     ) -> RhaiResultOf<T> {
-        let mut arg_values = crate::StaticVec::new_const();
+        let mut arg_values = StaticVec::new_const();
         args.parse(&mut arg_values);
 
         self.call_raw(context, None, arg_values).and_then(|result| {
@@ -316,17 +317,19 @@ impl FnPtr {
 
         context.call_fn_raw(self.fn_name(), is_method, is_method, args)
     }
-    /// Get a reference to the [encapsulated environment][crate::func::EncapsulatedEnviron].
+    /// Get a reference to the [encapsulated environment][EncapsulatedEnviron].
     #[inline(always)]
     #[must_use]
-    pub(crate) fn encapsulated_environ(&self) -> Option<&crate::func::EncapsulatedEnviron> {
+    #[allow(dead_code)]
+    pub(crate) fn encapsulated_environ(&self) -> Option<&EncapsulatedEnviron> {
         self.environ.as_deref()
     }
-    /// Set a reference to the [encapsulated environment][crate::func::EncapsulatedEnviron].
+    /// Set a reference to the [encapsulated environment][EncapsulatedEnviron].
     #[inline(always)]
+    #[allow(dead_code)]
     pub(crate) fn set_encapsulated_environ(
         &mut self,
-        value: Option<impl Into<crate::Shared<crate::func::EncapsulatedEnviron>>>,
+        value: Option<impl Into<Shared<EncapsulatedEnviron>>>,
     ) {
         self.environ = value.map(Into::into);
     }
@@ -334,16 +337,13 @@ impl FnPtr {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn fn_def(&self) -> Option<&crate::Shared<crate::ast::ScriptFnDef>> {
+    pub(crate) fn fn_def(&self) -> Option<&Shared<crate::ast::ScriptFnDef>> {
         self.fn_def.as_ref()
     }
     /// Set a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
-    pub(crate) fn set_fn_def(
-        &mut self,
-        value: Option<impl Into<crate::Shared<crate::ast::ScriptFnDef>>>,
-    ) {
+    pub(crate) fn set_fn_def(&mut self, value: Option<impl Into<Shared<crate::ast::ScriptFnDef>>>) {
         self.fn_def = value.map(Into::into);
     }
 }
@@ -374,7 +374,7 @@ impl TryFrom<ImmutableString> for FnPtr {
 }
 
 #[cfg(not(feature = "no_function"))]
-impl<T: Into<crate::Shared<crate::ast::ScriptFnDef>>> From<T> for FnPtr {
+impl<T: Into<Shared<crate::ast::ScriptFnDef>>> From<T> for FnPtr {
     #[inline(always)]
     fn from(value: T) -> Self {
         let fn_def = value.into();

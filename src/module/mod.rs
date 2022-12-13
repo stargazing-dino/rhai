@@ -2139,19 +2139,37 @@ impl Module {
         let _ = result?;
 
         // Encapsulated environment
-        #[cfg(not(feature = "no_function"))]
         let environ = Shared::new(crate::func::EncapsulatedEnviron {
+            #[cfg(not(feature = "no_function"))]
             lib: ast.shared_lib().clone(),
             imports: imports.into_boxed_slice(),
+            #[cfg(not(feature = "no_function"))]
             constants,
         });
 
+        fn update_encapsulated_environ(
+            value: &mut Dynamic,
+            environ: &Shared<crate::func::EncapsulatedEnviron>,
+        ) {
+            match value.0 {
+                #[cfg(not(feature = "no_index"))]
+                crate::types::dynamic::Union::Array(ref mut a, _, _) => a
+                    .iter_mut()
+                    .for_each(|v| update_encapsulated_environ(v, environ)),
+                #[cfg(not(feature = "no_object"))]
+                crate::types::dynamic::Union::Map(ref mut map, _, _) => map
+                    .values_mut()
+                    .for_each(|v| update_encapsulated_environ(v, environ)),
+                crate::types::dynamic::Union::FnPtr(ref mut fn_ptr, _, _) => {
+                    fn_ptr.set_encapsulated_environ(Some(environ.clone()))
+                }
+                _ => (),
+            }
+        }
+
         // Variables with an alias left in the scope become module variables
         for (_name, mut value, mut aliases) in scope {
-            #[cfg(not(feature = "no_function"))]
-            if let Some(mut fn_ptr) = value.write_lock::<crate::FnPtr>() {
-                fn_ptr.set_encapsulated_environ(Some(environ.clone()));
-            }
+            update_encapsulated_environ(&mut value, &environ);
 
             match aliases.len() {
                 0 => (),

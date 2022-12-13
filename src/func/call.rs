@@ -834,13 +834,13 @@ impl Engine {
                 let fn_ptr = mem::take(&mut call_args[0]).cast::<FnPtr>();
 
                 #[cfg(not(feature = "no_function"))]
-                let (fn_name, is_anon, fn_curry, environ, fn_def) = {
+                let (fn_name, is_anon, fn_curry, _environ, fn_def) = {
                     let is_anon = fn_ptr.is_anonymous();
                     let (fn_name, fn_curry, environ, fn_def) = fn_ptr.take_data();
                     (fn_name, is_anon, fn_curry, environ, fn_def)
                 };
                 #[cfg(feature = "no_function")]
-                let (fn_name, is_anon, environ, fn_curry) = {
+                let (fn_name, is_anon, fn_curry, _environ) = {
                     let (fn_name, fn_curry, environ) = fn_ptr.take_data();
                     (fn_name, false, fn_curry, environ)
                 };
@@ -868,7 +868,7 @@ impl Engine {
                                 caches,
                                 &mut Scope::new(),
                                 target,
-                                environ.as_deref(),
+                                _environ.as_deref(),
                                 &fn_def,
                                 args,
                                 true,
@@ -1043,13 +1043,13 @@ impl Engine {
                 let fn_ptr = arg_value.cast::<FnPtr>();
 
                 #[cfg(not(feature = "no_function"))]
-                let (fn_name, is_anon, fn_curry, environ, fn_def) = {
+                let (fn_name, is_anon, fn_curry, _environ, fn_def) = {
                     let is_anon = fn_ptr.is_anonymous();
                     let (fn_name, fn_curry, environ, fn_def) = fn_ptr.take_data();
                     (fn_name, is_anon, fn_curry, environ, fn_def)
                 };
                 #[cfg(feature = "no_function")]
-                let (fn_name, is_anon, fn_curry, environ) = {
+                let (fn_name, is_anon, fn_curry, _environ) = {
                     let (fn_name, fn_curry, environ) = fn_ptr.take_data();
                     (fn_name, false, fn_curry, environ)
                 };
@@ -1077,7 +1077,7 @@ impl Engine {
                             caches,
                             &mut Scope::new(),
                             &mut this_ptr,
-                            environ.as_deref(),
+                            _environ.as_deref(),
                             &fn_def,
                             args,
                             true,
