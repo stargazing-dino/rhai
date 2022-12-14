@@ -162,7 +162,7 @@ macro_rules! def_register {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |_, args: &mut FnCallArgs| {
+                CallableFunction::$abi { func: Shared::new(move |_, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
                     check_constant!($abi, $n, fn_name, no_const, args);
 
@@ -174,7 +174,7 @@ macro_rules! def_register {
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }), false)
+                }), has_context: false }
             }
         }
 
@@ -186,7 +186,7 @@ macro_rules! def_register {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
+                CallableFunction::$abi { func: Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
                     let ctx = ctx.unwrap();
 
                     // The arguments are assumed to be of the correct number and types!
@@ -200,7 +200,7 @@ macro_rules! def_register {
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }), true)
+                }), has_context: true }
             }
         }
 
@@ -213,7 +213,7 @@ macro_rules! def_register {
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
             #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |_, args: &mut FnCallArgs| {
+                CallableFunction::$abi { func: Shared::new(move |_, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
                     check_constant!($abi, $n, fn_name, no_const, args);
 
@@ -222,7 +222,7 @@ macro_rules! def_register {
 
                     // Call the function with each argument value
                     self($($arg),*).map(Dynamic::from)
-                }), false)
+                }), has_context: false }
             }
         }
 
@@ -235,7 +235,7 @@ macro_rules! def_register {
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
             #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
-                CallableFunction::$abi(Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
+                CallableFunction::$abi { func: Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
                     let ctx = ctx.unwrap();
 
                     // The arguments are assumed to be of the correct number and types!
@@ -246,7 +246,7 @@ macro_rules! def_register {
 
                     // Call the function with each argument value
                     self(ctx, $($arg),*).map(Dynamic::from)
-                }), true)
+                }), has_context: true }
             }
         }
 

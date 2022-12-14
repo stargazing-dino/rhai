@@ -9,7 +9,7 @@ use crate::func::{
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypesCollection};
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, FnArgsVec, FnPtr, Identifier, ImmutableString,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, FnArgsVec, Identifier, ImmutableString,
     NativeCallContext, RhaiResultOf, Shared, SharedModule, SmartString,
 };
 use bitflags::bitflags;
@@ -1221,7 +1221,10 @@ impl Module {
             access,
             None,
             arg_types,
-            CallableFunction::Method(Shared::new(f), true),
+            CallableFunction::Method {
+                func: Shared::new(f),
+                has_context: true,
+            },
         )
     }
 
@@ -2142,7 +2145,7 @@ impl Module {
         let environ = Shared::new(crate::func::EncapsulatedEnviron {
             #[cfg(not(feature = "no_function"))]
             lib: ast.shared_lib().clone(),
-            imports: imports.into_boxed_slice(),
+            imports: imports.into(),
             #[cfg(not(feature = "no_function"))]
             constants,
         });
@@ -2150,7 +2153,7 @@ impl Module {
         // Variables with an alias left in the scope become module variables
         for (_name, mut value, mut aliases) in scope {
             value.deep_scan(|v| {
-                if let Some(fn_ptr) = v.downcast_mut::<FnPtr>() {
+                if let Some(fn_ptr) = v.downcast_mut::<crate::FnPtr>() {
                     fn_ptr.set_encapsulated_environ(Some(environ.clone()));
                 }
             });
@@ -2184,8 +2187,8 @@ impl Module {
                 let f = module.functions.as_mut().unwrap().get_mut(&hash).unwrap();
 
                 // Encapsulate AST environment
-                match f.func {
-                    CallableFunction::Script(.., ref mut e) => *e = Some(environ.clone()),
+                match &mut f.func {
+                    CallableFunction::Script { environ: e, .. } => *e = Some(environ.clone()),
                     _ => (),
                 }
             });

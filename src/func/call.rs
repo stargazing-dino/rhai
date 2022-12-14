@@ -270,25 +270,31 @@ impl Engine {
                         }
 
                         // Try to find a built-in version
-                        let builtin =
-                            args.and_then(|args| match op_token {
-                                Token::NONE => None,
-                                token if token.is_op_assignment() => {
-                                    let (first_arg, rest_args) = args.split_first().unwrap();
+                        let builtin = args.and_then(|args| match op_token {
+                            Token::NONE => None,
+                            token if token.is_op_assignment() => {
+                                let (first_arg, rest_args) = args.split_first().unwrap();
 
-                                    get_builtin_op_assignment_fn(token, first_arg, rest_args[0])
-                                        .map(|(f, ctx)| FnResolutionCacheEntry {
-                                            func: CallableFunction::Method(Shared::new(f), ctx),
-                                            source: None,
-                                        })
-                                }
-                                token => get_builtin_binary_op_fn(token, args[0], args[1]).map(
-                                    |(f, ctx)| FnResolutionCacheEntry {
-                                        func: CallableFunction::Method(Shared::new(f), ctx),
+                                get_builtin_op_assignment_fn(token, first_arg, rest_args[0]).map(
+                                    |(f, has_context)| FnResolutionCacheEntry {
+                                        func: CallableFunction::Method {
+                                            func: Shared::new(f),
+                                            has_context,
+                                        },
                                         source: None,
                                     },
-                                ),
-                            });
+                                )
+                            }
+                            token => get_builtin_binary_op_fn(token, args[0], args[1]).map(
+                                |(f, has_context)| FnResolutionCacheEntry {
+                                    func: CallableFunction::Method {
+                                        func: Shared::new(f),
+                                        has_context,
+                                    },
+                                    source: None,
+                                },
+                            ),
+                        });
 
                         return if cache.filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
