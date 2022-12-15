@@ -386,7 +386,6 @@ impl Engine {
                 // Clone the first argument
                 backup.change_first_arg_to_copy(args);
             }
-            auto_restore!(args if swap => move |a| backup.restore_first_arg(a));
 
             #[cfg(feature = "debugging")]
             if self.is_debugger_registered() {
@@ -423,6 +422,10 @@ impl Engine {
             }
             .and_then(|r| self.check_data_size(r, pos))
             .map_err(|err| err.fill_position(pos));
+
+            if swap {
+                backup.restore_first_arg(args);
+            }
 
             #[cfg(feature = "debugging")]
             if self.is_debugger_registered() {
