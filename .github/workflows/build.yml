@@ -178,8 +178,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - {toolchain: nightly, os: ubuntu-latest, experimental: false, flags: "--features metadata"}
-          - {toolchain: nightly, os: windows-latest, experimental: false, flags: "--features metadata"}
+          - {toolchain: stable, os: ubuntu-latest, experimental: false, flags: "--features metadata"}
+          - {toolchain: stable, os: windows-latest, experimental: false, flags: "--features metadata"}
     steps:
     - name: Checkout
       uses: actions/checkout@v2
