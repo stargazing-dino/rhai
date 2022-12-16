@@ -2,7 +2,7 @@ error: expecting attribute name
  --> ui_tests/export_fn_path_attr.rs:9:13
   |
 9 | #[export_fn(rhai::name = "thing")]
-  |             ^^^^^^^^^^
+  |             ^^^^
 
 error[E0425]: cannot find function `test_fn` in this scope
   --> ui_tests/export_fn_path_attr.rs:19:8
