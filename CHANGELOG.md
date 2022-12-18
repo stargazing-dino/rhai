@@ -64,6 +64,7 @@ Enhancements
 * The traits `Index` and `IndexMut` are added to `FnPtr`.
 * `FnPtr::iter_curry` and `FnPtr::iter_curry_mut` are added.
 * `Dynamic::deep_scan` is added to recursively scan for `Dynamic` values.
+* `>>` and `<<` operators on integers no longer throw errors when the number of bits to shift is out of bounds.  Shifting by a negative number of bits simply reverses the shift direction.
 
 
 Version 1.11.0

@@ -118,6 +118,11 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
             let y = args[1].$yy().unwrap() as $base;
             Ok(x.$func(y as $yyy).into())
         }, false) };
+        ($base:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { (|_, args| {
+            let x = args[0].$xx().unwrap() as $base;
+            let y = args[1].$yy().unwrap() as $base;
+            Ok($func(x, y).into())
+        }, false) };
         ($base:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
             let x = args[0].$xx().unwrap() as $base;
             let y = args[1].$yy().unwrap() as $base;
@@ -132,6 +137,11 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
             let x = <$base>::from(args[0].$xx().unwrap());
             let y = <$base>::from(args[1].$yy().unwrap());
             Ok(x.$func(y).into())
+        }, false) };
+        (from $base:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { (|_, args| {
+            let x = <$base>::from(args[0].$xx().unwrap());
+            let y = <$base>::from(args[1].$yy().unwrap());
+            Ok($func(x, y).into())
         }, false) };
         (from $base:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
             let x = <$base>::from(args[0].$xx().unwrap());
@@ -155,8 +165,8 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
                 Divide => return Some(impl_op!(INT => divide(as_int, as_int))),
                 Modulo => return Some(impl_op!(INT => modulo(as_int, as_int))),
                 PowerOf => return Some(impl_op!(INT => power(as_int, as_int))),
-                RightShift => return Some(impl_op!(INT => shift_right(as_int, as_int))),
-                LeftShift => return Some(impl_op!(INT => shift_left(as_int, as_int))),
+                RightShift => return Some(impl_op!(INT => Ok(shift_right(as_int, as_int)))),
+                LeftShift => return Some(impl_op!(INT => Ok(shift_left(as_int, as_int)))),
                 _ => (),
             }
 
@@ -168,8 +178,26 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
                 Divide => return Some(impl_op!(INT => as_int / as_int)),
                 Modulo => return Some(impl_op!(INT => as_int % as_int)),
                 PowerOf => return Some(impl_op!(INT => as_int.pow(as_int as u32))),
-                RightShift => return Some(impl_op!(INT => as_int >> as_int)),
-                LeftShift => return Some(impl_op!(INT => as_int << as_int)),
+                RightShift => {
+                    return Some((
+                        |_, args| {
+                            let x = args[0].as_int().unwrap();
+                            let y = args[1].as_int().unwrap();
+                            Ok((if y < 0 { x << -y } else { x >> y }).into())
+                        },
+                        false,
+                    ))
+                }
+                LeftShift => {
+                    return Some((
+                        |_, args| {
+                            let x = args[0].as_int().unwrap();
+                            let y = args[1].as_int().unwrap();
+                            Ok((if y < 0 { x >> -y } else { x << y }).into())
+                        },
+                        false,
+                    ))
+                }
                 _ => (),
             }
 
@@ -614,6 +642,12 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
             let y = args[1].$yy().unwrap() as $x;
             Ok((*args[0].write_lock::<$x>().unwrap() = x.$func(y as $yyy)).into())
         }, false) };
+        ($x:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { (|_, args| {
+            let x = args[0].$xx().unwrap();
+            let y = args[1].$yy().unwrap() as $x;
+            let v: Dynamic = $func(x, y).into();
+            Ok((*args[0].write_lock().unwrap() = v).into())
+        }, false) };
         ($x:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
             let x = args[0].$xx().unwrap();
             let y = args[1].$yy().unwrap() as $x;
@@ -627,6 +661,11 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
             let x = args[0].$xx().unwrap();
             let y = <$x>::from(args[1].$yy().unwrap());
             Ok((*args[0].write_lock::<$x>().unwrap() = x.$func(y)).into())
+        }, false) };
+        (from $x:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { (|_, args| {
+            let x = args[0].$xx().unwrap();
+            let y = <$x>::from(args[1].$yy().unwrap());
+            Ok((*args[0].write_lock().unwrap() = $func(x, y).into()).into())
         }, false) };
         (from $x:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
             let x = args[0].$xx().unwrap();
@@ -650,8 +689,8 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
                 DivideAssign => return Some(impl_op!(INT => divide(as_int, as_int))),
                 ModuloAssign => return Some(impl_op!(INT => modulo(as_int, as_int))),
                 PowerOfAssign => return Some(impl_op!(INT => power(as_int, as_int))),
-                RightShiftAssign => return Some(impl_op!(INT => shift_right(as_int, as_int))),
-                LeftShiftAssign => return Some(impl_op!(INT => shift_left(as_int, as_int))),
+                RightShiftAssign => return Some(impl_op!(INT => Ok(shift_right(as_int, as_int)))),
+                LeftShiftAssign => return Some(impl_op!(INT => Ok(shift_left(as_int, as_int)))),
                 _ => (),
             }
 
@@ -663,8 +702,28 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
                 DivideAssign => return Some(impl_op!(INT /= as_int)),
                 ModuloAssign => return Some(impl_op!(INT %= as_int)),
                 PowerOfAssign => return Some(impl_op!(INT => as_int.pow(as_int as u32))),
-                RightShiftAssign => return Some(impl_op!(INT >>= as_int)),
-                LeftShiftAssign => return Some(impl_op!(INT <<= as_int)),
+                RightShiftAssign => {
+                    return Some((
+                        |_, args| {
+                            let x = args[0].as_int().unwrap();
+                            let y = args[1].as_int().unwrap();
+                            let v = if y < 0 { x << -y } else { x >> y };
+                            Ok((*args[0].write_lock::<Dynamic>().unwrap() = v.into()).into())
+                        },
+                        false,
+                    ))
+                }
+                LeftShiftAssign => {
+                    return Some((
+                        |_, args| {
+                            let x = args[0].as_int().unwrap();
+                            let y = args[1].as_int().unwrap();
+                            let v = if y < 0 { x >> -y } else { x << y };
+                            Ok((*args[0].write_lock::<Dynamic>().unwrap() = v.into()).into())
+                        },
+                        false,
+                    ))
+                }
                 _ => (),
             }
 

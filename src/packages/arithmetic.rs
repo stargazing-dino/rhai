@@ -72,9 +72,9 @@ macro_rules! gen_arithmetic_functions {
                 pub fn power(x: $arg_type, y: INT) -> RhaiResultOf<$arg_type> {
                     if cfg!(not(feature = "unchecked")) {
                         if cfg!(not(feature = "only_i32")) && y > (u32::MAX as INT) {
-                            Err(make_err(format!("Integer raised to too large an index: {x} ** {y}")))
+                            Err(make_err(format!("Exponential overflow: {x} ** {y}")))
                         } else if y < 0 {
-                            Err(make_err(format!("Integer raised to a negative index: {x} ** {y}")))
+                            Err(make_err(format!("Integer raised to a negative power: {x} ** {y}")))
                         } else {
                             x.checked_pow(y as u32).ok_or_else(|| make_err(format!("Exponential overflow: {x} ** {y}")))
                         }
@@ -83,32 +83,36 @@ macro_rules! gen_arithmetic_functions {
                     }
                 }
 
-                #[rhai_fn(name = "<<", return_raw)]
-                pub fn shift_left(x: $arg_type, y: INT) -> RhaiResultOf<$arg_type> {
+                #[rhai_fn(name = "<<")]
+                pub fn shift_left(x: $arg_type, y: INT) -> $arg_type {
                     if cfg!(not(feature = "unchecked")) {
                         if cfg!(not(feature = "only_i32")) && y > (u32::MAX as INT) {
-                            Err(make_err(format!("Left-shift by too many bits: {x} << {y}")))
+                            0
                         } else if y < 0 {
-                            Err(make_err(format!("Left-shift by a negative number: {x} << {y}")))
+                            shift_right(x, y.checked_abs().unwrap_or(INT::MAX))
                         } else {
-                            x.checked_shl(y as u32).ok_or_else(|| make_err(format!("Left-shift by too many bits: {x} << {y}")))
+                            x.checked_shl(y as u32).unwrap_or_else(|| 0)
                         }
+                    } else if y < 0 {
+                        x >> -y
                     } else {
-                        Ok(x << y)
+                        x << y
                     }
                 }
-                #[rhai_fn(name = ">>", return_raw)]
-                pub fn shift_right(x: $arg_type, y: INT) -> RhaiResultOf<$arg_type> {
+                #[rhai_fn(name = ">>")]
+                pub fn shift_right(x: $arg_type, y: INT) -> $arg_type {
                     if cfg!(not(feature = "unchecked")) {
                         if cfg!(not(feature = "only_i32")) && y > (u32::MAX as INT) {
-                            Err(make_err(format!("Right-shift by too many bits: {x} >> {y}")))
+                            x.wrapping_shr(u32::MAX)
                         } else if y < 0 {
-                            Err(make_err(format!("Right-shift by a negative number: {x} >> {y}")))
+                            shift_left(x, y.checked_abs().unwrap_or(INT::MAX))
                         } else {
-                            x.checked_shr(y as u32).ok_or_else(|| make_err(format!("Right-shift by too many bits: {x} >> {y}")))
+                            x.checked_shr(y as u32).unwrap_or_else(|| x.wrapping_shr(u32::MAX))
                         }
+                    } else if y < 0 {
+                        x << -y
                     } else {
-                        Ok(x >> y)
+                        x >> y
                     }
                 }
                 #[rhai_fn(name = "&")]
