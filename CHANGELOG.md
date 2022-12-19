@@ -22,6 +22,7 @@ Deprecated API's
 
 * `Module::with_capacity` is deprecated.
 * The internal method `Engine::eval_statements_raw` is deprecated.
+* Array overloaded methods that take function names (as string) are deprecated in favor of using the `Fn("...")` call.
 
 Speed improvements
 ------------------
