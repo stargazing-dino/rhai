@@ -423,6 +423,56 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
         "
     )?);
 
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let x = [1, 2, 3];
+                x.find(|v| v > 2)
+            "
+        )?,
+        3
+    );
+
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let x = [1, 2, 3];
+                x.find(|v, i| v * i == 6)
+            "
+        )?,
+        3
+    );
+
+    assert_eq!(
+        engine.eval::<()>(
+            "
+                let x = [1, 2, 3, 2, 1];
+                x.find(|v| v > 4)
+            "
+        )?,
+        ()
+    );
+
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let x = [#{alice: 1}, #{bob: 2}, #{clara: 3}];
+                x.find_map(|v| v.bob)
+            "
+        )?,
+        2
+    );
+
+    assert_eq!(
+        engine.eval::<()>(
+            "
+                let x = [#{alice: 1}, #{bob: 2}, #{clara: 3}];
+                x.find_map(|v| v.dave)
+            "
+        )?,
+        ()
+    );
+
     Ok(())
 }
 
