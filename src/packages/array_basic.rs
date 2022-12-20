@@ -1718,4 +1718,146 @@ pub mod array_functions {
     ) -> RhaiResultOf<bool> {
         equals(ctx, array1, array2).map(|r| !r)
     }
+    /// Iterate through all the elements in the array, applying a `filter` function to each element
+    /// in turn, and return a copy of the first element that returns `true`.
+    /// If no element returns `true`, `()` is returned.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `element`: copy of array element
+    /// * `index` _(optional)_: current index in the array
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = [1, 2, 3, 5, 8, 13];
+    ///
+    /// print(x.find(|v| v > 3));                    // prints 5: 5 > 3
+    ///
+    /// x.find(|v| v > 13) ?? print("not found");    // prints "not found": nothing is > 13
+    ///
+    /// print(x.find(|v, i| v * i > 13));            // prints 5: 3 * 5 > 13
+    /// ```
+    #[rhai_fn(return_raw, pure)]
+    pub fn find(ctx: NativeCallContext, array: &mut Array, filter: FnPtr) -> RhaiResult {
+        find_starting_from(ctx, array, filter, 0)
+    }
+    /// Iterate through all the elements in the array, starting from a particular `start` position,
+    /// applying a `filter` function to each element in turn, and return a copy of the first
+    /// element that returns `true`. If no element returns `true`, `()` is returned.
+    ///
+    /// * If `start` < 0, position counts from the end of the array (`-1` is the last element).
+    /// * If `start` < -length of array, position counts from the beginning of the array.
+    /// * If `start` ≥ length of array, `-1` is returned.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `element`: copy of array element
+    /// * `index` _(optional)_: current index in the array
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = [1, 2, 3, 5, 8, 13];
+    ///
+    /// print(x.find(|v| v > 1, 2));                     // prints 3: 3 > 1
+    ///
+    /// x.find(|v| v < 2, 3) ?? print("not found");      // prints "not found": nothing < 2 past index 3
+    ///
+    /// x.find(|v| v > 1, 8) ?? print("not found");      // prints "not found": nothing found past end of array
+    ///
+    /// print(x.find(|v| v > 1, -3));                    // prints 5: -3 = start from index 4
+    ///
+    /// print(x.find(|v| v > 0, -99));                   // prints 1: -99 = start from beginning
+    ///
+    /// print(x.find(|v, i| v * i > 6, 3));              // prints 5: 5 * 4 > 6
+    /// ```
+    #[rhai_fn(name = "find", return_raw, pure)]
+    pub fn find_starting_from(
+        ctx: NativeCallContext,
+        array: &mut Array,
+        filter: FnPtr,
+        start: INT,
+    ) -> RhaiResult {
+        let index = index_of_filter_starting_from(ctx, array, filter, start)?;
+
+        if index < 0 {
+            return Ok(Dynamic::UNIT);
+        }
+
+        Ok(get(array, index))
+    }
+    /// Iterate through all the elements in the array, applying a `mapper` function to each element
+    /// in turn, and return the first result that is not `()`.
+    /// If no result is not `()`, `()` is returned.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `element`: copy of array element
+    /// * `index` _(optional)_: current index in the array
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = [#{alice: 1}, #{bob: 2}, #{clara: 3}];
+    ///
+    /// print(x.find_map(|v| v.alice));                  // prints 1
+    ///
+    /// x.find_map(|v| v.dave) ?? print("not found");    // prints "not found"
+    /// ```
+    #[rhai_fn(return_raw, pure)]
+    pub fn find_map(ctx: NativeCallContext, array: &mut Array, filter: FnPtr) -> RhaiResult {
+        find_map_starting_from(ctx, array, filter, 0)
+    }
+    /// Iterate through all the elements in the array, starting from a particular `start` position,
+    /// applying a `mapper` function to each element in turn, and return the first result that is not `()`.
+    /// If no result is not `()`, `()` is returned.
+    ///
+    /// * If `start` < 0, position counts from the end of the array (`-1` is the last element).
+    /// * If `start` < -length of array, position counts from the beginning of the array.
+    /// * If `start` ≥ length of array, `-1` is returned.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `element`: copy of array element
+    /// * `index` _(optional)_: current index in the array
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = [#{alice: 1}, #{bob: 2}, #{bob: 3}, #{clara: 3}, #{alice: 0}, #{clara: 5}];
+    ///
+    /// print(x.find_map(|v| v.alice, 2));                   // prints 0
+    ///
+    /// x.find_map(|v| v.bob, 4) ?? print("not found");      // prints "not found"
+    ///
+    /// x.find_map(|v| v.alice, 8) ?? print("not found");    // prints "not found"
+    ///
+    /// print(x.find_map(|v| v.bob, -4));                    // prints 3: -4 = start from index 2
+    ///
+    /// print(x.find_map(|v| v.alice, -99));                 // prints 1: -99 = start from beginning
+    /// ```
+    #[rhai_fn(name = "find_map", return_raw, pure)]
+    pub fn find_map_starting_from(
+        ctx: NativeCallContext,
+        array: &mut Array,
+        filter: FnPtr,
+        start: INT,
+    ) -> RhaiResult {
+        if array.is_empty() {
+            return Ok(Dynamic::UNIT);
+        }
+
+        let (start, ..) = calc_offset_len(array.len(), start, 0);
+
+        for (i, item) in array.iter().enumerate().skip(start) {
+            let value = make_dual_arity_fn_ptr_call("find_map", &filter, &ctx, [item.clone()], i)?;
+
+            if !value.is_unit() {
+                return Ok(value);
+            }
+        }
+
+        Ok(Dynamic::UNIT)
+    }
 }
