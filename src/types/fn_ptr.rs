@@ -357,6 +357,91 @@ impl FnPtr {
     pub(crate) fn set_fn_def(&mut self, value: Option<impl Into<Shared<crate::ast::ScriptFnDef>>>) {
         self.fn_def = value.map(Into::into);
     }
+
+    /// Make a call to a function pointer with either a specified number of arguments, or with extra
+    /// arguments attached.
+    ///
+    /// This is useful for calling predicate closures within an iteration loop where the extra argument
+    /// is the current element's index.
+    ///
+    /// If the function pointer is linked to a scripted function definition, use the appropriate number
+    /// of arguments to call it directly (one version attaches extra arguments).
+    #[cfg(not(feature = "internals"))]
+    #[inline(always)]
+    pub(crate) fn call_raw_with_extra_args<const N: usize, const E: usize>(
+        &self,
+        fn_name: &str,
+        ctx: &NativeCallContext,
+        this_ptr: Option<&mut Dynamic>,
+        items: [Dynamic; N],
+        extras: [Dynamic; E],
+    ) -> RhaiResult {
+        self._call_with_extra_args(fn_name, ctx, this_ptr, items, extras)
+    }
+    /// _(internals)_ Make a call to a function pointer with either a specified number of arguments,
+    /// or with extra arguments attached.
+    /// Exported under the `internals` feature only.
+    ///
+    /// This is useful for calling predicate closures within an iteration loop where the extra
+    /// argument is the current element's index.
+    ///
+    /// If the function pointer is linked to a scripted function definition, use the appropriate
+    /// number of arguments to call it directly (one version attaches extra arguments).
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    pub fn call_raw_with_extra_args<const N: usize, const E: usize>(
+        &self,
+        fn_name: &str,
+        ctx: &NativeCallContext,
+        this_ptr: Option<&mut Dynamic>,
+        items: [Dynamic; N],
+        extras: [Dynamic; E],
+    ) -> RhaiResult {
+        self._call_with_extra_args(fn_name, ctx, this_ptr, items, extras)
+    }
+    /// Make a call to a function pointer with either a specified number of arguments, or with extra
+    /// arguments attached.
+    fn _call_with_extra_args<const N: usize, const E: usize>(
+        &self,
+        fn_name: &str,
+        ctx: &NativeCallContext,
+        mut this_ptr: Option<&mut Dynamic>,
+        items: [Dynamic; N],
+        extras: [Dynamic; E],
+    ) -> RhaiResult {
+        #[cfg(not(feature = "no_function"))]
+        {
+            let arity = self.fn_def().map(|f| f.params.len()).unwrap_or(0);
+
+            if arity == N {
+                return self.call_raw(&ctx, None, items);
+            } else if arity == N + E {
+                let mut items2 = FnArgsVec::with_capacity(items.len() + extras.len());
+                items2.extend(IntoIterator::into_iter(items));
+                items2.extend(IntoIterator::into_iter(extras));
+                return self.call_raw(&ctx, this_ptr, items2);
+            }
+        }
+
+        self.call_raw(&ctx, this_ptr.as_deref_mut(), items.clone())
+            .or_else(|err| match *err {
+                ERR::ErrorFunctionNotFound(sig, ..) if sig.starts_with(self.fn_name()) => {
+                    let mut items2 = FnArgsVec::with_capacity(items.len() + extras.len());
+                    items2.extend(IntoIterator::into_iter(items));
+                    items2.extend(IntoIterator::into_iter(extras));
+                    self.call_raw(&ctx, this_ptr, items2)
+                }
+                _ => Err(err),
+            })
+            .map_err(|err| {
+                Box::new(ERR::ErrorInFunctionCall(
+                    fn_name.to_string(),
+                    ctx.source().unwrap_or("").to_string(),
+                    err,
+                    Position::NONE,
+                ))
+            })
+    }
 }
 
 impl fmt::Display for FnPtr {

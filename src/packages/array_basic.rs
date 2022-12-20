@@ -26,52 +26,6 @@ def_package! {
     }
 }
 
-/// Make a call to a function pointer.
-///
-/// If the function pointer is linked to a scripted function definition, use the appropriate number
-/// of arguments to call it directly (one version attaches an extra numeric argument).
-fn make_dual_arity_fn_ptr_call<const N: usize>(
-    fn_name: &str,
-    fn_ptr: &FnPtr,
-    ctx: &NativeCallContext,
-    items: [Dynamic; N],
-    number: usize,
-) -> RhaiResult {
-    #[cfg(not(feature = "no_function"))]
-    {
-        let arity = fn_ptr.fn_def().map(|f| f.params.len()).unwrap_or(0);
-
-        if arity == N {
-            return fn_ptr.call_raw(&ctx, None, items);
-        } else if arity == N + 1 {
-            let mut items2 = crate::StaticVec::new_const();
-            items2.extend(IntoIterator::into_iter(items));
-            items2.push((number as INT).into());
-            return fn_ptr.call_raw(&ctx, None, items2);
-        }
-    }
-
-    fn_ptr
-        .call_raw(&ctx, None, items.clone())
-        .or_else(|err| match *err {
-            ERR::ErrorFunctionNotFound(sig, ..) if sig.starts_with(fn_ptr.fn_name()) => {
-                let mut items2 = crate::StaticVec::new_const();
-                items2.extend(IntoIterator::into_iter(items));
-                items2.push((number as INT).into());
-                fn_ptr.call_raw(&ctx, None, items2)
-            }
-            _ => Err(err),
-        })
-        .map_err(|err| {
-            Box::new(ERR::ErrorInFunctionCall(
-                fn_name.to_string(),
-                ctx.source().unwrap_or("").to_string(),
-                err,
-                Position::NONE,
-            ))
-        })
-}
-
 #[export_module]
 pub mod array_functions {
     /// Number of elements in the array.
@@ -698,7 +652,7 @@ pub mod array_functions {
     /// print(y);       // prints "[0, 2, 6, 12, 20]"
     /// ```
     #[rhai_fn(return_raw)]
-    pub fn map(ctx: NativeCallContext, array: Array, mapper: FnPtr) -> RhaiResultOf<Array> {
+    pub fn map(ctx: NativeCallContext, array: Array, map: FnPtr) -> RhaiResultOf<Array> {
         if array.is_empty() {
             return Ok(array);
         }
@@ -706,13 +660,9 @@ pub mod array_functions {
         let mut ar = Array::with_capacity(array.len());
 
         for (i, item) in array.into_iter().enumerate() {
-            ar.push(make_dual_arity_fn_ptr_call(
-                "map",
-                &mapper,
-                &ctx,
-                [item],
-                i,
-            )?);
+            let ex = [(i as INT).into()];
+
+            ar.push(map.call_raw_with_extra_args("map", &ctx, None, [item], ex)?);
         }
 
         Ok(ar)
@@ -748,7 +698,10 @@ pub mod array_functions {
         let mut ar = Array::new();
 
         for (i, item) in array.into_iter().enumerate() {
-            if make_dual_arity_fn_ptr_call("filter", &filter, &ctx, [item.clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if filter
+                .call_raw_with_extra_args("filter", &ctx, None, [item.clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -976,7 +929,10 @@ pub mod array_functions {
         let (start, ..) = calc_offset_len(array.len(), start, 0);
 
         for (i, item) in array.iter().enumerate().skip(start) {
-            if make_dual_arity_fn_ptr_call("index_of", &filter, &ctx, [item.clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if filter
+                .call_raw_with_extra_args("index_of", &ctx, None, [item.clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1011,7 +967,10 @@ pub mod array_functions {
         }
 
         for (i, item) in array.iter().enumerate() {
-            if make_dual_arity_fn_ptr_call("some", &filter, &ctx, [item.clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if filter
+                .call_raw_with_extra_args("some", &ctx, None, [item.clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1046,7 +1005,10 @@ pub mod array_functions {
         }
 
         for (i, item) in array.iter().enumerate() {
-            if !make_dual_arity_fn_ptr_call("all", &filter, &ctx, [item.clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if !filter
+                .call_raw_with_extra_args("all", &ctx, None, [item.clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1172,7 +1134,8 @@ pub mod array_functions {
             .iter()
             .enumerate()
             .try_fold(initial, |result, (i, item)| {
-                make_dual_arity_fn_ptr_call("reduce", &reducer, &ctx, [result, item.clone()], i)
+                let ex = [(i as INT).into()];
+                reducer.call_raw_with_extra_args("reduce", &ctx, None, [result, item.clone()], ex)
             })
     }
     /// Reduce an array by iterating through all elements, in _reverse_ order,
@@ -1239,12 +1202,14 @@ pub mod array_functions {
             .rev()
             .enumerate()
             .try_fold(initial, |result, (i, item)| {
-                make_dual_arity_fn_ptr_call(
+                let ex = [((array.len() - 1 - i) as INT).into()];
+
+                reducer.call_raw_with_extra_args(
                     "reduce_rev",
-                    &reducer,
                     &ctx,
+                    None,
                     [result, item.clone()],
-                    array.len() - 1 - i,
+                    ex,
                 )
             })
     }
@@ -1427,7 +1392,10 @@ pub mod array_functions {
         let mut x = 0;
 
         while x < array.len() {
-            if make_dual_arity_fn_ptr_call("drain", &filter, &ctx, [array[x].clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if filter
+                .call_raw_with_extra_args("drain", &ctx, None, [array[x].clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1567,7 +1535,10 @@ pub mod array_functions {
         let mut x = 0;
 
         while x < array.len() {
-            if make_dual_arity_fn_ptr_call("retain", &filter, &ctx, [array[x].clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if filter
+                .call_raw_with_extra_args("retain", &ctx, None, [array[x].clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
