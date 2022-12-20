@@ -410,7 +410,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &mut Scope,
-        this_ptr: &mut Dynamic,
+        this_ptr: Option<&mut Dynamic>,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<()> {
         if self.is_debugger_registered() {
@@ -435,7 +435,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &mut Scope,
-        this_ptr: &mut Dynamic,
+        this_ptr: Option<&mut Dynamic>,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<Option<DebuggerStatus>> {
         if self.is_debugger_registered() {
@@ -456,7 +456,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &mut Scope,
-        this_ptr: &mut Dynamic,
+        this_ptr: Option<&mut Dynamic>,
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<Option<DebuggerStatus>> {
         let node = node.into();
@@ -502,7 +502,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &mut Scope,
-        this_ptr: &mut Dynamic,
+        this_ptr: Option<&mut Dynamic>,
         node: ASTNode<'a>,
         event: DebuggerEvent,
     ) -> Result<Option<DebuggerStatus>, Box<crate::EvalAltResult>> {

@@ -2890,8 +2890,7 @@ impl Engine {
                     will_shadow,
                 };
                 let caches = &mut Caches::new();
-                let mut this_ptr = Dynamic::NULL;
-                let context = EvalContext::new(self, global, caches, stack, &mut this_ptr);
+                let context = EvalContext::new(self, global, caches, stack, None);
 
                 match filter(false, info, context) {
                     Ok(true) => (),

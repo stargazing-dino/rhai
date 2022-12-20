@@ -53,7 +53,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &'s mut Scope,
-        this_ptr: &'s mut Dynamic,
+        this_ptr: Option<&'s mut Dynamic>,
         expr: &Expr,
     ) -> RhaiResultOf<Target<'s>> {
         match expr {
@@ -132,7 +132,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &'s mut Scope,
-        this_ptr: &'s mut Dynamic,
+        this_ptr: Option<&'s mut Dynamic>,
         expr: &Expr,
     ) -> RhaiResultOf<Target<'s>> {
         // Make sure that the pointer indirection is taken only when absolutely necessary.
@@ -142,10 +142,10 @@ impl Engine {
             Expr::Variable(v, None, ..)
                 if v.0.is_none() && v.1.is_empty() && v.3 == KEYWORD_THIS =>
             {
-                return if this_ptr.is_null() {
-                    Err(ERR::ErrorUnboundThis(expr.position()).into())
-                } else {
+                return if let Some(this_ptr) = this_ptr {
                     Ok(this_ptr.into())
+                } else {
+                    Err(ERR::ErrorUnboundThis(expr.position()).into())
                 };
             }
 
@@ -223,7 +223,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &mut Scope,
-        this_ptr: &mut Dynamic,
+        mut this_ptr: Option<&mut Dynamic>,
         expr: &Expr,
     ) -> RhaiResult {
         // Coded this way for better branch prediction.
@@ -233,7 +233,8 @@ impl Engine {
         // binary operators are also function calls.
         if let Expr::FnCall(x, pos) = expr {
             #[cfg(feature = "debugging")]
-            let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
+            let reset =
+                self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
             #[cfg(feature = "debugging")]
             auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
 
@@ -247,16 +248,14 @@ impl Engine {
         // will cost more than the mis-predicted `match` branch.
         if let Expr::Variable(x, index, var_pos) = expr {
             #[cfg(feature = "debugging")]
-            self.run_debugger(global, caches, scope, this_ptr, expr)?;
+            self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
 
             self.track_operation(global, expr.position())?;
 
             return if index.is_none() && x.0.is_none() && x.3 == KEYWORD_THIS {
-                if this_ptr.is_null() {
-                    ERR::ErrorUnboundThis(*var_pos).into()
-                } else {
-                    Ok(this_ptr.clone())
-                }
+                this_ptr
+                    .ok_or_else(|| ERR::ErrorUnboundThis(*var_pos).into())
+                    .cloned()
             } else {
                 self.search_namespace(global, caches, scope, this_ptr, expr)
                     .map(Target::take_or_clone)
@@ -264,7 +263,8 @@ impl Engine {
         }
 
         #[cfg(feature = "debugging")]
-        let reset = self.run_debugger_with_reset(global, caches, scope, this_ptr, expr)?;
+        let reset =
+            self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
         #[cfg(feature = "debugging")]
         auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
 
@@ -291,7 +291,7 @@ impl Engine {
                 x.iter()
                     .try_for_each(|expr| {
                         let item = self
-                            .eval_expr(global, caches, scope, this_ptr, expr)?
+                            .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
                             .flatten();
 
                         op_info.pos = expr.start_position();
@@ -312,7 +312,13 @@ impl Engine {
                         crate::Array::with_capacity(x.len()),
                         |mut array, item_expr| {
                             let value = self
-                                .eval_expr(global, caches, scope, this_ptr, item_expr)?
+                                .eval_expr(
+                                    global,
+                                    caches,
+                                    scope,
+                                    this_ptr.as_deref_mut(),
+                                    item_expr,
+                                )?
                                 .flatten();
 
                             #[cfg(not(feature = "unchecked"))]
@@ -344,7 +350,7 @@ impl Engine {
                 x.0.iter()
                     .try_fold(x.1.clone(), |mut map, (key, value_expr)| {
                         let value = self
-                            .eval_expr(global, caches, scope, this_ptr, value_expr)?
+                            .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), value_expr)?
                             .flatten();
 
                         #[cfg(not(feature = "unchecked"))]
@@ -367,7 +373,7 @@ impl Engine {
             }
 
             Expr::And(x, ..) => Ok((self
-                .eval_expr(global, caches, scope, this_ptr, &x.lhs)?
+                .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), &x.lhs)?
                 .as_bool()
                 .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, x.lhs.position()))?
                 && self
@@ -377,7 +383,7 @@ impl Engine {
             .into()),
 
             Expr::Or(x, ..) => Ok((self
-                .eval_expr(global, caches, scope, this_ptr, &x.lhs)?
+                .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), &x.lhs)?
                 .as_bool()
                 .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, x.lhs.position()))?
                 || self
@@ -387,7 +393,8 @@ impl Engine {
             .into()),
 
             Expr::Coalesce(x, ..) => {
-                let value = self.eval_expr(global, caches, scope, this_ptr, &x.lhs)?;
+                let value =
+                    self.eval_expr(global, caches, scope, this_ptr.as_deref_mut(), &x.lhs)?;
 
                 if value.is_unit() {
                     self.eval_expr(global, caches, scope, this_ptr, &x.rhs)

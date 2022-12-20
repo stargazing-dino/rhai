@@ -17,7 +17,7 @@ pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     /// The current [`Scope`].
     scope: &'s mut Scope<'ps>,
     /// The current bound `this` pointer, if any.
-    this_ptr: &'t mut Dynamic,
+    this_ptr: Option<&'t mut Dynamic>,
 }
 
 impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
@@ -29,7 +29,7 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
         global: &'g mut GlobalRuntimeState,
         caches: &'c mut Caches,
         scope: &'s mut Scope<'ps>,
-        this_ptr: &'t mut Dynamic,
+        this_ptr: Option<&'t mut Dynamic>,
     ) -> Self {
         Self {
             engine,
@@ -118,24 +118,16 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
         &self.global.lib
     }
     /// The current bound `this` pointer, if any.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn this_ptr(&self) -> Option<&Dynamic> {
-        if self.this_ptr.is_null() {
-            None
-        } else {
-            Some(self.this_ptr)
-        }
+        self.this_ptr.as_deref()
     }
     /// Mutable reference to the current bound `this` pointer, if any.
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn this_ptr_mut(&mut self) -> Option<&mut Dynamic> {
-        if self.this_ptr.is_null() {
-            None
-        } else {
-            Some(self.this_ptr)
-        }
+        self.this_ptr.as_deref_mut()
     }
     /// The current nesting level of function calls.
     #[inline(always)]
@@ -177,19 +169,20 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
         rewind_scope: bool,
     ) -> crate::RhaiResult {
         let expr: &crate::ast::Expr = expr;
+        let this_ptr = self.this_ptr.as_deref_mut();
 
         match expr {
-            crate::ast::Expr::Stmt(statements) => self.engine.eval_stmt_block(
+            crate::ast::Expr::Stmt(stmts) => self.engine.eval_stmt_block(
                 self.global,
                 self.caches,
                 self.scope,
-                self.this_ptr,
-                statements,
+                this_ptr,
+                stmts,
                 rewind_scope,
             ),
             _ => self
                 .engine
-                .eval_expr(self.global, self.caches, self.scope, self.this_ptr, expr),
+                .eval_expr(self.global, self.caches, self.scope, this_ptr, expr),
         }
     }
 }

@@ -219,16 +219,10 @@ impl Engine {
 
         let orig_lib_len = global.lib.len();
 
-        let mut orig_tag = None;
-
-        if let Some(value) = options.tag {
-            orig_tag = Some(mem::replace(&mut global.tag, value));
-        }
+        let orig_tag = options.tag.map(|v| mem::replace(&mut global.tag, v));
+        let mut this_ptr = options.this_ptr;
 
         global.lib.push(ast.shared_lib().clone());
-
-        let mut no_this_ptr = Dynamic::NULL;
-        let this_ptr = options.this_ptr.unwrap_or(&mut no_this_ptr);
 
         #[cfg(not(feature = "no_module"))]
         let orig_embedded_module_resolver = std::mem::replace(
@@ -264,7 +258,7 @@ impl Engine {
                             global,
                             caches,
                             scope,
-                            this_ptr,
+                            this_ptr.as_deref_mut(),
                             None,
                             fn_def,
                             args,
@@ -279,7 +273,7 @@ impl Engine {
         if self.is_debugger_registered() {
             global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
-            self.run_debugger(global, caches, scope, this_ptr, node)?;
+            self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), node)?;
         }
 
         #[cfg(not(feature = "no_module"))]

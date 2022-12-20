@@ -298,19 +298,19 @@ impl FnPtr {
 
         // Linked to scripted function?
         #[cfg(not(feature = "no_function"))]
-        if let Some(fn_def) = self.fn_def() {
+        if let Some(ref fn_def) = self.fn_def {
             if fn_def.params.len() == args.len() {
                 let global = &mut context.global_runtime_state().clone();
                 global.level += 1;
 
                 let caches = &mut crate::eval::Caches::new();
-                let mut null_ptr = Dynamic::NULL;
+                let mut this_ptr = this_ptr;
 
                 return context.engine().call_script_fn(
                     global,
                     caches,
                     &mut crate::Scope::new(),
-                    this_ptr.unwrap_or(&mut null_ptr),
+                    this_ptr.as_deref_mut(),
                     self.encapsulated_environ(),
                     &fn_def,
                     args,
@@ -348,8 +348,8 @@ impl FnPtr {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn fn_def(&self) -> Option<&Shared<crate::ast::ScriptFnDef>> {
-        self.fn_def.as_ref()
+    pub(crate) fn fn_def(&self) -> Option<&crate::ast::ScriptFnDef> {
+        self.fn_def.as_deref()
     }
     /// Set a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
     #[cfg(not(feature = "no_function"))]
@@ -410,12 +410,11 @@ impl FnPtr {
         extras: [Dynamic; E],
     ) -> RhaiResult {
         #[cfg(not(feature = "no_function"))]
-        {
-            let arity = self.fn_def().map(|f| f.params.len()).unwrap_or(0);
-
+        if let Some(arity) = self.fn_def().map(|f| f.params.len()) {
             if arity == N {
                 return self.call_raw(&ctx, None, items);
-            } else if arity == N + E {
+            }
+            if arity == N + E {
                 let mut items2 = FnArgsVec::with_capacity(items.len() + extras.len());
                 items2.extend(IntoIterator::into_iter(items));
                 items2.extend(IntoIterator::into_iter(extras));
