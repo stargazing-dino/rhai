@@ -573,8 +573,8 @@ pub enum Stmt {
     Assignment(Box<(OpAssignment, BinaryExpr)>),
     /// func `(` expr `,` ... `)`
     ///
-    /// Note - this is a duplicate of [`Expr::FnCall`] to cover the very common pattern of a single
-    ///        function call forming one statement.
+    /// This is a duplicate of [`Expr::FnCall`] to cover the very common pattern of a single
+    /// function call forming one statement.
     FnCall(Box<FnCallExpr>, Position),
     /// `{` stmt`;` ... `}`
     Block(Box<StmtBlock>),

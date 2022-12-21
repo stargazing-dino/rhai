@@ -1,11 +1,12 @@
 //! The `FnPtr` type.
 
 use crate::eval::GlobalRuntimeState;
+use crate::func::EncapsulatedEnviron;
 use crate::tokenizer::is_valid_function_name;
 use crate::types::dynamic::Variant;
 use crate::{
     Dynamic, Engine, FnArgsVec, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError,
-    RhaiResult, RhaiResultOf, StaticVec, AST, ERR,
+    RhaiResult, RhaiResultOf, Shared, StaticVec, AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -13,8 +14,9 @@ use std::{
     any::{type_name, TypeId},
     convert::{TryFrom, TryInto},
     fmt,
-    hash::Hash,
+    hash::{Hash, Hasher},
     mem,
+    ops::{Index, IndexMut},
 };
 
 /// A general function pointer, which may carry additional (i.e. curried) argument values
@@ -23,22 +25,23 @@ use std::{
 pub struct FnPtr {
     name: ImmutableString,
     curry: StaticVec<Dynamic>,
+    environ: Option<Shared<EncapsulatedEnviron>>,
     #[cfg(not(feature = "no_function"))]
-    fn_def: Option<crate::Shared<crate::ast::ScriptFnDef>>,
+    fn_def: Option<Shared<crate::ast::ScriptFnDef>>,
 }
 
 impl Hash for FnPtr {
     #[inline(always)]
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         self.curry.hash(state);
 
+        // Hash the shared [`EncapsulatedEnviron`] by hashing its shared pointer.
+        self.environ.as_ref().map(|e| Shared::as_ptr(e)).hash(state);
+
         // Hash the linked [`ScriptFnDef`][crate::ast::ScriptFnDef] by hashing its shared pointer.
         #[cfg(not(feature = "no_function"))]
-        self.fn_def
-            .as_ref()
-            .map(|f| crate::Shared::as_ptr(f))
-            .hash(state);
+        self.fn_def.as_ref().map(|f| Shared::as_ptr(f)).hash(state);
     }
 }
 
@@ -75,6 +78,7 @@ impl FnPtr {
         Self {
             name: name.into(),
             curry,
+            environ: None,
             #[cfg(not(feature = "no_function"))]
             fn_def: None,
         }
@@ -100,22 +104,39 @@ impl FnPtr {
     ) -> (
         ImmutableString,
         StaticVec<Dynamic>,
-        Option<crate::Shared<crate::ast::ScriptFnDef>>,
+        Option<Shared<EncapsulatedEnviron>>,
+        Option<Shared<crate::ast::ScriptFnDef>>,
     ) {
-        (self.name, self.curry, self.fn_def)
+        (self.name, self.curry, self.environ, self.fn_def)
     }
     /// Get the underlying data of the function pointer.
     #[cfg(feature = "no_function")]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn take_data(self) -> (ImmutableString, StaticVec<Dynamic>) {
-        (self.name, self.curry)
+    pub(crate) fn take_data(
+        self,
+    ) -> (
+        ImmutableString,
+        StaticVec<Dynamic>,
+        Option<Shared<EncapsulatedEnviron>>,
+    ) {
+        (self.name, self.curry, self.environ)
     }
     /// Get the curried arguments.
     #[inline(always)]
     #[must_use]
     pub fn curry(&self) -> &[Dynamic] {
         self.curry.as_ref()
+    }
+    /// Iterate the curried arguments.
+    #[inline(always)]
+    pub fn iter_curry(&self) -> impl Iterator<Item = &Dynamic> {
+        self.curry.iter()
+    }
+    /// Mutably-iterate the curried arguments.
+    #[inline(always)]
+    pub fn iter_curry_mut(&mut self) -> impl Iterator<Item = &mut Dynamic> {
+        self.curry.iter_mut()
     }
     /// Add a new curried argument.
     #[inline(always)]
@@ -183,7 +204,7 @@ impl FnPtr {
         args: impl FuncArgs,
     ) -> RhaiResultOf<T> {
         let _ast = ast;
-        let mut arg_values = crate::StaticVec::new_const();
+        let mut arg_values = StaticVec::new_const();
         args.parse(&mut arg_values);
 
         let global = &mut GlobalRuntimeState::new(engine);
@@ -219,7 +240,7 @@ impl FnPtr {
         context: &NativeCallContext,
         args: impl FuncArgs,
     ) -> RhaiResultOf<T> {
-        let mut arg_values = crate::StaticVec::new_const();
+        let mut arg_values = StaticVec::new_const();
         args.parse(&mut arg_values);
 
         self.call_raw(context, None, arg_values).and_then(|result| {
@@ -277,19 +298,20 @@ impl FnPtr {
 
         // Linked to scripted function?
         #[cfg(not(feature = "no_function"))]
-        if let Some(fn_def) = self.fn_def() {
+        if let Some(ref fn_def) = self.fn_def {
             if fn_def.params.len() == args.len() {
                 let global = &mut context.global_runtime_state().clone();
                 global.level += 1;
 
                 let caches = &mut crate::eval::Caches::new();
-                let mut null_ptr = Dynamic::NULL;
+                let mut this_ptr = this_ptr;
 
                 return context.engine().call_script_fn(
                     global,
                     caches,
                     &mut crate::Scope::new(),
-                    this_ptr.unwrap_or(&mut null_ptr),
+                    this_ptr.as_deref_mut(),
+                    self.encapsulated_environ(),
                     &fn_def,
                     args,
                     true,
@@ -306,21 +328,118 @@ impl FnPtr {
 
         context.call_fn_raw(self.fn_name(), is_method, is_method, args)
     }
+    /// Get a reference to the [encapsulated environment][EncapsulatedEnviron].
+    #[inline(always)]
+    #[must_use]
+    #[allow(dead_code)]
+    pub(crate) fn encapsulated_environ(&self) -> Option<&EncapsulatedEnviron> {
+        self.environ.as_deref()
+    }
+    /// Set a reference to the [encapsulated environment][EncapsulatedEnviron].
+    #[inline(always)]
+    #[allow(dead_code)]
+    pub(crate) fn set_encapsulated_environ(
+        &mut self,
+        value: Option<impl Into<Shared<EncapsulatedEnviron>>>,
+    ) {
+        self.environ = value.map(Into::into);
+    }
     /// Get a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn fn_def(&self) -> Option<&crate::Shared<crate::ast::ScriptFnDef>> {
-        self.fn_def.as_ref()
+    pub(crate) fn fn_def(&self) -> Option<&crate::ast::ScriptFnDef> {
+        self.fn_def.as_deref()
     }
     /// Set a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
-    pub(crate) fn set_fn_def(
-        &mut self,
-        value: Option<impl Into<crate::Shared<crate::ast::ScriptFnDef>>>,
-    ) {
+    pub(crate) fn set_fn_def(&mut self, value: Option<impl Into<Shared<crate::ast::ScriptFnDef>>>) {
         self.fn_def = value.map(Into::into);
+    }
+
+    /// Make a call to a function pointer with either a specified number of arguments, or with extra
+    /// arguments attached.
+    ///
+    /// This is useful for calling predicate closures within an iteration loop where the extra argument
+    /// is the current element's index.
+    ///
+    /// If the function pointer is linked to a scripted function definition, use the appropriate number
+    /// of arguments to call it directly (one version attaches extra arguments).
+    #[cfg(not(feature = "internals"))]
+    #[inline(always)]
+    pub(crate) fn call_raw_with_extra_args<const N: usize, const E: usize>(
+        &self,
+        fn_name: &str,
+        ctx: &NativeCallContext,
+        this_ptr: Option<&mut Dynamic>,
+        items: [Dynamic; N],
+        extras: [Dynamic; E],
+    ) -> RhaiResult {
+        self._call_with_extra_args(fn_name, ctx, this_ptr, items, extras)
+    }
+    /// _(internals)_ Make a call to a function pointer with either a specified number of arguments,
+    /// or with extra arguments attached.
+    /// Exported under the `internals` feature only.
+    ///
+    /// This is useful for calling predicate closures within an iteration loop where the extra
+    /// argument is the current element's index.
+    ///
+    /// If the function pointer is linked to a scripted function definition, use the appropriate
+    /// number of arguments to call it directly (one version attaches extra arguments).
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    pub fn call_raw_with_extra_args<const N: usize, const E: usize>(
+        &self,
+        fn_name: &str,
+        ctx: &NativeCallContext,
+        this_ptr: Option<&mut Dynamic>,
+        items: [Dynamic; N],
+        extras: [Dynamic; E],
+    ) -> RhaiResult {
+        self._call_with_extra_args(fn_name, ctx, this_ptr, items, extras)
+    }
+    /// Make a call to a function pointer with either a specified number of arguments, or with extra
+    /// arguments attached.
+    fn _call_with_extra_args<const N: usize, const E: usize>(
+        &self,
+        fn_name: &str,
+        ctx: &NativeCallContext,
+        mut this_ptr: Option<&mut Dynamic>,
+        items: [Dynamic; N],
+        extras: [Dynamic; E],
+    ) -> RhaiResult {
+        #[cfg(not(feature = "no_function"))]
+        if let Some(arity) = self.fn_def().map(|f| f.params.len()) {
+            if arity == N {
+                return self.call_raw(&ctx, None, items);
+            }
+            if arity == N + E {
+                let mut items2 = FnArgsVec::with_capacity(items.len() + extras.len());
+                items2.extend(IntoIterator::into_iter(items));
+                items2.extend(IntoIterator::into_iter(extras));
+                return self.call_raw(&ctx, this_ptr, items2);
+            }
+        }
+
+        self.call_raw(&ctx, this_ptr.as_deref_mut(), items.clone())
+            .or_else(|err| match *err {
+                ERR::ErrorFunctionNotFound(sig, ..) if sig.starts_with(self.fn_name()) => {
+                    let mut items2 = FnArgsVec::with_capacity(items.len() + extras.len());
+                    items2.extend(IntoIterator::into_iter(items));
+                    items2.extend(IntoIterator::into_iter(extras));
+                    self.call_raw(&ctx, this_ptr, items2)
+                }
+                _ => Err(err),
+            })
+            .map_err(|err| {
+                Box::new(ERR::ErrorInFunctionCall(
+                    fn_name.to_string(),
+                    ctx.source().unwrap_or("").to_string(),
+                    err,
+                    Position::NONE,
+                ))
+            })
     }
 }
 
@@ -339,6 +458,7 @@ impl TryFrom<ImmutableString> for FnPtr {
             Ok(Self {
                 name: value,
                 curry: StaticVec::new_const(),
+                environ: None,
                 #[cfg(not(feature = "no_function"))]
                 fn_def: None,
             })
@@ -349,7 +469,7 @@ impl TryFrom<ImmutableString> for FnPtr {
 }
 
 #[cfg(not(feature = "no_function"))]
-impl<T: Into<crate::Shared<crate::ast::ScriptFnDef>>> From<T> for FnPtr {
+impl<T: Into<Shared<crate::ast::ScriptFnDef>>> From<T> for FnPtr {
     #[inline(always)]
     fn from(value: T) -> Self {
         let fn_def = value.into();
@@ -357,7 +477,24 @@ impl<T: Into<crate::Shared<crate::ast::ScriptFnDef>>> From<T> for FnPtr {
         Self {
             name: fn_def.name.clone(),
             curry: StaticVec::new_const(),
+            environ: None,
             fn_def: Some(fn_def),
         }
+    }
+}
+
+impl Index<usize> for FnPtr {
+    type Output = Dynamic;
+
+    #[inline(always)]
+    fn index(&self, index: usize) -> &Self::Output {
+        self.curry.index(index)
+    }
+}
+
+impl IndexMut<usize> for FnPtr {
+    #[inline(always)]
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.curry.index_mut(index)
     }
 }

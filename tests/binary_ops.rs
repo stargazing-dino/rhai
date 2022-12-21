@@ -30,7 +30,9 @@ fn test_binary_ops() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(engine.eval::<INT>("let x = 10; x %= 4; x")?, 2);
     assert_eq!(engine.eval::<INT>("let x = 10; x **= 4; x")?, 10000);
     assert_eq!(engine.eval::<INT>("let x = 10; x <<= 4; x")?, 160);
+    assert_eq!(engine.eval::<INT>("let x = 10; x <<= -1; x")?, 5);
     assert_eq!(engine.eval::<INT>("let x = 10; x >>= 4; x")?, 0);
+    assert_eq!(engine.eval::<INT>("let x = 10; x >>= -2; x")?, 40);
     assert_eq!(engine.eval::<INT>("let x = 10; x &= 4; x")?, 0);
     assert_eq!(engine.eval::<INT>("let x = 10; x |= 4; x")?, 14);
     assert_eq!(engine.eval::<INT>("let x = 10; x ^= 4; x")?, 14);

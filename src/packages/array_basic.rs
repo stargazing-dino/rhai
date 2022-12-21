@@ -1,5 +1,6 @@
 #![cfg(not(feature = "no_index"))]
 
+use crate::api::deprecated::deprecated_array_functions;
 use crate::engine::OP_EQUALS;
 use crate::eval::{calc_index, calc_offset_len};
 use crate::module::ModuleFlags;
@@ -18,56 +19,11 @@ def_package! {
         lib.flags |= ModuleFlags::STANDARD_LIB;
 
         combine_with_exported_module!(lib, "array", array_functions);
+        combine_with_exported_module!(lib, "deprecated_array", deprecated_array_functions);
 
         // Register array iterator
         lib.set_iterable::<Array>();
     }
-}
-
-/// Make a call to a function pointer.
-///
-/// If the function pointer is linked to a scripted function definition, use the appropriate number
-/// of arguments to call it directly (one version attaches an extra numeric argument).
-fn make_dual_arity_fn_ptr_call<const N: usize>(
-    fn_name: &str,
-    fn_ptr: &FnPtr,
-    ctx: &NativeCallContext,
-    items: [Dynamic; N],
-    number: usize,
-) -> RhaiResult {
-    #[cfg(not(feature = "no_function"))]
-    {
-        let arity = fn_ptr.fn_def().map(|f| f.params.len()).unwrap_or(0);
-
-        if arity == N {
-            return fn_ptr.call_raw(&ctx, None, items);
-        } else if arity == N + 1 {
-            let mut items2 = crate::StaticVec::new_const();
-            items2.extend(IntoIterator::into_iter(items));
-            items2.push((number as INT).into());
-            return fn_ptr.call_raw(&ctx, None, items2);
-        }
-    }
-
-    fn_ptr
-        .call_raw(&ctx, None, items.clone())
-        .or_else(|err| match *err {
-            ERR::ErrorFunctionNotFound(sig, ..) if sig.starts_with(fn_ptr.fn_name()) => {
-                let mut items2 = crate::StaticVec::new_const();
-                items2.extend(IntoIterator::into_iter(items));
-                items2.push((number as INT).into());
-                fn_ptr.call_raw(&ctx, None, items2)
-            }
-            _ => Err(err),
-        })
-        .map_err(|err| {
-            Box::new(ERR::ErrorInFunctionCall(
-                fn_name.to_string(),
-                ctx.source().unwrap_or("").to_string(),
-                err,
-                Position::NONE,
-            ))
-        })
 }
 
 #[export_module]
@@ -696,7 +652,7 @@ pub mod array_functions {
     /// print(y);       // prints "[0, 2, 6, 12, 20]"
     /// ```
     #[rhai_fn(return_raw)]
-    pub fn map(ctx: NativeCallContext, array: Array, mapper: FnPtr) -> RhaiResultOf<Array> {
+    pub fn map(ctx: NativeCallContext, array: Array, map: FnPtr) -> RhaiResultOf<Array> {
         if array.is_empty() {
             return Ok(array);
         }
@@ -704,51 +660,12 @@ pub mod array_functions {
         let mut ar = Array::with_capacity(array.len());
 
         for (i, item) in array.into_iter().enumerate() {
-            ar.push(make_dual_arity_fn_ptr_call(
-                "map",
-                &mapper,
-                &ctx,
-                [item],
-                i,
-            )?);
+            let ex = [(i as INT).into()];
+
+            ar.push(map.call_raw_with_extra_args("map", &ctx, None, [item], ex)?);
         }
 
         Ok(ar)
-    }
-    /// Iterate through all the elements in the array, applying a function named by `mapper` to each
-    /// element in turn, and return the results as a new array.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `mapper` must exist taking these parameters:
-    ///
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn square(x) { x * x }
-    ///
-    /// fn multiply(x, i) { x * i }
-    ///
-    /// let x = [1, 2, 3, 4, 5];
-    ///
-    /// let y = x.map("square");
-    ///
-    /// print(y);       // prints "[1, 4, 9, 16, 25]"
-    ///
-    /// let y = x.map("multiply");
-    ///
-    /// print(y);       // prints "[0, 2, 6, 12, 20]"
-    /// ```
-    #[rhai_fn(name = "map", return_raw)]
-    pub fn map_by_fn_name(
-        ctx: NativeCallContext,
-        array: Array,
-        mapper: &str,
-    ) -> RhaiResultOf<Array> {
-        map(ctx, array, FnPtr::new(mapper)?)
     }
 
     /// Iterate through all the elements in the array, applying a `filter` function to each element
@@ -781,7 +698,10 @@ pub mod array_functions {
         let mut ar = Array::new();
 
         for (i, item) in array.into_iter().enumerate() {
-            if make_dual_arity_fn_ptr_call("filter", &filter, &ctx, [item.clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if filter
+                .call_raw_with_extra_args("filter", &ctx, None, [item.clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -790,39 +710,6 @@ pub mod array_functions {
         }
 
         Ok(ar)
-    }
-    /// Iterate through all the elements in the array, applying a function named by `filter` to each
-    /// element in turn, and return a copy of all elements (in order) that return `true` as a new array.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `filter` must exist taking these parameters:
-    ///
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn screen(x, i) { x * i >= 10 }
-    ///
-    /// let x = [1, 2, 3, 4, 5];
-    ///
-    /// let y = x.filter("is_odd");
-    ///
-    /// print(y);       // prints "[1, 3, 5]"
-    ///
-    /// let y = x.filter("screen");
-    ///
-    /// print(y);       // prints "[12, 20]"
-    /// ```
-    #[rhai_fn(name = "filter", return_raw)]
-    pub fn filter_by_fn_name(
-        ctx: NativeCallContext,
-        array: Array,
-        filter_func: &str,
-    ) -> RhaiResultOf<Array> {
-        filter(ctx, array, FnPtr::new(filter_func)?)
     }
     /// Return `true` if the array contains an element that equals `value`.
     ///
@@ -998,38 +885,6 @@ pub mod array_functions {
             index_of_filter_starting_from(ctx, array, filter, 0)
         }
     }
-    /// Iterate through all the elements in the array, applying a function named by `filter` to each
-    /// element in turn, and return the index of the first element that returns `true`.
-    /// If no element returns `true`, `-1` is returned.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `filter` must exist taking these parameters:
-    ///
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn is_special(x) { x > 3 }
-    ///
-    /// fn is_dumb(x) { x > 8 }
-    ///
-    /// let x = [1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 5];
-    ///
-    /// print(x.index_of("is_special"));    // prints 3
-    ///
-    /// print(x.index_of("is_dumb"));       // prints -1
-    /// ```
-    #[rhai_fn(name = "index_of", return_raw, pure)]
-    pub fn index_of_by_fn_name(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        filter: &str,
-    ) -> RhaiResultOf<INT> {
-        index_of_filter(ctx, array, FnPtr::new(filter)?)
-    }
     /// Iterate through all the elements in the array, starting from a particular `start` position,
     /// applying a `filter` function to each element in turn, and return the index of the first
     /// element that returns `true`. If no element returns `true`, `-1` is returned.
@@ -1074,7 +929,10 @@ pub mod array_functions {
         let (start, ..) = calc_offset_len(array.len(), start, 0);
 
         for (i, item) in array.iter().enumerate().skip(start) {
-            if make_dual_arity_fn_ptr_call("index_of", &filter, &ctx, [item.clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if filter
+                .call_raw_with_extra_args("index_of", &ctx, None, [item.clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1084,17 +942,11 @@ pub mod array_functions {
 
         Ok(-1 as INT)
     }
-    /// Iterate through all the elements in the array, starting from a particular `start` position,
-    /// applying a function named by `filter` to each element in turn, and return the index of the
-    /// first element that returns `true`. If no element returns `true`, `-1` is returned.
-    ///
-    /// * If `start` < 0, position counts from the end of the array (`-1` is the last element).
-    /// * If `start` < -length of array, position counts from the beginning of the array.
-    /// * If `start` ≥ length of array, `-1` is returned.
+    /// Iterate through all the elements in the array, applying a `filter` function to each element
+    /// in turn, and return a copy of the first element that returns `true`. If no element returns
+    /// `true`, `()` is returned.
     ///
     /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `filter` must exist taking these parameters:
     ///
     /// * `element`: copy of array element
     /// * `index` _(optional)_: current index in the array
@@ -1102,34 +954,137 @@ pub mod array_functions {
     /// # Example
     ///
     /// ```rhai
-    /// fn plural(x) { x > 1 }
+    /// let x = [1, 2, 3, 5, 8, 13];
     ///
-    /// fn singular(x) { x < 2 }
+    /// print(x.find(|v| v > 3));                    // prints 5: 5 > 3
     ///
-    /// fn screen(x, i) { x * i > 20 }
+    /// x.find(|v| v > 13) ?? print("not found");    // prints "not found": nothing is > 13
     ///
-    /// let x = [1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 5];
-    ///
-    /// print(x.index_of("plural", 3));     // prints 5: 2 > 1
-    ///
-    /// print(x.index_of("singular", 9));   // prints -1: nothing < 2 past index 9
-    ///
-    /// print(x.index_of("plural", 15));    // prints -1: nothing found past end of array
-    ///
-    /// print(x.index_of("plural", -5));    // prints 9: -5 = start from index 8
-    ///
-    /// print(x.index_of("plural", -99));   // prints 1: -99 = start from beginning
-    ///
-    /// print(x.index_of("screen", 8));     // prints 10: 3 * 10 > 20
+    /// print(x.find(|v, i| v * i > 13));            // prints 5: 3 * 5 > 13
     /// ```
-    #[rhai_fn(name = "index_of", return_raw, pure)]
-    pub fn index_of_by_fn_name_starting_from(
+    #[rhai_fn(return_raw, pure)]
+    pub fn find(ctx: NativeCallContext, array: &mut Array, filter: FnPtr) -> RhaiResult {
+        find_starting_from(ctx, array, filter, 0)
+    }
+    /// Iterate through all the elements in the array, starting from a particular `start` position,
+    /// applying a `filter` function to each element in turn, and return a copy of the first element
+    /// that returns `true`. If no element returns `true`, `()` is returned.
+    ///
+    /// * If `start` < 0, position counts from the end of the array (`-1` is the last element).
+    /// * If `start` < -length of array, position counts from the beginning of the array.
+    /// * If `start` ≥ length of array, `-1` is returned.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `element`: copy of array element
+    /// * `index` _(optional)_: current index in the array
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = [1, 2, 3, 5, 8, 13];
+    ///
+    /// print(x.find(|v| v > 1, 2));                     // prints 3: 3 > 1
+    ///
+    /// x.find(|v| v < 2, 3) ?? print("not found");      // prints "not found": nothing < 2 past index 3
+    ///
+    /// x.find(|v| v > 1, 8) ?? print("not found");      // prints "not found": nothing found past end of array
+    ///
+    /// print(x.find(|v| v > 1, -3));                    // prints 5: -3 = start from index 4
+    ///
+    /// print(x.find(|v| v > 0, -99));                   // prints 1: -99 = start from beginning
+    ///
+    /// print(x.find(|v, i| v * i > 6, 3));              // prints 5: 5 * 4 > 6
+    /// ```
+    #[rhai_fn(name = "find", return_raw, pure)]
+    pub fn find_starting_from(
         ctx: NativeCallContext,
         array: &mut Array,
-        filter: &str,
+        filter: FnPtr,
         start: INT,
-    ) -> RhaiResultOf<INT> {
-        index_of_filter_starting_from(ctx, array, FnPtr::new(filter)?, start)
+    ) -> RhaiResult {
+        let index = index_of_filter_starting_from(ctx, array, filter, start)?;
+
+        if index < 0 {
+            return Ok(Dynamic::UNIT);
+        }
+
+        Ok(get(array, index))
+    }
+    /// Iterate through all the elements in the array, applying a `mapper` function to each element
+    /// in turn, and return the first result that is not `()`. Otherwise, `()` is returned.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `element`: copy of array element
+    /// * `index` _(optional)_: current index in the array
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = [#{alice: 1}, #{bob: 2}, #{clara: 3}];
+    ///
+    /// print(x.find_map(|v| v.alice));                  // prints 1
+    ///
+    /// x.find_map(|v| v.dave) ?? print("not found");    // prints "not found"
+    /// ```
+    #[rhai_fn(return_raw, pure)]
+    pub fn find_map(ctx: NativeCallContext, array: &mut Array, filter: FnPtr) -> RhaiResult {
+        find_map_starting_from(ctx, array, filter, 0)
+    }
+    /// Iterate through all the elements in the array, starting from a particular `start` position,
+    /// applying a `mapper` function to each element in turn, and return the first result that is not `()`.
+    /// Otherwise, `()` is returned.
+    ///
+    /// * If `start` < 0, position counts from the end of the array (`-1` is the last element).
+    /// * If `start` < -length of array, position counts from the beginning of the array.
+    /// * If `start` ≥ length of array, `-1` is returned.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `element`: copy of array element
+    /// * `index` _(optional)_: current index in the array
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = [#{alice: 1}, #{bob: 2}, #{bob: 3}, #{clara: 3}, #{alice: 0}, #{clara: 5}];
+    ///
+    /// print(x.find_map(|v| v.alice, 2));                   // prints 0
+    ///
+    /// x.find_map(|v| v.bob, 4) ?? print("not found");      // prints "not found"
+    ///
+    /// x.find_map(|v| v.alice, 8) ?? print("not found");    // prints "not found"
+    ///
+    /// print(x.find_map(|v| v.bob, -4));                    // prints 3: -4 = start from index 2
+    ///
+    /// print(x.find_map(|v| v.alice, -99));                 // prints 1: -99 = start from beginning
+    /// ```
+    #[rhai_fn(name = "find_map", return_raw, pure)]
+    pub fn find_map_starting_from(
+        ctx: NativeCallContext,
+        array: &mut Array,
+        filter: FnPtr,
+        start: INT,
+    ) -> RhaiResult {
+        if array.is_empty() {
+            return Ok(Dynamic::UNIT);
+        }
+
+        let (start, ..) = calc_offset_len(array.len(), start, 0);
+
+        for (i, item) in array.iter().enumerate().skip(start) {
+            let ex = [(i as INT).into()];
+
+            let value =
+                filter.call_raw_with_extra_args("find_map", &ctx, None, [item.clone()], ex)?;
+
+            if !value.is_unit() {
+                return Ok(value);
+            }
+        }
+
+        Ok(Dynamic::UNIT)
     }
     /// Return `true` if any element in the array that returns `true` when applied the `filter` function.
     ///
@@ -1156,7 +1111,10 @@ pub mod array_functions {
         }
 
         for (i, item) in array.iter().enumerate() {
-            if make_dual_arity_fn_ptr_call("some", &filter, &ctx, [item.clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if filter
+                .call_raw_with_extra_args("some", &ctx, None, [item.clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1165,41 +1123,6 @@ pub mod array_functions {
         }
 
         Ok(false)
-    }
-    /// Return `true` if any element in the array that returns `true` when applied a function named
-    /// by `filter`.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `filter` must exist taking these parameters:
-    ///
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn large(x) { x > 3 }
-    ///
-    /// fn huge(x) { x > 10 }
-    ///
-    /// fn screen(x, i) { i > x }
-    ///
-    /// let x = [1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 5];
-    ///
-    /// print(x.some("large"));     // prints true
-    ///
-    /// print(x.some("huge"));      // prints false
-    ///
-    /// print(x.some("screen"));    // prints true
-    /// ```
-    #[rhai_fn(name = "some", return_raw, pure)]
-    pub fn some_by_fn_name(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        filter: &str,
-    ) -> RhaiResultOf<bool> {
-        some(ctx, array, FnPtr::new(filter)?)
     }
     /// Return `true` if all elements in the array return `true` when applied the `filter` function.
     ///
@@ -1226,7 +1149,10 @@ pub mod array_functions {
         }
 
         for (i, item) in array.iter().enumerate() {
-            if !make_dual_arity_fn_ptr_call("all", &filter, &ctx, [item.clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if !filter
+                .call_raw_with_extra_args("all", &ctx, None, [item.clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1235,34 +1161,6 @@ pub mod array_functions {
         }
 
         Ok(true)
-    }
-    /// Return `true` if all elements in the array return `true` when applied a function named by `filter`.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `filter` must exist taking these parameters:
-    ///
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// let x = [1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 5];
-    ///
-    /// print(x.all(|v| v > 3));        // prints false
-    ///
-    /// print(x.all(|v| v > 1));        // prints true
-    ///
-    /// print(x.all(|v, i| i > v));     // prints false
-    /// ```
-    #[rhai_fn(name = "all", return_raw, pure)]
-    pub fn all_by_fn_name(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        filter: &str,
-    ) -> RhaiResultOf<bool> {
-        all(ctx, array, FnPtr::new(filter)?)
     }
     /// Remove duplicated _consecutive_ elements from the array.
     ///
@@ -1319,39 +1217,6 @@ pub mod array_functions {
                 .unwrap_or(false)
         });
     }
-    /// Remove duplicated _consecutive_ elements from the array that return `true` when applied a
-    /// function named by `comparer`.
-    ///
-    /// No element is removed if the correct `comparer` function does not exist.
-    ///
-    /// # Function Parameters
-    ///
-    /// * `element1`: copy of the current array element to compare
-    /// * `element2`: copy of the next array element to compare
-    ///
-    /// ## Return Value
-    ///
-    /// `true` if `element1 == element2`, otherwise `false`.
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn declining(a, b) { a >= b }
-    ///
-    /// let x = [1, 2, 2, 2, 3, 1, 2, 3, 4, 3, 3, 2, 1];
-    ///
-    /// x.dedup("declining");
-    ///
-    /// print(x);       // prints "[1, 2, 3, 4]"
-    /// ```
-    #[rhai_fn(name = "dedup", return_raw)]
-    pub fn dedup_by_fn_name(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        comparer: &str,
-    ) -> RhaiResultOf<()> {
-        Ok(dedup_by_comparer(ctx, array, FnPtr::new(comparer)?))
-    }
     /// Reduce an array by iterating through all elements while applying the `reducer` function.
     ///
     /// # Function Parameters
@@ -1376,44 +1241,6 @@ pub mod array_functions {
     #[rhai_fn(return_raw, pure)]
     pub fn reduce(ctx: NativeCallContext, array: &mut Array, reducer: FnPtr) -> RhaiResult {
         reduce_with_initial(ctx, array, reducer, Dynamic::UNIT)
-    }
-    /// Reduce an array by iterating through all elements while applying a function named by `reducer`.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `reducer` must exist taking these parameters:
-    ///
-    /// * `result`: accumulated result, initially `()`
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn process(r, x) {
-    ///     x + (r ?? 0)
-    /// }
-    /// fn process_extra(r, x, i) {
-    ///     x + i + (r ?? 0)
-    /// }
-    ///
-    /// let x = [1, 2, 3, 4, 5];
-    ///
-    /// let y = x.reduce("process");
-    ///
-    /// print(y);       // prints 15
-    ///
-    /// let y = x.reduce("process_extra");
-    ///
-    /// print(y);       // prints 25
-    /// ```
-    #[rhai_fn(name = "reduce", return_raw, pure)]
-    pub fn reduce_by_fn_name(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        reducer: &str,
-    ) -> RhaiResult {
-        reduce(ctx, array, FnPtr::new(reducer)?)
     }
     /// Reduce an array by iterating through all elements while applying the `reducer` function.
     ///
@@ -1451,44 +1278,9 @@ pub mod array_functions {
             .iter()
             .enumerate()
             .try_fold(initial, |result, (i, item)| {
-                make_dual_arity_fn_ptr_call("reduce", &reducer, &ctx, [result, item.clone()], i)
+                let ex = [(i as INT).into()];
+                reducer.call_raw_with_extra_args("reduce", &ctx, None, [result, item.clone()], ex)
             })
-    }
-    /// Reduce an array by iterating through all elements while applying a function named by `reducer`.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `reducer` must exist taking these parameters:
-    ///
-    /// * `result`: accumulated result, starting with the value of `initial`
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn process(r, x) { x + r }
-    ///
-    /// fn process_extra(r, x, i) { x + i + r }
-    ///
-    /// let x = [1, 2, 3, 4, 5];
-    ///
-    /// let y = x.reduce("process", 5);
-    ///
-    /// print(y);       // prints 20
-    ///
-    /// let y = x.reduce("process_extra", 5);
-    ///
-    /// print(y);       // prints 30
-    /// ```
-    #[rhai_fn(name = "reduce", return_raw, pure)]
-    pub fn reduce_by_fn_name_with_initial(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        reducer: &str,
-        initial: Dynamic,
-    ) -> RhaiResult {
-        reduce_with_initial(ctx, array, FnPtr::new(reducer)?, initial)
     }
     /// Reduce an array by iterating through all elements, in _reverse_ order,
     /// while applying the `reducer` function.
@@ -1515,45 +1307,6 @@ pub mod array_functions {
     #[rhai_fn(return_raw, pure)]
     pub fn reduce_rev(ctx: NativeCallContext, array: &mut Array, reducer: FnPtr) -> RhaiResult {
         reduce_rev_with_initial(ctx, array, reducer, Dynamic::UNIT)
-    }
-    /// Reduce an array by iterating through all elements, in _reverse_ order,
-    /// while applying a function named by `reducer`.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `reducer` must exist taking these parameters:
-    ///
-    /// * `result`: accumulated result, initially `()`
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn process(r, x) {
-    ///     x + (r ?? 0)
-    /// }
-    /// fn process_extra(r, x, i) {
-    ///     x + i + (r ?? 0)
-    /// }
-    ///
-    /// let x = [1, 2, 3, 4, 5];
-    ///
-    /// let y = x.reduce_rev("process");
-    ///
-    /// print(y);       // prints 15
-    ///
-    /// let y = x.reduce_rev("process_extra");
-    ///
-    /// print(y);       // prints 25
-    /// ```
-    #[rhai_fn(name = "reduce_rev", return_raw, pure)]
-    pub fn reduce_rev_by_fn_name(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        reducer: &str,
-    ) -> RhaiResult {
-        reduce_rev(ctx, array, FnPtr::new(reducer)?)
     }
     /// Reduce an array by iterating through all elements, in _reverse_ order,
     /// while applying the `reducer` function.
@@ -1593,51 +1346,16 @@ pub mod array_functions {
             .rev()
             .enumerate()
             .try_fold(initial, |result, (i, item)| {
-                make_dual_arity_fn_ptr_call(
+                let ex = [((array.len() - 1 - i) as INT).into()];
+
+                reducer.call_raw_with_extra_args(
                     "reduce_rev",
-                    &reducer,
                     &ctx,
+                    None,
                     [result, item.clone()],
-                    array.len() - 1 - i,
+                    ex,
                 )
             })
-    }
-    /// Reduce an array by iterating through all elements, in _reverse_ order,
-    /// while applying a function named by `reducer`.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `reducer` must exist taking these parameters:
-    ///
-    /// * `result`: accumulated result, starting with the value of `initial`
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn process(r, x) { x + r }
-    ///
-    /// fn process_extra(r, x, i) { x + i + r }
-    ///
-    /// let x = [1, 2, 3, 4, 5];
-    ///
-    /// let y = x.reduce_rev("process", 5);
-    ///
-    /// print(y);       // prints 20
-    ///
-    /// let y = x.reduce_rev("process_extra", 5);
-    ///
-    /// print(y);       // prints 30
-    /// ```
-    #[rhai_fn(name = "reduce_rev", return_raw, pure)]
-    pub fn reduce_rev_by_fn_name_with_initial(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        reducer: &str,
-        initial: Dynamic,
-    ) -> RhaiResult {
-        reduce_rev_with_initial(ctx, array, FnPtr::new(reducer)?, initial)
     }
     /// Sort the array based on applying the `comparer` function.
     ///
@@ -1685,47 +1403,6 @@ pub mod array_functions {
         });
 
         Ok(())
-    }
-    /// Sort the array based on applying a function named by `comparer`.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `comparer` must exist taking these parameters:
-    ///
-    /// * `element1`: copy of the current array element to compare
-    /// * `element2`: copy of the next array element to compare
-    ///
-    /// ## Return Value
-    ///
-    /// * Any integer > 0 if `element1 > element2`
-    /// * Zero if `element1 == element2`
-    /// * Any integer < 0 if `element1 < element2`
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn reverse(a, b) {
-    ///     if a > b {
-    ///         -1
-    ///     } else if a < b {
-    ///         1
-    ///     } else {
-    ///         0
-    ///     }
-    /// }
-    /// let x = [1, 3, 5, 7, 9, 2, 4, 6, 8, 10];
-    ///
-    /// x.sort("reverse");
-    ///
-    /// print(x);       // prints "[10, 9, 8, 7, 6, 5, 4, 3, 2, 1]"
-    /// ```
-    #[rhai_fn(name = "sort", return_raw)]
-    pub fn sort_by_fn_name(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        comparer: &str,
-    ) -> RhaiResultOf<()> {
-        sort(ctx, array, FnPtr::new(comparer)?)
     }
     /// Sort the array.
     ///
@@ -1859,7 +1536,10 @@ pub mod array_functions {
         let mut x = 0;
 
         while x < array.len() {
-            if make_dual_arity_fn_ptr_call("drain", &filter, &ctx, [array[x].clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if filter
+                .call_raw_with_extra_args("drain", &ctx, None, [array[x].clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1872,45 +1552,6 @@ pub mod array_functions {
         }
 
         Ok(drained)
-    }
-    /// Remove all elements in the array that returns `true` when applied a function named by `filter`
-    /// and return them as a new array.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `filter` must exist taking these parameters:
-    ///
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn small(x) { x < 3 }
-    ///
-    /// fn screen(x, i) { x + i > 5 }
-    ///
-    /// let x = [1, 2, 3, 4, 5];
-    ///
-    /// let y = x.drain("small");
-    ///
-    /// print(x);       // prints "[3, 4, 5]"
-    ///
-    /// print(y);       // prints "[1, 2]"
-    ///
-    /// let z = x.drain("screen");
-    ///
-    /// print(x);       // prints "[3, 4]"
-    ///
-    /// print(z);       // prints "[5]"
-    /// ```
-    #[rhai_fn(name = "drain", return_raw)]
-    pub fn drain_by_fn_name(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        filter: &str,
-    ) -> RhaiResultOf<Array> {
-        drain(ctx, array, FnPtr::new(filter)?)
     }
     /// Remove all elements in the array within an exclusive `range` and return them as a new array.
     ///
@@ -2038,7 +1679,10 @@ pub mod array_functions {
         let mut x = 0;
 
         while x < array.len() {
-            if make_dual_arity_fn_ptr_call("retain", &filter, &ctx, [array[x].clone()], i)?
+            let ex = [(i as INT).into()];
+
+            if filter
+                .call_raw_with_extra_args("retain", &ctx, None, [array[x].clone()], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -2051,45 +1695,6 @@ pub mod array_functions {
         }
 
         Ok(drained)
-    }
-    /// Remove all elements in the array that do not return `true` when applied a function named by
-    /// `filter` and return them as a new array.
-    ///
-    /// # Function Parameters
-    ///
-    /// A function with the same name as the value of `filter` must exist taking these parameters:
-    ///
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// fn large(x) { x >= 3 }
-    ///
-    /// fn screen(x, i) { x + i <= 5 }
-    ///
-    /// let x = [1, 2, 3, 4, 5];
-    ///
-    /// let y = x.retain("large");
-    ///
-    /// print(x);       // prints "[3, 4, 5]"
-    ///
-    /// print(y);       // prints "[1, 2]"
-    ///
-    /// let z = x.retain("screen");
-    ///
-    /// print(x);       // prints "[3, 4]"
-    ///
-    /// print(z);       // prints "[5]"
-    /// ```
-    #[rhai_fn(name = "retain", return_raw)]
-    pub fn retain_by_fn_name(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        filter: &str,
-    ) -> RhaiResultOf<Array> {
-        retain(ctx, array, FnPtr::new(filter)?)
     }
     /// Remove all elements in the array not within an exclusive `range` and return them as a new array.
     ///
@@ -2256,147 +1861,5 @@ pub mod array_functions {
         array2: Array,
     ) -> RhaiResultOf<bool> {
         equals(ctx, array1, array2).map(|r| !r)
-    }
-    /// Iterate through all the elements in the array, applying a `filter` function to each element
-    /// in turn, and return a copy of the first element that returns `true`.
-    /// If no element returns `true`, `()` is returned.
-    ///
-    /// # Function Parameters
-    ///
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// let x = [1, 2, 3, 5, 8, 13];
-    ///
-    /// print(x.find(|v| v > 3));                    // prints 5: 5 > 3
-    ///
-    /// x.find(|v| v > 13) ?? print("not found");    // prints "not found": nothing is > 13
-    ///
-    /// print(x.find(|v, i| v * i > 13));            // prints 5: 3 * 5 > 13
-    /// ```
-    #[rhai_fn(return_raw, pure)]
-    pub fn find(ctx: NativeCallContext, array: &mut Array, filter: FnPtr) -> RhaiResult {
-        find_starting_from(ctx, array, filter, 0)
-    }
-    /// Iterate through all the elements in the array, starting from a particular `start` position,
-    /// applying a `filter` function to each element in turn, and return a copy of the first
-    /// element that returns `true`. If no element returns `true`, `()` is returned.
-    ///
-    /// * If `start` < 0, position counts from the end of the array (`-1` is the last element).
-    /// * If `start` < -length of array, position counts from the beginning of the array.
-    /// * If `start` ≥ length of array, `-1` is returned.
-    ///
-    /// # Function Parameters
-    ///
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// let x = [1, 2, 3, 5, 8, 13];
-    ///
-    /// print(x.find(|v| v > 1, 2));                     // prints 3: 3 > 1
-    ///
-    /// x.find(|v| v < 2, 3) ?? print("not found");      // prints "not found": nothing < 2 past index 3
-    ///
-    /// x.find(|v| v > 1, 8) ?? print("not found");      // prints "not found": nothing found past end of array
-    ///
-    /// print(x.find(|v| v > 1, -3));                    // prints 5: -3 = start from index 4
-    ///
-    /// print(x.find(|v| v > 0, -99));                   // prints 1: -99 = start from beginning
-    ///
-    /// print(x.find(|v, i| v * i > 6, 3));              // prints 5: 5 * 4 > 6
-    /// ```
-    #[rhai_fn(name = "find", return_raw, pure)]
-    pub fn find_starting_from(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        filter: FnPtr,
-        start: INT,
-    ) -> RhaiResult {
-        let index = index_of_filter_starting_from(ctx, array, filter, start)?;
-
-        if index < 0 {
-            return Ok(Dynamic::UNIT);
-        }
-
-        Ok(get(array, index))
-    }
-    /// Iterate through all the elements in the array, applying a `mapper` function to each element
-    /// in turn, and return the first result that is not `()`.
-    /// If no result is not `()`, `()` is returned.
-    ///
-    /// # Function Parameters
-    ///
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// let x = [#{alice: 1}, #{bob: 2}, #{clara: 3}];
-    ///
-    /// print(x.find_map(|v| v.alice));                  // prints 1
-    ///
-    /// x.find_map(|v| v.dave) ?? print("not found");    // prints "not found"
-    /// ```
-    #[rhai_fn(return_raw, pure)]
-    pub fn find_map(ctx: NativeCallContext, array: &mut Array, filter: FnPtr) -> RhaiResult {
-        find_map_starting_from(ctx, array, filter, 0)
-    }
-    /// Iterate through all the elements in the array, starting from a particular `start` position,
-    /// applying a `mapper` function to each element in turn, and return the first result that is not `()`.
-    /// If no result is not `()`, `()` is returned.
-    ///
-    /// * If `start` < 0, position counts from the end of the array (`-1` is the last element).
-    /// * If `start` < -length of array, position counts from the beginning of the array.
-    /// * If `start` ≥ length of array, `-1` is returned.
-    ///
-    /// # Function Parameters
-    ///
-    /// * `element`: copy of array element
-    /// * `index` _(optional)_: current index in the array
-    ///
-    /// # Example
-    ///
-    /// ```rhai
-    /// let x = [#{alice: 1}, #{bob: 2}, #{bob: 3}, #{clara: 3}, #{alice: 0}, #{clara: 5}];
-    ///
-    /// print(x.find_map(|v| v.alice, 2));                   // prints 0
-    ///
-    /// x.find_map(|v| v.bob, 4) ?? print("not found");      // prints "not found"
-    ///
-    /// x.find_map(|v| v.alice, 8) ?? print("not found");    // prints "not found"
-    ///
-    /// print(x.find_map(|v| v.bob, -4));                    // prints 3: -4 = start from index 2
-    ///
-    /// print(x.find_map(|v| v.alice, -99));                 // prints 1: -99 = start from beginning
-    /// ```
-    #[rhai_fn(name = "find_map", return_raw, pure)]
-    pub fn find_map_starting_from(
-        ctx: NativeCallContext,
-        array: &mut Array,
-        filter: FnPtr,
-        start: INT,
-    ) -> RhaiResult {
-        if array.is_empty() {
-            return Ok(Dynamic::UNIT);
-        }
-
-        let (start, ..) = calc_offset_len(array.len(), start, 0);
-
-        for (i, item) in array.iter().enumerate().skip(start) {
-            let value = make_dual_arity_fn_ptr_call("find_map", &filter, &ctx, [item.clone()], i)?;
-
-            if !value.is_unit() {
-                return Ok(value);
-            }
-        }
-
-        Ok(Dynamic::UNIT)
     }
 }

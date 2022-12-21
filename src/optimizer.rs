@@ -54,7 +54,7 @@ struct OptimizerState<'a> {
     /// Has the [`AST`] been changed during this pass?
     changed: bool,
     /// Collection of constants to use for eager function evaluations.
-    variables: StaticVec<(Identifier, AccessMode, Dynamic)>,
+    variables: StaticVec<(Identifier, AccessMode, Option<Dynamic>)>,
     /// Activate constants propagation?
     propagate_constants: bool,
     /// An [`Engine`] instance for eager function evaluation.
@@ -115,7 +115,12 @@ impl<'a> OptimizerState<'a> {
     }
     /// Add a new variable to the list.
     #[inline(always)]
-    pub fn push_var(&mut self, name: impl Into<Identifier>, access: AccessMode, value: Dynamic) {
+    pub fn push_var(
+        &mut self,
+        name: impl Into<Identifier>,
+        access: AccessMode,
+        value: Option<Dynamic>,
+    ) {
         self.variables.push((name.into(), access, value));
     }
     /// Look up a constant from the list.
@@ -129,8 +134,7 @@ impl<'a> OptimizerState<'a> {
             if n == name {
                 return match access {
                     AccessMode::ReadWrite => None,
-                    AccessMode::ReadOnly if value.is_null() => None,
-                    AccessMode::ReadOnly => Some(value),
+                    AccessMode::ReadOnly => value.as_ref(),
                 };
             }
         }
@@ -144,7 +148,7 @@ impl<'a> OptimizerState<'a> {
         fn_name: &str,
         op_token: Token,
         arg_values: &mut [Dynamic],
-    ) -> Dynamic {
+    ) -> Option<Dynamic> {
         self.engine
             .exec_native_fn_call(
                 &mut self.global,
@@ -156,7 +160,8 @@ impl<'a> OptimizerState<'a> {
                 false,
                 Position::NONE,
             )
-            .map_or(Dynamic::NULL, |(v, ..)| v)
+            .ok()
+            .map(|(v, ..)| v)
     }
 }
 
@@ -234,13 +239,13 @@ fn optimize_stmt_block(
                             state.push_var(
                                 x.0.as_str(),
                                 AccessMode::ReadOnly,
-                                x.1.get_literal_value().unwrap_or(Dynamic::NULL),
+                                x.1.get_literal_value(),
                             );
                         }
                     } else {
                         // Add variables into the state
                         optimize_expr(&mut x.1, state, false);
-                        state.push_var(x.0.as_str(), AccessMode::ReadWrite, Dynamic::NULL);
+                        state.push_var(x.0.as_str(), AccessMode::ReadWrite, None);
                     }
                 }
                 // Optimize the statement
@@ -1190,15 +1195,15 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 let arg_values = &mut x.args.iter().map(Expr::get_literal_value).collect::<Option<StaticVec<_>>>().unwrap();
 
                 let result = match x.name.as_str() {
-                    KEYWORD_TYPE_OF if arg_values.len() == 1 => state.engine.map_type_name(arg_values[0].type_name()).into(),
+                    KEYWORD_TYPE_OF if arg_values.len() == 1 => Some(state.engine.map_type_name(arg_values[0].type_name()).into()),
                     #[cfg(not(feature = "no_closure"))]
-                    crate::engine::KEYWORD_IS_SHARED if arg_values.len() == 1 => Dynamic::FALSE,
+                    crate::engine::KEYWORD_IS_SHARED if arg_values.len() == 1 => Some(Dynamic::FALSE),
                     _ => state.call_fn_with_constant_arguments(&x.name, x.op_token.clone(), arg_values)
                 };
 
-                if !result.is_null() {
+                if let Some(r) = result {
                     state.set_dirty();
-                    *expr = Expr::from_dynamic(result, *pos);
+                    *expr = Expr::from_dynamic(r, *pos);
                     return;
                 }
             }
@@ -1303,15 +1308,15 @@ impl Engine {
 
         // Add constants from global modules
         for (name, value) in self.global_modules.iter().rev().flat_map(|m| m.iter_var()) {
-            state.push_var(name, AccessMode::ReadOnly, value.clone());
+            state.push_var(name, AccessMode::ReadOnly, Some(value.clone()));
         }
 
         // Add constants and variables from the scope
         for (name, constant, value) in scope.iter() {
             if constant {
-                state.push_var(name, AccessMode::ReadOnly, value);
+                state.push_var(name, AccessMode::ReadOnly, Some(value));
             } else {
-                state.push_var(name, AccessMode::ReadWrite, Dynamic::NULL);
+                state.push_var(name, AccessMode::ReadWrite, None);
             }
         }
 
@@ -1344,8 +1349,6 @@ impl Engine {
                         access: fn_def.access,
                         body: crate::ast::StmtBlock::NONE,
                         params: fn_def.params.clone(),
-                        #[cfg(not(feature = "no_module"))]
-                        environ: None,
                         #[cfg(not(feature = "no_function"))]
                         #[cfg(feature = "metadata")]
                         comments: Box::default(),

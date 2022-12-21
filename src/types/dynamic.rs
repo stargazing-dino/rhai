@@ -57,9 +57,6 @@ pub struct Dynamic(pub(crate) Union);
 /// Most variants are boxed to reduce the size.
 #[must_use]
 pub enum Union {
-    /// An error value which should not exist.
-    Null,
-
     /// The Unit value - ().
     Unit((), Tag, AccessMode),
     /// A boolean value.
@@ -187,8 +184,6 @@ impl Dynamic {
     #[must_use]
     pub const fn tag(&self) -> Tag {
         match self.0 {
-            Union::Null => unreachable!(),
-
             Union::Unit(_, tag, _)
             | Union::Bool(_, tag, _)
             | Union::Str(_, tag, _)
@@ -214,8 +209,6 @@ impl Dynamic {
     /// Attach arbitrary data to this [`Dynamic`].
     pub fn set_tag(&mut self, value: Tag) -> &mut Self {
         match self.0 {
-            Union::Null => unreachable!(),
-
             Union::Unit(_, ref mut tag, _)
             | Union::Bool(_, ref mut tag, _)
             | Union::Str(_, ref mut tag, _)
@@ -238,12 +231,6 @@ impl Dynamic {
             Union::Shared(_, ref mut tag, _) => *tag = value,
         }
         self
-    }
-    /// Is this [`Dynamic`] null?
-    #[inline(always)]
-    #[must_use]
-    pub(crate) const fn is_null(&self) -> bool {
-        matches!(self.0, Union::Null)
     }
     /// Does this [`Dynamic`] hold a variant data type instead of one of the supported system
     /// primitive types?
@@ -334,8 +321,6 @@ impl Dynamic {
     #[must_use]
     pub fn type_id(&self) -> TypeId {
         match self.0 {
-            Union::Null => unreachable!(),
-
             Union::Unit(..) => TypeId::of::<()>(),
             Union::Bool(..) => TypeId::of::<bool>(),
             Union::Str(..) => TypeId::of::<ImmutableString>(),
@@ -370,8 +355,6 @@ impl Dynamic {
     #[must_use]
     pub fn type_name(&self) -> &'static str {
         match self.0 {
-            Union::Null => unreachable!(),
-
             Union::Unit(..) => "()",
             Union::Bool(..) => "bool",
             Union::Str(..) => "string",
@@ -416,8 +399,6 @@ impl Hash for Dynamic {
         mem::discriminant(&self.0).hash(state);
 
         match self.0 {
-            Union::Null => unreachable!(),
-
             Union::Unit(..) => (),
             Union::Bool(ref b, ..) => b.hash(state),
             Union::Str(ref s, ..) => s.hash(state),
@@ -449,8 +430,6 @@ impl Hash for Dynamic {
 impl fmt::Display for Dynamic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
-            Union::Null => unreachable!(),
-
             Union::Unit(..) => Ok(()),
             Union::Bool(ref v, ..) => fmt::Display::fmt(v, f),
             Union::Str(ref v, ..) => fmt::Display::fmt(v, f),
@@ -544,8 +523,6 @@ impl fmt::Debug for Dynamic {
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
-            Union::Null => unreachable!(),
-
             Union::Unit(ref v, ..) => fmt::Debug::fmt(v, f),
             Union::Bool(ref v, ..) => fmt::Debug::fmt(v, f),
             Union::Str(ref v, ..) => fmt::Debug::fmt(v, f),
@@ -657,8 +634,6 @@ impl Clone for Dynamic {
     /// The cloned copy is marked read-write even if the original is read-only.
     fn clone(&self) -> Self {
         match self.0 {
-            Union::Null => unreachable!(),
-
             Union::Unit(v, tag, ..) => Self(Union::Unit(v, tag, ReadWrite)),
             Union::Bool(v, tag, ..) => Self(Union::Bool(v, tag, ReadWrite)),
             Union::Str(ref v, tag, ..) => Self(Union::Str(v.clone(), tag, ReadWrite)),
@@ -705,9 +680,6 @@ use std::f32::consts as FloatConstants;
 use std::f64::consts as FloatConstants;
 
 impl Dynamic {
-    /// A [`Dynamic`] containing a `null`.
-    pub(crate) const NULL: Self = Self(Union::Null);
-
     /// A [`Dynamic`] containing a `()`.
     pub const UNIT: Self = Self(Union::Unit((), DEFAULT_TAG_VALUE, ReadWrite));
     /// A [`Dynamic`] containing a `true`.
@@ -921,8 +893,6 @@ impl Dynamic {
     #[must_use]
     pub(crate) const fn access_mode(&self) -> AccessMode {
         match self.0 {
-            Union::Null => unreachable!(),
-
             Union::Unit(.., access)
             | Union::Bool(.., access)
             | Union::Str(.., access)
@@ -948,8 +918,6 @@ impl Dynamic {
     /// Set the [`AccessMode`] for this [`Dynamic`].
     pub(crate) fn set_access_mode(&mut self, typ: AccessMode) -> &mut Self {
         match self.0 {
-            Union::Null => unreachable!(),
-
             Union::Unit(.., ref mut access)
             | Union::Bool(.., ref mut access)
             | Union::Str(.., ref mut access)
@@ -1138,7 +1106,6 @@ impl Dynamic {
         let _access = self.access_mode();
 
         match self.0 {
-            Union::Null => unreachable!(),
             Union::Shared(..) => self,
             _ => Self(Union::Shared(
                 crate::Locked::new(self).into(),
@@ -1584,7 +1551,6 @@ impl Dynamic {
         }
 
         match self.0 {
-            Union::Null => unreachable!(),
             Union::Variant(ref v, ..) => (***v).as_any().downcast_ref::<T>(),
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => None,
@@ -1683,7 +1649,6 @@ impl Dynamic {
         }
 
         match self.0 {
-            Union::Null => unreachable!(),
             Union::Variant(ref mut v, ..) => (***v).as_any_mut().downcast_mut::<T>(),
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => None,
@@ -2083,6 +2048,27 @@ impl Dynamic {
             },
             _ => Err(self.type_name()),
         }
+    }
+
+    /// Recursively scan for [`Dynamic`] values within this [`Dynamic`] (e.g. items in an array or map),
+    /// calling a filter function on each.
+    ///
+    /// Shared values are _NOT_ scanned.
+    #[inline]
+    pub fn deep_scan(&mut self, mut filter: impl FnMut(&mut Self)) {
+        fn scan_inner(value: &mut Dynamic, filter: &mut impl FnMut(&mut Dynamic)) {
+            match &mut value.0 {
+                #[cfg(not(feature = "no_index"))]
+                Union::Array(a, ..) => a.iter_mut().for_each(|v| scan_inner(v, filter)),
+                #[cfg(not(feature = "no_object"))]
+                Union::Map(m, ..) => m.values_mut().for_each(|v| scan_inner(v, filter)),
+                Union::FnPtr(f, ..) => f.iter_curry_mut().for_each(|v| scan_inner(v, filter)),
+                _ => (),
+            }
+        }
+
+        filter(self);
+        scan_inner(self, &mut filter);
     }
 }
 

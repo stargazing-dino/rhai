@@ -4,6 +4,7 @@
 use super::call::FnCallArgs;
 use crate::ast::ScriptFnDef;
 use crate::eval::{Caches, GlobalRuntimeState};
+use crate::func::EncapsulatedEnviron;
 use crate::{Dynamic, Engine, Position, RhaiResult, Scope, ERR};
 use std::mem;
 #[cfg(feature = "no_std")]
@@ -27,7 +28,8 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &mut Scope,
-        this_ptr: &mut Dynamic,
+        mut this_ptr: Option<&mut Dynamic>,
+        _environ: Option<&EncapsulatedEnviron>,
         fn_def: &ScriptFnDef,
         args: &mut FnCallArgs,
         rewind_scope: bool,
@@ -84,12 +86,12 @@ impl Engine {
         let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
 
         #[cfg(not(feature = "no_module"))]
-        let orig_constants = if let Some(ref environ) = fn_def.environ {
-            let crate::ast::EncapsulatedEnviron {
-                ref lib,
-                ref imports,
-                ref constants,
-            } = **environ;
+        let orig_constants = if let Some(environ) = _environ {
+            let EncapsulatedEnviron {
+                lib,
+                imports,
+                constants,
+            } = environ;
 
             imports
                 .iter()
@@ -106,12 +108,19 @@ impl Engine {
         #[cfg(feature = "debugging")]
         if self.is_debugger_registered() {
             let node = crate::ast::Stmt::Noop(fn_def.body.position());
-            self.run_debugger(global, caches, scope, this_ptr, &node)?;
+            self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), &node)?;
         }
 
         // Evaluate the function
         let mut _result: RhaiResult = self
-            .eval_stmt_block(global, caches, scope, this_ptr, &fn_def.body, rewind_scope)
+            .eval_stmt_block(
+                global,
+                caches,
+                scope,
+                this_ptr.as_deref_mut(),
+                &fn_def.body,
+                rewind_scope,
+            )
             .or_else(|err| match *err {
                 // Convert return statement to return value
                 ERR::Return(x, ..) => Ok(x),
@@ -124,8 +133,7 @@ impl Engine {
                 _ => Err(ERR::ErrorInFunctionCall(
                     fn_def.name.to_string(),
                     #[cfg(not(feature = "no_module"))]
-                    fn_def
-                        .environ
+                    _environ
                         .as_deref()
                         .and_then(|environ| environ.lib.id())
                         .unwrap_or_else(|| global.source().unwrap_or(""))

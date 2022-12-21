@@ -1,7 +1,7 @@
 //! Module defining external-loaded modules for Rhai.
 
 #[cfg(feature = "metadata")]
-use crate::api::type_names::format_type;
+use crate::api::formatting::format_type;
 use crate::ast::FnAccess;
 use crate::func::{
     shared_take_or_clone, CallableFunction, FnCallArgs, IteratorFn, RegisterNativeFunction,
@@ -1221,7 +1221,10 @@ impl Module {
             access,
             None,
             arg_types,
-            CallableFunction::Method(Shared::new(f), true),
+            CallableFunction::Method {
+                func: Shared::new(f),
+                has_context: true,
+            },
         )
     }
 
@@ -2138,31 +2141,22 @@ impl Module {
         // The return value is thrown away and not used
         let _ = result?;
 
-        // Variables with an alias left in the scope become module variables
-        for (_name, value, mut aliases) in scope {
-            // It is an error to export function pointers that refer to encapsulated local functions.
-            //
-            // Even if the function pointer already links to a scripted function definition, it may
-            // cross-call other functions inside the module and won't have the full encapsulated
-            // environment available.
+        // Encapsulated environment
+        let environ = Shared::new(crate::func::EncapsulatedEnviron {
             #[cfg(not(feature = "no_function"))]
-            if let Some(fn_ptr) = value.downcast_ref::<crate::FnPtr>() {
-                if ast.iter_fn_def().any(|f| f.name == fn_ptr.fn_name()) {
-                    return Err(crate::ERR::ErrorMismatchDataType(
-                        String::new(),
-                        if fn_ptr.is_anonymous() {
-                            format!("cannot export closure in variable {_name}")
-                        } else {
-                            format!(
-                                "cannot export function pointer to local function '{}' in variable {_name}",
-                                fn_ptr.fn_name()
-                            )
-                        },
-                        crate::Position::NONE,
-                    )
-                    .into());
+            lib: ast.shared_lib().clone(),
+            imports: imports.into(),
+            #[cfg(not(feature = "no_function"))]
+            constants,
+        });
+
+        // Variables with an alias left in the scope become module variables
+        for (_name, mut value, mut aliases) in scope {
+            value.deep_scan(|v| {
+                if let Some(fn_ptr) = v.downcast_mut::<crate::FnPtr>() {
+                    fn_ptr.set_encapsulated_environ(Some(environ.clone()));
                 }
-            }
+            });
 
             match aliases.len() {
                 0 => (),
@@ -2183,34 +2177,21 @@ impl Module {
 
         // Non-private functions defined become module functions
         #[cfg(not(feature = "no_function"))]
-        {
-            let environ = Shared::new(crate::ast::EncapsulatedEnviron {
-                lib: ast.shared_lib().clone(),
-                imports: imports.into_boxed_slice(),
-                constants,
+        ast.iter_fn_def()
+            .filter(|&f| match f.access {
+                FnAccess::Public => true,
+                FnAccess::Private => false,
+            })
+            .for_each(|f| {
+                let hash = module.set_script_fn(f.clone());
+                let f = module.functions.as_mut().unwrap().get_mut(&hash).unwrap();
+
+                // Encapsulate AST environment
+                match &mut f.func {
+                    CallableFunction::Script { environ: e, .. } => *e = Some(environ.clone()),
+                    _ => (),
+                }
             });
-
-            ast.shared_lib()
-                .iter_fn()
-                .filter(|&f| match f.metadata.access {
-                    FnAccess::Public => true,
-                    FnAccess::Private => false,
-                })
-                .filter(|&f| f.func.is_script())
-                .for_each(|f| {
-                    let mut func = f
-                        .func
-                        .get_script_fn_def()
-                        .expect("script-defined function")
-                        .as_ref()
-                        .clone();
-
-                    // Encapsulate AST environment
-                    func.environ = Some(environ.clone());
-
-                    module.set_script_fn(func);
-                });
-        }
 
         module.id = ast.source_raw().cloned();
 

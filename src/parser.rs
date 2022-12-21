@@ -2890,8 +2890,7 @@ impl Engine {
                     will_shadow,
                 };
                 let caches = &mut Caches::new();
-                let mut this_ptr = Dynamic::NULL;
-                let context = EvalContext::new(self, global, caches, stack, &mut this_ptr);
+                let context = EvalContext::new(self, global, caches, stack, None);
 
                 match filter(false, info, context) {
                     Ok(true) => (),
@@ -3629,8 +3628,6 @@ impl Engine {
             access,
             params,
             body,
-            #[cfg(not(feature = "no_module"))]
-            environ: None,
             #[cfg(feature = "metadata")]
             comments: comments.into_iter().collect(),
         })
@@ -3791,8 +3788,6 @@ impl Engine {
             access: crate::FnAccess::Public,
             params,
             body: body.into(),
-            #[cfg(not(feature = "no_module"))]
-            environ: None,
             #[cfg(not(feature = "no_function"))]
             #[cfg(feature = "metadata")]
             comments: Box::default(),

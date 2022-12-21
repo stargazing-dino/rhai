@@ -19,9 +19,6 @@ pub use ident::Ident;
 pub use namespace::Namespace;
 #[cfg(feature = "no_module")]
 pub use namespace_none::Namespace;
-#[cfg(not(feature = "no_module"))]
-#[cfg(not(feature = "no_function"))]
-pub use script_fn::EncapsulatedEnviron;
 #[cfg(not(feature = "no_function"))]
 pub use script_fn::{ScriptFnDef, ScriptFnMetadata};
 pub use stmt::{

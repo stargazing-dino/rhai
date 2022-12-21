@@ -32,15 +32,27 @@ fn check_struct_sizes() {
         if IS_32_BIT { 12 } else { 16 }
     );
 
+    #[cfg(feature = "internals")]
+    {
+        assert_eq!(
+            size_of::<CallableFunction>(),
+            if IS_32_BIT { 12 } else { 24 }
+        );
+        assert_eq!(
+            size_of::<module::FuncInfo>(),
+            if IS_32_BIT { 16 } else { 32 }
+        );
+    }
+
     #[cfg(target_pointer_width = "64")]
     {
         assert_eq!(size_of::<Scope>(), 536);
         assert_eq!(
             size_of::<FnPtr>(),
             if cfg!(feature = "no_function") {
-                64
-            } else {
                 72
+            } else {
+                80
             }
         );
         assert_eq!(size_of::<LexError>(), 56);
