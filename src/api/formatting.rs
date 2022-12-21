@@ -1,9 +1,10 @@
 //! Module that provide formatting services to the [`Engine`].
 use crate::packages::iter_basic::{BitRange, CharsStream, StepRange};
 use crate::parser::{ParseResult, ParseState};
+use crate::types::StringsInterner;
 use crate::{
     Engine, ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, OptimizationLevel, Position,
-    RhaiError, Scope, SmartString, StringsInterner, ERR,
+    RhaiError, Scope, SmartString, ERR,
 };
 use std::any::type_name;
 #[cfg(feature = "no_std")]
