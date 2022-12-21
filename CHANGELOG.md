@@ -37,7 +37,7 @@ Net features
 
 * A function pointer created via a closure definition now links to the particular anonymous function itself.
 * This avoids a potentially expensive function lookup when the function pointer is called, speeding up closures.
-* An additional benefit is that function pointers can now be `export`ed from modules!
+* Closures now also encapsulate their defining environment, so function pointers can now be freely `export`ed from modules!
 
 ### `!in`
 
@@ -48,6 +48,12 @@ Net features
 * `Engine::call_fn_raw` is deprecated in favor of `Engine::call_fn_with_options` which allows setting options for the function call.
 * The options are for future-proofing the API.
 * In this version, it gains the ability to set the value of the _custom state_ (accessible via `NativeCallContext::tag`) for a function evaluation, overriding `Engine::set_default_tag`.
+
+### Compact a script for compression
+
+* `Engine::compact_script` is added which takes a valid script (it still returns parsing errors) and returns a _compacted_ version of the script with all insignificant whitespaces and all comments removed.
+* A compact script compresses better than one with liberal whitespaces and comments.
+* Unlike some uglifiers or minifiers, `Engine::compact_script` does not optimize the script in any way, nor does it rename variables.
 
 Enhancements
 ------------

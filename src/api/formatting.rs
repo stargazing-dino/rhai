@@ -1,6 +1,9 @@
+//! Module that provide formatting services to the [`Engine`].
 use crate::packages::iter_basic::{BitRange, CharsStream, StepRange};
+use crate::parser::{ParseResult, ParseState};
 use crate::{
-    Engine, ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, Position, RhaiError, ERR,
+    Engine, ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, OptimizationLevel, Position,
+    RhaiError, Scope, SmartString, StringsInterner, ERR,
 };
 use std::any::type_name;
 #[cfg(feature = "no_std")]
@@ -262,5 +265,34 @@ impl Engine {
     pub(crate) fn make_type_mismatch_err<T>(&self, typ: &str, pos: Position) -> RhaiError {
         let t = self.map_type_name(type_name::<T>()).into();
         ERR::ErrorMismatchDataType(t, typ.into(), pos).into()
+    }
+
+    /// Compact a script to eliminate insignificant whitespaces and comments.
+    ///
+    /// This is useful to prepare a script for further compressing.
+    ///
+    /// The output script is semantically identical to the input script, except smaller in size.
+    ///
+    /// Unlike other uglifiers and minifiers, this method does not rename variables nor perform any
+    /// optimization on the input script.
+    #[inline]
+    pub fn compact_script(&self, script: impl AsRef<str>) -> ParseResult<String> {
+        let scripts = [script];
+        let (mut stream, tc) = self.lex_raw(&scripts, self.token_mapper.as_deref());
+        tc.borrow_mut().compressed = Some(String::new());
+        stream.state.last_token = Some(SmartString::new_const());
+        let scope = Scope::new();
+        let mut interner = StringsInterner::new();
+        let mut state = ParseState::new(&scope, &mut interner, tc);
+        let mut _ast = self.parse(
+            stream.peekable(),
+            &mut state,
+            #[cfg(not(feature = "no_optimize"))]
+            OptimizationLevel::None,
+            #[cfg(feature = "no_optimize")]
+            (),
+        )?;
+        let tc = state.tokenizer_control.borrow();
+        Ok(tc.compressed.as_ref().unwrap().into())
     }
 }

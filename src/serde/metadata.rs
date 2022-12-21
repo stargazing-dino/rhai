@@ -1,7 +1,7 @@
 //! Serialization of functions metadata.
 #![cfg(feature = "metadata")]
 
-use crate::api::type_names::format_type;
+use crate::api::formatting::format_type;
 use crate::module::{calc_native_fn_hash, FuncInfo, ModuleFlags};
 use crate::{calc_fn_hash, Engine, FnAccess, SmartString, StaticVec, AST};
 use serde::Serialize;

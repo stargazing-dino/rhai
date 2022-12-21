@@ -23,7 +23,7 @@ pub mod limits_unchecked;
 
 pub mod events;
 
-pub mod type_names;
+pub mod formatting;
 
 pub mod custom_syntax;
 

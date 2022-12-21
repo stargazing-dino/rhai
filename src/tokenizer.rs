@@ -26,6 +26,8 @@ pub struct TokenizerControlBlock {
     /// Global comments.
     #[cfg(feature = "metadata")]
     pub global_comments: String,
+    /// Whitespace-compressed version of the script (if any).
+    pub compressed: Option<String>,
 }
 
 impl TokenizerControlBlock {
@@ -37,6 +39,7 @@ impl TokenizerControlBlock {
             is_within_text: false,
             #[cfg(feature = "metadata")]
             global_comments: String::new(),
+            compressed: None,
         }
     }
 }
@@ -879,6 +882,8 @@ pub struct TokenizeState {
     pub include_comments: bool,
     /// Is the current tokenizer position within the text stream of an interpolated string?
     pub is_within_text_terminated_by: Option<char>,
+    /// Last token
+    pub last_token: Option<SmartString>,
 }
 
 /// _(internals)_ Trait that encapsulates a peekable character input stream.
@@ -956,6 +961,10 @@ pub fn parse_string_literal(
     let mut skip_whitespace_until = 0;
 
     state.is_within_text_terminated_by = Some(termination_char);
+    state.last_token.as_mut().map(|last| {
+        last.clear();
+        last.push(termination_char);
+    });
 
     loop {
         assert!(
@@ -985,6 +994,8 @@ pub fn parse_string_literal(
             }
         };
 
+        state.last_token.as_mut().map(|last| last.push(next_char));
+
         // String interpolation?
         if allow_interpolation
             && next_char == '$'
@@ -1004,6 +1015,10 @@ pub fn parse_string_literal(
             // Double wrapper
             if stream.peek_next().map_or(false, |c| c == termination_char) {
                 eat_next(stream, pos);
+                state
+                    .last_token
+                    .as_mut()
+                    .map(|last| last.push(termination_char));
             } else {
                 state.is_within_text_terminated_by = None;
                 break;
@@ -1060,6 +1075,7 @@ pub fn parse_string_literal(
                         .get_next()
                         .ok_or_else(|| (LERR::MalformedEscapeSequence(seq.to_string()), *pos))?;
 
+                    state.last_token.as_mut().map(|last| last.push(c));
                     seq.push(c);
                     pos.advance();
 
@@ -1240,6 +1256,8 @@ fn get_next_token_inner(
     state: &mut TokenizeState,
     pos: &mut Position,
 ) -> Option<(Token, Position)> {
+    state.last_token.as_mut().map(|last| last.clear());
+
     // Still inside a comment?
     if state.comment_level > 0 {
         let start_pos = *pos;
@@ -1398,6 +1416,8 @@ fn get_next_token_inner(
                     negated_pos
                 });
 
+                state.last_token.as_mut().map(|last| *last = result.clone());
+
                 // Parse number
                 let token = radix_base.map_or_else(
                     || {
@@ -1452,14 +1472,14 @@ fn get_next_token_inner(
             #[cfg(not(feature = "unicode-xid-ident"))]
             ('a'..='z' | '_' | 'A'..='Z', ..) => {
                 return Some(
-                    parse_identifier_token(stream, pos, start_pos, c)
+                    parse_identifier_token(stream, state, pos, start_pos, c)
                         .unwrap_or_else(|err| (Token::LexError(err.into()), start_pos)),
                 );
             }
             #[cfg(feature = "unicode-xid-ident")]
             (ch, ..) if unicode_xid::UnicodeXID::is_xid_start(ch) || ch == '_' => {
                 return Some(
-                    parse_identifier_token(stream, pos, start_pos, c)
+                    parse_identifier_token(stream, state, pos, start_pos, c)
                         .unwrap_or_else(|err| (Token::LexError(err.into()), start_pos)),
                 );
             }
@@ -1942,18 +1962,24 @@ fn get_next_token_inner(
 /// Get the next token, parsing it as an identifier.
 fn parse_identifier_token(
     stream: &mut impl InputStream,
+    state: &mut TokenizeState,
     pos: &mut Position,
     start_pos: Position,
     first_char: char,
 ) -> Result<(Token, Position), LexError> {
     let mut identifier = SmartString::new_const();
     identifier.push(first_char);
+    state.last_token.as_mut().map(|last| {
+        last.clear();
+        last.push(first_char);
+    });
 
     while let Some(next_char) = stream.peek_next() {
         match next_char {
             x if is_id_continue(x) => {
-                identifier.push(x);
                 eat_next(stream, pos);
+                identifier.push(x);
+                state.last_token.as_mut().map(|last| last.push(x));
             }
             _ => break,
         }
@@ -2129,7 +2155,7 @@ impl<'a> Iterator for TokenIterator<'a> {
     type Item = (Token, Position);
 
     fn next(&mut self) -> Option<Self::Item> {
-        {
+        let (within_interpolated, compress_script) = {
             let control = &mut *self.state.tokenizer_control.borrow_mut();
 
             if control.is_within_text {
@@ -2138,7 +2164,12 @@ impl<'a> Iterator for TokenIterator<'a> {
                 // Reset it
                 control.is_within_text = false;
             }
-        }
+
+            (
+                self.state.is_within_text_terminated_by.is_some(),
+                control.compressed.is_some(),
+            )
+        };
 
         let (token, pos) = match get_next_token(&mut self.stream, &mut self.state, &mut self.pos) {
             // {EOF}
@@ -2230,6 +2261,49 @@ impl<'a> Iterator for TokenIterator<'a> {
             None => token,
         };
 
+        // Collect the compressed script, if needed
+        if compress_script {
+            let control = &mut *self.state.tokenizer_control.borrow_mut();
+
+            if let Some(ref mut compressed) = control.compressed {
+                if !matches!(token, Token::EOF) {
+                    use std::fmt::Write;
+
+                    let last_token = self.state.last_token.as_ref().unwrap();
+                    let mut buf = SmartString::new_const();
+
+                    if last_token.is_empty() {
+                        write!(buf, "{token}").unwrap();
+                    } else if within_interpolated
+                        && matches!(
+                            token,
+                            Token::StringConstant(..) | Token::InterpolatedString(..)
+                        )
+                    {
+                        compressed.push_str(&last_token[1..]);
+                    } else {
+                        buf = last_token.clone();
+                    }
+
+                    if !buf.is_empty() {
+                        if !compressed.is_empty() {
+                            let prev = compressed.chars().last().unwrap();
+                            let cur = buf.chars().next().unwrap();
+                            if (prev == '_' || is_id_first_alphabetic(prev) || is_id_continue(prev))
+                                && (cur == '_'
+                                    || is_id_first_alphabetic(cur)
+                                    || is_id_continue(cur))
+                            {
+                                compressed.push(' ');
+                            }
+                        }
+
+                        compressed.push_str(&buf);
+                    }
+                }
+            }
+        }
+
         Some((token, pos))
     }
 }
@@ -2281,6 +2355,7 @@ impl Engine {
                     comment_level: 0,
                     include_comments: false,
                     is_within_text_terminated_by: None,
+                    last_token: None,
                 },
                 pos: Position::new(1, 0),
                 stream: MultiInputsStream {
