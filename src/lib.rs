@@ -52,7 +52,11 @@
 //! }
 //! ```
 //!
-//! # Documentation
+//! # Features
+//!
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!(feature_label = "<span id=\"feature-{feature}\">**`{feature}`**</span>"))]
+//!
+//! # On-Line Documentation
 //!
 //! See [The Rhai Book](https://rhai.rs/book) for details on the Rhai scripting engine and language.
 
