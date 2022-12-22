@@ -26,6 +26,7 @@ use bitflags::bitflags;
 use std::prelude::v1::*;
 use std::{
     collections::BTreeMap,
+    convert::TryFrom,
     fmt,
     hash::{Hash, Hasher},
     num::{NonZeroU8, NonZeroUsize},
@@ -147,7 +148,7 @@ impl<'e, 's> ParseState<'e, 's> {
             .stack
             .as_deref()
             .into_iter()
-            .flat_map(|s| s.iter_rev_raw())
+            .flat_map(Scope::iter_rev_raw)
             .enumerate()
             .find(|&(.., (n, ..))| {
                 if n == SCOPE_SEARCH_BARRIER_MARKER {
@@ -363,7 +364,7 @@ pub fn make_anonymous_fn(hash: u64) -> Identifier {
     use std::fmt::Write;
 
     let mut buf = Identifier::new_const();
-    write!(&mut buf, "{}{:016x}", crate::engine::FN_ANONYMOUS, hash).unwrap();
+    write!(&mut buf, "{}{hash:016x}", crate::engine::FN_ANONYMOUS).unwrap();
     buf
 }
 
@@ -1198,14 +1199,14 @@ impl Engine {
             };
 
             let (action_expr, need_comma) =
-                if !settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
+                if settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
+                    (self.parse_expr(input, state, lib, settings)?, true)
+                } else {
                     let stmt = self.parse_stmt(input, state, lib, settings)?;
                     let need_comma = !stmt.is_self_terminated();
 
                     let stmt_block: StmtBlock = stmt.into();
                     (Expr::Stmt(stmt_block.into()), need_comma)
-                } else {
-                    (self.parse_expr(input, state, lib, settings)?, true)
                 };
             let has_condition = !matches!(condition, Expr::BoolConstant(true, ..));
 
@@ -1293,8 +1294,8 @@ impl Engine {
         let cases = SwitchCasesCollection {
             expressions,
             cases,
-            def_case,
             ranges,
+            def_case,
         };
 
         Ok(Stmt::Switch((item, cases).into(), settings.pos))
@@ -1636,13 +1637,9 @@ impl Engine {
                             );
                         }
 
-                        let short_index = index.and_then(|x| {
-                            if x.get() <= u8::MAX as usize {
-                                NonZeroU8::new(x.get() as u8)
-                            } else {
-                                None
-                            }
-                        });
+                        let short_index = index
+                            .and_then(|x| u8::try_from(x.get()).ok())
+                            .and_then(NonZeroU8::new);
                         let name = state.get_interned_string(*s);
                         Expr::Variable((index, ns, 0, name).into(), short_index, settings.pos)
                     }
@@ -2023,16 +2020,16 @@ impl Engine {
             }
         }
 
-        let op_info = if op != NO_TOKEN {
-            OpAssignment::new_op_assignment_from_token(op, op_pos)
-        } else {
+        let op_info = if op == NO_TOKEN {
             OpAssignment::new_assignment(op_pos)
+        } else {
+            OpAssignment::new_op_assignment_from_token(op, op_pos)
         };
 
         match lhs {
             // const_expr = rhs
             ref expr if expr.is_constant() => {
-                Err(PERR::AssignmentToConstant("".into()).into_err(lhs.start_position()))
+                Err(PERR::AssignmentToConstant(String::new()).into_err(lhs.start_position()))
             }
             // var (non-indexed) = rhs
             Expr::Variable(ref x, None, _) if x.0.is_none() => {
@@ -2384,7 +2381,7 @@ impl Engine {
                         let not_base = FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string(op),
-                            hashes: FnCallHashes::from_native(calc_fn_hash(None, op, 1).into()),
+                            hashes: FnCallHashes::from_native(calc_fn_hash(None, op, 1)),
                             args,
                             op_token: Token::Bang,
                             capture_parent_scope: false,
@@ -3661,7 +3658,7 @@ impl Engine {
                 Some(n) if !is_func && n.get() <= u8::MAX as usize => NonZeroU8::new(n.get() as u8),
                 _ => None,
             };
-            Expr::Variable((index, Default::default(), 0, name).into(), idx, pos)
+            Expr::Variable((index, Namespace::default(), 0, name).into(), idx, pos)
         }));
 
         let expr = FnCallExpr {

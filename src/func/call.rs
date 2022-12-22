@@ -182,7 +182,7 @@ impl Engine {
         match cache.map.entry(hash) {
             Entry::Occupied(entry) => entry.into_mut().as_ref(),
             Entry::Vacant(entry) => {
-                let num_args = args.as_deref().map_or(0, |a| a.len());
+                let num_args = args.as_deref().map_or(0, FnCallArgs::len);
                 let mut max_bitmask = 0; // One above maximum bitmask based on number of parameters.
                                          // Set later when a specific matching function is not found.
                 let mut bitmask = 1usize; // Bitmask of which parameter to replace with `Dynamic`
@@ -1167,12 +1167,12 @@ impl Engine {
                     .as_int()
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
 
-                return Ok(if !(0..=crate::MAX_USIZE_INT).contains(&num_params) {
-                    false
-                } else {
-                    #[allow(clippy::cast_sign_loss)]
+                return Ok(if (0..=crate::MAX_USIZE_INT).contains(&num_params) {
+                    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                     let hash_script = calc_fn_hash(None, &fn_name, num_params as usize);
                     self.has_script_fn(global, caches, hash_script)
+                } else {
+                    false
                 }
                 .into());
             }
@@ -1588,7 +1588,7 @@ impl Engine {
                 .0
                 .flatten();
 
-            return value.as_bool().and_then(|r| Ok((!r).into())).or_else(|_| {
+            return value.as_bool().map(|r| (!r).into()).or_else(|_| {
                 let operand = &mut [&mut value];
                 self.exec_fn_call(
                     global, caches, None, name, op_token, *hashes, operand, false, false, pos,

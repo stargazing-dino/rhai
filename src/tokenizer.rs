@@ -21,12 +21,15 @@ use std::{
 #[derive(Debug, Clone, Eq, PartialEq, Default, Hash)]
 pub struct TokenizerControlBlock {
     /// Is the current tokenizer position within an interpolated text string?
+    ///
     /// This flag allows switching the tokenizer back to _text_ parsing after an interpolation stream.
     pub is_within_text: bool,
     /// Global comments.
     #[cfg(feature = "metadata")]
     pub global_comments: String,
     /// Whitespace-compressed version of the script (if any).
+    ///
+    /// Set to `Some` in order to collect a compressed script.
     pub compressed: Option<String>,
 }
 
@@ -882,7 +885,9 @@ pub struct TokenizeState {
     pub include_comments: bool,
     /// Is the current tokenizer position within the text stream of an interpolated string?
     pub is_within_text_terminated_by: Option<char>,
-    /// Last token
+    /// Textual syntax of the current token, if any.
+    ///
+    /// Set to `Some` to begin tracking this information.
     pub last_token: Option<SmartString>,
 }
 
@@ -961,10 +966,10 @@ pub fn parse_string_literal(
     let mut skip_whitespace_until = 0;
 
     state.is_within_text_terminated_by = Some(termination_char);
-    state.last_token.as_mut().map(|last| {
+    if let Some(ref mut last) = state.last_token {
         last.clear();
         last.push(termination_char);
-    });
+    }
 
     loop {
         assert!(
@@ -983,7 +988,7 @@ pub fn parse_string_literal(
                 break;
             }
             None if allow_line_continuation && !escape.is_empty() => {
-                assert_eq!(escape, "\\", "unexpected escape {} at end of line", escape);
+                assert_eq!(escape, "\\", "unexpected escape {escape} at end of line");
                 pos.advance();
                 break;
             }
@@ -994,7 +999,9 @@ pub fn parse_string_literal(
             }
         };
 
-        state.last_token.as_mut().map(|last| last.push(next_char));
+        if let Some(ref mut last) = state.last_token {
+            last.push(next_char);
+        }
 
         // String interpolation?
         if allow_interpolation
@@ -1015,10 +1022,9 @@ pub fn parse_string_literal(
             // Double wrapper
             if stream.peek_next().map_or(false, |c| c == termination_char) {
                 eat_next(stream, pos);
-                state
-                    .last_token
-                    .as_mut()
-                    .map(|last| last.push(termination_char));
+                if let Some(ref mut last) = state.last_token {
+                    last.push(termination_char);
+                }
             } else {
                 state.is_within_text_terminated_by = None;
                 break;
@@ -1075,9 +1081,11 @@ pub fn parse_string_literal(
                         .get_next()
                         .ok_or_else(|| (LERR::MalformedEscapeSequence(seq.to_string()), *pos))?;
 
-                    state.last_token.as_mut().map(|last| last.push(c));
-                    seq.push(c);
                     pos.advance();
+                    seq.push(c);
+                    if let Some(ref mut last) = state.last_token {
+                        last.push(c);
+                    }
 
                     out_val *= 16;
                     out_val += c
@@ -1106,7 +1114,7 @@ pub fn parse_string_literal(
 
             // Line continuation
             '\n' if allow_line_continuation && !escape.is_empty() => {
-                assert_eq!(escape, "\\", "unexpected escape {} at end of line", escape);
+                assert_eq!(escape, "\\", "unexpected escape {escape} at end of line");
                 escape.clear();
                 pos.new_line();
 
@@ -1256,7 +1264,7 @@ fn get_next_token_inner(
     state: &mut TokenizeState,
     pos: &mut Position,
 ) -> Option<(Token, Position)> {
-    state.last_token.as_mut().map(|last| last.clear());
+    state.last_token.as_mut().map(SmartString::clear);
 
     // Still inside a comment?
     if state.comment_level > 0 {
@@ -1338,7 +1346,7 @@ fn get_next_token_inner(
                                     pos.advance();
                                 }
                                 // _ - cannot follow a decimal point
-                                '_' => {
+                                NUMBER_SEPARATOR => {
                                     stream.unget(next_char);
                                     break;
                                 }
@@ -1416,7 +1424,9 @@ fn get_next_token_inner(
                     negated_pos
                 });
 
-                state.last_token.as_mut().map(|last| *last = result.clone());
+                if let Some(ref mut last) = state.last_token {
+                    *last = result.clone();
+                }
 
                 // Parse number
                 let token = radix_base.map_or_else(
@@ -1471,17 +1481,11 @@ fn get_next_token_inner(
             // letter or underscore ...
             #[cfg(not(feature = "unicode-xid-ident"))]
             ('a'..='z' | '_' | 'A'..='Z', ..) => {
-                return Some(
-                    parse_identifier_token(stream, state, pos, start_pos, c)
-                        .unwrap_or_else(|err| (Token::LexError(err.into()), start_pos)),
-                );
+                return Some(parse_identifier_token(stream, state, pos, start_pos, c));
             }
             #[cfg(feature = "unicode-xid-ident")]
             (ch, ..) if unicode_xid::UnicodeXID::is_xid_start(ch) || ch == '_' => {
-                return Some(
-                    parse_identifier_token(stream, state, pos, start_pos, c)
-                        .unwrap_or_else(|err| (Token::LexError(err.into()), start_pos)),
-                );
+                return Some(parse_identifier_token(stream, state, pos, start_pos, c));
             }
 
             // " - string literal
@@ -1966,40 +1970,42 @@ fn parse_identifier_token(
     pos: &mut Position,
     start_pos: Position,
     first_char: char,
-) -> Result<(Token, Position), LexError> {
+) -> (Token, Position) {
     let mut identifier = SmartString::new_const();
     identifier.push(first_char);
-    state.last_token.as_mut().map(|last| {
+    if let Some(ref mut last) = state.last_token {
         last.clear();
         last.push(first_char);
-    });
+    }
 
     while let Some(next_char) = stream.peek_next() {
         match next_char {
             x if is_id_continue(x) => {
                 eat_next(stream, pos);
                 identifier.push(x);
-                state.last_token.as_mut().map(|last| last.push(x));
+                if let Some(ref mut last) = state.last_token {
+                    last.push(x);
+                }
             }
             _ => break,
         }
     }
 
     if let Some(token) = Token::lookup_symbol_from_syntax(&identifier) {
-        return Ok((token, start_pos));
+        return (token, start_pos);
     }
     if Token::is_reserved_keyword(&identifier) {
-        return Ok((Token::Reserved(Box::new(identifier)), start_pos));
+        return (Token::Reserved(Box::new(identifier)), start_pos);
     }
 
     if !is_valid_identifier(&identifier) {
-        return Ok((
+        return (
             Token::LexError(LERR::MalformedIdentifier(identifier.to_string()).into()),
             start_pos,
-        ));
+        );
     }
 
-    Ok((Token::Identifier(identifier.into()), start_pos))
+    (Token::Identifier(identifier.into()), start_pos)
 }
 
 /// Is a keyword allowed as a function?
@@ -2256,9 +2262,10 @@ impl<'a> Iterator for TokenIterator<'a> {
         };
 
         // Run the mapper, if any
-        let token = match self.token_mapper {
-            Some(map_func) => map_func(token, pos, &self.state),
-            None => token,
+        let token = if let Some(func) = self.token_mapper {
+            func(token, pos, &self.state)
+        } else {
+            token
         };
 
         // Collect the compressed script, if needed
@@ -2285,21 +2292,19 @@ impl<'a> Iterator for TokenIterator<'a> {
                         buf = last_token.clone();
                     }
 
-                    if !buf.is_empty() {
-                        if !compressed.is_empty() {
+                    if !buf.is_empty() && !compressed.is_empty() {
+                        let cur = buf.chars().next().unwrap();
+
+                        if cur == '_' || is_id_first_alphabetic(cur) || is_id_continue(cur) {
                             let prev = compressed.chars().last().unwrap();
-                            let cur = buf.chars().next().unwrap();
-                            if (prev == '_' || is_id_first_alphabetic(prev) || is_id_continue(prev))
-                                && (cur == '_'
-                                    || is_id_first_alphabetic(cur)
-                                    || is_id_continue(cur))
-                            {
+
+                            if prev == '_' || is_id_first_alphabetic(prev) || is_id_continue(prev) {
                                 compressed.push(' ');
                             }
                         }
-
-                        compressed.push_str(&buf);
                     }
+
+                    compressed.push_str(&buf);
                 }
             }
         }

@@ -207,13 +207,11 @@ impl Engine {
 
     /// Get the default value of the custom state for each evaluation run.
     #[inline(always)]
-    #[must_use]
     pub const fn default_tag(&self) -> &Dynamic {
         &self.def_tag
     }
     /// Get a mutable reference to the default value of the custom state for each evaluation run.
     #[inline(always)]
-    #[must_use]
     pub fn default_tag_mut(&mut self) -> &mut Dynamic {
         &mut self.def_tag
     }

@@ -235,7 +235,6 @@ impl<'a> Target<'a> {
     /// Get the source [`Dynamic`] of the [`Target`].
     #[allow(dead_code)]
     #[inline]
-    #[must_use]
     pub fn source(&self) -> &Dynamic {
         match self {
             Self::RefMut(r) => r,
@@ -399,7 +398,6 @@ impl Deref for Target<'_> {
 
 impl AsRef<Dynamic> for Target<'_> {
     #[inline(always)]
-    #[must_use]
     fn as_ref(&self) -> &Dynamic {
         self
     }
@@ -407,7 +405,6 @@ impl AsRef<Dynamic> for Target<'_> {
 
 impl Borrow<Dynamic> for Target<'_> {
     #[inline(always)]
-    #[must_use]
     fn borrow(&self) -> &Dynamic {
         self
     }
@@ -432,7 +429,6 @@ impl DerefMut for Target<'_> {
 
 impl AsMut<Dynamic> for Target<'_> {
     #[inline(always)]
-    #[must_use]
     fn as_mut(&mut self) -> &mut Dynamic {
         self
     }

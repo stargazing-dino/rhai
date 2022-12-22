@@ -932,6 +932,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         }
         // lhs[rhs]
         #[cfg(not(feature = "no_index"))]
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         Expr::Index(x, ..) if !_chaining => match (&mut x.lhs, &mut x.rhs) {
             // array[int]
             (Expr::Array(a, pos), Expr::IntegerConstant(i, ..)) if *i >= 0 && *i <= crate::MAX_USIZE_INT && (*i as usize) < a.len() && a.iter().all(Expr::is_pure) => {
@@ -1339,7 +1340,11 @@ impl Engine {
         let lib: crate::Shared<_> = {
             let mut module = crate::Module::new();
 
-            if optimization_level != OptimizationLevel::None {
+            if optimization_level == OptimizationLevel::None {
+                for fn_def in functions {
+                    module.set_script_fn(fn_def);
+                }
+            } else {
                 // We only need the script library's signatures for optimization purposes
                 let mut lib2 = crate::Module::new();
 
@@ -1365,10 +1370,6 @@ impl Engine {
 
                     *fn_def.body = self.optimize_top_level(body, scope, lib2, optimization_level);
 
-                    module.set_script_fn(fn_def);
-                }
-            } else {
-                for fn_def in functions {
                     module.set_script_fn(fn_def);
                 }
             }

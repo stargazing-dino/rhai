@@ -78,9 +78,7 @@ impl Position {
         assert!(!self.is_none(), "cannot advance Position::none");
 
         // Advance up to maximum position
-        if self.pos < u16::MAX {
-            self.pos += 1;
-        }
+        self.pos = self.pos.saturating_add(1);
     }
     /// Go backwards by one character position.
     ///
@@ -136,7 +134,7 @@ impl Position {
     #[inline]
     pub(crate) fn debug_print(self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !self.is_none() {
-            write!(_f, " @ {:?}", self)?;
+            write!(_f, " @ {self:?}")?;
         }
         Ok(())
     }
@@ -166,12 +164,10 @@ impl fmt::Debug for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_none() {
             f.write_str("none")
+        } else if self.is_beginning_of_line() {
+            write!(f, "{}", self.line)
         } else {
-            if self.is_beginning_of_line() {
-                write!(f, "{}", self.line)
-            } else {
-                write!(f, "{}:{}", self.line, self.pos)
-            }
+            write!(f, "{}:{}", self.line, self.pos)
         }
     }
 }
@@ -261,10 +257,10 @@ impl fmt::Display for Span {
 
         match (self.start(), self.end()) {
             (Position::NONE, Position::NONE) => write!(_f, "{:?}", Position::NONE),
-            (Position::NONE, end) => write!(_f, "..{:?}", end),
-            (start, Position::NONE) => write!(_f, "{:?}", start),
+            (Position::NONE, end) => write!(_f, "..{end:?}"),
+            (start, Position::NONE) => write!(_f, "{start:?}"),
             (start, end) if start.line() != end.line() => {
-                write!(_f, "{:?}-{:?}", start, end)
+                write!(_f, "{start:?}-{end:?}")
             }
             (start, end) => write!(
                 _f,

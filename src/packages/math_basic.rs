@@ -477,7 +477,7 @@ mod decimal_functions {
             }
         }
 
-        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         Ok(x.round_dp(digits as u32))
     }
     /// Round the decimal number to the specified number of `digits` after the decimal point and return it.
@@ -495,7 +495,7 @@ mod decimal_functions {
             }
         }
 
-        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         Ok(x.round_dp_with_strategy(digits as u32, RoundingStrategy::AwayFromZero))
     }
     /// Round the decimal number to the specified number of `digits` after the decimal point and return it.
@@ -513,7 +513,7 @@ mod decimal_functions {
             }
         }
 
-        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         Ok(x.round_dp_with_strategy(digits as u32, RoundingStrategy::ToZero))
     }
     /// Round the decimal number to the specified number of `digits` after the decimal point and return it.
@@ -531,7 +531,7 @@ mod decimal_functions {
             }
         }
 
-        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         Ok(x.round_dp_with_strategy(digits as u32, RoundingStrategy::MidpointAwayFromZero))
     }
     /// Round the decimal number to the specified number of `digits` after the decimal point and return it.
@@ -549,33 +549,34 @@ mod decimal_functions {
             }
         }
 
-        #[allow(clippy::cast_sign_loss)]
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         Ok(x.round_dp_with_strategy(digits as u32, RoundingStrategy::MidpointTowardZero))
     }
     /// Convert the decimal number into an integer.
     #[rhai_fn(return_raw)]
     pub fn to_int(x: Decimal) -> RhaiResultOf<INT> {
-        let n = x.to_i64().and_then(|n| {
-            #[cfg(feature = "only_i32")]
-            return if n > (INT::MAX as i64) || n < (INT::MIN as i64) {
-                None
-            } else {
-                Some(n as i32)
-            };
+        x.to_i64()
+            .and_then(|n| {
+                #[cfg(feature = "only_i32")]
+                return if n > (INT::MAX as i64) || n < (INT::MIN as i64) {
+                    None
+                } else {
+                    Some(n as i32)
+                };
 
-            #[cfg(not(feature = "only_i32"))]
-            return Some(n);
-        });
-
-        n.map_or_else(
-            || {
-                Err(
-                    ERR::ErrorArithmetic(format!("Integer overflow: to_int({x})"), Position::NONE)
-                        .into(),
-                )
-            },
-            Ok,
-        )
+                #[cfg(not(feature = "only_i32"))]
+                return Some(n);
+            })
+            .map_or_else(
+                || {
+                    Err(ERR::ErrorArithmetic(
+                        format!("Integer overflow: to_int({x})"),
+                        Position::NONE,
+                    )
+                    .into())
+                },
+                Ok,
+            )
     }
     /// Return the integral part of the decimal number.
     #[rhai_fn(name = "int", get = "int")]

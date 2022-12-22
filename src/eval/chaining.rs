@@ -254,12 +254,13 @@ impl Engine {
                 })?;
 
                 let bit_value = (*value & (1 << bit)) != 0;
+                #[allow(clippy::cast_possible_truncation)]
+                let bit = bit as u8;
 
                 Ok(Target::Bit {
                     source: target,
                     value: bit_value.into(),
-                    #[allow(clippy::cast_possible_truncation)]
-                    bit: bit as u8,
+                    bit,
                 })
             }
 

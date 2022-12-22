@@ -201,7 +201,7 @@ impl<'a> NativeCallContext<'a> {
     pub fn store_data(&self) -> NativeCallContextStore {
         NativeCallContextStore {
             fn_name: self.fn_name.to_string(),
-            source: self.source.map(|s| s.to_string()),
+            source: self.source.map(ToString::to_string),
             global: self.global.clone(),
             pos: self.pos,
         }

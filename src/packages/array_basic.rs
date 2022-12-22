@@ -220,14 +220,18 @@ pub mod array_functions {
         len: INT,
         item: Dynamic,
     ) -> RhaiResultOf<()> {
-        let len = len.min(MAX_USIZE_INT);
+        if len <= 0 {
+            return Ok(());
+        }
 
-        if len <= 0 || (len as usize) <= array.len() {
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        let len = len.min(MAX_USIZE_INT) as usize;
+
+        if len <= array.len() {
             return Ok(());
         }
 
         let _ctx = ctx;
-        let len = len as usize;
 
         // Check if array will be over max size limit
         #[cfg(not(feature = "unchecked"))]
@@ -373,11 +377,16 @@ pub mod array_functions {
     /// print(x);       // prints "[1, 2, 3]"
     /// ```
     pub fn truncate(array: &mut Array, len: INT) {
+        if len <= 0 {
+            array.clear();
+            return;
+        }
         if !array.is_empty() {
-            let len = len.min(MAX_USIZE_INT);
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            let len = len.min(MAX_USIZE_INT) as usize;
 
             if len > 0 {
-                array.truncate(len as usize);
+                array.truncate(len);
             } else {
                 array.clear();
             }
@@ -402,13 +411,18 @@ pub mod array_functions {
     /// print(x);       // prints "[3, 4, 5]"
     /// ```
     pub fn chop(array: &mut Array, len: INT) {
+        if len <= 0 {
+            array.clear();
+            return;
+        }
         if !array.is_empty() {
-            let len = len.min(MAX_USIZE_INT);
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            let len = len.min(MAX_USIZE_INT) as usize;
 
             if len <= 0 {
                 array.clear();
-            } else if (len as usize) < array.len() {
-                array.drain(0..array.len() - len as usize);
+            } else if len < array.len() {
+                array.drain(0..array.len() - len);
             }
         }
     }
@@ -1178,7 +1192,7 @@ pub mod array_functions {
     /// ```
     pub fn dedup(ctx: NativeCallContext, array: &mut Array) {
         let comparer = FnPtr::new_unchecked(OP_EQUALS, StaticVec::new_const());
-        dedup_by_comparer(ctx, array, comparer)
+        dedup_by_comparer(ctx, array, comparer);
     }
     /// Remove duplicated _consecutive_ elements from the array that return `true` when applied the
     /// `comparer` function.

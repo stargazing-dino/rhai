@@ -95,11 +95,11 @@ mod string_functions {
 
     #[rhai_fn(name = "+=")]
     pub fn add_assign_append_str(string1: &mut ImmutableString, string2: ImmutableString) {
-        *string1 += string2
+        *string1 += string2;
     }
     #[rhai_fn(name = "+=", pure)]
     pub fn add_assign_append_char(string: &mut ImmutableString, character: char) {
-        *string += character
+        *string += character;
     }
     #[rhai_fn(name = "+=")]
     pub fn add_assign_append_unit(string: &mut ImmutableString, item: ()) {
@@ -246,9 +246,9 @@ mod string_functions {
     pub fn clear(string: &mut ImmutableString) {
         if !string.is_empty() {
             if let Some(s) = string.get_mut() {
-                s.clear()
+                s.clear();
             } else {
-                *string = ImmutableString::new()
+                *string = ImmutableString::new();
             }
         }
     }
@@ -272,7 +272,7 @@ mod string_functions {
     /// ```
     pub fn truncate(string: &mut ImmutableString, len: INT) {
         if len > 0 {
-            #[allow(clippy::cast_sign_loss)]
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             let len = len.min(MAX_USIZE_INT) as usize;
             let chars: StaticVec<_> = string.chars().collect();
             let copy = string.make_mut();
@@ -355,6 +355,7 @@ mod string_functions {
         if string.is_empty() || len <= 0 {
             return ctx.engine().const_empty_string();
         }
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let len = len.min(MAX_USIZE_INT) as usize;
 
         let mut chars = StaticVec::<char>::with_capacity(len);
@@ -598,6 +599,7 @@ mod string_functions {
             return -1;
         }
 
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let start = if start < 0 {
             let abs_start = start.unsigned_abs();
 
@@ -608,6 +610,7 @@ mod string_functions {
             let abs_start = abs_start as usize;
             let chars: Vec<_> = string.chars().collect();
             let num_chars = chars.len();
+
             if abs_start > num_chars {
                 0
             } else {
@@ -680,6 +683,7 @@ mod string_functions {
             return -1;
         }
 
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let start = if start < 0 {
             let abs_start = start.unsigned_abs();
 
@@ -690,6 +694,7 @@ mod string_functions {
             let abs_start = abs_start as usize;
             let chars = string.chars().collect::<Vec<_>>();
             let num_chars = chars.len();
+
             if abs_start > num_chars {
                 0
             } else {
@@ -763,9 +768,12 @@ mod string_functions {
                 return Dynamic::UNIT;
             }
 
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            let index = index as usize;
+
             string
                 .chars()
-                .nth(index as usize)
+                .nth(index)
                 .map_or_else(|| Dynamic::UNIT, Into::into)
         } else {
             // Count from end if negative
@@ -775,10 +783,13 @@ mod string_functions {
                 return Dynamic::UNIT;
             }
 
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            let abs_index = abs_index as usize;
+
             string
                 .chars()
                 .rev()
-                .nth((abs_index as usize) - 1)
+                .nth(abs_index - 1)
                 .map_or_else(|| Dynamic::UNIT, Into::into)
         }
     }
@@ -811,6 +822,7 @@ mod string_functions {
                 return;
             }
 
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             let index = index as usize;
 
             *string = string
@@ -825,6 +837,7 @@ mod string_functions {
                 return;
             }
 
+            #[allow(clippy::cast_possible_truncation)]
             let abs_index = abs_index as usize;
             let string_len = string.chars().count();
 
@@ -894,13 +907,14 @@ mod string_functions {
     ///
     /// print(text.sub_string(-8, 3));  // prints ", w"
     /// ```
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn sub_string(
         ctx: NativeCallContext,
         string: &str,
         start: INT,
         len: INT,
     ) -> ImmutableString {
-        if string.is_empty() {
+        if string.is_empty() || len <= 0 {
             return ctx.engine().const_empty_string();
         }
 
@@ -915,8 +929,11 @@ mod string_functions {
                 return ctx.engine().const_empty_string();
             }
 
+            #[allow(clippy::cast_possible_truncation)]
             let abs_start = abs_start as usize;
+
             chars.extend(string.chars());
+
             if abs_start > chars.len() {
                 0
             } else {
@@ -932,10 +949,12 @@ mod string_functions {
             chars.extend(string.chars());
         }
 
-        let len = if offset + len as usize > chars.len() {
+        let len = len.min(MAX_USIZE_INT) as usize;
+
+        let len = if offset + len > chars.len() {
             chars.len() - offset
         } else {
-            len as usize
+            len
         };
 
         chars
@@ -988,10 +1007,10 @@ mod string_functions {
     /// print(text);        // prints "llo, w"
     /// ```
     #[rhai_fn(name = "crop")]
-    pub fn crop_range(string: &mut ImmutableString, range: ExclusiveRange) {
+    pub fn crop_range(ctx: NativeCallContext, string: &mut ImmutableString, range: ExclusiveRange) {
         let start = INT::max(range.start, 0);
         let end = INT::max(range.end, start);
-        crop(string, start, end - start);
+        crop(ctx, string, start, end - start);
     }
     /// Remove all characters from the string except those within an inclusive `range`.
     ///
@@ -1005,10 +1024,14 @@ mod string_functions {
     /// print(text);        // prints "llo, wo"
     /// ```
     #[rhai_fn(name = "crop")]
-    pub fn crop_inclusive_range(string: &mut ImmutableString, range: InclusiveRange) {
+    pub fn crop_inclusive_range(
+        ctx: NativeCallContext,
+        string: &mut ImmutableString,
+        range: InclusiveRange,
+    ) {
         let start = INT::max(*range.start(), 0);
         let end = INT::max(*range.end(), start);
-        crop(string, start, end - start + 1);
+        crop(ctx, string, start, end - start + 1);
     }
 
     /// Remove all characters from the string except those within a range.
@@ -1033,8 +1056,13 @@ mod string_functions {
     /// print(text);        // prints ", w"
     /// ```
     #[rhai_fn(name = "crop")]
-    pub fn crop(string: &mut ImmutableString, start: INT, len: INT) {
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    pub fn crop(ctx: NativeCallContext, string: &mut ImmutableString, start: INT, len: INT) {
         if string.is_empty() {
+            return;
+        }
+        if len <= 0 {
+            *string = ctx.engine().const_empty_string();
             return;
         }
 
@@ -1051,7 +1079,9 @@ mod string_functions {
             }
 
             let abs_start = abs_start as usize;
+
             chars.extend(string.chars());
+
             if abs_start > chars.len() {
                 0
             } else {
@@ -1068,10 +1098,12 @@ mod string_functions {
             chars.extend(string.chars());
         }
 
-        let len = if offset + len as usize > chars.len() {
+        let len = len.min(MAX_USIZE_INT) as usize;
+
+        let len = if offset + len > chars.len() {
             chars.len() - offset
         } else {
-            len as usize
+            len
         };
 
         let copy = string.make_mut();
@@ -1098,8 +1130,12 @@ mod string_functions {
     /// print(text);            // prints "ld!"
     /// ```
     #[rhai_fn(name = "crop")]
-    pub fn crop_string_starting_from(string: &mut ImmutableString, start: INT) {
-        crop(string, start, string.len() as INT);
+    pub fn crop_string_starting_from(
+        ctx: NativeCallContext,
+        string: &mut ImmutableString,
+        start: INT,
+    ) {
+        crop(ctx, string, start, string.len() as INT);
     }
 
     /// Replace all occurrences of the specified sub-string in the string with another string.
@@ -1219,6 +1255,7 @@ mod string_functions {
         if len <= 0 {
             return Ok(());
         }
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let len = len.min(MAX_USIZE_INT) as usize;
         let _ctx = ctx;
 
@@ -1275,6 +1312,7 @@ mod string_functions {
         if len <= 0 {
             return Ok(());
         }
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let len = len.min(MAX_USIZE_INT) as usize;
         let _ctx = ctx;
 
@@ -1339,6 +1377,7 @@ mod string_functions {
         /// print(text.split(-99));     // prints ["", "hello, world!"]
         /// ```
         #[rhai_fn(name = "split")]
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         pub fn split_at(ctx: NativeCallContext, string: &mut ImmutableString, index: INT) -> Array {
             if index <= 0 {
                 let abs_index = index.unsigned_abs();
@@ -1349,9 +1388,9 @@ mod string_functions {
                         string.as_str().into(),
                     ];
                 }
-
                 let abs_index = abs_index as usize;
                 let num_chars = string.chars().count();
+
                 if abs_index > num_chars {
                     vec![
                         ctx.engine().const_empty_string().into(),
@@ -1432,7 +1471,11 @@ mod string_functions {
         /// print(text.split("ll", 2));     // prints ["he", "o, world! hello, foo!"]
         /// ```
         #[rhai_fn(name = "split")]
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         pub fn splitn(string: &str, delimiter: &str, segments: INT) -> Array {
+            if segments < 1 {
+                return [string.into()].into();
+            }
             let segments = segments.min(MAX_USIZE_INT) as usize;
             let pieces: usize = if segments < 1 { 1 } else { segments };
             string.splitn(pieces, delimiter).map(Into::into).collect()
@@ -1463,7 +1506,11 @@ mod string_functions {
         /// print(text.split('l', 3));      // prints ["he", "", "o, world! hello, foo!"]
         /// ```
         #[rhai_fn(name = "split")]
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         pub fn splitn_char(string: &str, delimiter: char, segments: INT) -> Array {
+            if segments < 1 {
+                return [string.into()].into();
+            }
             let segments = segments.min(MAX_USIZE_INT) as usize;
             let pieces: usize = if segments < 1 { 1 } else { segments };
             string.splitn(pieces, delimiter).map(Into::into).collect()
@@ -1495,7 +1542,11 @@ mod string_functions {
         /// print(text.split_rev("ll", 2));     // prints ["o, foo!", "hello, world! he"]
         /// ```
         #[rhai_fn(name = "split_rev")]
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         pub fn rsplitn(string: &str, delimiter: &str, segments: INT) -> Array {
+            if segments < 1 {
+                return [string.into()].into();
+            }
             let segments = segments.min(MAX_USIZE_INT) as usize;
             let pieces: usize = if segments < 1 { 1 } else { segments };
             string.rsplitn(pieces, delimiter).map(Into::into).collect()
@@ -1527,7 +1578,11 @@ mod string_functions {
         /// print(text.split('l', 3));      // prints ["o, foo!", "", "hello, world! he"
         /// ```
         #[rhai_fn(name = "split_rev")]
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         pub fn rsplitn_char(string: &str, delimiter: char, segments: INT) -> Array {
+            if segments < 1 {
+                return [string.into()].into();
+            }
             let segments = segments.min(MAX_USIZE_INT) as usize;
             let pieces: usize = if segments < 1 { 1 } else { segments };
             string.rsplitn(pieces, delimiter).map(Into::into).collect()

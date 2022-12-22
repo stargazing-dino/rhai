@@ -22,6 +22,7 @@ use rust_decimal::Decimal;
 
 #[cfg(not(feature = "unchecked"))]
 #[inline(always)]
+#[allow(clippy::needless_pass_by_value)]
 fn std_add<T>(x: T, y: T) -> Option<T>
 where
     T: num_traits::CheckedAdd<Output = T>,
@@ -30,6 +31,7 @@ where
 }
 #[inline(always)]
 #[allow(dead_code)]
+#[allow(clippy::unnecessary_wraps, clippy::needless_pass_by_value)]
 fn regular_add<T>(x: T, y: T) -> Option<T>
 where
     T: std::ops::Add<Output = T>,
@@ -123,6 +125,7 @@ impl<T: Copy + PartialOrd> FusedIterator for StepRange<T> {}
 pub struct BitRange(INT, usize);
 
 impl BitRange {
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn new(value: INT, from: INT, len: INT) -> RhaiResultOf<Self> {
         let from = calc_index(INT_BITS, from, true, || {
             ERR::ErrorBitFieldBounds(INT_BITS, from, Position::NONE).into()
@@ -174,6 +177,7 @@ impl ExactSizeIterator for BitRange {
 pub struct CharsStream(Vec<char>, usize);
 
 impl CharsStream {
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn new(string: &str, from: INT, len: INT) -> Self {
         if len <= 0 || from > MAX_USIZE_INT {
             return Self(Vec::new(), 0);

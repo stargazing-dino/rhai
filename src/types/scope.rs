@@ -696,7 +696,6 @@ impl Scope<'_> {
     ///
     /// Panics if the index is out of bounds.
     #[inline]
-    #[must_use]
     pub(crate) fn get_mut_by_index(&mut self, index: usize) -> &mut Dynamic {
         self.values.get_mut(index).unwrap()
     }

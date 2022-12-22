@@ -71,11 +71,13 @@ fn is_numeric(type_id: TypeId) -> bool {
 
 /// A function that returns `true`.
 #[inline(always)]
+#[allow(clippy::unnecessary_wraps)]
 fn const_true_fn(_: Option<NativeCallContext>, _: &mut [&mut Dynamic]) -> RhaiResult {
     Ok(Dynamic::TRUE)
 }
 /// A function that returns `false`.
 #[inline(always)]
+#[allow(clippy::unnecessary_wraps)]
 fn const_false_fn(_: Option<NativeCallContext>, _: &mut [&mut Dynamic]) -> RhaiResult {
     Ok(Dynamic::FALSE)
 }

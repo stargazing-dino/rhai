@@ -71,16 +71,16 @@ impl OpAssignment {
     ///
     /// Panics if the token is not an op-assignment operator.
     #[must_use]
-    pub fn new_op_assignment_from_token(op: Token, pos: Position) -> Self {
-        let op_raw = op
+    pub fn new_op_assignment_from_token(op_assign: Token, pos: Position) -> Self {
+        let op = op_assign
             .get_base_op_from_assignment()
             .expect("op-assignment operator");
 
         Self {
-            hash_op_assign: calc_fn_hash(None, op.literal_syntax(), 2),
-            hash_op: calc_fn_hash(None, op_raw.literal_syntax(), 2),
-            op_assign: op.clone(),
-            op: op_raw,
+            hash_op_assign: calc_fn_hash(None, op_assign.literal_syntax(), 2),
+            hash_op: calc_fn_hash(None, op.literal_syntax(), 2),
+            op_assign,
+            op,
             pos,
         }
     }
