@@ -2,7 +2,8 @@
 #![cfg(not(feature = "no_optimize"))]
 
 use crate::ast::{
-    ASTFlags, Expr, OpAssignment, Stmt, StmtBlock, StmtBlockContainer, SwitchCasesCollection,
+    ASTFlags, Expr, FlowControl, OpAssignment, Stmt, StmtBlock, StmtBlockContainer,
+    SwitchCasesCollection,
 };
 use crate::engine::{KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_PRINT, KEYWORD_TYPE_OF};
 use crate::eval::{Caches, GlobalRuntimeState};
@@ -12,8 +13,8 @@ use crate::module::ModuleFlags;
 use crate::tokenizer::Token;
 use crate::types::dynamic::AccessMode;
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FlowControl, FnPtr, Identifier,
-    ImmutableString, Position, Scope, StaticVec, AST,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnPtr, Identifier, ImmutableString, Position,
+    Scope, StaticVec, AST,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
