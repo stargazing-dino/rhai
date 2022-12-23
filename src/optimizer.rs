@@ -12,8 +12,8 @@ use crate::module::ModuleFlags;
 use crate::tokenizer::Token;
 use crate::types::dynamic::AccessMode;
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnPtr, Identifier, ImmutableString, Position,
-    Scope, StaticVec, AST,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FlowControl, FnPtr, Identifier,
+    ImmutableString, Position, Scope, StaticVec, AST,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -430,8 +430,8 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         }
 
         // if expr {}
-        Stmt::If(x, ..) if x.1.is_empty() && x.2.is_empty() => {
-            let condition = &mut x.0;
+        Stmt::If(x, ..) if x.body.is_empty() && x.branch.is_empty() => {
+            let condition = &mut x.expr;
             state.set_dirty();
 
             let pos = condition.start_position();
@@ -452,8 +452,10 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             };
         }
         // if false { if_block } -> Noop
-        Stmt::If(x, ..) if matches!(x.0, Expr::BoolConstant(false, ..)) && x.2.is_empty() => {
-            if let Expr::BoolConstant(false, pos) = x.0 {
+        Stmt::If(x, ..)
+            if matches!(x.expr, Expr::BoolConstant(false, ..)) && x.branch.is_empty() =>
+        {
+            if let Expr::BoolConstant(false, pos) = x.expr {
                 state.set_dirty();
                 *stmt = Stmt::Noop(pos);
             } else {
@@ -461,33 +463,31 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             }
         }
         // if false { if_block } else { else_block } -> else_block
-        Stmt::If(x, ..) if matches!(x.0, Expr::BoolConstant(false, ..)) => {
+        Stmt::If(x, ..) if matches!(x.expr, Expr::BoolConstant(false, ..)) => {
             state.set_dirty();
-            *stmt =
-                match optimize_stmt_block(mem::take(&mut *x.2), state, preserve_result, true, false)
-                {
-                    statements if statements.is_empty() => Stmt::Noop(x.2.position()),
-                    statements => (statements, x.2.span()).into(),
-                }
+            let body = mem::take(&mut *x.branch);
+            *stmt = match optimize_stmt_block(body, state, preserve_result, true, false) {
+                statements if statements.is_empty() => Stmt::Noop(x.branch.position()),
+                statements => (statements, x.branch.span()).into(),
+            }
         }
         // if true { if_block } else { else_block } -> if_block
-        Stmt::If(x, ..) if matches!(x.0, Expr::BoolConstant(true, ..)) => {
+        Stmt::If(x, ..) if matches!(x.expr, Expr::BoolConstant(true, ..)) => {
             state.set_dirty();
-            *stmt =
-                match optimize_stmt_block(mem::take(&mut *x.1), state, preserve_result, true, false)
-                {
-                    statements if statements.is_empty() => Stmt::Noop(x.1.position()),
-                    statements => (statements, x.1.span()).into(),
-                }
+            let body = mem::take(&mut *x.body);
+            *stmt = match optimize_stmt_block(body, state, preserve_result, true, false) {
+                statements if statements.is_empty() => Stmt::Noop(x.body.position()),
+                statements => (statements, x.body.span()).into(),
+            }
         }
         // if expr { if_block } else { else_block }
         Stmt::If(x, ..) => {
-            let (condition, body, other) = &mut **x;
-            optimize_expr(condition, state, false);
-            **body =
-                optimize_stmt_block(mem::take(&mut **body), state, preserve_result, true, false);
-            **other =
-                optimize_stmt_block(mem::take(&mut **other), state, preserve_result, true, false);
+            let FlowControl { expr, body, branch } = &mut **x;
+            optimize_expr(expr, state, false);
+            let statements = mem::take(&mut **body);
+            **body = optimize_stmt_block(statements, state, preserve_result, true, false);
+            let statements = mem::take(&mut **branch);
+            **branch = optimize_stmt_block(statements, state, preserve_result, true, false);
         }
 
         // switch const { ... }
@@ -524,7 +524,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                             // switch const { case if condition => stmt, _ => def } => if condition { stmt } else { def }
                             optimize_expr(&mut b.condition, state, false);
 
-                            let else_stmt = match def_case {
+                            let branch = match def_case {
                                 Some(index) => {
                                     let mut def_stmt =
                                         Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
@@ -533,14 +533,11 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                                 }
                                 _ => StmtBlock::NONE,
                             };
+                            let body = Stmt::Expr(mem::take(&mut b.expr).into()).into();
+                            let expr = mem::take(&mut b.condition);
 
                             *stmt = Stmt::If(
-                                (
-                                    mem::take(&mut b.condition),
-                                    Stmt::Expr(mem::take(&mut b.expr).into()).into(),
-                                    else_stmt,
-                                )
-                                    .into(),
+                                FlowControl { expr, body, branch }.into(),
                                 match_expr.start_position(),
                             );
                         }
@@ -585,12 +582,12 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                             optimize_stmt(&mut statements, state, true);
                             *stmt = statements;
                         } else {
-                            let mut condition = mem::take(&mut range_block.condition);
+                            let mut expr = mem::take(&mut range_block.condition);
 
                             // switch const { range if condition => stmt, _ => def } => if condition { stmt } else { def }
-                            optimize_expr(&mut condition, state, false);
+                            optimize_expr(&mut expr, state, false);
 
-                            let else_stmt = match def_case {
+                            let branch = match def_case {
                                 Some(index) => {
                                     let mut def_stmt =
                                         Stmt::Expr(mem::take(&mut expressions[*index].expr).into());
@@ -600,12 +597,12 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                                 _ => StmtBlock::NONE,
                             };
 
-                            let if_stmt =
+                            let body =
                                 Stmt::Expr(mem::take(&mut expressions[r.index()].expr).into())
                                     .into();
 
                             *stmt = Stmt::If(
-                                (condition, if_stmt, else_stmt).into(),
+                                FlowControl { expr, body, branch }.into(),
                                 match_expr.start_position(),
                             );
                         }
@@ -738,7 +735,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         }
 
         // while false { block } -> Noop
-        Stmt::While(x, ..) if matches!(x.0, Expr::BoolConstant(false, ..)) => match x.0 {
+        Stmt::While(x, ..) if matches!(x.expr, Expr::BoolConstant(false, ..)) => match x.expr {
             Expr::BoolConstant(false, pos) => {
                 state.set_dirty();
                 *stmt = Stmt::Noop(pos);
@@ -747,22 +744,22 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         },
         // while expr { block }
         Stmt::While(x, ..) => {
-            let (condition, body) = &mut **x;
-            optimize_expr(condition, state, false);
-            if let Expr::BoolConstant(true, pos) = condition {
-                *condition = Expr::Unit(*pos);
+            let FlowControl { expr, body, .. } = &mut **x;
+            optimize_expr(expr, state, false);
+            if let Expr::BoolConstant(true, pos) = expr {
+                *expr = Expr::Unit(*pos);
             }
             **body = optimize_stmt_block(mem::take(&mut **body), state, false, true, false);
         }
         // do { block } while|until expr
         Stmt::Do(x, ..) => {
-            optimize_expr(&mut x.0, state, false);
-            *x.1 = optimize_stmt_block(mem::take(&mut *x.1), state, false, true, false);
+            optimize_expr(&mut x.expr, state, false);
+            *x.body = optimize_stmt_block(mem::take(&mut *x.body), state, false, true, false);
         }
         // for id in expr { block }
         Stmt::For(x, ..) => {
-            optimize_expr(&mut x.2, state, false);
-            *x.3 = optimize_stmt_block(mem::take(&mut *x.3), state, false, true, false);
+            optimize_expr(&mut x.2.expr, state, false);
+            *x.2.body = optimize_stmt_block(mem::take(&mut *x.2.body), state, false, true, false);
         }
         // let id = expr;
         Stmt::Var(x, options, ..) if !options.contains(ASTFlags::CONSTANT) => {
@@ -791,21 +788,19 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             }
         }
         // try { pure try_block } catch ( var ) { catch_block } -> try_block
-        Stmt::TryCatch(x, ..) if x.try_block.iter().all(Stmt::is_pure) => {
+        Stmt::TryCatch(x, ..) if x.body.iter().all(Stmt::is_pure) => {
             // If try block is pure, there will never be any exceptions
             state.set_dirty();
             *stmt = (
-                optimize_stmt_block(mem::take(&mut *x.try_block), state, false, true, false),
-                x.try_block.span(),
+                optimize_stmt_block(mem::take(&mut *x.body), state, false, true, false),
+                x.body.span(),
             )
                 .into();
         }
         // try { try_block } catch ( var ) { catch_block }
         Stmt::TryCatch(x, ..) => {
-            *x.try_block =
-                optimize_stmt_block(mem::take(&mut *x.try_block), state, false, true, false);
-            *x.catch_block =
-                optimize_stmt_block(mem::take(&mut *x.catch_block), state, false, true, false);
+            *x.body = optimize_stmt_block(mem::take(&mut *x.body), state, false, true, false);
+            *x.branch = optimize_stmt_block(mem::take(&mut *x.branch), state, false, true, false);
         }
 
         // expr(stmt)

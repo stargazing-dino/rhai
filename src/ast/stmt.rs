@@ -292,18 +292,6 @@ pub struct SwitchCasesCollection {
     pub def_case: Option<usize>,
 }
 
-/// _(internals)_ A `try-catch` block.
-/// Exported under the `internals` feature only.
-#[derive(Debug, Clone, Hash)]
-pub struct TryCatchBlock {
-    /// `try` block.
-    pub try_block: StmtBlock,
-    /// `catch` variable, if any.
-    pub catch_var: Ident,
-    /// `catch` block.
-    pub catch_block: StmtBlock,
-}
-
 /// Number of items to keep inline for [`StmtBlockContainer`].
 #[cfg(not(feature = "no_std"))]
 const STMT_BLOCK_INLINE_SIZE: usize = 8;
@@ -532,6 +520,22 @@ impl Extend<Stmt> for StmtBlock {
     }
 }
 
+/// _(internals)_ A flow control block containing:
+/// * an expression,
+/// * a statements body
+/// * an alternate statements body
+///
+/// Exported under the `internals` feature only.
+#[derive(Debug, Clone, Hash)]
+pub struct FlowControl {
+    /// Flow control expression.
+    pub expr: Expr,
+    /// Main body.
+    pub body: StmtBlock,
+    /// Branch body.
+    pub branch: StmtBlock,
+}
+
 /// _(internals)_ A statement.
 /// Exported under the `internals` feature only.
 #[derive(Debug, Clone, Hash)]
@@ -540,7 +544,7 @@ pub enum Stmt {
     /// No-op.
     Noop(Position),
     /// `if` expr `{` stmt `}` `else` `{` stmt `}`
-    If(Box<(Expr, StmtBlock, StmtBlock)>, Position),
+    If(Box<FlowControl>, Position),
     /// `switch` expr `{` literal or range or _ `if` condition `=>` stmt `,` ... `}`
     ///
     /// ### Data Structure
@@ -552,16 +556,16 @@ pub enum Stmt {
     /// `while` expr `{` stmt `}` | `loop` `{` stmt `}`
     ///
     /// If the guard expression is [`UNIT`][Expr::Unit], then it is a `loop` statement.
-    While(Box<(Expr, StmtBlock)>, Position),
+    While(Box<FlowControl>, Position),
     /// `do` `{` stmt `}` `while`|`until` expr
     ///
     /// ### Flags
     ///
     /// * [`NONE`][ASTFlags::NONE] = `while`
     /// * [`NEGATED`][ASTFlags::NEGATED] = `until`
-    Do(Box<(Expr, StmtBlock)>, ASTFlags, Position),
+    Do(Box<FlowControl>, ASTFlags, Position),
     /// `for` `(` id `,` counter `)` `in` expr `{` stmt `}`
-    For(Box<(Ident, Ident, Expr, StmtBlock)>, Position),
+    For(Box<(Ident, Ident, FlowControl)>, Position),
     /// \[`export`\] `let`|`const` id `=` expr
     ///
     /// ### Flags
@@ -579,7 +583,7 @@ pub enum Stmt {
     /// `{` stmt`;` ... `}`
     Block(Box<StmtBlock>),
     /// `try` `{` stmt; ... `}` `catch` `(` var `)` `{` stmt; ... `}`
-    TryCatch(Box<TryCatchBlock>, Position),
+    TryCatch(Box<FlowControl>, Position),
     /// [expression][Expr]
     Expr(Box<Expr>),
     /// `continue`/`break` expr
@@ -815,7 +819,9 @@ impl Stmt {
             Self::Noop(..) => true,
             Self::Expr(expr) => expr.is_pure(),
             Self::If(x, ..) => {
-                x.0.is_pure() && x.1.iter().all(Self::is_pure) && x.2.iter().all(Self::is_pure)
+                x.expr.is_pure()
+                    && x.body.iter().all(Self::is_pure)
+                    && x.branch.iter().all(Self::is_pure)
             }
             Self::Switch(x, ..) => {
                 let (expr, sw) = &**x;
@@ -833,10 +839,10 @@ impl Stmt {
             }
 
             // Loops that exit can be pure because it can never be infinite.
-            Self::While(x, ..) if matches!(x.0, Expr::BoolConstant(false, ..)) => true,
-            Self::Do(x, options, ..) if matches!(x.0, Expr::BoolConstant(..)) => match x.0 {
+            Self::While(x, ..) if matches!(x.expr, Expr::BoolConstant(false, ..)) => true,
+            Self::Do(x, options, ..) if matches!(x.expr, Expr::BoolConstant(..)) => match x.expr {
                 Expr::BoolConstant(cond, ..) if cond == options.contains(ASTFlags::NEGATED) => {
-                    x.1.iter().all(Self::is_pure)
+                    x.body.iter().all(Self::is_pure)
                 }
                 _ => false,
             },
@@ -846,13 +852,15 @@ impl Stmt {
 
             // For loops can be pure because if the iterable is pure, it is finite,
             // so infinite loops can never occur.
-            Self::For(x, ..) => x.2.is_pure() && x.3.iter().all(Self::is_pure),
+            Self::For(x, ..) => x.2.expr.is_pure() && x.2.body.iter().all(Self::is_pure),
 
             Self::Var(..) | Self::Assignment(..) | Self::FnCall(..) => false,
             Self::Block(block, ..) => block.iter().all(Self::is_pure),
             Self::BreakLoop(..) | Self::Return(..) => false,
             Self::TryCatch(x, ..) => {
-                x.try_block.iter().all(Self::is_pure) && x.catch_block.iter().all(Self::is_pure)
+                x.expr.is_pure()
+                    && x.body.iter().all(Self::is_pure)
+                    && x.branch.iter().all(Self::is_pure)
             }
 
             #[cfg(not(feature = "no_module"))]
@@ -947,15 +955,15 @@ impl Stmt {
                 }
             }
             Self::If(x, ..) => {
-                if !x.0.walk(path, on_node) {
+                if !x.expr.walk(path, on_node) {
                     return false;
                 }
-                for s in &x.1 {
+                for s in &x.body {
                     if !s.walk(path, on_node) {
                         return false;
                     }
                 }
-                for s in &x.2 {
+                for s in &x.branch {
                     if !s.walk(path, on_node) {
                         return false;
                     }
@@ -996,20 +1004,20 @@ impl Stmt {
                 }
             }
             Self::While(x, ..) | Self::Do(x, ..) => {
-                if !x.0.walk(path, on_node) {
+                if !x.expr.walk(path, on_node) {
                     return false;
                 }
-                for s in x.1.statements() {
+                for s in x.body.statements() {
                     if !s.walk(path, on_node) {
                         return false;
                     }
                 }
             }
             Self::For(x, ..) => {
-                if !x.2.walk(path, on_node) {
+                if !x.2.expr.walk(path, on_node) {
                     return false;
                 }
-                for s in &x.3 {
+                for s in &x.2.body {
                     if !s.walk(path, on_node) {
                         return false;
                     }
@@ -1038,12 +1046,12 @@ impl Stmt {
                 }
             }
             Self::TryCatch(x, ..) => {
-                for s in &x.try_block {
+                for s in &x.body {
                     if !s.walk(path, on_node) {
                         return false;
                     }
                 }
-                for s in &x.catch_block {
+                for s in &x.branch {
                     if !s.walk(path, on_node) {
                         return false;
                     }

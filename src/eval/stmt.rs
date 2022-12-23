@@ -3,7 +3,7 @@
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::api::events::VarDefInfo;
 use crate::ast::{
-    ASTFlags, BinaryExpr, Expr, OpAssignment, Stmt, SwitchCasesCollection, TryCatchBlock,
+    ASTFlags, BinaryExpr, Expr, FlowControl, OpAssignment, Stmt, SwitchCasesCollection,
 };
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::types::dynamic::{AccessMode, Union};
@@ -310,7 +310,11 @@ impl Engine {
 
             // If statement
             Stmt::If(x, ..) => {
-                let (expr, if_block, else_block) = &**x;
+                let FlowControl {
+                    expr,
+                    body: if_block,
+                    branch: else_block,
+                } = &**x;
 
                 let guard_val = self
                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
@@ -402,8 +406,10 @@ impl Engine {
             }
 
             // Loop
-            Stmt::While(x, ..) if matches!(x.0, Expr::Unit(..) | Expr::BoolConstant(true, ..)) => {
-                let (.., body) = &**x;
+            Stmt::While(x, ..)
+                if matches!(x.expr, Expr::Unit(..) | Expr::BoolConstant(true, ..)) =>
+            {
+                let FlowControl { body, .. } = &**x;
 
                 if body.is_empty() {
                     loop {
@@ -427,7 +433,7 @@ impl Engine {
 
             // While loop
             Stmt::While(x, ..) => {
-                let (expr, body) = &**x;
+                let FlowControl { expr, body, .. } = &**x;
 
                 loop {
                     let condition = self
@@ -458,7 +464,7 @@ impl Engine {
 
             // Do loop
             Stmt::Do(x, options, ..) => {
-                let (expr, body) = &**x;
+                let FlowControl { expr, body, .. } = &**x;
                 let is_while = !options.contains(ASTFlags::NEGATED);
 
                 loop {
@@ -488,7 +494,7 @@ impl Engine {
 
             // For loop
             Stmt::For(x, ..) => {
-                let (var_name, counter, expr, statements) = &**x;
+                let (var_name, counter, FlowControl { expr, body, .. }) = &**x;
 
                 let iter_obj = self
                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
@@ -566,15 +572,15 @@ impl Engine {
                     *scope.get_mut_by_index(index).write_lock().unwrap() = value;
 
                     // Run block
-                    self.track_operation(global, statements.position())?;
+                    self.track_operation(global, body.position())?;
 
-                    if statements.is_empty() {
+                    if body.is_empty() {
                         continue;
                     }
 
                     let this_ptr = this_ptr.as_deref_mut();
 
-                    match self.eval_stmt_block(global, caches, scope, this_ptr, statements, true) {
+                    match self.eval_stmt_block(global, caches, scope, this_ptr, body, true) {
                         Ok(_) => (),
                         Err(err) => match *err {
                             ERR::LoopBreak(false, ..) => (),
@@ -605,10 +611,10 @@ impl Engine {
 
             // Try/Catch statement
             Stmt::TryCatch(x, ..) => {
-                let TryCatchBlock {
-                    try_block,
-                    catch_var,
-                    catch_block,
+                let FlowControl {
+                    body: try_block,
+                    expr: catch_var,
+                    branch: catch_block,
                 } = &**x;
 
                 match self.eval_stmt_block(
@@ -659,10 +665,10 @@ impl Engine {
                         };
 
                         // Restore scope at end of block
-                        auto_restore! { scope if !catch_var.is_empty() => rewind; let orig_scope_len = scope.len(); }
+                        auto_restore! { scope if !catch_var.is_unit() => rewind; let orig_scope_len = scope.len(); }
 
-                        if !catch_var.is_empty() {
-                            scope.push(catch_var.name.clone(), err_value);
+                        if let Expr::Variable(x, ..) = catch_var {
+                            scope.push(x.3.clone(), err_value);
                         }
 
                         let this_ptr = this_ptr.as_deref_mut();

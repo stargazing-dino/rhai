@@ -3,9 +3,9 @@
 use crate::api::events::VarDefInfo;
 use crate::api::options::LangOptions;
 use crate::ast::{
-    ASTFlags, BinaryExpr, CaseBlocksList, ConditionalExpr, Expr, FnCallExpr, FnCallHashes, Ident,
-    Namespace, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock, StmtBlockContainer,
-    SwitchCasesCollection, TryCatchBlock,
+    ASTFlags, BinaryExpr, CaseBlocksList, ConditionalExpr, Expr, FlowControl, FnCallExpr,
+    FnCallHashes, Ident, Namespace, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock,
+    StmtBlockContainer, SwitchCasesCollection,
 };
 use crate::engine::{Precedence, KEYWORD_THIS, OP_CONTAINS};
 use crate::eval::{Caches, GlobalRuntimeState};
@@ -2649,14 +2649,14 @@ impl Engine {
 
         // if guard { if_body }
         ensure_not_statement_expr(input, "a boolean")?;
-        let guard = self
+        let expr = self
             .parse_expr(input, state, lib, settings)?
             .ensure_bool_expr()?;
         ensure_not_assignment(input)?;
-        let if_body = self.parse_block(input, state, lib, settings)?;
+        let body = self.parse_block(input, state, lib, settings)?.into();
 
         // if guard { if_body } else ...
-        let else_body = if match_token(input, Token::Else).0 {
+        let branch = if match_token(input, Token::Else).0 {
             if let (Token::If, ..) = input.peek().expect(NEVER_ENDS) {
                 // if guard { if_body } else if ...
                 self.parse_if(input, state, lib, settings)?
@@ -2666,10 +2666,11 @@ impl Engine {
             }
         } else {
             Stmt::Noop(Position::NONE)
-        };
+        }
+        .into();
 
         Ok(Stmt::If(
-            (guard, if_body.into(), else_body.into()).into(),
+            FlowControl { expr, body, branch }.into(),
             settings.pos,
         ))
     }
@@ -2685,7 +2686,7 @@ impl Engine {
         let mut settings = settings.level_up()?;
 
         // while|loops ...
-        let (guard, token_pos) = match input.next().expect(NEVER_ENDS) {
+        let (expr, token_pos) = match input.next().expect(NEVER_ENDS) {
             (Token::While, pos) => {
                 ensure_not_statement_expr(input, "a boolean")?;
                 let expr = self
@@ -2700,9 +2701,13 @@ impl Engine {
         settings.pos = token_pos;
         settings.flags |= ParseSettingFlags::BREAKABLE;
 
-        let body = self.parse_block(input, state, lib, settings)?;
+        let body = self.parse_block(input, state, lib, settings)?.into();
+        let branch = StmtBlock::NONE;
 
-        Ok(Stmt::While((guard, body.into()).into(), settings.pos))
+        Ok(Stmt::While(
+            FlowControl { expr, body, branch }.into(),
+            settings.pos,
+        ))
     }
 
     /// Parse a do loop.
@@ -2722,7 +2727,7 @@ impl Engine {
 
         // do { body } [while|until] guard
 
-        let body = self.parse_block(input, state, lib, settings)?;
+        let body = self.parse_block(input, state, lib, settings)?.into();
 
         let negated = match input.next().expect(NEVER_ENDS) {
             (Token::While, ..) => ASTFlags::NONE,
@@ -2740,12 +2745,18 @@ impl Engine {
         }
 
         ensure_not_statement_expr(input, "a boolean")?;
-        let guard = self
+        let expr = self
             .parse_expr(input, state, lib, settings)?
             .ensure_bool_expr()?;
         ensure_not_assignment(input)?;
 
-        Ok(Stmt::Do((guard, body.into()).into(), negated, settings.pos))
+        let branch = StmtBlock::NONE;
+
+        Ok(Stmt::Do(
+            FlowControl { expr, body, branch }.into(),
+            negated,
+            settings.pos,
+        ))
     }
 
     /// Parse a for loop.
@@ -2837,12 +2848,14 @@ impl Engine {
         };
 
         settings.flags |= ParseSettingFlags::BREAKABLE;
-        let body = self.parse_block(input, state, lib, settings)?;
+        let body = self.parse_block(input, state, lib, settings)?.into();
 
         state.stack.as_deref_mut().unwrap().rewind(prev_stack_len);
 
+        let branch = StmtBlock::NONE;
+
         Ok(Stmt::For(
-            Box::new((loop_var, counter_var, expr, body.into())),
+            Box::new((loop_var, counter_var, FlowControl { expr, body, branch })),
             settings.pos,
         ))
     }
@@ -3477,7 +3490,7 @@ impl Engine {
         settings.pos = eat_token(input, Token::Try);
 
         // try { try_block }
-        let try_block = self.parse_block(input, state, lib, settings)?;
+        let body = self.parse_block(input, state, lib, settings)?.into();
 
         // try { try_block } catch
         let (matched, catch_pos) = match_token(input, Token::Catch);
@@ -3516,20 +3529,23 @@ impl Engine {
         };
 
         // try { try_block } catch ( var ) { catch_block }
-        let catch_block = self.parse_block(input, state, lib, settings)?;
+        let branch = self.parse_block(input, state, lib, settings)?.into();
 
-        if !catch_var.is_empty() {
+        let expr = if !catch_var.is_empty() {
             // Remove the error variable from the stack
             state.stack.as_deref_mut().unwrap().pop();
-        }
+
+            Expr::Variable(
+                (None, Namespace::default(), 0, catch_var.name).into(),
+                None,
+                catch_var.pos,
+            )
+        } else {
+            Expr::Unit(catch_var.pos)
+        };
 
         Ok(Stmt::TryCatch(
-            TryCatchBlock {
-                try_block: try_block.into(),
-                catch_var,
-                catch_block: catch_block.into(),
-            }
-            .into(),
+            FlowControl { body, expr, branch }.into(),
             settings.pos,
         ))
     }

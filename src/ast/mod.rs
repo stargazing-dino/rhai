@@ -22,8 +22,8 @@ pub use namespace_none::Namespace;
 #[cfg(not(feature = "no_function"))]
 pub use script_fn::{ScriptFnDef, ScriptFnMetadata};
 pub use stmt::{
-    CaseBlocksList, ConditionalExpr, OpAssignment, RangeCase, Stmt, StmtBlock, StmtBlockContainer,
-    SwitchCasesCollection, TryCatchBlock,
+    CaseBlocksList, ConditionalExpr, FlowControl, OpAssignment, RangeCase, Stmt, StmtBlock,
+    StmtBlockContainer, SwitchCasesCollection,
 };
 
 /// _(internals)_ Placeholder for a script-defined function.
