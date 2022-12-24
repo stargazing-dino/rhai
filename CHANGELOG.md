@@ -55,6 +55,11 @@ Net features
 * A compact script compresses better than one with liberal whitespaces and comments.
 * Unlike some uglifiers or minifiers, `Engine::compact_script` does not optimize the script in any way, nor does it rename variables.
 
+### Enhanced array API
+
+* Array methods that take a function pointer, usually a closure (e.g. `map`, `filter`, `index_of` etc.), can now provide a closure with one few parameter but binds the first parameter to `this`.
+* This vastly improves performance when working with arrays of object maps by avoiding unnecessary cloning of large types.
+
 Enhancements
 ------------
 

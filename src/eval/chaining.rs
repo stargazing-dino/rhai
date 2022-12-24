@@ -471,13 +471,8 @@ impl Engine {
                         if chain_type == ChainType::Dotting && !x.is_qualified() =>
                     {
                         for expr in &x.args {
-                            let arg_value = self.get_arg_value(
-                                global,
-                                caches,
-                                scope,
-                                this_ptr.as_deref_mut(),
-                                expr,
-                            )?;
+                            let tp = this_ptr.as_deref_mut();
+                            let arg_value = self.get_arg_value(global, caches, scope, tp, expr)?;
                             _arg_values.push(arg_value.0.flatten());
                         }
                     }
@@ -529,7 +524,7 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        mut this_ptr: Option<&mut Dynamic>,
+        this_ptr: Option<&mut Dynamic>,
         root: &Expr,
         parent: &Expr,
         target: &mut Target,
@@ -539,6 +534,9 @@ impl Engine {
     ) -> RhaiResultOf<(Dynamic, bool)> {
         let is_ref_mut = target.is_ref();
         let op_pos = parent.position();
+
+        #[cfg(feature = "debugging")]
+        let mut this_ptr = this_ptr;
 
         #[cfg(feature = "debugging")]
         let scope = &mut Scope::new();
@@ -838,17 +836,13 @@ impl Engine {
                     // {xxx:map}.sub_lhs[expr] | {xxx:map}.sub_lhs.expr
                     Expr::Index(x, ..) | Expr::Dot(x, ..) if target.is_map() => {
                         let _node = &x.lhs;
+                        let mut _this_ptr = this_ptr;
+                        let _tp = _this_ptr.as_deref_mut();
 
                         let val_target = &mut match x.lhs {
                             Expr::Property(ref p, pos) => {
                                 #[cfg(feature = "debugging")]
-                                self.run_debugger(
-                                    global,
-                                    caches,
-                                    scope,
-                                    this_ptr.as_deref_mut(),
-                                    _node,
-                                )?;
+                                self.run_debugger(global, caches, scope, _tp, _node)?;
 
                                 let index = &mut p.2.clone().into();
                                 self.get_indexed_mut(
@@ -858,13 +852,8 @@ impl Engine {
                             // {xxx:map}.fn_name(arg_expr_list)[expr] | {xxx:map}.fn_name(arg_expr_list).expr
                             Expr::MethodCall(ref x, pos) if !x.is_qualified() => {
                                 #[cfg(feature = "debugging")]
-                                let reset = self.run_debugger_with_reset(
-                                    global,
-                                    caches,
-                                    scope,
-                                    this_ptr.as_deref_mut(),
-                                    _node,
-                                )?;
+                                let reset = self
+                                    .run_debugger_with_reset(global, caches, scope, _tp, _node)?;
                                 #[cfg(feature = "debugging")]
                                 auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
 
@@ -893,25 +882,21 @@ impl Engine {
                         };
 
                         self.eval_dot_index_chain_raw(
-                            global, caches, this_ptr, root, rhs, val_target, &x.rhs, idx_values,
+                            global, caches, _this_ptr, root, rhs, val_target, &x.rhs, idx_values,
                             new_val,
                         )
                     }
                     // xxx.sub_lhs[expr] | xxx.sub_lhs.expr
                     Expr::Index(x, ..) | Expr::Dot(x, ..) => {
                         let _node = &x.lhs;
+                        let mut _this_ptr = this_ptr;
+                        let _tp = _this_ptr.as_deref_mut();
 
                         match x.lhs {
                             // xxx.prop[expr] | xxx.prop.expr
                             Expr::Property(ref p, pos) => {
                                 #[cfg(feature = "debugging")]
-                                self.run_debugger(
-                                    global,
-                                    caches,
-                                    scope,
-                                    this_ptr.as_deref_mut(),
-                                    _node,
-                                )?;
+                                self.run_debugger(global, caches, scope, _tp, _node)?;
 
                                 let ((getter, hash_get), (setter, hash_set), name) = &**p;
                                 let args = &mut [target.as_mut()];
@@ -943,7 +928,7 @@ impl Engine {
                                 let val = &mut (&mut val).into();
 
                                 let (result, may_be_changed) = self.eval_dot_index_chain_raw(
-                                    global, caches, this_ptr, root, rhs, val, &x.rhs, idx_values,
+                                    global, caches, _this_ptr, root, rhs, val, &x.rhs, idx_values,
                                     new_val,
                                 )?;
 
@@ -987,11 +972,7 @@ impl Engine {
                                 let val = {
                                     #[cfg(feature = "debugging")]
                                     let reset = self.run_debugger_with_reset(
-                                        global,
-                                        caches,
-                                        scope,
-                                        this_ptr.as_deref_mut(),
-                                        _node,
+                                        global, caches, scope, _tp, _node,
                                     )?;
                                     #[cfg(feature = "debugging")]
                                     auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
@@ -1015,7 +996,7 @@ impl Engine {
                                 let val = &mut val.into();
 
                                 self.eval_dot_index_chain_raw(
-                                    global, caches, this_ptr, root, rhs, val, &x.rhs, idx_values,
+                                    global, caches, _this_ptr, root, rhs, val, &x.rhs, idx_values,
                                     new_val,
                                 )
                             }
