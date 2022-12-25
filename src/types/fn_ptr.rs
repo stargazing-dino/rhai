@@ -360,7 +360,9 @@ impl FnPtr {
     /// arguments attached.
     ///
     /// If `this_ptr` is provided, it is first provided to script-defined functions bound to `this`.
-    /// When an appropriate function is not found, it is then removed and mapped to the first parameter.
+    ///
+    /// When an appropriate function is not found and `move_this_ptr_to_args` is `Some`, `this_ptr`
+    /// is removed and inserted as the appropriate parameter number.
     ///
     /// This is useful for calling predicate closures within an iteration loop where the extra argument
     /// is the current element's index.
@@ -374,17 +376,19 @@ impl FnPtr {
         fn_name: &str,
         ctx: &NativeCallContext,
         this_ptr: Option<&mut Dynamic>,
-        items: [Dynamic; N],
+        args: [Dynamic; N],
         extras: [Dynamic; E],
+        move_this_ptr_to_args: Option<usize>,
     ) -> RhaiResult {
-        self._call_with_extra_args(fn_name, ctx, this_ptr, items, extras)
+        self._call_with_extra_args(fn_name, ctx, this_ptr, args, extras, move_this_ptr_to_args)
     }
     /// _(internals)_ Make a call to a function pointer with either a specified number of arguments,
-    /// or with extra arguments attached.
-    /// Exported under the `internals` feature only.
+    /// or with extra arguments attached. Exported under the `internals` feature only.
     ///
     /// If `this_ptr` is provided, it is first provided to script-defined functions bound to `this`.
-    /// When an appropriate function is not found, it is then removed and mapped to the first parameter.
+    ///
+    /// When an appropriate function is not found and `move_this_ptr_to_args` is `Some`, `this_ptr`
+    /// is removed and inserted as the appropriate parameter number.
     ///
     /// This is useful for calling predicate closures within an iteration loop where the extra
     /// argument is the current element's index.
@@ -398,10 +402,11 @@ impl FnPtr {
         fn_name: &str,
         ctx: &NativeCallContext,
         this_ptr: Option<&mut Dynamic>,
-        items: [Dynamic; N],
+        args: [Dynamic; N],
         extras: [Dynamic; E],
+        move_this_ptr_to_args: Option<usize>,
     ) -> RhaiResult {
-        self._call_with_extra_args(fn_name, ctx, this_ptr, items, extras)
+        self._call_with_extra_args(fn_name, ctx, this_ptr, args, extras, move_this_ptr_to_args)
     }
     /// Make a call to a function pointer with either a specified number of arguments, or with extra
     /// arguments attached.
@@ -410,51 +415,94 @@ impl FnPtr {
         fn_name: &str,
         ctx: &NativeCallContext,
         mut this_ptr: Option<&mut Dynamic>,
-        items: [Dynamic; N],
+        args: [Dynamic; N],
         extras: [Dynamic; E],
+        move_this_ptr_to_args: Option<usize>,
     ) -> RhaiResult {
         #[cfg(not(feature = "no_function"))]
         if let Some(arity) = self.fn_def().map(|f| f.params.len()) {
-            if arity == N + 1 && this_ptr.is_some() {
-                let mut args = FnArgsVec::with_capacity(items.len() + 1);
-                args.push(this_ptr.as_mut().unwrap().clone());
-                args.extend(items);
-                return self.call_raw(ctx, None, args);
+            if let Some(move_to_args) = move_this_ptr_to_args {
+                if this_ptr.is_some() {
+                    if arity == N + 1 {
+                        let mut args2 = FnArgsVec::with_capacity(args.len() + 1);
+                        if move_to_args == 0 {
+                            args2.push(this_ptr.as_mut().unwrap().clone());
+                            args2.extend(args);
+                        } else {
+                            args2.extend(args);
+                            args2.insert(move_to_args, this_ptr.as_mut().unwrap().clone());
+                        }
+                        return self.call_raw(ctx, None, args2);
+                    }
+                    if arity == N + E + 1 {
+                        let mut args2 = FnArgsVec::with_capacity(args.len() + extras.len() + 1);
+                        if move_to_args == 0 {
+                            args2.push(this_ptr.as_mut().unwrap().clone());
+                            args2.extend(args);
+                            args2.extend(extras);
+                        } else {
+                            args2.extend(args);
+                            args2.insert(move_to_args, this_ptr.as_mut().unwrap().clone());
+                            args2.extend(extras);
+                        }
+                        return self.call_raw(ctx, None, args2);
+                    }
+                }
             }
             if arity == N {
-                return self.call_raw(ctx, this_ptr, items);
+                return self.call_raw(ctx, this_ptr, args);
             }
             if arity == N + E {
-                let mut items2 = FnArgsVec::with_capacity(items.len() + extras.len());
-                items2.extend(IntoIterator::into_iter(items));
-                items2.extend(IntoIterator::into_iter(extras));
-                return self.call_raw(ctx, this_ptr, items2);
+                let mut args2 = FnArgsVec::with_capacity(args.len() + extras.len());
+                args2.extend(args);
+                args2.extend(extras);
+                return self.call_raw(ctx, this_ptr, args2);
             }
         }
 
-        self.call_raw(ctx, this_ptr.as_deref_mut(), items.clone())
+        self.call_raw(ctx, this_ptr.as_deref_mut(), args.clone())
             .or_else(|err| match *err {
                 ERR::ErrorFunctionNotFound(sig, ..)
-                    if this_ptr.is_some() && sig.starts_with(self.fn_name()) =>
+                    if move_this_ptr_to_args.is_some()
+                        && this_ptr.is_some()
+                        && sig.starts_with(self.fn_name()) =>
                 {
-                    let mut args = FnArgsVec::with_capacity(items.len() + 1);
-                    args.push(this_ptr.as_mut().unwrap().clone());
-                    args.extend(IntoIterator::into_iter(items.clone()));
-                    self.call_raw(ctx, this_ptr.as_deref_mut(), args)
+                    let mut args2 = FnArgsVec::with_capacity(args.len() + 1);
+                    let move_to_args = move_this_ptr_to_args.unwrap();
+                    if move_to_args == 0 {
+                        args2.push(this_ptr.as_mut().unwrap().clone());
+                        args2.extend(args.clone());
+                    } else {
+                        args2.extend(args.clone());
+                        args2.insert(move_to_args, this_ptr.as_mut().unwrap().clone());
+                    }
+                    self.call_raw(ctx, None, args2)
                 }
                 _ => Err(err),
             })
             .or_else(|err| match *err {
                 ERR::ErrorFunctionNotFound(sig, ..) if sig.starts_with(self.fn_name()) => {
-                    let mut args = FnArgsVec::with_capacity(
-                        items.len() + extras.len() + if this_ptr.is_some() { 1 } else { 0 },
-                    );
-                    if let Some(ref mut this_ptr) = this_ptr {
-                        args.push(this_ptr.clone());
+                    if let Some(move_to_args) = move_this_ptr_to_args {
+                        if let Some(ref mut this_ptr) = this_ptr {
+                            let mut args2 = FnArgsVec::with_capacity(args.len() + extras.len() + 1);
+                            if move_to_args == 0 {
+                                args2.push(this_ptr.clone());
+                                args2.extend(args);
+                                args2.extend(extras);
+                            } else {
+                                args2.extend(args);
+                                args2.extend(extras);
+                                args2.insert(move_to_args, this_ptr.clone());
+                            }
+                            return self.call_raw(ctx, None, args2);
+                        }
                     }
-                    args.extend(IntoIterator::into_iter(items));
-                    args.extend(IntoIterator::into_iter(extras));
-                    self.call_raw(ctx, this_ptr, args)
+
+                    let mut args2 = FnArgsVec::with_capacity(args.len() + extras.len());
+                    args2.extend(args);
+                    args2.extend(extras);
+
+                    self.call_raw(ctx, this_ptr, args2)
                 }
                 _ => Err(err),
             })

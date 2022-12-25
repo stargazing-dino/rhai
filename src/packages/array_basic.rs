@@ -644,6 +644,43 @@ pub mod array_functions {
             result
         }
     }
+
+    /// Iterate through all the elements in the array, applying a `process` function to each element in turn.
+    /// Each element is bound to `this` before calling the function.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `this`: bound to array element (mutable)
+    /// * `index` _(optional)_: current index in the array
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = [1, 2, 3, 4, 5];
+    ///
+    /// x.for_each(|| this *= this);
+    ///
+    /// print(x);       // prints "[1, 4, 9, 16, 25]"
+    ///
+    /// x.for_each(|i| this *= i);
+    ///
+    /// print(x);       // prints "[0, 2, 6, 12, 20]"
+    /// ```
+    #[rhai_fn(return_raw)]
+    pub fn for_each(ctx: NativeCallContext, array: &mut Array, map: FnPtr) -> RhaiResultOf<()> {
+        if array.is_empty() {
+            return Ok(());
+        }
+
+        for (i, item) in array.iter_mut().enumerate() {
+            let ex = [(i as INT).into()];
+
+            let _ = map.call_raw_with_extra_args("map", &ctx, Some(item), [], ex, None)?;
+        }
+
+        Ok(())
+    }
+
     /// Iterate through all the elements in the array, applying a `mapper` function to each element
     /// in turn, and return the results as a new array.
     ///
@@ -679,8 +716,7 @@ pub mod array_functions {
 
         for (i, item) in array.iter_mut().enumerate() {
             let ex = [(i as INT).into()];
-
-            ar.push(map.call_raw_with_extra_args("map", &ctx, Some(item), [], ex)?);
+            ar.push(map.call_raw_with_extra_args("map", &ctx, Some(item), [], ex, Some(0))?);
         }
 
         Ok(ar)
@@ -723,7 +759,7 @@ pub mod array_functions {
             let ex = [(i as INT).into()];
 
             if filter
-                .call_raw_with_extra_args("filter", &ctx, Some(item), [], ex)?
+                .call_raw_with_extra_args("filter", &ctx, Some(item), [], ex, Some(0))?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -962,7 +998,7 @@ pub mod array_functions {
             let ex = [(i as INT).into()];
 
             if filter
-                .call_raw_with_extra_args("index_of", &ctx, Some(item), [], ex)?
+                .call_raw_with_extra_args("index_of", &ctx, Some(item), [], ex, Some(0))?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1128,7 +1164,8 @@ pub mod array_functions {
         for (i, item) in array.iter_mut().enumerate().skip(start) {
             let ex = [(i as INT).into()];
 
-            let value = filter.call_raw_with_extra_args("find_map", &ctx, Some(item), [], ex)?;
+            let value =
+                filter.call_raw_with_extra_args("find_map", &ctx, Some(item), [], ex, Some(0))?;
 
             if !value.is_unit() {
                 return Ok(value);
@@ -1169,7 +1206,7 @@ pub mod array_functions {
             let ex = [(i as INT).into()];
 
             if filter
-                .call_raw_with_extra_args("some", &ctx, Some(item), [], ex)?
+                .call_raw_with_extra_args("some", &ctx, Some(item), [], ex, Some(0))?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1211,7 +1248,7 @@ pub mod array_functions {
             let ex = [(i as INT).into()];
 
             if !filter
-                .call_raw_with_extra_args("all", &ctx, Some(item), [], ex)?
+                .call_raw_with_extra_args("all", &ctx, Some(item), [], ex, Some(0))?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1334,11 +1371,11 @@ pub mod array_functions {
         }
 
         array
-            .iter()
+            .iter_mut()
             .enumerate()
             .try_fold(initial, |result, (i, item)| {
                 let ex = [(i as INT).into()];
-                reducer.call_raw_with_extra_args("reduce", &ctx, None, [result, item.clone()], ex)
+                reducer.call_raw_with_extra_args("reduce", &ctx, Some(item), [result], ex, Some(1))
             })
     }
     /// Reduce an array by iterating through all elements, in _reverse_ order,
@@ -1400,19 +1437,22 @@ pub mod array_functions {
             return Ok(initial);
         }
 
+        let len = array.len();
+
         array
-            .iter()
+            .iter_mut()
             .rev()
             .enumerate()
             .try_fold(initial, |result, (i, item)| {
-                let ex = [((array.len() - 1 - i) as INT).into()];
+                let ex = [((len - 1 - i) as INT).into()];
 
                 reducer.call_raw_with_extra_args(
                     "reduce_rev",
                     &ctx,
-                    None,
-                    [result, item.clone()],
+                    Some(item),
+                    [result],
                     ex,
+                    Some(1),
                 )
             })
     }
@@ -1602,7 +1642,7 @@ pub mod array_functions {
             let ex = [(i as INT).into()];
 
             if filter
-                .call_raw_with_extra_args("drain", &ctx, Some(&mut array[x]), [], ex)?
+                .call_raw_with_extra_args("drain", &ctx, Some(&mut array[x]), [], ex, Some(0))?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1749,7 +1789,7 @@ pub mod array_functions {
             let ex = [(i as INT).into()];
 
             if filter
-                .call_raw_with_extra_args("retain", &ctx, Some(&mut array[x]), [], ex)?
+                .call_raw_with_extra_args("retain", &ctx, Some(&mut array[x]), [], ex, Some(0))?
                 .as_bool()
                 .unwrap_or(false)
             {

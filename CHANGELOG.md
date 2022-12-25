@@ -57,8 +57,9 @@ Net features
 
 ### Enhanced array API
 
-* Array methods that take a function pointer, usually a closure (e.g. `map`, `filter`, `index_of` etc.), can now provide a closure with one few parameter but binds the first parameter to `this`.
-* This vastly improves performance when working with arrays of object maps by avoiding unnecessary cloning of large types.
+* Array methods that take a function pointer, usually a closure (e.g. `map`, `filter`, `index_of`, `reduce` etc.), can now bind the array element to `this` when calling a closure.
+* This vastly improves performance when working with arrays of large types (e.g. object maps) by avoiding unnecessary cloning.
+* `for_each` is also added for arrays, allowing a closure to mutate array elements (bound to `this`) in turn.
 
 Enhancements
 ------------
