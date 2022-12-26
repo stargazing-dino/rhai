@@ -235,52 +235,15 @@ pub mod array_functions {
 
         // Check if array will be over max size limit
         #[cfg(not(feature = "unchecked"))]
-        {
-            use crate::types::dynamic::Union;
+        if _ctx.engine().max_array_size() > 0 {
+            let pad = len - array.len();
+            let (a, m, s) = Dynamic::calc_array_sizes(array, true);
+            let (ax, mx, sx) = item.calc_data_sizes(true);
 
-            if _ctx.engine().max_array_size() > 0 && len > _ctx.engine().max_array_size() {
-                return Err(
-                    ERR::ErrorDataTooLarge("Size of array".to_string(), Position::NONE).into(),
-                );
-            }
-
-            let check_sizes = match item.0 {
-                Union::Str(..) => true,
-                Union::Array(..) => true,
-                #[cfg(not(feature = "no_object"))]
-                Union::Map(..) => true,
-                _ => false,
-            };
-
-            if check_sizes {
-                let mut arr_len = array.len();
-                let mut arr = Dynamic::from_array(mem::take(array));
-
-                let (mut a1, mut m1, mut s1) = arr.calc_data_sizes(true);
-                let (a2, m2, s2) = item.calc_data_sizes(true);
-
-                {
-                    let mut guard = arr.write_lock::<Array>().unwrap();
-
-                    while arr_len < len {
-                        a1 += a2;
-                        m1 += m2;
-                        s1 += s2;
-
-                        _ctx.engine().throw_on_size((a1, m1, s1))?;
-
-                        guard.push(item.clone());
-                        arr_len += 1;
-                    }
-                }
-
-                *array = arr.into_array().unwrap();
-            } else {
-                array.resize(len, item);
-            }
+            _ctx.engine()
+                .throw_on_size((a + pad + ax * pad, m + mx * pad, s + sx * pad))?;
         }
 
-        #[cfg(feature = "unchecked")]
         array.resize(len, item);
 
         Ok(())
