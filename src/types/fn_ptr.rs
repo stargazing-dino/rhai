@@ -421,9 +421,12 @@ impl FnPtr {
     ) -> RhaiResult {
         #[cfg(not(feature = "no_function"))]
         if let Some(arity) = self.fn_def().map(|f| f.params.len()) {
+            if arity == N + self.curry().len() {
+                return self.call_raw(ctx, this_ptr, args);
+            }
             if let Some(move_to_args) = move_this_ptr_to_args {
                 if this_ptr.is_some() {
-                    if arity == N + 1 {
+                    if arity == N + 1 + self.curry().len() {
                         let mut args2 = FnArgsVec::with_capacity(args.len() + 1);
                         if move_to_args == 0 {
                             args2.push(this_ptr.as_mut().unwrap().clone());
@@ -434,7 +437,7 @@ impl FnPtr {
                         }
                         return self.call_raw(ctx, None, args2);
                     }
-                    if arity == N + E + 1 {
+                    if arity == N + E + 1 + self.curry().len() {
                         let mut args2 = FnArgsVec::with_capacity(args.len() + extras.len() + 1);
                         if move_to_args == 0 {
                             args2.push(this_ptr.as_mut().unwrap().clone());
@@ -449,10 +452,7 @@ impl FnPtr {
                     }
                 }
             }
-            if arity == N {
-                return self.call_raw(ctx, this_ptr, args);
-            }
-            if arity == N + E {
+            if arity == N + E + self.curry().len() {
                 let mut args2 = FnArgsVec::with_capacity(args.len() + extras.len());
                 args2.extend(args);
                 args2.extend(extras);

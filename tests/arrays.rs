@@ -303,6 +303,18 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
         engine.eval::<INT>("let x = [1, 2, 3]; x.for_each(|| this += 41); x[0]")?,
         42
     );
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let x = [1, 2, 3];
+                let sum = 0;
+                let factor = 2;
+                x.for_each(|| sum += this * factor);
+                sum
+            "
+        )?,
+        12
+    );
     assert_eq!(engine.eval::<INT>("([1].map(|x| x + 41))[0]")?, 42);
     assert_eq!(
         engine.eval::<INT>("let c = 40; let y = 1; [1].map(|x, i| c + x + y + i)[0]")?,
