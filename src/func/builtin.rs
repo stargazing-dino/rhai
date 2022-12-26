@@ -91,65 +91,65 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
     let type2 = y.type_id();
 
     macro_rules! impl_op {
-        ($xx:ident $op:tt $yy:ident) => { (|_, args| {
+        ($xx:ident $op:tt $yy:ident) => { Some((|_, args| {
             let x = &*args[0].read_lock::<$xx>().unwrap();
             let y = &*args[1].read_lock::<$yy>().unwrap();
             Ok((x $op y).into())
-        }, false) };
-        ($xx:ident . $func:ident ( $yy:ty )) => { (|_, args| {
+        }, false)) };
+        ($xx:ident . $func:ident ( $yy:ty )) => { Some((|_, args| {
             let x = &*args[0].read_lock::<$xx>().unwrap();
             let y = &*args[1].read_lock::<$yy>().unwrap();
             Ok(x.$func(y).into())
-        }, false) };
-        ($xx:ident . $func:ident ( $yy:ident . $yyy:ident () )) => { (|_, args| {
+        }, false)) };
+        ($xx:ident . $func:ident ( $yy:ident . $yyy:ident () )) => { Some((|_, args| {
             let x = &*args[0].read_lock::<$xx>().unwrap();
             let y = &*args[1].read_lock::<$yy>().unwrap();
             Ok(x.$func(y.$yyy()).into())
-        }, false) };
-        ($func:ident ( $op:tt )) => { (|_, args| {
+        }, false)) };
+        ($func:ident ( $op:tt )) => { Some((|_, args| {
             let (x, y) = $func(args);
             Ok((x $op y).into())
-        }, false) };
-        ($base:ty => $xx:ident $op:tt $yy:ident) => { (|_, args| {
+        }, false)) };
+        ($base:ty => $xx:ident $op:tt $yy:ident) => { Some((|_, args| {
             let x = args[0].$xx().unwrap() as $base;
             let y = args[1].$yy().unwrap() as $base;
             Ok((x $op y).into())
-        }, false) };
-        ($base:ty => $xx:ident . $func:ident ( $yy:ident as $yyy:ty)) => { (|_, args| {
+        }, false)) };
+        ($base:ty => $xx:ident . $func:ident ( $yy:ident as $yyy:ty)) => { Some((|_, args| {
             let x = args[0].$xx().unwrap() as $base;
             let y = args[1].$yy().unwrap() as $base;
             Ok(x.$func(y as $yyy).into())
-        }, false) };
-        ($base:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { (|_, args| {
+        }, false)) };
+        ($base:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { Some((|_, args| {
             let x = args[0].$xx().unwrap() as $base;
             let y = args[1].$yy().unwrap() as $base;
             Ok($func(x, y).into())
-        }, false) };
-        ($base:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
+        }, false)) };
+        ($base:ty => $func:ident ( $xx:ident, $yy:ident )) => { Some((|_, args| {
             let x = args[0].$xx().unwrap() as $base;
             let y = args[1].$yy().unwrap() as $base;
             $func(x, y).map(Into::into)
-        }, false) };
-        (from $base:ty => $xx:ident $op:tt $yy:ident) => { (|_, args| {
+        }, false)) };
+        (from $base:ty => $xx:ident $op:tt $yy:ident) => { Some((|_, args| {
             let x = <$base>::from(args[0].$xx().unwrap());
             let y = <$base>::from(args[1].$yy().unwrap());
             Ok((x $op y).into())
-        }, false) };
-        (from $base:ty => $xx:ident . $func:ident ( $yy:ident )) => { (|_, args| {
+        }, false)) };
+        (from $base:ty => $xx:ident . $func:ident ( $yy:ident )) => { Some((|_, args| {
             let x = <$base>::from(args[0].$xx().unwrap());
             let y = <$base>::from(args[1].$yy().unwrap());
             Ok(x.$func(y).into())
-        }, false) };
-        (from $base:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { (|_, args| {
+        }, false)) };
+        (from $base:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { Some((|_, args| {
             let x = <$base>::from(args[0].$xx().unwrap());
             let y = <$base>::from(args[1].$yy().unwrap());
             Ok($func(x, y).into())
-        }, false) };
-        (from $base:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
+        }, false)) };
+        (from $base:ty => $func:ident ( $xx:ident, $yy:ident )) => { Some((|_, args| {
             let x = <$base>::from(args[0].$xx().unwrap());
             let y = <$base>::from(args[1].$yy().unwrap());
             $func(x, y).map(Into::into)
-        }, false) };
+        }, false)) };
     }
 
     // Check for common patterns
@@ -161,25 +161,25 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
 
             #[cfg(not(feature = "unchecked"))]
             match op {
-                Plus => return Some(impl_op!(INT => add(as_int, as_int))),
-                Minus => return Some(impl_op!(INT => subtract(as_int, as_int))),
-                Multiply => return Some(impl_op!(INT => multiply(as_int, as_int))),
-                Divide => return Some(impl_op!(INT => divide(as_int, as_int))),
-                Modulo => return Some(impl_op!(INT => modulo(as_int, as_int))),
-                PowerOf => return Some(impl_op!(INT => power(as_int, as_int))),
-                RightShift => return Some(impl_op!(INT => Ok(shift_right(as_int, as_int)))),
-                LeftShift => return Some(impl_op!(INT => Ok(shift_left(as_int, as_int)))),
+                Plus => return impl_op!(INT => add(as_int, as_int)),
+                Minus => return impl_op!(INT => subtract(as_int, as_int)),
+                Multiply => return impl_op!(INT => multiply(as_int, as_int)),
+                Divide => return impl_op!(INT => divide(as_int, as_int)),
+                Modulo => return impl_op!(INT => modulo(as_int, as_int)),
+                PowerOf => return impl_op!(INT => power(as_int, as_int)),
+                RightShift => return impl_op!(INT => Ok(shift_right(as_int, as_int))),
+                LeftShift => return impl_op!(INT => Ok(shift_left(as_int, as_int))),
                 _ => (),
             }
 
             #[cfg(feature = "unchecked")]
             match op {
-                Plus => return Some(impl_op!(INT => as_int + as_int)),
-                Minus => return Some(impl_op!(INT => as_int - as_int)),
-                Multiply => return Some(impl_op!(INT => as_int * as_int)),
-                Divide => return Some(impl_op!(INT => as_int / as_int)),
-                Modulo => return Some(impl_op!(INT => as_int % as_int)),
-                PowerOf => return Some(impl_op!(INT => as_int.pow(as_int as u32))),
+                Plus => return impl_op!(INT => as_int + as_int),
+                Minus => return impl_op!(INT => as_int - as_int),
+                Multiply => return impl_op!(INT => as_int * as_int),
+                Divide => return impl_op!(INT => as_int / as_int),
+                Modulo => return impl_op!(INT => as_int % as_int),
+                PowerOf => return impl_op!(INT => as_int.pow(as_int as u32)),
                 RightShift => {
                     return Some((
                         |_, args| {
@@ -204,32 +204,32 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
             }
 
             return match op {
-                EqualsTo => Some(impl_op!(INT => as_int == as_int)),
-                NotEqualsTo => Some(impl_op!(INT => as_int != as_int)),
-                GreaterThan => Some(impl_op!(INT => as_int > as_int)),
-                GreaterThanEqualsTo => Some(impl_op!(INT => as_int >= as_int)),
-                LessThan => Some(impl_op!(INT => as_int < as_int)),
-                LessThanEqualsTo => Some(impl_op!(INT => as_int <= as_int)),
-                Ampersand => Some(impl_op!(INT => as_int & as_int)),
-                Pipe => Some(impl_op!(INT => as_int | as_int)),
-                XOr => Some(impl_op!(INT => as_int ^ as_int)),
-                ExclusiveRange => Some(impl_op!(INT => as_int .. as_int)),
-                InclusiveRange => Some(impl_op!(INT => as_int ..= as_int)),
+                EqualsTo => impl_op!(INT => as_int == as_int),
+                NotEqualsTo => impl_op!(INT => as_int != as_int),
+                GreaterThan => impl_op!(INT => as_int > as_int),
+                GreaterThanEqualsTo => impl_op!(INT => as_int >= as_int),
+                LessThan => impl_op!(INT => as_int < as_int),
+                LessThanEqualsTo => impl_op!(INT => as_int <= as_int),
+                Ampersand => impl_op!(INT => as_int & as_int),
+                Pipe => impl_op!(INT => as_int | as_int),
+                XOr => impl_op!(INT => as_int ^ as_int),
+                ExclusiveRange => impl_op!(INT => as_int .. as_int),
+                InclusiveRange => impl_op!(INT => as_int ..= as_int),
                 _ => None,
             };
         }
 
         if type1 == TypeId::of::<bool>() {
             return match op {
-                EqualsTo => Some(impl_op!(bool => as_bool == as_bool)),
-                NotEqualsTo => Some(impl_op!(bool => as_bool != as_bool)),
-                GreaterThan => Some(impl_op!(bool => as_bool > as_bool)),
-                GreaterThanEqualsTo => Some(impl_op!(bool => as_bool >= as_bool)),
-                LessThan => Some(impl_op!(bool => as_bool < as_bool)),
-                LessThanEqualsTo => Some(impl_op!(bool => as_bool <= as_bool)),
-                Ampersand => Some(impl_op!(bool => as_bool & as_bool)),
-                Pipe => Some(impl_op!(bool => as_bool | as_bool)),
-                XOr => Some(impl_op!(bool => as_bool ^ as_bool)),
+                EqualsTo => impl_op!(bool => as_bool == as_bool),
+                NotEqualsTo => impl_op!(bool => as_bool != as_bool),
+                GreaterThan => impl_op!(bool => as_bool > as_bool),
+                GreaterThanEqualsTo => impl_op!(bool => as_bool >= as_bool),
+                LessThan => impl_op!(bool => as_bool < as_bool),
+                LessThanEqualsTo => impl_op!(bool => as_bool <= as_bool),
+                Ampersand => impl_op!(bool => as_bool & as_bool),
+                Pipe => impl_op!(bool => as_bool | as_bool),
+                XOr => impl_op!(bool => as_bool ^ as_bool),
                 _ => None,
             };
         }
@@ -250,13 +250,13 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
                     },
                     CHECKED_BUILD,
                 )),
-                Minus => Some(impl_op!(ImmutableString - ImmutableString)),
-                EqualsTo => Some(impl_op!(ImmutableString == ImmutableString)),
-                NotEqualsTo => Some(impl_op!(ImmutableString != ImmutableString)),
-                GreaterThan => Some(impl_op!(ImmutableString > ImmutableString)),
-                GreaterThanEqualsTo => Some(impl_op!(ImmutableString >= ImmutableString)),
-                LessThan => Some(impl_op!(ImmutableString < ImmutableString)),
-                LessThanEqualsTo => Some(impl_op!(ImmutableString <= ImmutableString)),
+                Minus => impl_op!(ImmutableString - ImmutableString),
+                EqualsTo => impl_op!(ImmutableString == ImmutableString),
+                NotEqualsTo => impl_op!(ImmutableString != ImmutableString),
+                GreaterThan => impl_op!(ImmutableString > ImmutableString),
+                GreaterThanEqualsTo => impl_op!(ImmutableString >= ImmutableString),
+                LessThan => impl_op!(ImmutableString < ImmutableString),
+                LessThanEqualsTo => impl_op!(ImmutableString <= ImmutableString),
                 _ => None,
             };
         }
@@ -279,12 +279,12 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
                     },
                     CHECKED_BUILD,
                 )),
-                EqualsTo => Some(impl_op!(char => as_char == as_char)),
-                NotEqualsTo => Some(impl_op!(char => as_char != as_char)),
-                GreaterThan => Some(impl_op!(char => as_char > as_char)),
-                GreaterThanEqualsTo => Some(impl_op!(char => as_char >= as_char)),
-                LessThan => Some(impl_op!(char => as_char < as_char)),
-                LessThanEqualsTo => Some(impl_op!(char => as_char <= as_char)),
+                EqualsTo => impl_op!(char => as_char == as_char),
+                NotEqualsTo => impl_op!(char => as_char != as_char),
+                GreaterThan => impl_op!(char => as_char > as_char),
+                GreaterThanEqualsTo => impl_op!(char => as_char >= as_char),
+                LessThan => impl_op!(char => as_char < as_char),
+                LessThanEqualsTo => impl_op!(char => as_char <= as_char),
                 _ => None,
             };
         }
@@ -316,8 +316,8 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
                     },
                     CHECKED_BUILD,
                 )),
-                EqualsTo => Some(impl_op!(Blob == Blob)),
-                NotEqualsTo => Some(impl_op!(Blob != Blob)),
+                EqualsTo => impl_op!(Blob == Blob),
+                NotEqualsTo => impl_op!(Blob != Blob),
                 _ => None,
             };
         }
@@ -338,18 +338,18 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
         ($x:ty, $xx:ident, $y:ty, $yy:ident) => {
             if (type1, type2) == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
                 return match op {
-                    Plus                => Some(impl_op!(FLOAT => $xx + $yy)),
-                    Minus               => Some(impl_op!(FLOAT => $xx - $yy)),
-                    Multiply            => Some(impl_op!(FLOAT => $xx * $yy)),
-                    Divide              => Some(impl_op!(FLOAT => $xx / $yy)),
-                    Modulo              => Some(impl_op!(FLOAT => $xx % $yy)),
-                    PowerOf             => Some(impl_op!(FLOAT => $xx.powf($yy as FLOAT))),
-                    EqualsTo            => Some(impl_op!(FLOAT => $xx == $yy)),
-                    NotEqualsTo         => Some(impl_op!(FLOAT => $xx != $yy)),
-                    GreaterThan         => Some(impl_op!(FLOAT => $xx > $yy)),
-                    GreaterThanEqualsTo => Some(impl_op!(FLOAT => $xx >= $yy)),
-                    LessThan            => Some(impl_op!(FLOAT => $xx < $yy)),
-                    LessThanEqualsTo    => Some(impl_op!(FLOAT => $xx <= $yy)),
+                    Plus                => impl_op!(FLOAT => $xx + $yy),
+                    Minus               => impl_op!(FLOAT => $xx - $yy),
+                    Multiply            => impl_op!(FLOAT => $xx * $yy),
+                    Divide              => impl_op!(FLOAT => $xx / $yy),
+                    Modulo              => impl_op!(FLOAT => $xx % $yy),
+                    PowerOf             => impl_op!(FLOAT => $xx.powf($yy as FLOAT)),
+                    EqualsTo            => impl_op!(FLOAT => $xx == $yy),
+                    NotEqualsTo         => impl_op!(FLOAT => $xx != $yy),
+                    GreaterThan         => impl_op!(FLOAT => $xx > $yy),
+                    GreaterThanEqualsTo => impl_op!(FLOAT => $xx >= $yy),
+                    LessThan            => impl_op!(FLOAT => $xx < $yy),
+                    LessThanEqualsTo    => impl_op!(FLOAT => $xx <= $yy),
                     _                   => None,
                 };
             }
@@ -373,12 +373,12 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
 
                 #[cfg(not(feature = "unchecked"))]
                 match op {
-                    Plus     => return Some(impl_op!(from Decimal => add($xx, $yy))),
-                    Minus    => return Some(impl_op!(from Decimal => subtract($xx, $yy))),
-                    Multiply => return Some(impl_op!(from Decimal => multiply($xx, $yy))),
-                    Divide   => return Some(impl_op!(from Decimal => divide($xx, $yy))),
-                    Modulo   => return Some(impl_op!(from Decimal => modulo($xx, $yy))),
-                    PowerOf  => return Some(impl_op!(from Decimal => power($xx, $yy))),
+                    Plus     => return impl_op!(from Decimal => add($xx, $yy)),
+                    Minus    => return impl_op!(from Decimal => subtract($xx, $yy)),
+                    Multiply => return impl_op!(from Decimal => multiply($xx, $yy)),
+                    Divide   => return impl_op!(from Decimal => divide($xx, $yy)),
+                    Modulo   => return impl_op!(from Decimal => modulo($xx, $yy)),
+                    PowerOf  => return impl_op!(from Decimal => power($xx, $yy)),
                     _        => ()
                 }
 
@@ -387,22 +387,22 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
 
                 #[cfg(feature = "unchecked")]
                 match op {
-                    Plus     => return Some(impl_op!(from Decimal => $xx + $yy)),
-                    Minus    => return Some(impl_op!(from Decimal => $xx - $yy)),
-                    Multiply => return Some(impl_op!(from Decimal => $xx * $yy)),
-                    Divide   => return Some(impl_op!(from Decimal => $xx / $yy)),
-                    Modulo   => return Some(impl_op!(from Decimal => $xx % $yy)),
-                    PowerOf  => return Some(impl_op!(from Decimal => $xx.powd($yy))),
+                    Plus     => return impl_op!(from Decimal => $xx + $yy),
+                    Minus    => return impl_op!(from Decimal => $xx - $yy),
+                    Multiply => return impl_op!(from Decimal => $xx * $yy),
+                    Divide   => return impl_op!(from Decimal => $xx / $yy),
+                    Modulo   => return impl_op!(from Decimal => $xx % $yy),
+                    PowerOf  => return impl_op!(from Decimal => $xx.powd($yy)),
                     _        => ()
                 }
 
                 return match op {
-                    EqualsTo            => Some(impl_op!(from Decimal => $xx == $yy)),
-                    NotEqualsTo         => Some(impl_op!(from Decimal => $xx != $yy)),
-                    GreaterThan         => Some(impl_op!(from Decimal => $xx > $yy)),
-                    GreaterThanEqualsTo => Some(impl_op!(from Decimal => $xx >= $yy)),
-                    LessThan            => Some(impl_op!(from Decimal => $xx < $yy)),
-                    LessThanEqualsTo    => Some(impl_op!(from Decimal => $xx <= $yy)),
+                    EqualsTo            => impl_op!(from Decimal => $xx == $yy),
+                    NotEqualsTo         => impl_op!(from Decimal => $xx != $yy),
+                    GreaterThan         => impl_op!(from Decimal => $xx > $yy),
+                    GreaterThanEqualsTo => impl_op!(from Decimal => $xx >= $yy),
+                    LessThan            => impl_op!(from Decimal => $xx < $yy),
+                    LessThanEqualsTo    => impl_op!(from Decimal => $xx <= $yy),
                     _                   => None
                 };
             }
@@ -444,12 +444,12 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
                 },
                 CHECKED_BUILD,
             )),
-            EqualsTo => Some(impl_op!(get_s1s2(==))),
-            NotEqualsTo => Some(impl_op!(get_s1s2(!=))),
-            GreaterThan => Some(impl_op!(get_s1s2(>))),
-            GreaterThanEqualsTo => Some(impl_op!(get_s1s2(>=))),
-            LessThan => Some(impl_op!(get_s1s2(<))),
-            LessThanEqualsTo => Some(impl_op!(get_s1s2(<=))),
+            EqualsTo => impl_op!(get_s1s2(==)),
+            NotEqualsTo => impl_op!(get_s1s2(!=)),
+            GreaterThan => impl_op!(get_s1s2(>)),
+            GreaterThanEqualsTo => impl_op!(get_s1s2(>=)),
+            LessThan => impl_op!(get_s1s2(<)),
+            LessThanEqualsTo => impl_op!(get_s1s2(<=)),
             _ => None,
         };
     }
@@ -486,12 +486,12 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
                 },
                 false,
             )),
-            EqualsTo => Some(impl_op!(get_s1s2(==))),
-            NotEqualsTo => Some(impl_op!(get_s1s2(!=))),
-            GreaterThan => Some(impl_op!(get_s1s2(>))),
-            GreaterThanEqualsTo => Some(impl_op!(get_s1s2(>=))),
-            LessThan => Some(impl_op!(get_s1s2(<))),
-            LessThanEqualsTo => Some(impl_op!(get_s1s2(<=))),
+            EqualsTo => impl_op!(get_s1s2(==)),
+            NotEqualsTo => impl_op!(get_s1s2(!=)),
+            GreaterThan => impl_op!(get_s1s2(>)),
+            GreaterThanEqualsTo => impl_op!(get_s1s2(>=)),
+            LessThan => impl_op!(get_s1s2(<)),
+            LessThanEqualsTo => impl_op!(get_s1s2(<=)),
             _ => None,
         };
     }
@@ -568,16 +568,16 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
     // Handle ranges here because ranges are implemented as custom type
     if type1 == TypeId::of::<ExclusiveRange>() && type1 == type2 {
         return match op {
-            EqualsTo => Some(impl_op!(ExclusiveRange == ExclusiveRange)),
-            NotEqualsTo => Some(impl_op!(ExclusiveRange != ExclusiveRange)),
+            EqualsTo => impl_op!(ExclusiveRange == ExclusiveRange),
+            NotEqualsTo => impl_op!(ExclusiveRange != ExclusiveRange),
             _ => None,
         };
     }
 
     if type1 == TypeId::of::<InclusiveRange>() && type1 == type2 {
         return match op {
-            EqualsTo => Some(impl_op!(InclusiveRange == InclusiveRange)),
-            NotEqualsTo => Some(impl_op!(InclusiveRange != InclusiveRange)),
+            EqualsTo => impl_op!(InclusiveRange == InclusiveRange),
+            NotEqualsTo => impl_op!(InclusiveRange != InclusiveRange),
             _ => None,
         };
     }
@@ -626,54 +626,54 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
     let type2 = y.type_id();
 
     macro_rules! impl_op {
-        ($x:ty = x $op:tt $yy:ident) => { (|_, args| {
+        ($x:ty = x $op:tt $yy:ident) => { Some((|_, args| {
             let x = args[0].$yy().unwrap();
             let y = args[1].$yy().unwrap() as $x;
             Ok((*args[0].write_lock::<$x>().unwrap() = x $op y).into())
-        }, false) };
-        ($x:ident $op:tt $yy:ident) => { (|_, args| {
+        }, false)) };
+        ($x:ident $op:tt $yy:ident) => { Some((|_, args| {
             let y = args[1].$yy().unwrap() as $x;
             Ok((*args[0].write_lock::<$x>().unwrap() $op y).into())
-        }, false) };
-        ($x:ident $op:tt $yy:ident as $yyy:ty) => { (|_, args| {
+        }, false)) };
+        ($x:ident $op:tt $yy:ident as $yyy:ty) => { Some((|_, args| {
             let y = args[1].$yy().unwrap() as $yyy;
             Ok((*args[0].write_lock::<$x>().unwrap() $op y).into())
-        }, false) };
-        ($x:ty => $xx:ident . $func:ident ( $yy:ident as $yyy:ty )) => { (|_, args| {
+        }, false)) };
+        ($x:ty => $xx:ident . $func:ident ( $yy:ident as $yyy:ty )) => { Some((|_, args| {
             let x = args[0].$xx().unwrap();
             let y = args[1].$yy().unwrap() as $x;
             Ok((*args[0].write_lock::<$x>().unwrap() = x.$func(y as $yyy)).into())
-        }, false) };
-        ($x:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { (|_, args| {
+        }, false)) };
+        ($x:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { Some((|_, args| {
             let x = args[0].$xx().unwrap();
             let y = args[1].$yy().unwrap() as $x;
             let v: Dynamic = $func(x, y).into();
             Ok((*args[0].write_lock().unwrap() = v).into())
-        }, false) };
-        ($x:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
+        }, false)) };
+        ($x:ty => $func:ident ( $xx:ident, $yy:ident )) => { Some((|_, args| {
             let x = args[0].$xx().unwrap();
             let y = args[1].$yy().unwrap() as $x;
             Ok((*args[0].write_lock().unwrap() = $func(x, y)?).into())
-        }, false) };
-        (from $x:ident $op:tt $yy:ident) => { (|_, args| {
+        }, false)) };
+        (from $x:ident $op:tt $yy:ident) => { Some((|_, args| {
             let y = <$x>::from(args[1].$yy().unwrap());
             Ok((*args[0].write_lock::<$x>().unwrap() $op y).into())
-        }, false) };
-        (from $x:ty => $xx:ident . $func:ident ( $yy:ident )) => { (|_, args| {
+        }, false)) };
+        (from $x:ty => $xx:ident . $func:ident ( $yy:ident )) => { Some((|_, args| {
             let x = args[0].$xx().unwrap();
             let y = <$x>::from(args[1].$yy().unwrap());
             Ok((*args[0].write_lock::<$x>().unwrap() = x.$func(y)).into())
-        }, false) };
-        (from $x:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { (|_, args| {
+        }, false)) };
+        (from $x:ty => Ok($func:ident ( $xx:ident, $yy:ident ))) => { Some((|_, args| {
             let x = args[0].$xx().unwrap();
             let y = <$x>::from(args[1].$yy().unwrap());
             Ok((*args[0].write_lock().unwrap() = $func(x, y).into()).into())
-        }, false) };
-        (from $x:ty => $func:ident ( $xx:ident, $yy:ident )) => { (|_, args| {
+        }, false)) };
+        (from $x:ty => $func:ident ( $xx:ident, $yy:ident )) => { Some((|_, args| {
             let x = args[0].$xx().unwrap();
             let y = <$x>::from(args[1].$yy().unwrap());
             Ok((*args[0].write_lock().unwrap() = $func(x, y)?).into())
-        }, false) };
+        }, false)) };
     }
 
     // Check for common patterns
@@ -685,25 +685,25 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
 
             #[cfg(not(feature = "unchecked"))]
             match op {
-                PlusAssign => return Some(impl_op!(INT => add(as_int, as_int))),
-                MinusAssign => return Some(impl_op!(INT => subtract(as_int, as_int))),
-                MultiplyAssign => return Some(impl_op!(INT => multiply(as_int, as_int))),
-                DivideAssign => return Some(impl_op!(INT => divide(as_int, as_int))),
-                ModuloAssign => return Some(impl_op!(INT => modulo(as_int, as_int))),
-                PowerOfAssign => return Some(impl_op!(INT => power(as_int, as_int))),
-                RightShiftAssign => return Some(impl_op!(INT => Ok(shift_right(as_int, as_int)))),
-                LeftShiftAssign => return Some(impl_op!(INT => Ok(shift_left(as_int, as_int)))),
+                PlusAssign => return impl_op!(INT => add(as_int, as_int)),
+                MinusAssign => return impl_op!(INT => subtract(as_int, as_int)),
+                MultiplyAssign => return impl_op!(INT => multiply(as_int, as_int)),
+                DivideAssign => return impl_op!(INT => divide(as_int, as_int)),
+                ModuloAssign => return impl_op!(INT => modulo(as_int, as_int)),
+                PowerOfAssign => return impl_op!(INT => power(as_int, as_int)),
+                RightShiftAssign => return impl_op!(INT => Ok(shift_right(as_int, as_int))),
+                LeftShiftAssign => return impl_op!(INT => Ok(shift_left(as_int, as_int))),
                 _ => (),
             }
 
             #[cfg(feature = "unchecked")]
             match op {
-                PlusAssign => return Some(impl_op!(INT += as_int)),
-                MinusAssign => return Some(impl_op!(INT -= as_int)),
-                MultiplyAssign => return Some(impl_op!(INT *= as_int)),
-                DivideAssign => return Some(impl_op!(INT /= as_int)),
-                ModuloAssign => return Some(impl_op!(INT %= as_int)),
-                PowerOfAssign => return Some(impl_op!(INT => as_int.pow(as_int as u32))),
+                PlusAssign => return impl_op!(INT += as_int),
+                MinusAssign => return impl_op!(INT -= as_int),
+                MultiplyAssign => return impl_op!(INT *= as_int),
+                DivideAssign => return impl_op!(INT /= as_int),
+                ModuloAssign => return impl_op!(INT %= as_int),
+                PowerOfAssign => return impl_op!(INT => as_int.pow(as_int as u32)),
                 RightShiftAssign => {
                     return Some((
                         |_, args| {
@@ -730,17 +730,17 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
             }
 
             return match op {
-                AndAssign => Some(impl_op!(INT &= as_int)),
-                OrAssign => Some(impl_op!(INT |= as_int)),
-                XOrAssign => Some(impl_op!(INT ^= as_int)),
+                AndAssign => impl_op!(INT &= as_int),
+                OrAssign => impl_op!(INT |= as_int),
+                XOrAssign => impl_op!(INT ^= as_int),
                 _ => None,
             };
         }
 
         if type1 == TypeId::of::<bool>() {
             return match op {
-                AndAssign => Some(impl_op!(bool = x && as_bool)),
-                OrAssign => Some(impl_op!(bool = x || as_bool)),
+                AndAssign => impl_op!(bool = x && as_bool),
+                OrAssign => impl_op!(bool = x || as_bool),
                 _ => None,
             };
         }
@@ -861,12 +861,12 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
         ($x:ident, $xx:ident, $y:ty, $yy:ident) => {
             if (type1, type2) == (TypeId::of::<$x>(), TypeId::of::<$y>()) {
                 return match op {
-                    PlusAssign      => Some(impl_op!($x += $yy)),
-                    MinusAssign     => Some(impl_op!($x -= $yy)),
-                    MultiplyAssign  => Some(impl_op!($x *= $yy)),
-                    DivideAssign    => Some(impl_op!($x /= $yy)),
-                    ModuloAssign    => Some(impl_op!($x %= $yy)),
-                    PowerOfAssign   => Some(impl_op!($x => $xx.powf($yy as $x))),
+                    PlusAssign      => impl_op!($x += $yy),
+                    MinusAssign     => impl_op!($x -= $yy),
+                    MultiplyAssign  => impl_op!($x *= $yy),
+                    DivideAssign    => impl_op!($x /= $yy),
+                    ModuloAssign    => impl_op!($x %= $yy),
+                    PowerOfAssign   => impl_op!($x => $xx.powf($yy as $x)),
                     _               => None,
                 };
             }
@@ -889,12 +889,12 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
 
                 #[cfg(not(feature = "unchecked"))]
                 return match op {
-                    PlusAssign      => Some(impl_op!(from $x => add($xx, $yy))),
-                    MinusAssign     => Some(impl_op!(from $x => subtract($xx, $yy))),
-                    MultiplyAssign  => Some(impl_op!(from $x => multiply($xx, $yy))),
-                    DivideAssign    => Some(impl_op!(from $x => divide($xx, $yy))),
-                    ModuloAssign    => Some(impl_op!(from $x => modulo($xx, $yy))),
-                    PowerOfAssign   => Some(impl_op!(from $x => power($xx, $yy))),
+                    PlusAssign      => impl_op!(from $x => add($xx, $yy)),
+                    MinusAssign     => impl_op!(from $x => subtract($xx, $yy)),
+                    MultiplyAssign  => impl_op!(from $x => multiply($xx, $yy)),
+                    DivideAssign    => impl_op!(from $x => divide($xx, $yy)),
+                    ModuloAssign    => impl_op!(from $x => modulo($xx, $yy)),
+                    PowerOfAssign   => impl_op!(from $x => power($xx, $yy)),
                     _               => None,
                 };
 
@@ -903,12 +903,12 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
 
                 #[cfg(feature = "unchecked")]
                 return match op {
-                    PlusAssign      => Some(impl_op!(from $x += $yy)),
-                    MinusAssign     => Some(impl_op!(from $x -= $yy)),
-                    MultiplyAssign  => Some(impl_op!(from $x *= $yy)),
-                    DivideAssign    => Some(impl_op!(from $x /= $yy)),
-                    ModuloAssign    => Some(impl_op!(from $x %= $yy)),
-                    PowerOfAssign   => Some(impl_op!(from $x => $xx.powd($yy))),
+                    PlusAssign      => impl_op!(from $x += $yy),
+                    MinusAssign     => impl_op!(from $x -= $yy),
+                    MultiplyAssign  => impl_op!(from $x *= $yy),
+                    DivideAssign    => impl_op!(from $x /= $yy),
+                    ModuloAssign    => impl_op!(from $x %= $yy),
+                    PowerOfAssign   => impl_op!(from $x => $xx.powd($yy)),
                     _               => None,
                 };
             }
@@ -939,7 +939,7 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
                 },
                 CHECKED_BUILD,
             )),
-            MinusAssign => Some(impl_op!(ImmutableString -= as_char as char)),
+            MinusAssign => impl_op!(ImmutableString -= as_char as char),
             _ => None,
         };
     }

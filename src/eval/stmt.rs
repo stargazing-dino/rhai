@@ -140,14 +140,14 @@ impl Engine {
             let args = &mut [&mut *lock_guard, &mut new_val];
 
             if self.fast_operators() {
-                if let Some((func, ctx)) =
+                if let Some((func, need_context)) =
                     get_builtin_op_assignment_fn(op_assign_token.clone(), args[0], args[1])
                 {
                     // Built-in found
                     let op = op_assign_token.literal_syntax();
                     auto_restore! { let orig_level = global.level; global.level += 1 }
 
-                    let context = if ctx {
+                    let context = if need_context {
                         Some((self, op, None, &*global, *op_pos).into())
                     } else {
                         None

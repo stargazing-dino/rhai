@@ -1611,13 +1611,13 @@ impl Engine {
 
             let operands = &mut [&mut lhs, &mut rhs];
 
-            if let Some((func, ctx)) =
+            if let Some((func, need_context)) =
                 get_builtin_binary_op_fn(op_token.clone(), operands[0], operands[1])
             {
                 // Built-in found
                 auto_restore! { let orig_level = global.level; global.level += 1 }
 
-                let context = if ctx {
+                let context = if need_context {
                     Some((self, name.as_str(), None, &*global, pos).into())
                 } else {
                     None
