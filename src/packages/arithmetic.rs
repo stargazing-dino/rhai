@@ -276,6 +276,7 @@ gen_signed_functions!(signed_num_128 => i128);
 #[export_module]
 mod f32_functions {
     #[cfg(not(feature = "f32_float"))]
+    #[allow(clippy::cast_precision_loss)]
     pub mod basic_arithmetic {
         #[rhai_fn(name = "+")]
         pub fn add(x: f32, y: f32) -> f32 {
@@ -381,6 +382,7 @@ mod f32_functions {
                 "Number raised to too large an index: {x} ** {y}"
             )))
         } else {
+            #[allow(clippy::cast_possible_truncation)]
             Ok(x.powi(y as i32))
         }
     }

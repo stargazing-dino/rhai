@@ -328,7 +328,7 @@ pub fn check_rename_collisions(fns: &[ExportedFn]) -> Result<(), syn::Error> {
 
             for (name, fn_name) in names {
                 let current_span = item_fn.params().span.unwrap();
-                let key = make_key(&name, item_fn);
+                let key = make_key(name, item_fn);
                 if let Some(other_span) = renames.insert(key, current_span) {
                     let mut err = syn::Error::new(
                         current_span,

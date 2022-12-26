@@ -114,11 +114,12 @@ mod time_functions {
 
     #[cfg(not(feature = "no_float"))]
     pub mod float_functions {
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         fn add_impl(timestamp: Instant, seconds: FLOAT) -> RhaiResultOf<Instant> {
             if seconds < 0.0 {
                 subtract_impl(timestamp, -seconds)
             } else if cfg!(not(feature = "unchecked")) {
-                if seconds > (INT::MAX as FLOAT) {
+                if seconds > (INT::MAX as FLOAT).min(u64::MAX as FLOAT) {
                     Err(make_arithmetic_err(format!(
                         "Integer overflow for timestamp add: {seconds}"
                     )))
@@ -135,20 +136,21 @@ mod time_functions {
                 Ok(timestamp + Duration::from_millis((seconds * 1000.0) as u64))
             }
         }
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         fn subtract_impl(timestamp: Instant, seconds: FLOAT) -> RhaiResultOf<Instant> {
             if seconds < 0.0 {
                 add_impl(timestamp, -seconds)
             } else if cfg!(not(feature = "unchecked")) {
-                if seconds > (INT::MAX as FLOAT) {
+                if seconds > (INT::MAX as FLOAT).min(u64::MAX as FLOAT) {
                     Err(make_arithmetic_err(format!(
-                        "Integer overflow for timestamp add: {seconds}"
+                        "Integer overflow for timestamp subtract: {seconds}"
                     )))
                 } else {
                     timestamp
                         .checked_sub(Duration::from_millis((seconds * 1000.0) as u64))
                         .ok_or_else(|| {
                             make_arithmetic_err(format!(
-                                "Timestamp overflow when adding {seconds} second(s)"
+                                "Timestamp overflow when subtracting {seconds} second(s)"
                             ))
                         })
                 }
@@ -182,6 +184,7 @@ mod time_functions {
     }
 
     fn add_impl(timestamp: Instant, seconds: INT) -> RhaiResultOf<Instant> {
+        #[allow(clippy::cast_sign_loss)]
         if seconds < 0 {
             subtract_impl(timestamp, -seconds)
         } else if cfg!(not(feature = "unchecked")) {
@@ -197,6 +200,7 @@ mod time_functions {
         }
     }
     fn subtract_impl(timestamp: Instant, seconds: INT) -> RhaiResultOf<Instant> {
+        #[allow(clippy::cast_sign_loss)]
         if seconds < 0 {
             add_impl(timestamp, -seconds)
         } else if cfg!(not(feature = "unchecked")) {
@@ -204,7 +208,7 @@ mod time_functions {
                 .checked_sub(Duration::from_secs(seconds as u64))
                 .ok_or_else(|| {
                     make_arithmetic_err(format!(
-                        "Timestamp overflow when adding {seconds} second(s)"
+                        "Timestamp overflow when subtracting {seconds} second(s)"
                     ))
                 })
         } else {

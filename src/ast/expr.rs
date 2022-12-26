@@ -117,7 +117,7 @@ impl fmt::Debug for FnCallHashes {
             return if script == self.native {
                 fmt::Debug::fmt(&self.native, f)
             } else {
-                write!(f, "({}, {})", script, self.native)
+                write!(f, "({script}, {})", self.native)
             };
         }
 

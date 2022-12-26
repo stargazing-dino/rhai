@@ -132,6 +132,7 @@ mod bit_field_functions {
             ERR::ErrorBitFieldBounds(INT_BITS, start, Position::NONE).into()
         })?;
 
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let bits = if bit + bits as usize > INT_BITS {
             INT_BITS - bit
         } else {
@@ -143,6 +144,7 @@ mod bit_field_functions {
         }
 
         // 2^bits - 1
+        #[allow(clippy::cast_possible_truncation)]
         let mask = ((2 as UNSIGNED_INT).pow(bits as u32) - 1) as INT;
 
         Ok(((value & (mask << bit)) >> bit) & mask)
@@ -218,6 +220,7 @@ mod bit_field_functions {
             ERR::ErrorBitFieldBounds(INT_BITS, bit, Position::NONE).into()
         })?;
 
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let bits = if bit + bits as usize > INT_BITS {
             INT_BITS - bit
         } else {
@@ -230,6 +233,7 @@ mod bit_field_functions {
         }
 
         // 2^bits - 1
+        #[allow(clippy::cast_possible_truncation)]
         let mask = ((2 as UNSIGNED_INT).pow(bits as u32) - 1) as INT;
 
         *value &= !(mask << bit);

@@ -674,7 +674,7 @@ pub mod deprecated_array_functions {
     #[rhai_fn(name = "map", return_raw)]
     pub fn map_by_fn_name(
         ctx: NativeCallContext,
-        array: Array,
+        array: &mut Array,
         mapper: &str,
     ) -> RhaiResultOf<Array> {
         map(ctx, array, FnPtr::new(mapper)?)
@@ -712,7 +712,7 @@ pub mod deprecated_array_functions {
     #[rhai_fn(name = "filter", return_raw)]
     pub fn filter_by_fn_name(
         ctx: NativeCallContext,
-        array: Array,
+        array: &mut Array,
         filter_func: &str,
     ) -> RhaiResultOf<Array> {
         filter(ctx, array, FnPtr::new(filter_func)?)

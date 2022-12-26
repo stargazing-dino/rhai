@@ -153,8 +153,9 @@ mod reflection_functions {
     /// Return an array of object maps containing metadata of all script-defined functions
     /// matching the specified name and arity (number of parameters).
     #[rhai_fn(name = "get_fn_metadata_list")]
+    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn get_fn_metadata2(ctx: NativeCallContext, name: &str, params: INT) -> Array {
-        if params < 0 || params > crate::MAX_USIZE_INT {
+        if !(0..=crate::MAX_USIZE_INT).contains(&params) {
             Array::new()
         } else {
             collect_fn_metadata(ctx, |_, _, n, p, _| p == (params as usize) && n == name)

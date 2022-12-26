@@ -317,6 +317,7 @@ impl GlobalRuntimeState {
     ///
     /// Panics if the debugging interface is not set.
     #[cfg(feature = "debugging")]
+    #[must_use]
     pub fn debugger(&self) -> &super::Debugger {
         self.debugger.as_ref().unwrap()
     }
@@ -326,6 +327,7 @@ impl GlobalRuntimeState {
     ///
     /// Panics if the debugging interface is not set.
     #[cfg(feature = "debugging")]
+    #[must_use]
     pub fn debugger_mut(&mut self) -> &mut super::Debugger {
         self.debugger.as_deref_mut().unwrap()
     }

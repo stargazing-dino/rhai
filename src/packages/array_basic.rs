@@ -220,14 +220,18 @@ pub mod array_functions {
         len: INT,
         item: Dynamic,
     ) -> RhaiResultOf<()> {
-        let len = len.min(MAX_USIZE_INT);
+        if len <= 0 {
+            return Ok(());
+        }
 
-        if len <= 0 || (len as usize) <= array.len() {
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        let len = len.min(MAX_USIZE_INT) as usize;
+
+        if len <= array.len() {
             return Ok(());
         }
 
         let _ctx = ctx;
-        let len = len as usize;
 
         // Check if array will be over max size limit
         #[cfg(not(feature = "unchecked"))]
@@ -373,11 +377,16 @@ pub mod array_functions {
     /// print(x);       // prints "[1, 2, 3]"
     /// ```
     pub fn truncate(array: &mut Array, len: INT) {
+        if len <= 0 {
+            array.clear();
+            return;
+        }
         if !array.is_empty() {
-            let len = len.min(MAX_USIZE_INT);
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            let len = len.min(MAX_USIZE_INT) as usize;
 
             if len > 0 {
-                array.truncate(len as usize);
+                array.truncate(len);
             } else {
                 array.clear();
             }
@@ -402,13 +411,18 @@ pub mod array_functions {
     /// print(x);       // prints "[3, 4, 5]"
     /// ```
     pub fn chop(array: &mut Array, len: INT) {
+        if len <= 0 {
+            array.clear();
+            return;
+        }
         if !array.is_empty() {
-            let len = len.min(MAX_USIZE_INT);
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            let len = len.min(MAX_USIZE_INT) as usize;
 
             if len <= 0 {
                 array.clear();
-            } else if (len as usize) < array.len() {
-                array.drain(0..array.len() - len as usize);
+            } else if len < array.len() {
+                array.drain(0..array.len() - len);
             }
         }
     }
@@ -633,6 +647,10 @@ pub mod array_functions {
     /// Iterate through all the elements in the array, applying a `mapper` function to each element
     /// in turn, and return the results as a new array.
     ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -652,17 +670,17 @@ pub mod array_functions {
     /// print(y);       // prints "[0, 2, 6, 12, 20]"
     /// ```
     #[rhai_fn(return_raw)]
-    pub fn map(ctx: NativeCallContext, array: Array, map: FnPtr) -> RhaiResultOf<Array> {
+    pub fn map(ctx: NativeCallContext, array: &mut Array, map: FnPtr) -> RhaiResultOf<Array> {
         if array.is_empty() {
-            return Ok(array);
+            return Ok(Array::new());
         }
 
         let mut ar = Array::with_capacity(array.len());
 
-        for (i, item) in array.into_iter().enumerate() {
+        for (i, item) in array.iter_mut().enumerate() {
             let ex = [(i as INT).into()];
 
-            ar.push(map.call_raw_with_extra_args("map", &ctx, None, [item], ex)?);
+            ar.push(map.call_raw_with_extra_args("map", &ctx, Some(item), [], ex)?);
         }
 
         Ok(ar)
@@ -670,6 +688,10 @@ pub mod array_functions {
 
     /// Iterate through all the elements in the array, applying a `filter` function to each element
     /// in turn, and return a copy of all elements (in order) that return `true` as a new array.
+    ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
     ///
     /// # Function Parameters
     ///
@@ -690,22 +712,22 @@ pub mod array_functions {
     /// print(y);       // prints "[12, 20]"
     /// ```
     #[rhai_fn(return_raw)]
-    pub fn filter(ctx: NativeCallContext, array: Array, filter: FnPtr) -> RhaiResultOf<Array> {
+    pub fn filter(ctx: NativeCallContext, array: &mut Array, filter: FnPtr) -> RhaiResultOf<Array> {
         if array.is_empty() {
-            return Ok(array);
+            return Ok(Array::new());
         }
 
         let mut ar = Array::new();
 
-        for (i, item) in array.into_iter().enumerate() {
+        for (i, item) in array.iter_mut().enumerate() {
             let ex = [(i as INT).into()];
 
             if filter
-                .call_raw_with_extra_args("filter", &ctx, None, [item.clone()], ex)?
+                .call_raw_with_extra_args("filter", &ctx, Some(item), [], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
-                ar.push(item);
+                ar.push(item.clone());
             }
         }
 
@@ -857,6 +879,10 @@ pub mod array_functions {
     /// in turn, and return the index of the first element that returns `true`.
     /// If no element returns `true`, `-1` is returned.
     ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -893,6 +919,10 @@ pub mod array_functions {
     /// * If `start` < -length of array, position counts from the beginning of the array.
     /// * If `start` ≥ length of array, `-1` is returned.
     ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -928,11 +958,11 @@ pub mod array_functions {
 
         let (start, ..) = calc_offset_len(array.len(), start, 0);
 
-        for (i, item) in array.iter().enumerate().skip(start) {
+        for (i, item) in array.iter_mut().enumerate().skip(start) {
             let ex = [(i as INT).into()];
 
             if filter
-                .call_raw_with_extra_args("index_of", &ctx, None, [item.clone()], ex)?
+                .call_raw_with_extra_args("index_of", &ctx, Some(item), [], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -946,6 +976,10 @@ pub mod array_functions {
     /// in turn, and return a copy of the first element that returns `true`. If no element returns
     /// `true`, `()` is returned.
     ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -958,7 +992,7 @@ pub mod array_functions {
     ///
     /// print(x.find(|v| v > 3));                    // prints 5: 5 > 3
     ///
-    /// x.find(|v| v > 13) ?? print("not found");    // prints "not found": nothing is > 13
+    /// print(x.find(|v| v > 13) ?? "not found");    // prints "not found": nothing is > 13
     ///
     /// print(x.find(|v, i| v * i > 13));            // prints 5: 3 * 5 > 13
     /// ```
@@ -974,6 +1008,10 @@ pub mod array_functions {
     /// * If `start` < -length of array, position counts from the beginning of the array.
     /// * If `start` ≥ length of array, `-1` is returned.
     ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -986,9 +1024,9 @@ pub mod array_functions {
     ///
     /// print(x.find(|v| v > 1, 2));                     // prints 3: 3 > 1
     ///
-    /// x.find(|v| v < 2, 3) ?? print("not found");      // prints "not found": nothing < 2 past index 3
+    /// print(x.find(|v| v < 2, 3) ?? "not found");      // prints "not found": nothing < 2 past index 3
     ///
-    /// x.find(|v| v > 1, 8) ?? print("not found");      // prints "not found": nothing found past end of array
+    /// print(x.find(|v| v > 1, 8) ?? "not found");      // prints "not found": nothing found past end of array
     ///
     /// print(x.find(|v| v > 1, -3));                    // prints 5: -3 = start from index 4
     ///
@@ -1014,6 +1052,10 @@ pub mod array_functions {
     /// Iterate through all the elements in the array, applying a `mapper` function to each element
     /// in turn, and return the first result that is not `()`. Otherwise, `()` is returned.
     ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -1026,7 +1068,9 @@ pub mod array_functions {
     ///
     /// print(x.find_map(|v| v.alice));                  // prints 1
     ///
-    /// x.find_map(|v| v.dave) ?? print("not found");    // prints "not found"
+    /// print(x.find_map(|v| v.dave) ?? "not found");    // prints "not found"
+    ///
+    /// print(x.find_map(|| this.dave) ?? "not found");  // prints "not found"
     /// ```
     #[rhai_fn(return_raw, pure)]
     pub fn find_map(ctx: NativeCallContext, array: &mut Array, filter: FnPtr) -> RhaiResult {
@@ -1040,6 +1084,10 @@ pub mod array_functions {
     /// * If `start` < -length of array, position counts from the beginning of the array.
     /// * If `start` ≥ length of array, `-1` is returned.
     ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -1052,13 +1100,17 @@ pub mod array_functions {
     ///
     /// print(x.find_map(|v| v.alice, 2));                   // prints 0
     ///
-    /// x.find_map(|v| v.bob, 4) ?? print("not found");      // prints "not found"
+    /// print(x.find_map(|v| v.bob, 4) ?? "not found");      // prints "not found"
     ///
-    /// x.find_map(|v| v.alice, 8) ?? print("not found");    // prints "not found"
+    /// print(x.find_map(|v| v.alice, 8) ?? "not found");    // prints "not found"
+    ///
+    /// print(x.find_map(|| this.alice, 8) ?? "not found");  // prints "not found"
     ///
     /// print(x.find_map(|v| v.bob, -4));                    // prints 3: -4 = start from index 2
     ///
     /// print(x.find_map(|v| v.alice, -99));                 // prints 1: -99 = start from beginning
+    ///
+    /// print(x.find_map(|| this.alice, -99));               // prints 1: -99 = start from beginning
     /// ```
     #[rhai_fn(name = "find_map", return_raw, pure)]
     pub fn find_map_starting_from(
@@ -1073,11 +1125,10 @@ pub mod array_functions {
 
         let (start, ..) = calc_offset_len(array.len(), start, 0);
 
-        for (i, item) in array.iter().enumerate().skip(start) {
+        for (i, item) in array.iter_mut().enumerate().skip(start) {
             let ex = [(i as INT).into()];
 
-            let value =
-                filter.call_raw_with_extra_args("find_map", &ctx, None, [item.clone()], ex)?;
+            let value = filter.call_raw_with_extra_args("find_map", &ctx, Some(item), [], ex)?;
 
             if !value.is_unit() {
                 return Ok(value);
@@ -1087,6 +1138,10 @@ pub mod array_functions {
         Ok(Dynamic::UNIT)
     }
     /// Return `true` if any element in the array that returns `true` when applied the `filter` function.
+    ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
     ///
     /// # Function Parameters
     ///
@@ -1110,11 +1165,11 @@ pub mod array_functions {
             return Ok(false);
         }
 
-        for (i, item) in array.iter().enumerate() {
+        for (i, item) in array.iter_mut().enumerate() {
             let ex = [(i as INT).into()];
 
             if filter
-                .call_raw_with_extra_args("some", &ctx, None, [item.clone()], ex)?
+                .call_raw_with_extra_args("some", &ctx, Some(item), [], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1125,6 +1180,10 @@ pub mod array_functions {
         Ok(false)
     }
     /// Return `true` if all elements in the array return `true` when applied the `filter` function.
+    ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
     ///
     /// # Function Parameters
     ///
@@ -1148,11 +1207,11 @@ pub mod array_functions {
             return Ok(true);
         }
 
-        for (i, item) in array.iter().enumerate() {
+        for (i, item) in array.iter_mut().enumerate() {
             let ex = [(i as INT).into()];
 
             if !filter
-                .call_raw_with_extra_args("all", &ctx, None, [item.clone()], ex)?
+                .call_raw_with_extra_args("all", &ctx, Some(item), [], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1178,7 +1237,7 @@ pub mod array_functions {
     /// ```
     pub fn dedup(ctx: NativeCallContext, array: &mut Array) {
         let comparer = FnPtr::new_unchecked(OP_EQUALS, StaticVec::new_const());
-        dedup_by_comparer(ctx, array, comparer)
+        dedup_by_comparer(ctx, array, comparer);
     }
     /// Remove duplicated _consecutive_ elements from the array that return `true` when applied the
     /// `comparer` function.
@@ -1502,6 +1561,10 @@ pub mod array_functions {
     /// Remove all elements in the array that returns `true` when applied the `filter` function and
     /// return them as a new array.
     ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -1539,7 +1602,7 @@ pub mod array_functions {
             let ex = [(i as INT).into()];
 
             if filter
-                .call_raw_with_extra_args("drain", &ctx, None, [array[x].clone()], ex)?
+                .call_raw_with_extra_args("drain", &ctx, Some(&mut array[x]), [], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -1645,6 +1708,10 @@ pub mod array_functions {
     /// Remove all elements in the array that do not return `true` when applied the `filter`
     /// function and return them as a new array.
     ///
+    /// # No Function Parameter
+    ///
+    /// Array element (mutable) is bound to `this`.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -1682,7 +1749,7 @@ pub mod array_functions {
             let ex = [(i as INT).into()];
 
             if filter
-                .call_raw_with_extra_args("retain", &ctx, None, [array[x].clone()], ex)?
+                .call_raw_with_extra_args("retain", &ctx, Some(&mut array[x]), [], ex)?
                 .as_bool()
                 .unwrap_or(false)
             {

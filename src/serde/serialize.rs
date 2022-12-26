@@ -98,6 +98,7 @@ impl Serialize for Scope<'_> {
             pub is_constant: bool,
         }
 
+        #[allow(clippy::trivially_copy_pass_by_ref)]
         fn is_false(value: &bool) -> bool {
             !value
         }

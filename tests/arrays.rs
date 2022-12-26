@@ -298,6 +298,7 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
 
     assert_eq!(engine.eval::<INT>("[1].map(|x| x + 41)[0]")?, 42);
+    assert_eq!(engine.eval::<INT>("[1].map(|| this + 41)[0]")?, 42);
     assert_eq!(engine.eval::<INT>("([1].map(|x| x + 41))[0]")?, 42);
     assert_eq!(
         engine.eval::<INT>("let c = 40; let y = 1; [1].map(|x, i| c + x + y + i)[0]")?,
@@ -310,6 +311,18 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
                 "
                     let x = [1, 2, 3];
                     x.filter(|v| v > 2)
+                "
+            )?
+            .into_typed_array::<INT>()?,
+        [3]
+    );
+
+    assert_eq!(
+        engine
+            .eval::<Dynamic>(
+                "
+                    let x = [1, 2, 3];
+                    x.filter(|| this > 2)
                 "
             )?
             .into_typed_array::<INT>()?,
@@ -334,6 +347,18 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
                 "
                     let x = [1, 2, 3];
                     x.map(|v| v * 2)
+                "
+            )?
+            .into_typed_array::<INT>()?,
+        [2, 4, 6]
+    );
+
+    assert_eq!(
+        engine
+            .eval::<Dynamic>(
+                "
+                    let x = [1, 2, 3];
+                    x.map(|| this * 2)
                 "
             )?
             .into_typed_array::<INT>()?,

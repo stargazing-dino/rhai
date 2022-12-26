@@ -126,7 +126,10 @@ pub fn export_fn(
     args: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let mut output = proc_macro2::TokenStream::from(input.clone());
+    let mut output = quote! {
+        #[allow(clippy::needless_pass_by_value)]
+    };
+    output.extend(proc_macro2::TokenStream::from(input.clone()));
 
     let parsed_params = match crate::attrs::outer_item_attributes(args.into(), "export_fn") {
         Ok(args) => args,

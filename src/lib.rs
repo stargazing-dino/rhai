@@ -52,7 +52,11 @@
 //! }
 //! ```
 //!
-//! # Documentation
+//! # Features
+//!
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!(feature_label = "<span id=\"feature-{feature}\">**`{feature}`**</span>"))]
+//!
+//! # On-Line Documentation
 //!
 //! See [The Rhai Book](https://rhai.rs/book) for details on the Rhai scripting engine and language.
 
@@ -61,7 +65,7 @@
 // #![warn(clippy::all)]
 // #![warn(clippy::pedantic)]
 // #![warn(clippy::nursery)]
-// #![warn(clippy::cargo)]
+#![warn(clippy::cargo)]
 // #![warn(clippy::undocumented_unsafe_blocks)]
 #![allow(clippy::unit_arg)]
 #![allow(clippy::missing_errors_doc)]
@@ -74,6 +78,13 @@
 #![allow(clippy::box_collection)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::match_same_arms)]
+// The lints below can be turned off to reduce signal/noise ratio
+// #![allow(clippy::too_many_lines)]
+// #![allow(clippy::let_underscore_drop)]
+// #![allow(clippy::absurd_extreme_comparisons)]
+// #![allow(clippy::unnecessary_cast)]
+// #![allow(clippy::wildcard_imports)]
 
 #[cfg(feature = "no_std")]
 extern crate alloc;
@@ -325,8 +336,8 @@ pub use parser::ParseState;
 
 #[cfg(feature = "internals")]
 pub use ast::{
-    ASTFlags, ASTNode, BinaryExpr, ConditionalExpr, Expr, FnCallExpr, FnCallHashes, Ident,
-    OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock, SwitchCasesCollection, TryCatchBlock,
+    ASTFlags, ASTNode, BinaryExpr, ConditionalExpr, Expr, FlowControl, FnCallExpr, FnCallHashes,
+    Ident, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock, SwitchCasesCollection,
 };
 
 #[cfg(feature = "internals")]

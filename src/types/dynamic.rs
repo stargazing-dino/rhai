@@ -2055,6 +2055,7 @@ impl Dynamic {
     ///
     /// Shared values are _NOT_ scanned.
     #[inline]
+    #[allow(clippy::only_used_in_recursion)]
     pub fn deep_scan(&mut self, mut filter: impl FnMut(&mut Self)) {
         fn scan_inner(value: &mut Dynamic, filter: &mut impl FnMut(&mut Dynamic)) {
             match &mut value.0 {

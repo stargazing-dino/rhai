@@ -134,7 +134,6 @@ impl Engine {
                     fn_def.name.to_string(),
                     #[cfg(not(feature = "no_module"))]
                     _environ
-                        .as_deref()
                         .and_then(|environ| environ.lib.id())
                         .unwrap_or_else(|| global.source().unwrap_or(""))
                         .to_string(),

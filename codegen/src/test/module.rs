@@ -320,6 +320,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod empty {
                 #[allow(unused_imports)]
                 use super::*;
@@ -354,6 +355,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 pub fn get_mystic_number() -> INT {
                     42
@@ -432,6 +434,7 @@ mod generate_tests {
              */
             /// Another line!
             /// Final line!
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 /// This is a doc-comment.
                 /// Another line.
@@ -502,6 +505,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_global_fn {
                 pub fn add_one_to(x: INT) -> INT {
                     x + 1
@@ -561,6 +565,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 pub fn add_one_to(x: INT) -> INT {
                     x + 1
@@ -626,6 +631,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod two_fns {
                 pub fn add_one_to(x: INT) -> INT {
                     x + 1
@@ -714,6 +720,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 pub fn add_together(x: INT, y: INT) -> INT {
                     x + y
@@ -775,6 +782,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 pub fn add_together(x: INT, y: INT) -> INT {
                     x + y
@@ -848,6 +856,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_constant {
                 #[derive(Debug, Clone)]
                 pub struct Foo(pub INT);
@@ -915,6 +924,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_constant {
                 pub const MYSTIC_NUMBER: INT = 42;
                 #[allow(unused_imports)]
@@ -950,6 +960,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_constant {
                 pub use rhai::INT;
                 pub const MYSTIC_NUMBER: INT = 42;
@@ -987,6 +998,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 fn get_mystic_number() -> INT {
                     42
@@ -1025,6 +1037,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 pub fn get_mystic_number() -> INT {
                     42
@@ -1066,10 +1079,12 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 pub fn get_mystic_number() -> INT {
                     42
                 }
+                #[allow(clippy::needless_pass_by_value)]
                 pub mod inner_secrets {
                     pub const SECRET_NUMBER: INT = 86;
                 }
@@ -1125,6 +1140,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_constant {
                 const MYSTIC_NUMBER: INT = 42;
                 #[allow(unused_imports)]
@@ -1160,6 +1176,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod str_fn {
                 pub fn print_out_to(x: &str) {
                     x + 1
@@ -1219,6 +1236,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod str_fn {
                 pub fn print_out_to(x: String) {
                     x + 1
@@ -1279,6 +1297,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod ref_fn {
                 pub fn foo(x: &mut FLOAT, y: INT) -> FLOAT {
                     *x + y as FLOAT
@@ -1339,6 +1358,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod ref_fn {
                 pub fn increment(x: &mut FLOAT) {
                     *x += 1.0 as FLOAT;
@@ -1400,7 +1420,9 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
+                #[allow(clippy::needless_pass_by_value)]
                 pub mod it_is {
                     pub fn increment(x: &mut FLOAT) {
                         *x += 1.0 as FLOAT;
@@ -1483,9 +1505,10 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 #[cfg(not(feature = "no_float"))]
-
+                #[allow(clippy::needless_pass_by_value)]
                 pub mod it_is {
                     pub fn increment(x: &mut FLOAT) {
                         *x += 1.0 as FLOAT;
@@ -1572,6 +1595,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 pub fn int_foo(x: &mut u64) -> u64 {
                     (*x) * (*x)
@@ -1632,6 +1656,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 pub fn int_foo(x: &mut u64) -> u64 {
                     (*x) * (*x)
@@ -1695,6 +1720,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 pub fn int_foo(x: &mut u64, y: u64) {
                     *x = y * y
@@ -1756,6 +1782,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
                 pub fn int_foo(x: &mut u64, y: u64) {
                     *x = y * y
@@ -1820,6 +1847,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_index_fn {
                 pub fn get_by_index(x: &mut MyCollection, i: u64) -> FLOAT {
                     x.get(i)
@@ -1883,6 +1911,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_index_fn {
                 #[cfg(hello)]
                 #[some_other_attr]
@@ -1950,6 +1979,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_index_fn {
                 pub fn get_by_index(x: &mut MyCollection, i: u64) -> FLOAT {
                     x.get(i)
@@ -2014,6 +2044,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_index_fn {
                 pub fn set_by_index(x: &mut MyCollection, i: u64, item: FLOAT) {
                     x.entry(i).set(item)
@@ -2076,6 +2107,7 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_index_fn {
                 pub fn set_by_index(x: &mut MyCollection, i: u64, item: FLOAT) {
                     x.entry(i).set(item)
@@ -2140,7 +2172,9 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod one_constant {
+                #[allow(clippy::needless_pass_by_value)]
                 pub mod it_is {
                     pub const MYSTIC_NUMBER: INT = 42;
                     #[allow(unused_imports)]
@@ -2201,7 +2235,9 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod two_constants {
+                #[allow(clippy::needless_pass_by_value)]
                 pub mod first_is {
                     pub const MYSTIC_NUMBER: INT = 42;
                     #[allow(unused_imports)]
@@ -2221,6 +2257,7 @@ mod generate_tests {
                         if flatten {} else {}
                     }
                 }
+                #[allow(clippy::needless_pass_by_value)]
                 pub mod second_is {
                     #[cfg(hello)]
                     pub const SPECIAL_CPU_NUMBER: INT = 68000;
@@ -2303,12 +2340,16 @@ mod generate_tests {
         };
 
         let expected_tokens = quote! {
+            #[allow(clippy::needless_pass_by_value)]
             pub mod heap_root {
                 pub const VALUE: INT = 100;
+                #[allow(clippy::needless_pass_by_value)]
                 pub mod left {
                     pub const VALUE: INT = 19;
+                    #[allow(clippy::needless_pass_by_value)]
                     pub mod left {
                         pub const VALUE: INT = 17;
+                        #[allow(clippy::needless_pass_by_value)]
                         pub mod left {
                             pub const VALUE: INT = 2;
                             #[allow(unused_imports)]
@@ -2328,6 +2369,7 @@ mod generate_tests {
                                 if flatten {} else {}
                             }
                         }
+                        #[allow(clippy::needless_pass_by_value)]
                         pub mod right {
                             pub const VALUE: INT = 7;
                             #[allow(unused_imports)]
@@ -2371,6 +2413,7 @@ mod generate_tests {
                             }
                         }
                     }
+                    #[allow(clippy::needless_pass_by_value)]
                     pub mod right {
                         pub const VALUE: INT = 3;
                         #[allow(unused_imports)]
@@ -2414,8 +2457,10 @@ mod generate_tests {
                         }
                     }
                 }
+                #[allow(clippy::needless_pass_by_value)]
                 pub mod right {
                     pub const VALUE: INT = 36;
+                    #[allow(clippy::needless_pass_by_value)]
                     pub mod left {
                         pub const VALUE: INT = 25;
                         #[allow(unused_imports)]
@@ -2435,6 +2480,7 @@ mod generate_tests {
                             if flatten {} else {}
                         }
                     }
+                    #[allow(clippy::needless_pass_by_value)]
                     pub mod right {
                         pub const VALUE: INT = 1;
                         #[allow(unused_imports)]

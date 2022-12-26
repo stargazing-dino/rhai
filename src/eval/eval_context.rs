@@ -72,13 +72,11 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
     }
     /// Custom state kept in a [`Dynamic`].
     #[inline(always)]
-    #[must_use]
     pub const fn tag(&self) -> &Dynamic {
         &self.global.tag
     }
     /// Mutable reference to the custom state kept in a [`Dynamic`].
     #[inline(always)]
-    #[must_use]
     pub fn tag_mut(&mut self) -> &mut Dynamic {
         &mut self.global.tag
     }

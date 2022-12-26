@@ -37,11 +37,11 @@ impl Hash for FnPtr {
         self.curry.hash(state);
 
         // Hash the shared [`EncapsulatedEnviron`] by hashing its shared pointer.
-        self.environ.as_ref().map(|e| Shared::as_ptr(e)).hash(state);
+        self.environ.as_ref().map(Shared::as_ptr).hash(state);
 
         // Hash the linked [`ScriptFnDef`][crate::ast::ScriptFnDef] by hashing its shared pointer.
         #[cfg(not(feature = "no_function"))]
-        self.fn_def.as_ref().map(|f| Shared::as_ptr(f)).hash(state);
+        self.fn_def.as_ref().map(Shared::as_ptr).hash(state);
     }
 }
 
@@ -124,7 +124,6 @@ impl FnPtr {
     }
     /// Get the curried arguments.
     #[inline(always)]
-    #[must_use]
     pub fn curry(&self) -> &[Dynamic] {
         self.curry.as_ref()
     }
@@ -304,15 +303,14 @@ impl FnPtr {
                 global.level += 1;
 
                 let caches = &mut crate::eval::Caches::new();
-                let mut this_ptr = this_ptr;
 
                 return context.engine().call_script_fn(
                     global,
                     caches,
                     &mut crate::Scope::new(),
-                    this_ptr.as_deref_mut(),
+                    this_ptr,
                     self.encapsulated_environ(),
-                    &fn_def,
+                    fn_def,
                     args,
                     true,
                     context.position(),
@@ -361,6 +359,9 @@ impl FnPtr {
     /// Make a call to a function pointer with either a specified number of arguments, or with extra
     /// arguments attached.
     ///
+    /// If `this_ptr` is provided, it is first provided to script-defined functions bound to `this`.
+    /// When an appropriate function is not found, it is then removed and mapped to the first parameter.
+    ///
     /// This is useful for calling predicate closures within an iteration loop where the extra argument
     /// is the current element's index.
     ///
@@ -381,6 +382,9 @@ impl FnPtr {
     /// _(internals)_ Make a call to a function pointer with either a specified number of arguments,
     /// or with extra arguments attached.
     /// Exported under the `internals` feature only.
+    ///
+    /// If `this_ptr` is provided, it is first provided to script-defined functions bound to `this`.
+    /// When an appropriate function is not found, it is then removed and mapped to the first parameter.
     ///
     /// This is useful for calling predicate closures within an iteration loop where the extra
     /// argument is the current element's index.
@@ -411,24 +415,46 @@ impl FnPtr {
     ) -> RhaiResult {
         #[cfg(not(feature = "no_function"))]
         if let Some(arity) = self.fn_def().map(|f| f.params.len()) {
+            if arity == N + 1 && this_ptr.is_some() {
+                let mut args = FnArgsVec::with_capacity(items.len() + 1);
+                args.push(this_ptr.as_mut().unwrap().clone());
+                args.extend(items);
+                return self.call_raw(ctx, None, args);
+            }
             if arity == N {
-                return self.call_raw(&ctx, None, items);
+                return self.call_raw(ctx, this_ptr, items);
             }
             if arity == N + E {
                 let mut items2 = FnArgsVec::with_capacity(items.len() + extras.len());
                 items2.extend(IntoIterator::into_iter(items));
                 items2.extend(IntoIterator::into_iter(extras));
-                return self.call_raw(&ctx, this_ptr, items2);
+                return self.call_raw(ctx, this_ptr, items2);
             }
         }
 
-        self.call_raw(&ctx, this_ptr.as_deref_mut(), items.clone())
+        self.call_raw(ctx, this_ptr.as_deref_mut(), items.clone())
+            .or_else(|err| match *err {
+                ERR::ErrorFunctionNotFound(sig, ..)
+                    if this_ptr.is_some() && sig.starts_with(self.fn_name()) =>
+                {
+                    let mut args = FnArgsVec::with_capacity(items.len() + 1);
+                    args.push(this_ptr.as_mut().unwrap().clone());
+                    args.extend(IntoIterator::into_iter(items.clone()));
+                    self.call_raw(ctx, this_ptr.as_deref_mut(), args)
+                }
+                _ => Err(err),
+            })
             .or_else(|err| match *err {
                 ERR::ErrorFunctionNotFound(sig, ..) if sig.starts_with(self.fn_name()) => {
-                    let mut items2 = FnArgsVec::with_capacity(items.len() + extras.len());
-                    items2.extend(IntoIterator::into_iter(items));
-                    items2.extend(IntoIterator::into_iter(extras));
-                    self.call_raw(&ctx, this_ptr, items2)
+                    let mut args = FnArgsVec::with_capacity(
+                        items.len() + extras.len() + if this_ptr.is_some() { 1 } else { 0 },
+                    );
+                    if let Some(ref mut this_ptr) = this_ptr {
+                        args.push(this_ptr.clone());
+                    }
+                    args.extend(IntoIterator::into_iter(items));
+                    args.extend(IntoIterator::into_iter(extras));
+                    self.call_raw(ctx, this_ptr, args)
                 }
                 _ => Err(err),
             })

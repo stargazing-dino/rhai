@@ -1962,7 +1962,7 @@ impl Module {
     #[inline]
     #[allow(dead_code)]
     pub(crate) fn iter_fn(&self) -> impl Iterator<Item = &FuncInfo> {
-        self.functions.iter().flat_map(|m| m.values())
+        self.functions.iter().flat_map(StraightHashMap::values)
     }
 
     /// Get an iterator over all script-defined functions in the [`Module`].
@@ -2187,9 +2187,11 @@ impl Module {
                 let f = module.functions.as_mut().unwrap().get_mut(&hash).unwrap();
 
                 // Encapsulate AST environment
-                match &mut f.func {
-                    CallableFunction::Script { environ: e, .. } => *e = Some(environ.clone()),
-                    _ => (),
+                if let CallableFunction::Script {
+                    environ: ref mut e, ..
+                } = f.func
+                {
+                    *e = Some(environ.clone())
                 }
             });
 

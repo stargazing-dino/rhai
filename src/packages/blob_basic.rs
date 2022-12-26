@@ -75,7 +75,8 @@ pub mod blob_functions {
         len: INT,
         value: INT,
     ) -> RhaiResultOf<Blob> {
-        let len = len.min(MAX_USIZE_INT).max(0) as usize;
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        let len = len.clamp(0, MAX_USIZE_INT) as usize;
         let _ctx = ctx;
 
         // Check if blob will be over max size limit
@@ -83,6 +84,7 @@ pub mod blob_functions {
         _ctx.engine().throw_on_size((len, 0, 0))?;
 
         let mut blob = Blob::new();
+        #[allow(clippy::cast_sign_loss)]
         blob.resize(len, (value & 0x0000_00ff) as u8);
         Ok(blob)
     }
@@ -155,6 +157,7 @@ pub mod blob_functions {
     /// ```
     #[rhai_fn(name = "contains")]
     pub fn contains(blob: &mut Blob, value: INT) -> bool {
+        #[allow(clippy::cast_sign_loss)]
         blob.contains(&((value & 0x0000_00ff) as u8))
     }
     /// Get the byte value at the `index` position in the BLOB.
@@ -221,6 +224,7 @@ pub mod blob_functions {
 
         let (index, ..) = calc_offset_len(blob.len(), index, 0);
 
+        #[allow(clippy::cast_sign_loss)]
         if index < blob.len() {
             blob[index] = (value & 0x0000_00ff) as u8;
         }
@@ -240,6 +244,7 @@ pub mod blob_functions {
     /// ```
     #[rhai_fn(name = "push", name = "append")]
     pub fn push(blob: &mut Blob, value: INT) {
+        #[allow(clippy::cast_sign_loss)]
         blob.push((value & 0x0000_00ff) as u8);
     }
     /// Add another BLOB to the end of the BLOB.
@@ -315,6 +320,7 @@ pub mod blob_functions {
     /// print(b);       // prints "[4242184242]"
     /// ```
     pub fn insert(blob: &mut Blob, index: INT, value: INT) {
+        #[allow(clippy::cast_sign_loss)]
         let value = (value & 0x0000_00ff) as u8;
 
         if blob.is_empty() {
@@ -354,8 +360,10 @@ pub mod blob_functions {
         if len <= 0 {
             return Ok(());
         }
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let len = len.min(MAX_USIZE_INT) as usize;
 
+        #[allow(clippy::cast_sign_loss)]
         let value = (value & 0x0000_00ff) as u8;
         let _ctx = ctx;
 
@@ -470,11 +478,16 @@ pub mod blob_functions {
     /// print(b);           // prints "[010203]"
     /// ```
     pub fn truncate(blob: &mut Blob, len: INT) {
+        if len <= 0 {
+            blob.clear();
+            return;
+        }
         if !blob.is_empty() {
-            let len = len.min(MAX_USIZE_INT);
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+            let len = len.min(MAX_USIZE_INT) as usize;
 
             if len > 0 {
-                blob.truncate(len as usize);
+                blob.truncate(len);
             } else {
                 blob.clear();
             }
@@ -500,6 +513,7 @@ pub mod blob_functions {
     ///
     /// print(b);           // prints "[030405]"
     /// ```
+    #[allow(clippy::cast_sign_loss, clippy::needless_pass_by_value)]
     pub fn chop(blob: &mut Blob, len: INT) {
         if !blob.is_empty() {
             if len <= 0 {

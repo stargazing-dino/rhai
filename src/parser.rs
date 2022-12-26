@@ -3,9 +3,9 @@
 use crate::api::events::VarDefInfo;
 use crate::api::options::LangOptions;
 use crate::ast::{
-    ASTFlags, BinaryExpr, CaseBlocksList, ConditionalExpr, Expr, FnCallExpr, FnCallHashes, Ident,
-    Namespace, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock, StmtBlockContainer,
-    SwitchCasesCollection, TryCatchBlock,
+    ASTFlags, BinaryExpr, CaseBlocksList, ConditionalExpr, Expr, FlowControl, FnCallExpr,
+    FnCallHashes, Ident, Namespace, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock,
+    StmtBlockContainer, SwitchCasesCollection,
 };
 use crate::engine::{Precedence, KEYWORD_THIS, OP_CONTAINS};
 use crate::eval::{Caches, GlobalRuntimeState};
@@ -26,6 +26,7 @@ use bitflags::bitflags;
 use std::prelude::v1::*;
 use std::{
     collections::BTreeMap,
+    convert::TryFrom,
     fmt,
     hash::{Hash, Hasher},
     num::{NonZeroU8, NonZeroUsize},
@@ -147,7 +148,7 @@ impl<'e, 's> ParseState<'e, 's> {
             .stack
             .as_deref()
             .into_iter()
-            .flat_map(|s| s.iter_rev_raw())
+            .flat_map(Scope::iter_rev_raw)
             .enumerate()
             .find(|&(.., (n, ..))| {
                 if n == SCOPE_SEARCH_BARRIER_MARKER {
@@ -363,7 +364,7 @@ pub fn make_anonymous_fn(hash: u64) -> Identifier {
     use std::fmt::Write;
 
     let mut buf = Identifier::new_const();
-    write!(&mut buf, "{}{:016x}", crate::engine::FN_ANONYMOUS, hash).unwrap();
+    write!(&mut buf, "{}{hash:016x}", crate::engine::FN_ANONYMOUS).unwrap();
     buf
 }
 
@@ -1198,14 +1199,14 @@ impl Engine {
             };
 
             let (action_expr, need_comma) =
-                if !settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
+                if settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
+                    (self.parse_expr(input, state, lib, settings)?, true)
+                } else {
                     let stmt = self.parse_stmt(input, state, lib, settings)?;
                     let need_comma = !stmt.is_self_terminated();
 
                     let stmt_block: StmtBlock = stmt.into();
                     (Expr::Stmt(stmt_block.into()), need_comma)
-                } else {
-                    (self.parse_expr(input, state, lib, settings)?, true)
                 };
             let has_condition = !matches!(condition, Expr::BoolConstant(true, ..));
 
@@ -1293,8 +1294,8 @@ impl Engine {
         let cases = SwitchCasesCollection {
             expressions,
             cases,
-            def_case,
             ranges,
+            def_case,
         };
 
         Ok(Stmt::Switch((item, cases).into(), settings.pos))
@@ -1636,13 +1637,9 @@ impl Engine {
                             );
                         }
 
-                        let short_index = index.and_then(|x| {
-                            if x.get() <= u8::MAX as usize {
-                                NonZeroU8::new(x.get() as u8)
-                            } else {
-                                None
-                            }
-                        });
+                        let short_index = index
+                            .and_then(|x| u8::try_from(x.get()).ok())
+                            .and_then(NonZeroU8::new);
                         let name = state.get_interned_string(*s);
                         Expr::Variable((index, ns, 0, name).into(), short_index, settings.pos)
                     }
@@ -2023,16 +2020,16 @@ impl Engine {
             }
         }
 
-        let op_info = if op != NO_TOKEN {
-            OpAssignment::new_op_assignment_from_token(op, op_pos)
-        } else {
+        let op_info = if op == NO_TOKEN {
             OpAssignment::new_assignment(op_pos)
+        } else {
+            OpAssignment::new_op_assignment_from_token(op, op_pos)
         };
 
         match lhs {
             // const_expr = rhs
             ref expr if expr.is_constant() => {
-                Err(PERR::AssignmentToConstant("".into()).into_err(lhs.start_position()))
+                Err(PERR::AssignmentToConstant(String::new()).into_err(lhs.start_position()))
             }
             // var (non-indexed) = rhs
             Expr::Variable(ref x, None, _) if x.0.is_none() => {
@@ -2384,7 +2381,7 @@ impl Engine {
                         let not_base = FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string(op),
-                            hashes: FnCallHashes::from_native(calc_fn_hash(None, op, 1).into()),
+                            hashes: FnCallHashes::from_native(calc_fn_hash(None, op, 1)),
                             args,
                             op_token: Token::Bang,
                             capture_parent_scope: false,
@@ -2652,14 +2649,14 @@ impl Engine {
 
         // if guard { if_body }
         ensure_not_statement_expr(input, "a boolean")?;
-        let guard = self
+        let expr = self
             .parse_expr(input, state, lib, settings)?
             .ensure_bool_expr()?;
         ensure_not_assignment(input)?;
-        let if_body = self.parse_block(input, state, lib, settings)?;
+        let body = self.parse_block(input, state, lib, settings)?.into();
 
         // if guard { if_body } else ...
-        let else_body = if match_token(input, Token::Else).0 {
+        let branch = if match_token(input, Token::Else).0 {
             if let (Token::If, ..) = input.peek().expect(NEVER_ENDS) {
                 // if guard { if_body } else if ...
                 self.parse_if(input, state, lib, settings)?
@@ -2669,10 +2666,11 @@ impl Engine {
             }
         } else {
             Stmt::Noop(Position::NONE)
-        };
+        }
+        .into();
 
         Ok(Stmt::If(
-            (guard, if_body.into(), else_body.into()).into(),
+            FlowControl { expr, body, branch }.into(),
             settings.pos,
         ))
     }
@@ -2688,7 +2686,7 @@ impl Engine {
         let mut settings = settings.level_up()?;
 
         // while|loops ...
-        let (guard, token_pos) = match input.next().expect(NEVER_ENDS) {
+        let (expr, token_pos) = match input.next().expect(NEVER_ENDS) {
             (Token::While, pos) => {
                 ensure_not_statement_expr(input, "a boolean")?;
                 let expr = self
@@ -2703,9 +2701,13 @@ impl Engine {
         settings.pos = token_pos;
         settings.flags |= ParseSettingFlags::BREAKABLE;
 
-        let body = self.parse_block(input, state, lib, settings)?;
+        let body = self.parse_block(input, state, lib, settings)?.into();
+        let branch = StmtBlock::NONE;
 
-        Ok(Stmt::While((guard, body.into()).into(), settings.pos))
+        Ok(Stmt::While(
+            FlowControl { expr, body, branch }.into(),
+            settings.pos,
+        ))
     }
 
     /// Parse a do loop.
@@ -2725,7 +2727,7 @@ impl Engine {
 
         // do { body } [while|until] guard
 
-        let body = self.parse_block(input, state, lib, settings)?;
+        let body = self.parse_block(input, state, lib, settings)?.into();
 
         let negated = match input.next().expect(NEVER_ENDS) {
             (Token::While, ..) => ASTFlags::NONE,
@@ -2743,12 +2745,18 @@ impl Engine {
         }
 
         ensure_not_statement_expr(input, "a boolean")?;
-        let guard = self
+        let expr = self
             .parse_expr(input, state, lib, settings)?
             .ensure_bool_expr()?;
         ensure_not_assignment(input)?;
 
-        Ok(Stmt::Do((guard, body.into()).into(), negated, settings.pos))
+        let branch = StmtBlock::NONE;
+
+        Ok(Stmt::Do(
+            FlowControl { expr, body, branch }.into(),
+            negated,
+            settings.pos,
+        ))
     }
 
     /// Parse a for loop.
@@ -2840,12 +2848,14 @@ impl Engine {
         };
 
         settings.flags |= ParseSettingFlags::BREAKABLE;
-        let body = self.parse_block(input, state, lib, settings)?;
+        let body = self.parse_block(input, state, lib, settings)?.into();
 
         state.stack.as_deref_mut().unwrap().rewind(prev_stack_len);
 
+        let branch = StmtBlock::NONE;
+
         Ok(Stmt::For(
-            Box::new((loop_var, counter_var, expr, body.into())),
+            Box::new((loop_var, counter_var, FlowControl { expr, body, branch })),
             settings.pos,
         ))
     }
@@ -3480,7 +3490,7 @@ impl Engine {
         settings.pos = eat_token(input, Token::Try);
 
         // try { try_block }
-        let try_block = self.parse_block(input, state, lib, settings)?;
+        let body = self.parse_block(input, state, lib, settings)?.into();
 
         // try { try_block } catch
         let (matched, catch_pos) = match_token(input, Token::Catch);
@@ -3519,20 +3529,23 @@ impl Engine {
         };
 
         // try { try_block } catch ( var ) { catch_block }
-        let catch_block = self.parse_block(input, state, lib, settings)?;
+        let branch = self.parse_block(input, state, lib, settings)?.into();
 
-        if !catch_var.is_empty() {
+        let expr = if !catch_var.is_empty() {
             // Remove the error variable from the stack
             state.stack.as_deref_mut().unwrap().pop();
-        }
+
+            Expr::Variable(
+                (None, Namespace::default(), 0, catch_var.name).into(),
+                None,
+                catch_var.pos,
+            )
+        } else {
+            Expr::Unit(catch_var.pos)
+        };
 
         Ok(Stmt::TryCatch(
-            TryCatchBlock {
-                try_block: try_block.into(),
-                catch_var,
-                catch_block: catch_block.into(),
-            }
-            .into(),
+            FlowControl { body, expr, branch }.into(),
             settings.pos,
         ))
     }
@@ -3661,7 +3674,7 @@ impl Engine {
                 Some(n) if !is_func && n.get() <= u8::MAX as usize => NonZeroU8::new(n.get() as u8),
                 _ => None,
             };
-            Expr::Variable((index, Default::default(), 0, name).into(), idx, pos)
+            Expr::Variable((index, Namespace::default(), 0, name).into(), idx, pos)
         }));
 
         let expr = FnCallExpr {
