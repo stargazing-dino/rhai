@@ -44,7 +44,14 @@ pub fn print_with_func(
             result.into_immutable_string().expect("`ImmutableString`")
         }
         Ok(result) => ctx.engine().map_type_name(result.type_name()).into(),
-        Err(_) => ctx.engine().map_type_name(value.type_name()).into(),
+        Err(_) => {
+            let mut buf = SmartString::new_const();
+            match fn_name {
+                FUNC_TO_DEBUG => write!(&mut buf, "{value:?}").unwrap(),
+                _ => write!(&mut buf, "{value}").unwrap(),
+            }
+            ctx.engine().map_type_name(&buf).into()
+        }
     }
 }
 
@@ -58,7 +65,9 @@ mod print_debug_functions {
     /// Convert the value of the `item` into a string.
     #[rhai_fn(name = "to_string", pure)]
     pub fn to_string_generic(ctx: NativeCallContext, item: &mut Dynamic) -> ImmutableString {
-        ctx.engine().map_type_name(&item.to_string()).into()
+        let mut buf = SmartString::new_const();
+        write!(&mut buf, "{item}").unwrap();
+        ctx.engine().map_type_name(&buf).into()
     }
     /// Convert the value of the `item` into a string in debug format.
     #[rhai_fn(name = "debug", pure)]
@@ -95,7 +104,9 @@ mod print_debug_functions {
     /// Return the character into a string.
     #[rhai_fn(name = "print", name = "to_string")]
     pub fn print_char(character: char) -> ImmutableString {
-        character.to_string().into()
+        let mut buf = SmartString::new_const();
+        buf.push(character);
+        buf.into()
     }
     /// Convert the string into debug format.
     #[rhai_fn(name = "debug", name = "to_debug")]
@@ -108,13 +119,17 @@ mod print_debug_functions {
     /// Convert the function pointer into a string in debug format.
     #[rhai_fn(name = "debug", name = "to_debug", pure)]
     pub fn debug_fn_ptr(f: &mut FnPtr) -> ImmutableString {
-        f.to_string().into()
+        let mut buf = SmartString::new_const();
+        write!(&mut buf, "{f}").unwrap();
+        buf.into()
     }
 
     /// Return the boolean value into a string.
     #[rhai_fn(name = "print", name = "to_string")]
     pub fn print_bool(value: bool) -> ImmutableString {
-        value.to_string().into()
+        let mut buf = SmartString::new_const();
+        write!(&mut buf, "{value}").unwrap();
+        buf.into()
     }
     /// Convert the boolean value into a string in debug format.
     #[rhai_fn(name = "debug", name = "to_debug")]
@@ -141,30 +156,32 @@ mod print_debug_functions {
     #[cfg(not(feature = "no_float"))]
     #[rhai_fn(name = "print", name = "to_string")]
     pub fn print_f64(number: f64) -> ImmutableString {
-        crate::types::FloatWrapper::new(number).to_string().into()
+        let mut buf = SmartString::new_const();
+        write!(&mut buf, "{}", crate::types::FloatWrapper::new(number)).unwrap();
+        buf.into()
     }
     /// Convert the value of `number` into a string.
     #[cfg(not(feature = "no_float"))]
     #[rhai_fn(name = "print", name = "to_string")]
     pub fn print_f32(number: f32) -> ImmutableString {
-        crate::types::FloatWrapper::new(number).to_string().into()
+        let mut buf = SmartString::new_const();
+        write!(&mut buf, "{}", crate::types::FloatWrapper::new(number)).unwrap();
+        buf.into()
     }
     /// Convert the value of `number` into a string.
     #[cfg(not(feature = "no_float"))]
     #[rhai_fn(name = "debug", name = "to_debug")]
     pub fn debug_f64(number: f64) -> ImmutableString {
-        let number = crate::types::FloatWrapper::new(number);
         let mut buf = SmartString::new_const();
-        write!(&mut buf, "{number:?}").unwrap();
+        write!(&mut buf, "{:?}", crate::types::FloatWrapper::new(number)).unwrap();
         buf.into()
     }
     /// Convert the value of `number` into a string.
     #[cfg(not(feature = "no_float"))]
     #[rhai_fn(name = "debug", name = "to_debug")]
     pub fn debug_f32(number: f32) -> ImmutableString {
-        let number = crate::types::FloatWrapper::new(number);
         let mut buf = SmartString::new_const();
-        write!(&mut buf, "{number:?}").unwrap();
+        write!(&mut buf, "{:?}", crate::types::FloatWrapper::new(number)).unwrap();
         buf.into()
     }
 
@@ -179,7 +196,7 @@ mod print_debug_functions {
     )]
     pub fn format_array(ctx: NativeCallContext, array: &mut Array) -> ImmutableString {
         let len = array.len();
-        let mut result = String::with_capacity(len * 5 + 2);
+        let mut result = SmartString::new_const();
         result.push('[');
 
         array.iter_mut().enumerate().for_each(|(i, x)| {
@@ -204,12 +221,10 @@ mod print_debug_functions {
     )]
     pub fn format_map(ctx: NativeCallContext, map: &mut Map) -> ImmutableString {
         let len = map.len();
-        let mut result = String::with_capacity(len * 5 + 3);
+        let mut result = SmartString::new_const();
         result.push_str("#{");
 
         map.iter_mut().enumerate().for_each(|(i, (k, v))| {
-            use std::fmt::Write;
-
             write!(
                 result,
                 "{:?}: {}{}",

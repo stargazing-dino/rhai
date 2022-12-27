@@ -148,7 +148,8 @@ impl Engine {
                     auto_restore! { let orig_level = global.level; global.level += 1 }
 
                     let context = if need_context {
-                        Some((self, op, None, &*global, *op_pos).into())
+                        let source = global.source();
+                        Some((self, op, source, &*global, *op_pos).into())
                     } else {
                         None
                     };

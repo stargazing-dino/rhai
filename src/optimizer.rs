@@ -1141,7 +1141,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     if let Some(result) = get_builtin_binary_op_fn(x.op_token.clone(), &arg_values[0], &arg_values[1])
                         .and_then(|(f, ctx)| {
                             let context = if ctx {
-                                Some((state.engine, x.name.as_str(),None, &state.global, *pos).into())
+                                Some((state.engine, x.name.as_str(), None, &state.global, *pos).into())
                             } else {
                                 None
                             };
