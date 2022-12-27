@@ -4,7 +4,7 @@
 use crate::ast::Expr;
 use crate::func::SendSync;
 use crate::parser::ParseResult;
-use crate::tokenizer::{is_valid_identifier, Token, NO_TOKEN};
+use crate::tokenizer::{is_reserved_keyword_or_symbol, is_valid_identifier, Token};
 use crate::types::dynamic::Variant;
 use crate::{
     Dynamic, Engine, EvalContext, Identifier, ImmutableString, LexError, Position, RhaiResult,
@@ -231,11 +231,11 @@ impl Engine {
                 continue;
             }
 
-            let token = Token::lookup_symbol_from_syntax(s).unwrap_or_else(|| {
-                if Token::is_reserved_keyword(s) {
-                    Token::Reserved(Box::new(s.into()))
+            let token = Token::lookup_symbol_from_syntax(s).or_else(|| {
+                if is_reserved_keyword_or_symbol(s) {
+                    Some(Token::Reserved(Box::new(s.into())))
                 } else {
-                    NO_TOKEN
+                    None
                 }
             });
 
@@ -256,13 +256,13 @@ impl Engine {
                 #[cfg(not(feature = "no_float"))]
                 CUSTOM_SYNTAX_MARKER_FLOAT if !segments.is_empty() => s.into(),
                 // Standard or reserved keyword/symbol not in first position
-                _ if !segments.is_empty() && token != NO_TOKEN => {
+                _ if !segments.is_empty() && token.is_some() => {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if (self
                         .disabled_symbols
                         .as_deref()
                         .map_or(false, |m| m.contains(s))
-                        || token.is_reserved())
+                        || token.as_ref().map_or(false, Token::is_reserved))
                         && !self
                             .custom_keywords
                             .as_deref()
@@ -276,7 +276,7 @@ impl Engine {
                 }
                 // Standard keyword in first position but not disabled
                 _ if segments.is_empty()
-                    && token.is_standard_keyword()
+                    && token.as_ref().map_or(false, Token::is_standard_keyword)
                     && !self
                         .disabled_symbols
                         .as_deref()
@@ -298,7 +298,7 @@ impl Engine {
                         .disabled_symbols
                         .as_deref()
                         .map_or(false, |m| m.contains(s))
-                        || (token.is_reserved()
+                        || (token.as_ref().map_or(false, Token::is_reserved)
                             && !self
                                 .custom_keywords
                                 .as_deref()

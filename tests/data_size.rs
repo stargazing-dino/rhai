@@ -175,7 +175,7 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(
         engine.eval::<INT>(
             "
-                let x = [1,2,3];
+                let x = [1,2];
                 len([x, x, x])
             "
         )?,

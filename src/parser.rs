@@ -12,7 +12,7 @@ use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::tokenizer::{
     is_keyword_function, is_valid_function_name, is_valid_identifier, Token, TokenStream,
-    TokenizerControl, NO_TOKEN,
+    TokenizerControl,
 };
 use crate::types::dynamic::AccessMode;
 use crate::types::StringsInterner;
@@ -627,7 +627,7 @@ impl Engine {
                 return Ok(FnCallExpr {
                     name: state.get_interned_string(id),
                     capture_parent_scope,
-                    op_token: NO_TOKEN,
+                    op_token: None,
                     namespace: _namespace,
                     hashes,
                     args,
@@ -702,7 +702,7 @@ impl Engine {
                     return Ok(FnCallExpr {
                         name: state.get_interned_string(id),
                         capture_parent_scope,
-                        op_token: NO_TOKEN,
+                        op_token: None,
                         namespace: _namespace,
                         hashes,
                         args,
@@ -1657,7 +1657,7 @@ impl Engine {
 
                 match input.peek().expect(NEVER_ENDS).0 {
                     // Function call is allowed to have reserved keyword
-                    Token::LeftParen | Token::Bang | Token::Unit if is_keyword_function(&s) => {
+                    Token::LeftParen | Token::Bang | Token::Unit if is_keyword_function(&s).0 => {
                         Expr::Variable(
                             (None, ns, 0, state.get_interned_string(*s)).into(),
                             None,
@@ -1800,7 +1800,10 @@ impl Engine {
                                 state.allow_capture = false;
                             }
                         }
-                        (Token::Reserved(s), ..) if is_keyword_function(s) => (),
+                        (Token::Reserved(s), ..) if is_keyword_function(s).1 => (),
+                        (Token::Reserved(s), pos) => {
+                            return Err(PERR::Reserved(s.to_string()).into_err(*pos))
+                        }
                         (.., pos) => return Err(PERR::PropertyExpected.into_err(*pos)),
                     }
 
@@ -1924,7 +1927,7 @@ impl Engine {
                             name: state.get_interned_string("-"),
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "-", 1)),
                             args,
-                            op_token: token,
+                            op_token: Some(token),
                             capture_parent_scope: false,
                         }
                         .into_fn_call_expr(pos))
@@ -1952,7 +1955,7 @@ impl Engine {
                             name: state.get_interned_string("+"),
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, "+", 1)),
                             args,
-                            op_token: token,
+                            op_token: Some(token),
                             capture_parent_scope: false,
                         }
                         .into_fn_call_expr(pos))
@@ -1973,7 +1976,7 @@ impl Engine {
                     name: state.get_interned_string("!"),
                     hashes: FnCallHashes::from_native(calc_fn_hash(None, "!", 1)),
                     args,
-                    op_token: token,
+                    op_token: Some(token),
                     capture_parent_scope: false,
                 }
                 .into_fn_call_expr(pos))
@@ -1987,7 +1990,7 @@ impl Engine {
 
     /// Make an assignment statement.
     fn make_assignment_stmt(
-        op: Token,
+        op: Option<Token>,
         state: &mut ParseState,
         lhs: Expr,
         rhs: Expr,
@@ -2020,10 +2023,10 @@ impl Engine {
             }
         }
 
-        let op_info = if op == NO_TOKEN {
-            OpAssignment::new_assignment(op_pos)
-        } else {
+        let op_info = if let Some(op) = op {
             OpAssignment::new_op_assignment_from_token(op, op_pos)
+        } else {
+            OpAssignment::new_assignment(op_pos)
         };
 
         match lhs {
@@ -2109,9 +2112,7 @@ impl Engine {
             }
             // lhs.module::id - syntax error
             #[cfg(not(feature = "no_module"))]
-            (.., Expr::Variable(x, ..)) if !x.1.is_empty() => {
-                Err(PERR::PropertyExpected.into_err(x.1.position()))
-            }
+            (.., Expr::Variable(x, ..)) if !x.1.is_empty() => unreachable!("lhs.ns::id"),
             // lhs.id
             (lhs, var_expr @ Expr::Variable(..)) => {
                 let rhs = var_expr.into_property(state);
@@ -2125,9 +2126,7 @@ impl Engine {
             )),
             // lhs.nnn::func(...) - syntax error
             #[cfg(not(feature = "no_module"))]
-            (.., Expr::FnCall(f, ..)) if f.is_qualified() => {
-                Err(PERR::PropertyExpected.into_err(f.namespace.position()))
-            }
+            (.., Expr::FnCall(f, ..)) if f.is_qualified() => unreachable!("lhs.ns::func()"),
             // lhs.Fn() or lhs.eval()
             (.., Expr::FnCall(f, func_pos))
                 if f.args.is_empty()
@@ -2174,13 +2173,11 @@ impl Engine {
                 match x.lhs {
                     // lhs.module::id.dot_rhs or lhs.module::id[idx_rhs] - syntax error
                     #[cfg(not(feature = "no_module"))]
-                    Expr::Variable(x, ..) if !x.1.is_empty() => {
-                        Err(PERR::PropertyExpected.into_err(x.1.position()))
-                    }
+                    Expr::Variable(x, ..) if !x.1.is_empty() => unreachable!("lhs.ns::id..."),
                     // lhs.module::func().dot_rhs or lhs.module::func()[idx_rhs] - syntax error
                     #[cfg(not(feature = "no_module"))]
                     Expr::FnCall(f, ..) if f.is_qualified() => {
-                        Err(PERR::PropertyExpected.into_err(f.namespace.position()))
+                        unreachable!("lhs.ns::func()...")
                     }
                     // lhs.id.dot_rhs or lhs.id[idx_rhs]
                     Expr::Variable(..) | Expr::Property(..) => {
@@ -2310,9 +2307,9 @@ impl Engine {
             let hash = calc_fn_hash(None, &op, 2);
             let is_valid_script_function = is_valid_function_name(&op);
             let operator_token = if is_valid_script_function {
-                NO_TOKEN
+                None
             } else {
-                op_token.clone()
+                Some(op_token.clone())
             };
 
             let mut args = StaticVec::new_const();
@@ -2383,7 +2380,7 @@ impl Engine {
                             name: state.get_interned_string(op),
                             hashes: FnCallHashes::from_native(calc_fn_hash(None, op, 1)),
                             args,
-                            op_token: Token::Bang,
+                            op_token: Some(Token::Bang),
                             capture_parent_scope: false,
                         };
                         not_base.into_fn_call_expr(pos)
@@ -3186,11 +3183,12 @@ impl Engine {
 
         let (op, pos) = match input.peek().expect(NEVER_ENDS) {
             // var = ...
-            (Token::Equals, ..) => (NO_TOKEN, eat_token(input, Token::Equals)),
+            (Token::Equals, ..) => (None, eat_token(input, Token::Equals)),
             // var op= ...
-            (token, ..) if token.is_op_assignment() => {
-                input.next().map(|(op, pos)| (op, pos)).expect(NEVER_ENDS)
-            }
+            (token, ..) if token.is_op_assignment() => input
+                .next()
+                .map(|(op, pos)| (Some(op), pos))
+                .expect(NEVER_ENDS),
             // Not op-assignment
             _ => return Ok(Stmt::Expr(expr.into())),
         };
@@ -3686,7 +3684,7 @@ impl Engine {
                 num_externals + 1,
             )),
             args,
-            op_token: NO_TOKEN,
+            op_token: None,
             capture_parent_scope: false,
         }
         .into_fn_call_expr(pos);

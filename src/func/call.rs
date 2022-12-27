@@ -8,7 +8,7 @@ use crate::engine::{
     KEYWORD_IS_DEF_VAR, KEYWORD_PRINT, KEYWORD_TYPE_OF,
 };
 use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
-use crate::tokenizer::{is_valid_function_name, Token, NO_TOKEN};
+use crate::tokenizer::{is_valid_function_name, Token};
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString,
     OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
@@ -164,7 +164,7 @@ impl Engine {
         _global: &GlobalRuntimeState,
         caches: &'s mut Caches,
         local_entry: &'s mut Option<FnResolutionCacheEntry>,
-        op_token: Token,
+        op_token: Option<Token>,
         hash_base: u64,
         args: Option<&mut FnCallArgs>,
         allow_dynamic: bool,
@@ -270,31 +270,30 @@ impl Engine {
                         }
 
                         // Try to find a built-in version
-                        let builtin = args.and_then(|args| match op_token {
-                            Token::NONE => None,
-                            token if token.is_op_assignment() => {
-                                let (first_arg, rest_args) = args.split_first().unwrap();
+                        let builtin =
+                            args.and_then(|args| match op_token {
+                                None => None,
+                                Some(token) if token.is_op_assignment() => {
+                                    let (first_arg, rest_args) = args.split_first().unwrap();
 
-                                get_builtin_op_assignment_fn(token, first_arg, rest_args[0]).map(
-                                    |(f, has_context)| FnResolutionCacheEntry {
+                                    get_builtin_op_assignment_fn(token, first_arg, rest_args[0])
+                                        .map(|(f, has_context)| FnResolutionCacheEntry {
+                                            func: CallableFunction::Method {
+                                                func: Shared::new(f),
+                                                has_context,
+                                            },
+                                            source: None,
+                                        })
+                                }
+                                Some(token) => get_builtin_binary_op_fn(token, args[0], args[1])
+                                    .map(|(f, has_context)| FnResolutionCacheEntry {
                                         func: CallableFunction::Method {
                                             func: Shared::new(f),
                                             has_context,
                                         },
                                         source: None,
-                                    },
-                                )
-                            }
-                            token => get_builtin_binary_op_fn(token, args[0], args[1]).map(
-                                |(f, has_context)| FnResolutionCacheEntry {
-                                    func: CallableFunction::Method {
-                                        func: Shared::new(f),
-                                        has_context,
-                                    },
-                                    source: None,
-                                },
-                            ),
-                        });
+                                    }),
+                            });
 
                         return if cache.filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
@@ -346,7 +345,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         name: &str,
-        op_token: Token,
+        op_token: Option<Token>,
         hash: u64,
         args: &mut FnCallArgs,
         is_ref_mut: bool,
@@ -568,21 +567,13 @@ impl Engine {
         caches: &mut Caches,
         _scope: Option<&mut Scope>,
         fn_name: &str,
-        op_token: Token,
+        op_token: Option<Token>,
         hashes: FnCallHashes,
         mut _args: &mut FnCallArgs,
         is_ref_mut: bool,
         _is_method_call: bool,
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
-        fn no_method_err(name: &str, pos: Position) -> RhaiResultOf<(Dynamic, bool)> {
-            Err(ERR::ErrorRuntime(
-                format!("'{name}' should not be called this way. Try {name}(...);").into(),
-                pos,
-            )
-            .into())
-        }
-
         // Check for data race.
         #[cfg(not(feature = "no_closure"))]
         ensure_no_data_race(fn_name, _args, is_ref_mut)?;
@@ -622,16 +613,13 @@ impl Engine {
 
                 // Handle is_shared()
                 #[cfg(not(feature = "no_closure"))]
-                crate::engine::KEYWORD_IS_SHARED if _args.len() == 1 => {
-                    return no_method_err(fn_name, pos)
+                crate::engine::KEYWORD_IS_SHARED => {
+                    unreachable!("{} called as method", fn_name)
                 }
 
-                KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR if _args.len() == 1 => {
-                    return no_method_err(fn_name, pos)
-                }
-
-                KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY if !_args.is_empty() => {
-                    return no_method_err(fn_name, pos)
+                KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR | KEYWORD_FN_PTR_CALL
+                | KEYWORD_FN_PTR_CURRY => {
+                    unreachable!("{} called as method", fn_name)
                 }
 
                 _ => (),
@@ -645,7 +633,7 @@ impl Engine {
             let local_entry = &mut None;
 
             if let Some(FnResolutionCacheEntry { func, ref source }) = self
-                .resolve_fn(global, caches, local_entry, NO_TOKEN, hash, None, false)
+                .resolve_fn(global, caches, local_entry, None, hash, None, false)
                 .cloned()
             {
                 // Script function call
@@ -812,7 +800,7 @@ impl Engine {
                     caches,
                     None,
                     fn_name,
-                    NO_TOKEN,
+                    None,
                     new_hash,
                     args,
                     false,
@@ -899,7 +887,7 @@ impl Engine {
                     caches,
                     None,
                     &fn_name,
-                    NO_TOKEN,
+                    None,
                     new_hash,
                     args,
                     is_ref_mut,
@@ -986,7 +974,7 @@ impl Engine {
                     caches,
                     None,
                     fn_name,
-                    NO_TOKEN,
+                    None,
                     hash,
                     &mut args,
                     is_ref_mut,
@@ -1012,7 +1000,7 @@ impl Engine {
         scope: &mut Scope,
         mut this_ptr: Option<&mut Dynamic>,
         fn_name: &str,
-        op_token: Token,
+        op_token: Option<Token>,
         first_arg: Option<&Expr>,
         args_expr: &[Expr],
         hashes: FnCallHashes,
@@ -1028,7 +1016,7 @@ impl Engine {
         let redirected; // Handle call() - Redirect function call
 
         match name {
-            _ if op_token != NO_TOKEN => (),
+            _ if op_token.is_some() => (),
 
             // Handle call(fn_ptr, ...)
             KEYWORD_FN_PTR_CALL if total_args >= 1 => {
@@ -1582,7 +1570,7 @@ impl Engine {
         let op_token = op_token.clone();
 
         // Short-circuit native unary operator call if under Fast Operators mode
-        if op_token == Token::Bang && self.fast_operators() && args.len() == 1 {
+        if op_token == Some(Token::Bang) && self.fast_operators() && args.len() == 1 {
             let mut value = self
                 .get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), &args[0])?
                 .0
@@ -1598,7 +1586,7 @@ impl Engine {
         }
 
         // Short-circuit native binary operator call if under Fast Operators mode
-        if op_token != NO_TOKEN && self.fast_operators() && args.len() == 2 {
+        if op_token.is_some() && self.fast_operators() && args.len() == 2 {
             let mut lhs = self
                 .get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), &args[0])?
                 .0
@@ -1611,13 +1599,13 @@ impl Engine {
 
             let operands = &mut [&mut lhs, &mut rhs];
 
-            if let Some((func, ctx)) =
-                get_builtin_binary_op_fn(op_token.clone(), operands[0], operands[1])
+            if let Some((func, need_context)) =
+                get_builtin_binary_op_fn(op_token.clone().unwrap(), operands[0], operands[1])
             {
                 // Built-in found
                 auto_restore! { let orig_level = global.level; global.level += 1 }
 
-                let context = if ctx {
+                let context = if need_context {
                     Some((self, name.as_str(), None, &*global, pos).into())
                 } else {
                     None

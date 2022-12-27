@@ -3,7 +3,7 @@
 use super::{ASTFlags, ASTNode, Ident, Namespace, Stmt, StmtBlock};
 use crate::engine::{KEYWORD_FN_PTR, OP_EXCLUSIVE_RANGE, OP_INCLUSIVE_RANGE};
 use crate::func::hashing::ALT_ZERO_HASH;
-use crate::tokenizer::{Token, NO_TOKEN};
+use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
 use crate::{
     calc_fn_hash, Dynamic, FnPtr, Identifier, ImmutableString, Position, SmartString, StaticVec,
@@ -207,8 +207,7 @@ pub struct FnCallExpr {
     /// Does this function call capture the parent scope?
     pub capture_parent_scope: bool,
     /// Is this function call a native operator?
-    /// Otherwise set to [`Token::NONE`].
-    pub op_token: Token,
+    pub op_token: Option<Token>,
 }
 
 impl fmt::Debug for FnCallExpr {
@@ -222,7 +221,7 @@ impl fmt::Debug for FnCallExpr {
         ff.field("hash", &self.hashes)
             .field("name", &self.name)
             .field("args", &self.args);
-        if self.op_token != NO_TOKEN {
+        if self.op_token.is_some() {
             ff.field("op_token", &self.op_token);
         }
         if self.capture_parent_scope {
@@ -582,7 +581,7 @@ impl Expr {
                     hashes: calc_fn_hash(None, f.fn_name(), 1).into(),
                     args: once(Self::StringConstant(f.fn_name().into(), pos)).collect(),
                     capture_parent_scope: false,
-                    op_token: NO_TOKEN,
+                    op_token: None,
                 }
                 .into(),
                 pos,

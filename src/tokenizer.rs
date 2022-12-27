@@ -55,9 +55,6 @@ type LERR = LexError;
 /// Separator character for numbers.
 const NUMBER_SEPARATOR: char = '_';
 
-/// No token.
-pub const NO_TOKEN: Token = Token::NONE;
-
 /// A stream of tokens.
 pub type TokenStream<'a> = Peekable<TokenIterator<'a>>;
 
@@ -629,41 +626,6 @@ impl Token {
 
             _ => return None,
         })
-    }
-
-    /// Is a piece of syntax a reserved keyword?
-    #[must_use]
-    pub fn is_reserved_keyword(syntax: &str) -> bool {
-        match syntax {
-            #[cfg(feature = "no_object")]
-            "?." => true,
-            #[cfg(feature = "no_index")]
-            "?[" => true,
-            #[cfg(feature = "no_function")]
-            "fn" | "private" => true,
-            #[cfg(feature = "no_module")]
-            "import" | "export" | "as" => true,
-
-            // List of reserved operators
-            "===" | "!==" | "->" | "<-" | "?" | ":=" | ":;" | "~" | "!." | "::<" | "(*" | "*)"
-            | "#" | "#!" | "@" | "$" | "++" | "--" | "..." | "<|" | "|>" => true,
-
-            // List of reserved keywords
-            "public" | "protected" | "super" | "new" | "use" | "module" | "package" | "var"
-            | "static" | "shared" | "with" | "is" | "goto" | "exit" | "match" | "case"
-            | "default" | "void" | "null" | "nil" | "spawn" | "thread" | "go" | "sync"
-            | "async" | "await" | "yield" => true,
-
-            KEYWORD_PRINT | KEYWORD_DEBUG | KEYWORD_TYPE_OF | KEYWORD_EVAL | KEYWORD_FN_PTR
-            | KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY | KEYWORD_THIS | KEYWORD_IS_DEF_VAR => {
-                true
-            }
-
-            #[cfg(not(feature = "no_function"))]
-            crate::engine::KEYWORD_IS_DEF_FN => true,
-
-            _ => false,
-        }
     }
 
     /// If another operator is after these, it's probably a unary operator
@@ -1994,7 +1956,8 @@ fn parse_identifier_token(
     if let Some(token) = Token::lookup_symbol_from_syntax(&identifier) {
         return (token, start_pos);
     }
-    if Token::is_reserved_keyword(&identifier) {
+
+    if is_reserved_keyword_or_symbol(&identifier) {
         return (Token::Reserved(Box::new(identifier)), start_pos);
     }
 
@@ -2008,18 +1971,27 @@ fn parse_identifier_token(
     (Token::Identifier(identifier.into()), start_pos)
 }
 
-/// Is a keyword allowed as a function?
+/// Can a keyword be called like a function?
+///
+/// # Return values
+///
+/// The first `bool` indicates whether the keyword can be called normally as a function.
+///
+/// The second `bool` indicates whether the keyword can be called in method-call style.
 #[inline]
 #[must_use]
-pub fn is_keyword_function(name: &str) -> bool {
+pub fn is_keyword_function(name: &str) -> (bool, bool) {
     match name {
-        KEYWORD_PRINT | KEYWORD_DEBUG | KEYWORD_TYPE_OF | KEYWORD_EVAL | KEYWORD_FN_PTR
-        | KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY | KEYWORD_IS_DEF_VAR => true,
+        KEYWORD_TYPE_OF | KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY => (true, true),
+
+        KEYWORD_PRINT | KEYWORD_DEBUG | KEYWORD_EVAL | KEYWORD_FN_PTR | KEYWORD_IS_DEF_VAR => {
+            (true, false)
+        }
 
         #[cfg(not(feature = "no_function"))]
-        crate::engine::KEYWORD_IS_DEF_FN => true,
+        crate::engine::KEYWORD_IS_DEF_FN => (true, false),
 
-        _ => false,
+        _ => (false, false),
     }
 }
 
@@ -2047,7 +2019,9 @@ pub fn is_valid_identifier(name: &str) -> bool {
 #[inline(always)]
 #[must_use]
 pub fn is_valid_function_name(name: &str) -> bool {
-    is_valid_identifier(name) && !is_keyword_function(name)
+    is_valid_identifier(name)
+        && !is_reserved_keyword_or_symbol(name)
+        && Token::lookup_symbol_from_syntax(name).is_none()
 }
 
 /// Is a character valid to start an identifier?
@@ -2080,6 +2054,39 @@ pub const fn is_id_first_alphabetic(x: char) -> bool {
 #[must_use]
 pub const fn is_id_continue(x: char) -> bool {
     x.is_ascii_alphanumeric() || x == '_'
+}
+
+/// Is a piece of syntax a reserved keyword or symbol?
+#[must_use]
+pub fn is_reserved_keyword_or_symbol(syntax: &str) -> bool {
+    match syntax {
+        #[cfg(feature = "no_object")]
+        "?." => true,
+        #[cfg(feature = "no_index")]
+        "?[" => true,
+        #[cfg(feature = "no_function")]
+        "fn" | "private" => true,
+        #[cfg(feature = "no_module")]
+        "import" | "export" | "as" => true,
+
+        // List of reserved operators
+        "===" | "!==" | "->" | "<-" | "?" | ":=" | ":;" | "~" | "!." | "::<" | "(*" | "*)"
+        | "#" | "#!" | "@" | "$" | "++" | "--" | "..." | "<|" | "|>" => true,
+
+        // List of reserved keywords
+        "public" | "protected" | "super" | "new" | "use" | "module" | "package" | "var"
+        | "static" | "shared" | "with" | "is" | "goto" | "exit" | "match" | "case" | "default"
+        | "void" | "null" | "nil" | "spawn" | "thread" | "go" | "sync" | "async" | "await"
+        | "yield" => true,
+
+        KEYWORD_PRINT | KEYWORD_DEBUG | KEYWORD_TYPE_OF | KEYWORD_EVAL | KEYWORD_FN_PTR
+        | KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY | KEYWORD_THIS | KEYWORD_IS_DEF_VAR => true,
+
+        #[cfg(not(feature = "no_function"))]
+        crate::engine::KEYWORD_IS_DEF_FN => true,
+
+        _ => false,
+    }
 }
 
 /// _(internals)_ A type that implements the [`InputStream`] trait.

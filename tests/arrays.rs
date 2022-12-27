@@ -299,10 +299,30 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
 
     assert_eq!(engine.eval::<INT>("[1].map(|x| x + 41)[0]")?, 42);
     assert_eq!(engine.eval::<INT>("[1].map(|| this + 41)[0]")?, 42);
+    assert_eq!(
+        engine.eval::<INT>("let x = [1, 2, 3]; x.for_each(|| this += 41); x[0]")?,
+        42
+    );
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let x = [1, 2, 3];
+                let sum = 0;
+                let factor = 2;
+                x.for_each(|| sum += this * factor);
+                sum
+            "
+        )?,
+        12
+    );
     assert_eq!(engine.eval::<INT>("([1].map(|x| x + 41))[0]")?, 42);
     assert_eq!(
         engine.eval::<INT>("let c = 40; let y = 1; [1].map(|x, i| c + x + y + i)[0]")?,
         42
+    );
+    assert_eq!(
+        engine.eval::<INT>("let x = [1, 2, 3]; x.for_each(|i| this += i); x[2]")?,
+        5
     );
 
     assert_eq!(
@@ -387,18 +407,31 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
         14
     );
 
-    assert_eq!(
-        engine.eval::<INT>(
-            "
-                let x = [1, 2, 3];
-                x.reduce(|sum, v, i| {
-                    if i == 0 { sum = 10 }
-                    sum + v * v
-                })
-            "
-        )?,
-        24
-    );
+    // assert_eq!(
+    //     engine.eval::<INT>(
+    //         "
+    //             let x = [1, 2, 3];
+    //             x.reduce(|sum, v, i| {
+    //                 if i == 0 { sum = 10 }
+    //                 sum + v * v
+    //             })
+    //         "
+    //     )?,
+    //     24
+    // );
+
+    // assert_eq!(
+    //     engine.eval::<INT>(
+    //         "
+    //             let x = [1, 2, 3];
+    //             x.reduce(|sum, i| {
+    //                 if i == 0 { sum = 10 }
+    //                 sum + this * this
+    //             })
+    //         "
+    //     )?,
+    //     24
+    // );
 
     assert_eq!(
         engine.eval::<INT>(

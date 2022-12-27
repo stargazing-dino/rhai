@@ -140,15 +140,16 @@ impl Engine {
             let args = &mut [&mut *lock_guard, &mut new_val];
 
             if self.fast_operators() {
-                if let Some((func, ctx)) =
+                if let Some((func, need_context)) =
                     get_builtin_op_assignment_fn(op_assign_token.clone(), args[0], args[1])
                 {
                     // Built-in found
                     let op = op_assign_token.literal_syntax();
                     auto_restore! { let orig_level = global.level; global.level += 1 }
 
-                    let context = if ctx {
-                        Some((self, op, None, &*global, *op_pos).into())
+                    let context = if need_context {
+                        let source = global.source();
+                        Some((self, op, source, &*global, *op_pos).into())
                     } else {
                         None
                     };
@@ -158,7 +159,7 @@ impl Engine {
 
             let op_assign = op_assign_token.literal_syntax();
             let op = op_token.literal_syntax();
-            let token = op_assign_token.clone();
+            let token = Some(op_assign_token.clone());
 
             match self
                 .exec_native_fn_call(global, caches, op_assign, token, hash, args, true, *op_pos)
@@ -167,7 +168,7 @@ impl Engine {
                 Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
                 {
                     // Expand to `var = var op rhs`
-                    let token = op_token.clone();
+                    let token = Some(op_token.clone());
 
                     *args[0] = self
                         .exec_native_fn_call(

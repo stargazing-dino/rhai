@@ -10,6 +10,8 @@ Bug fixes
 * Integer numbers that are too large to deserialize into `INT` now fall back to `Decimal` or `FLOAT` instead of silently truncating.
 * Parsing deeply-nested closures (e.g. `||{||{||{||{||{||{||{...}}}}}}}`) no longer panics but will be confined to the nesting limit.
 * Closures containing a single expression are now allowed in `Engine::eval_expression` etc.
+* Strings interpolation now works under `Engine::new_raw` without any standard package.
+* `Fn` now throws an error if the name is a reserved keyword as it cannot possibly map to such a function. This also disallows creating function pointers to custom operators which are defined as disabled keywords (a mouthful), but such custom operators are designed primarily to be used as operators.
 
 Breaking API changes
 --------------------
@@ -57,8 +59,10 @@ Net features
 
 ### Enhanced array API
 
-* Array methods that take a function pointer, usually a closure (e.g. `map`, `filter`, `index_of` etc.), can now provide a closure with one few parameter but binds the first parameter to `this`.
-* This vastly improves performance when working with arrays of object maps by avoiding unnecessary cloning of large types.
+* Array methods that take a function pointer, usually a closure (e.g. `map`, `filter`, `index_of`, `reduce` etc.), can now bind the array element to `this` when calling a closure.
+* This vastly improves performance when working with arrays of large types (e.g. object maps) by avoiding unnecessary cloning.
+* `find` and `find_map` are added for arrays.
+* `for_each` is also added for arrays, allowing a closure to mutate array elements (bound to `this`) in turn.
 
 Enhancements
 ------------
@@ -77,7 +81,6 @@ Enhancements
 * `FnPtr::iter_curry` and `FnPtr::iter_curry_mut` are added.
 * `Dynamic::deep_scan` is added to recursively scan for `Dynamic` values.
 * `>>` and `<<` operators on integers no longer throw errors when the number of bits to shift is out of bounds.  Shifting by a negative number of bits simply reverses the shift direction.
-* `find` and `find_map` are added for arrays.
 
 
 Version 1.11.0

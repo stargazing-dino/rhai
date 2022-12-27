@@ -52,11 +52,6 @@ pub const FN_ANONYMOUS: &str = "anon$";
 /// function to compare two [`Dynamic`] values.
 pub const OP_EQUALS: &str = Token::EqualsTo.literal_syntax();
 
-/// Standard concatenation operator.
-///
-/// Used primarily to build up interpolated strings.
-pub const OP_CONCAT: &str = Token::PlusAssign.literal_syntax();
-
 /// Standard containment testing function.
 ///
 /// The `in` operator is implemented as a call to this function.

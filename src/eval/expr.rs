@@ -1,13 +1,14 @@
 //! Module defining functions for evaluating an expression.
 
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
-use crate::ast::{Expr, OpAssignment};
-use crate::engine::{KEYWORD_THIS, OP_CONCAT};
+use crate::ast::Expr;
+use crate::engine::KEYWORD_THIS;
+use crate::packages::string_basic::{print_with_func, FUNC_TO_STRING};
 use crate::types::dynamic::AccessMode;
-use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, ERR};
-use std::num::NonZeroUsize;
+use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, SmartString, ERR};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+use std::{fmt::Write, num::NonZeroUsize};
 
 impl Engine {
     /// Search for a module within an imports stack.
@@ -283,72 +284,75 @@ impl Engine {
 
             // `... ${...} ...`
             Expr::InterpolatedString(x, _) => {
-                let mut concat = self.const_empty_string().into();
-                let target = &mut concat;
+                let mut concat = SmartString::new_const();
 
-                let mut op_info = OpAssignment::new_op_assignment(OP_CONCAT, Position::NONE);
+                x.iter().try_for_each(|expr| -> RhaiResultOf<()> {
+                    let item = &mut self
+                        .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
+                        .flatten();
+                    let pos = expr.position();
 
-                x.iter()
-                    .try_for_each(|expr| {
-                        let item = self
-                            .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
-                            .flatten();
+                    if item.is_string() {
+                        write!(concat, "{item}").unwrap();
+                    } else {
+                        let source = global.source();
+                        let context = &(self, FUNC_TO_STRING, source, &*global, pos).into();
+                        let display = print_with_func(FUNC_TO_STRING, context, item);
+                        write!(concat, "{}", display).unwrap();
+                    }
 
-                        op_info.pos = expr.start_position();
+                    #[cfg(not(feature = "unchecked"))]
+                    self.throw_on_size((0, 0, concat.len()))
+                        .map_err(|err| err.fill_position(pos))?;
 
-                        self.eval_op_assignment(global, caches, &op_info, expr, target, item)
-                    })
-                    .map(|_| concat.take_or_clone())
-                    .and_then(|r| self.check_data_size(r, expr.start_position()))
+                    Ok(())
+                })?;
+
+                Ok(self.get_interned_string(concat).into())
             }
 
             #[cfg(not(feature = "no_index"))]
             Expr::Array(x, ..) => {
+                let mut array = crate::Array::with_capacity(x.len());
+
                 #[cfg(not(feature = "unchecked"))]
                 let mut total_data_sizes = (0, 0, 0);
 
-                x.iter()
-                    .try_fold(
-                        crate::Array::with_capacity(x.len()),
-                        |mut array, item_expr| {
-                            let value = self
-                                .eval_expr(
-                                    global,
-                                    caches,
-                                    scope,
-                                    this_ptr.as_deref_mut(),
-                                    item_expr,
-                                )?
-                                .flatten();
+                x.iter().try_for_each(|item_expr| -> RhaiResultOf<()> {
+                    let value = self
+                        .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), item_expr)?
+                        .flatten();
 
-                            #[cfg(not(feature = "unchecked"))]
-                            if self.has_data_size_limit() {
-                                let val_sizes = value.calc_data_sizes(true);
+                    #[cfg(not(feature = "unchecked"))]
+                    if self.has_data_size_limit() {
+                        let val_sizes = value.calc_data_sizes(true);
 
-                                total_data_sizes = (
-                                    total_data_sizes.0 + val_sizes.0,
-                                    total_data_sizes.1 + val_sizes.1,
-                                    total_data_sizes.2 + val_sizes.2,
-                                );
-                                self.throw_on_size(total_data_sizes)
-                                    .map_err(|err| err.fill_position(item_expr.position()))?;
-                            }
+                        total_data_sizes = (
+                            total_data_sizes.0 + val_sizes.0 + 1,
+                            total_data_sizes.1 + val_sizes.1,
+                            total_data_sizes.2 + val_sizes.2,
+                        );
+                        self.throw_on_size(total_data_sizes)
+                            .map_err(|err| err.fill_position(item_expr.position()))?;
+                    }
 
-                            array.push(value);
+                    array.push(value);
 
-                            Ok(array)
-                        },
-                    )
-                    .map(Into::into)
+                    Ok(())
+                })?;
+
+                Ok(Dynamic::from_array(array))
             }
 
             #[cfg(not(feature = "no_object"))]
             Expr::Map(x, ..) => {
+                let mut map = x.1.clone();
+
                 #[cfg(not(feature = "unchecked"))]
                 let mut total_data_sizes = (0, 0, 0);
 
                 x.0.iter()
-                    .try_fold(x.1.clone(), |mut map, (key, value_expr)| {
+                    .try_for_each(|(key, value_expr)| -> RhaiResultOf<()> {
                         let value = self
                             .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), value_expr)?
                             .flatten();
@@ -358,7 +362,7 @@ impl Engine {
                             let delta = value.calc_data_sizes(true);
                             total_data_sizes = (
                                 total_data_sizes.0 + delta.0,
-                                total_data_sizes.1 + delta.1,
+                                total_data_sizes.1 + delta.1 + 1,
                                 total_data_sizes.2 + delta.2,
                             );
                             self.throw_on_size(total_data_sizes)
@@ -367,9 +371,10 @@ impl Engine {
 
                         *map.get_mut(key.as_str()).unwrap() = value;
 
-                        Ok(map)
-                    })
-                    .map(Into::into)
+                        Ok(())
+                    })?;
+
+                Ok(Dynamic::from_map(map))
             }
 
             Expr::And(x, ..) => Ok((self

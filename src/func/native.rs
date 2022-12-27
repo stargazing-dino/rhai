@@ -4,7 +4,7 @@ use super::call::FnCallArgs;
 use crate::ast::FnCallHashes;
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::plugin::PluginFunction;
-use crate::tokenizer::{is_valid_function_name, Token, TokenizeState, NO_TOKEN};
+use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Position, RhaiResult, RhaiResultOf,
@@ -436,7 +436,7 @@ impl<'a> NativeCallContext<'a> {
         let caches = &mut Caches::new();
 
         let fn_name = fn_name.as_ref();
-        let op_token = Token::lookup_symbol_from_syntax(fn_name).unwrap_or(NO_TOKEN);
+        let op_token = Token::lookup_symbol_from_syntax(fn_name);
         let args_len = args.len();
 
         if native_only {
