@@ -4,7 +4,7 @@
 use crate::ast::Expr;
 use crate::func::SendSync;
 use crate::parser::ParseResult;
-use crate::tokenizer::{is_valid_identifier, Token, NO_TOKEN};
+use crate::tokenizer::{is_reserved_keyword_or_symbol, is_valid_identifier, Token, NO_TOKEN};
 use crate::types::dynamic::Variant;
 use crate::{
     Dynamic, Engine, EvalContext, Identifier, ImmutableString, LexError, Position, RhaiResult,
@@ -232,7 +232,7 @@ impl Engine {
             }
 
             let token = Token::lookup_symbol_from_syntax(s).unwrap_or_else(|| {
-                if Token::is_reserved_keyword(s) {
+                if is_reserved_keyword_or_symbol(s) {
                     Token::Reserved(Box::new(s.into()))
                 } else {
                     NO_TOKEN

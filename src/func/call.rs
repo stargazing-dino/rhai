@@ -575,14 +575,6 @@ impl Engine {
         _is_method_call: bool,
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
-        fn no_method_err(name: &str, pos: Position) -> RhaiResultOf<(Dynamic, bool)> {
-            Err(ERR::ErrorRuntime(
-                format!("'{name}' should not be called this way. Try {name}(...);").into(),
-                pos,
-            )
-            .into())
-        }
-
         // Check for data race.
         #[cfg(not(feature = "no_closure"))]
         ensure_no_data_race(fn_name, _args, is_ref_mut)?;
@@ -622,16 +614,13 @@ impl Engine {
 
                 // Handle is_shared()
                 #[cfg(not(feature = "no_closure"))]
-                crate::engine::KEYWORD_IS_SHARED if _args.len() == 1 => {
-                    return no_method_err(fn_name, pos)
+                crate::engine::KEYWORD_IS_SHARED => {
+                    unreachable!("{} called as method", fn_name)
                 }
 
-                KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR if _args.len() == 1 => {
-                    return no_method_err(fn_name, pos)
-                }
-
-                KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY if !_args.is_empty() => {
-                    return no_method_err(fn_name, pos)
+                KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR | KEYWORD_FN_PTR_CALL
+                | KEYWORD_FN_PTR_CURRY => {
+                    unreachable!("{} called as method", fn_name)
                 }
 
                 _ => (),
