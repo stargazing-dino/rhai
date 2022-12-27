@@ -147,7 +147,7 @@ impl<'a> OptimizerState<'a> {
     pub fn call_fn_with_constant_arguments(
         &mut self,
         fn_name: &str,
-        op_token: Token,
+        op_token: Option<Token>,
         arg_values: &mut [Dynamic],
     ) -> Option<Dynamic> {
         self.engine
@@ -1137,8 +1137,8 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     return;
                 }
                 // Overloaded operators can override built-in.
-                _ if x.args.len() == 2 && x.op_token != Token::NONE && (state.engine.fast_operators() || !state.engine.has_native_fn_override(x.hashes.native(), &arg_types)) => {
-                    if let Some(result) = get_builtin_binary_op_fn(x.op_token.clone(), &arg_values[0], &arg_values[1])
+                _ if x.args.len() == 2 && x.op_token.is_some() && (state.engine.fast_operators() || !state.engine.has_native_fn_override(x.hashes.native(), &arg_types)) => {
+                    if let Some(result) = get_builtin_binary_op_fn(x.op_token.clone().unwrap(), &arg_values[0], &arg_values[1])
                         .and_then(|(f, ctx)| {
                             let context = if ctx {
                                 Some((state.engine, x.name.as_str(), None, &state.global, *pos).into())

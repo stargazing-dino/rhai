@@ -55,9 +55,6 @@ type LERR = LexError;
 /// Separator character for numbers.
 const NUMBER_SEPARATOR: char = '_';
 
-/// No token.
-pub const NO_TOKEN: Token = Token::NONE;
-
 /// A stream of tokens.
 pub type TokenStream<'a> = Peekable<TokenIterator<'a>>;
 
