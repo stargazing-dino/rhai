@@ -1468,28 +1468,22 @@ impl Engine {
                 let (expr, fn_def) = result?;
 
                 #[cfg(not(feature = "no_closure"))]
-                new_state
-                    .external_vars
-                    .as_deref()
-                    .into_iter()
-                    .flatten()
-                    .try_for_each(|Ident { name, pos }| {
-                        let (index, is_func) = state.access_var(name, lib, *pos);
+                for Ident { name, pos } in new_state.external_vars.as_deref().into_iter().flatten()
+                {
+                    let (index, is_func) = state.access_var(name, lib, *pos);
 
-                        if !is_func
-                            && index.is_none()
-                            && !settings.has_flag(ParseSettingFlags::CLOSURE_SCOPE)
-                            && settings.has_option(LangOptions::STRICT_VAR)
-                            && !state.scope.contains(name)
-                        {
-                            // If the parent scope is not inside another capturing closure
-                            // then we can conclude that the captured variable doesn't exist.
-                            // Under Strict Variables mode, this is not allowed.
-                            Err(PERR::VariableUndefined(name.to_string()).into_err(*pos))
-                        } else {
-                            Ok(())
-                        }
-                    })?;
+                    if !is_func
+                        && index.is_none()
+                        && !settings.has_flag(ParseSettingFlags::CLOSURE_SCOPE)
+                        && settings.has_option(LangOptions::STRICT_VAR)
+                        && !state.scope.contains(name)
+                    {
+                        // If the parent scope is not inside another capturing closure
+                        // then we can conclude that the captured variable doesn't exist.
+                        // Under Strict Variables mode, this is not allowed.
+                        return Err(PERR::VariableUndefined(name.to_string()).into_err(*pos));
+                    }
+                }
 
                 let hash_script = calc_fn_hash(None, &fn_def.name, fn_def.params.len());
                 lib.insert(hash_script, fn_def);

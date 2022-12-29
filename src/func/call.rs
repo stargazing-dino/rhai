@@ -1118,12 +1118,11 @@ impl Engine {
                 let mut fn_ptr = arg_value.cast::<FnPtr>();
 
                 // Append the new curried arguments to the existing list.
-                a_expr.iter().try_for_each(|expr| -> Result<_, RhaiError> {
+                for expr in a_expr {
                     let (value, ..) =
                         self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
                     fn_ptr.add_curry(value);
-                    Ok(())
-                })?;
+                }
 
                 return Ok(fn_ptr.into());
             }
@@ -1229,14 +1228,11 @@ impl Engine {
         // If so, do it separately because we cannot convert the first argument (if it is a simple
         // variable access) to &mut because `scope` is needed.
         if capture_scope && !scope.is_empty() {
-            first_arg
-                .iter()
-                .copied()
-                .chain(a_expr.iter())
-                .try_for_each(|expr| {
-                    self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)
-                        .map(|(value, ..)| arg_values.push(value.flatten()))
-                })?;
+            for expr in first_arg.iter().copied().chain(a_expr.iter()) {
+                let (value, ..) =
+                    self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
+                arg_values.push(value.flatten());
+            }
             args.extend(curry.iter_mut());
             args.extend(arg_values.iter_mut());
 
@@ -1265,10 +1261,11 @@ impl Engine {
                 self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), first_expr)?;
 
                 // func(x, ...) -> x.func(...)
-                a_expr.iter().try_for_each(|expr| {
-                    self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)
-                        .map(|(value, ..)| arg_values.push(value.flatten()))
-                })?;
+                for expr in a_expr {
+                    let (value, ..) =
+                        self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
+                    arg_values.push(value.flatten());
+                }
 
                 let mut target =
                     self.search_namespace(global, caches, scope, this_ptr, first_expr)?;
@@ -1289,13 +1286,11 @@ impl Engine {
                 }
             } else {
                 // func(..., ...)
-                first_arg
-                    .into_iter()
-                    .chain(a_expr.iter())
-                    .try_for_each(|expr| {
-                        self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)
-                            .map(|(value, ..)| arg_values.push(value.flatten()))
-                    })?;
+                for expr in first_arg.into_iter().chain(a_expr.iter()) {
+                    let (value, ..) =
+                        self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
+                    arg_values.push(value.flatten());
+                }
                 args.extend(curry.iter_mut());
             }
 
@@ -1345,10 +1340,11 @@ impl Engine {
                 // func(x, ...) -> x.func(...)
                 arg_values.push(Dynamic::UNIT);
 
-                args_expr.iter().skip(1).try_for_each(|expr| {
-                    self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)
-                        .map(|(value, ..)| arg_values.push(value.flatten()))
-                })?;
+                for expr in args_expr.iter().skip(1) {
+                    let (value, ..) =
+                        self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
+                    arg_values.push(value.flatten());
+                }
 
                 // Get target reference to first argument
                 let first_arg = &args_expr[0];
@@ -1374,10 +1370,11 @@ impl Engine {
                 }
             } else {
                 // func(..., ...) or func(mod::x, ...)
-                args_expr.iter().try_for_each(|expr| {
-                    self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)
-                        .map(|(value, ..)| arg_values.push(value.flatten()))
-                })?;
+                for expr in args_expr {
+                    let (value, ..) =
+                        self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
+                    arg_values.push(value.flatten());
+                }
                 args.extend(arg_values.iter_mut());
             }
         }

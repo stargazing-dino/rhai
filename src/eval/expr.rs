@@ -286,7 +286,7 @@ impl Engine {
             Expr::InterpolatedString(x, _) => {
                 let mut concat = SmartString::new_const();
 
-                x.iter().try_for_each(|expr| -> RhaiResultOf<()> {
+                for expr in &**x {
                     let item = &mut self
                         .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
                         .flatten();
@@ -304,9 +304,7 @@ impl Engine {
                     #[cfg(not(feature = "unchecked"))]
                     self.throw_on_size((0, 0, concat.len()))
                         .map_err(|err| err.fill_position(pos))?;
-
-                    Ok(())
-                })?;
+                }
 
                 Ok(self.get_interned_string(concat).into())
             }
@@ -318,7 +316,7 @@ impl Engine {
                 #[cfg(not(feature = "unchecked"))]
                 let mut total_data_sizes = (0, 0, 0);
 
-                x.iter().try_for_each(|item_expr| -> RhaiResultOf<()> {
+                for item_expr in &**x {
                     let value = self
                         .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), item_expr)?
                         .flatten();
@@ -337,9 +335,7 @@ impl Engine {
                     }
 
                     array.push(value);
-
-                    Ok(())
-                })?;
+                }
 
                 Ok(Dynamic::from_array(array))
             }
@@ -351,28 +347,25 @@ impl Engine {
                 #[cfg(not(feature = "unchecked"))]
                 let mut total_data_sizes = (0, 0, 0);
 
-                x.0.iter()
-                    .try_for_each(|(key, value_expr)| -> RhaiResultOf<()> {
-                        let value = self
-                            .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), value_expr)?
-                            .flatten();
+                for (key, value_expr) in &x.0 {
+                    let value = self
+                        .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), value_expr)?
+                        .flatten();
 
-                        #[cfg(not(feature = "unchecked"))]
-                        if self.has_data_size_limit() {
-                            let delta = value.calc_data_sizes(true);
-                            total_data_sizes = (
-                                total_data_sizes.0 + delta.0,
-                                total_data_sizes.1 + delta.1 + 1,
-                                total_data_sizes.2 + delta.2,
-                            );
-                            self.throw_on_size(total_data_sizes)
-                                .map_err(|err| err.fill_position(value_expr.position()))?;
-                        }
+                    #[cfg(not(feature = "unchecked"))]
+                    if self.has_data_size_limit() {
+                        let delta = value.calc_data_sizes(true);
+                        total_data_sizes = (
+                            total_data_sizes.0 + delta.0,
+                            total_data_sizes.1 + delta.1 + 1,
+                            total_data_sizes.2 + delta.2,
+                        );
+                        self.throw_on_size(total_data_sizes)
+                            .map_err(|err| err.fill_position(value_expr.position()))?;
+                    }
 
-                        *map.get_mut(key.as_str()).unwrap() = value;
-
-                        Ok(())
-                    })?;
+                    *map.get_mut(key.as_str()).unwrap() = value;
+                }
 
                 Ok(Dynamic::from_map(map))
             }
