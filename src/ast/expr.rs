@@ -489,11 +489,13 @@ impl Expr {
 
             #[cfg(not(feature = "no_object"))]
             Self::Map(x, ..) if self.is_constant() => {
-                Dynamic::from_map(x.0.iter().fold(x.1.clone(), |mut map, (k, v)| {
-                    let value_ref = map.get_mut(k.name.as_str()).unwrap();
-                    *value_ref = v.get_literal_value().unwrap();
-                    map
-                }))
+                let mut map = x.1.clone();
+
+                for (k, v) in &x.0 {
+                    *map.get_mut(k.name.as_str()).unwrap() = v.get_literal_value().unwrap();
+                }
+
+                Dynamic::from_map(map)
             }
 
             // Interpolated string

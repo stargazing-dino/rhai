@@ -112,20 +112,22 @@ impl StringsInterner {
         // We leave at least two entries, one for the empty string, and one for the string
         // that has just been inserted.
         while self.cache.len() > MAX_INTERNED_STRINGS - 3 {
-            let (_, _, n) = self
-                .cache
-                .iter()
-                .fold((0, usize::MAX, 0), |(x, c, n), (&k, v)| {
-                    if k != skip_hash
-                        && (v.strong_count() < c || (v.strong_count() == c && v.len() > x))
-                    {
-                        (v.len(), v.strong_count(), k)
-                    } else {
-                        (x, c, n)
-                    }
-                });
+            let mut max_len = 0;
+            let mut min_count = usize::MAX;
+            let mut index = 0;
 
-            self.cache.remove(&n);
+            for (&k, v) in &self.cache {
+                if k != skip_hash
+                    && (v.strong_count() < min_count
+                        || (v.strong_count() == min_count && v.len() > max_len))
+                {
+                    max_len = v.len();
+                    min_count = v.strong_count();
+                    index = k;
+                }
+            }
+
+            self.cache.remove(&index);
         }
     }
 
