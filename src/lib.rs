@@ -167,8 +167,7 @@ const MAX_USIZE_INT: INT = INT::MAX;
 const MAX_USIZE_INT: INT = usize::MAX as INT;
 
 /// The maximum integer that can fit into a [`usize`].
-#[cfg(feature = "only_i32")]
-#[cfg(target_pointer_width = "32")]
+#[cfg(all(feature = "only_i32", target_pointer_width = "32"))]
 const MAX_USIZE_INT: INT = INT::MAX;
 
 /// Number of bits in [`INT`].
@@ -187,8 +186,7 @@ const INT_BYTES: usize = std::mem::size_of::<INT>();
 /// Not available under `no_float`.
 ///
 /// If the `f32_float` feature is enabled, this will be [`f32`] instead.
-#[cfg(not(feature = "no_float"))]
-#[cfg(not(feature = "f32_float"))]
+#[cfg(all(not(feature = "no_float"), not(feature = "f32_float")))]
 pub type FLOAT = f64;
 
 /// The system floating-point type.
@@ -197,15 +195,13 @@ pub type FLOAT = f64;
 /// Not available under `no_float`.
 ///
 /// If the `f32_float` feature is not used, this will be `f64` instead.
-#[cfg(not(feature = "no_float"))]
-#[cfg(feature = "f32_float")]
+#[cfg(all(not(feature = "no_float"), feature = "f32_float"))]
 pub type FLOAT = f32;
 
 /// Number of bytes that make up a [`FLOAT`].
 ///
 /// It is 8 unless the `f32_float` feature is enabled when it will be 4.
-#[cfg(not(feature = "no_float"))]
-#[cfg(not(feature = "no_index"))]
+#[cfg(all(not(feature = "no_float"), not(feature = "no_index")))]
 const FLOAT_BYTES: usize = std::mem::size_of::<FLOAT>();
 
 /// An exclusive integer range.
@@ -218,8 +214,7 @@ type InclusiveRange = std::ops::RangeInclusive<INT>;
 pub use api::build_type::{CustomType, TypeBuilder};
 #[cfg(not(feature = "no_custom_syntax"))]
 pub use api::custom_syntax::Expression;
-#[cfg(not(feature = "no_std"))]
-#[cfg(not(target_family = "wasm"))]
+#[cfg(all(not(feature = "no_std"), target_family = "wasm"))]
 pub use api::files::{eval_file, run_file};
 pub use api::{eval::eval, events::VarDefInfo, run::run};
 pub use ast::{FnAccess, AST};
@@ -317,8 +312,7 @@ pub type OptimizationLevel = ();
 #[cfg(feature = "internals")]
 pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant};
 
-#[cfg(feature = "internals")]
-#[cfg(not(feature = "no_float"))]
+#[cfg(all(feature = "internals", not(feature = "no_float")))]
 pub use types::FloatWrapper;
 
 #[cfg(feature = "internals")]
@@ -340,12 +334,10 @@ pub use ast::{
     Ident, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock, SwitchCasesCollection,
 };
 
-#[cfg(feature = "internals")]
-#[cfg(not(feature = "no_custom_syntax"))]
+#[cfg(all(feature = "internals", not(feature = "no_custom_syntax")))]
 pub use ast::CustomExpr;
 
-#[cfg(feature = "internals")]
-#[cfg(not(feature = "no_module"))]
+#[cfg(all(feature = "internals", not(feature = "no_module")))]
 pub use ast::Namespace;
 
 #[cfg(feature = "internals")]
@@ -358,8 +350,7 @@ pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeS
 #[allow(deprecated)]
 pub use func::{locked_read, locked_write, CallableFunction, NativeCallContextStore};
 
-#[cfg(feature = "internals")]
-#[cfg(feature = "metadata")]
+#[cfg(all(feature = "internals", feature = "metadata"))]
 pub use api::definitions::Definitions;
 
 /// Number of items to keep inline for [`StaticVec`].
@@ -462,34 +453,26 @@ type SmartString = smartstring::SmartString<smartstring::LazyCompact>;
 
 // Compiler guards against mutually-exclusive feature flags
 
-#[cfg(feature = "no_float")]
-#[cfg(feature = "f32_float")]
+#[cfg(all(feature = "no_float", feature = "f32_float"))]
 compile_error!("`f32_float` cannot be used with `no_float`");
 
-#[cfg(feature = "only_i32")]
-#[cfg(feature = "only_i64")]
+#[cfg(all(feature = "only_i32", feature = "only_i64"))]
 compile_error!("`only_i32` and `only_i64` cannot be used together");
 
-#[cfg(feature = "no_std")]
-#[cfg(feature = "wasm-bindgen")]
+#[cfg(all(feature = "no_std", feature = "wasm-bindgen"))]
 compile_error!("`wasm-bindgen` cannot be used with `no-std`");
 
-#[cfg(feature = "no_std")]
-#[cfg(feature = "stdweb")]
+#[cfg(all(feature = "no_std", feature = "stdweb"))]
 compile_error!("`stdweb` cannot be used with `no-std`");
 
-#[cfg(target_family = "wasm")]
-#[cfg(feature = "no_std")]
+#[cfg(all(target_family = "wasm", feature = "no_std"))]
 compile_error!("`no_std` cannot be used for WASM target");
 
-#[cfg(not(target_family = "wasm"))]
-#[cfg(feature = "wasm-bindgen")]
+#[cfg(all(not(target_family = "wasm"), feature = "wasm-bindgen"))]
 compile_error!("`wasm-bindgen` cannot be used for non-WASM target");
 
-#[cfg(not(target_family = "wasm"))]
-#[cfg(feature = "stdweb")]
+#[cfg(all(not(target_family = "wasm"), feature = "stdweb"))]
 compile_error!("`stdweb` cannot be used non-WASM target");
 
-#[cfg(feature = "wasm-bindgen")]
-#[cfg(feature = "stdweb")]
+#[cfg(all(feature = "wasm-bindgen", feature = "stdweb"))]
 compile_error!("`wasm-bindgen` and `stdweb` cannot be used together");
