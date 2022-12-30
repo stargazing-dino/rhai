@@ -66,14 +66,15 @@ impl Dynamic {
             mx += 1;
 
             match value.0 {
+                #[cfg(not(feature = "no_index"))]
                 Union::Array(ref a, ..) => {
                     let (a, m, s) = Self::calc_array_sizes(a);
                     ax += a;
                     mx += m;
                     sx += s;
                 }
+                #[cfg(not(feature = "no_index"))]
                 Union::Blob(ref a, ..) => ax += 1 + a.len(),
-                #[cfg(not(feature = "no_object"))]
                 Union::Map(ref m, ..) => {
                     let (a, m, s) = Self::calc_map_sizes(m);
                     ax += a;
