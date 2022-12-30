@@ -546,11 +546,11 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
+        settings: ParseSettings,
         id: ImmutableString,
         no_args: bool,
         capture_parent_scope: bool,
         namespace: Namespace,
-        settings: ParseSettings,
     ) -> ParseResult<Expr> {
         let (token, token_pos) = if no_args {
             &(Token::RightParen, Position::NONE)
@@ -743,10 +743,10 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
+        settings: ParseSettings,
         lhs: Expr,
         options: ASTFlags,
         check_index_type: bool,
-        settings: ParseSettings,
     ) -> ParseResult<Expr> {
         let mut settings = settings;
 
@@ -869,7 +869,7 @@ impl Engine {
                             _ => unreachable!("`[` or `?[`"),
                         };
                         let idx_expr = self.parse_index_chain(
-                            input, state, lib, idx_expr, options, false, settings,
+                            input, state, lib, settings, idx_expr, options, false,
                         )?;
                         // Indexing binds to right
                         Ok(Expr::Index(
@@ -1307,8 +1307,8 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        is_property: bool,
         settings: ParseSettings,
+        is_property: bool,
     ) -> ParseResult<Expr> {
         let (token, token_pos) = input.peek().expect(NEVER_ENDS);
 
@@ -1460,7 +1460,7 @@ impl Engine {
                 };
 
                 let result =
-                    self.parse_anon_fn(input, new_state, state, lib, new_settings.level_up()?);
+                    self.parse_anon_fn(input, new_state, lib, new_settings.level_up()?, state);
 
                 // Restore the strings interner by swapping it back
                 std::mem::swap(state.interned_strings, new_state.interned_strings);
@@ -1468,28 +1468,22 @@ impl Engine {
                 let (expr, fn_def) = result?;
 
                 #[cfg(not(feature = "no_closure"))]
-                new_state
-                    .external_vars
-                    .as_deref()
-                    .into_iter()
-                    .flatten()
-                    .try_for_each(|Ident { name, pos }| {
-                        let (index, is_func) = state.access_var(name, lib, *pos);
+                for Ident { name, pos } in new_state.external_vars.as_deref().into_iter().flatten()
+                {
+                    let (index, is_func) = state.access_var(name, lib, *pos);
 
-                        if !is_func
-                            && index.is_none()
-                            && !settings.has_flag(ParseSettingFlags::CLOSURE_SCOPE)
-                            && settings.has_option(LangOptions::STRICT_VAR)
-                            && !state.scope.contains(name)
-                        {
-                            // If the parent scope is not inside another capturing closure
-                            // then we can conclude that the captured variable doesn't exist.
-                            // Under Strict Variables mode, this is not allowed.
-                            Err(PERR::VariableUndefined(name.to_string()).into_err(*pos))
-                        } else {
-                            Ok(())
-                        }
-                    })?;
+                    if !is_func
+                        && index.is_none()
+                        && !settings.has_flag(ParseSettingFlags::CLOSURE_SCOPE)
+                        && settings.has_option(LangOptions::STRICT_VAR)
+                        && !state.scope.contains(name)
+                    {
+                        // If the parent scope is not inside another capturing closure
+                        // then we can conclude that the captured variable doesn't exist.
+                        // Under Strict Variables mode, this is not allowed.
+                        return Err(PERR::VariableUndefined(name.to_string()).into_err(*pos));
+                    }
+                }
 
                 let hash_script = calc_fn_hash(None, &fn_def.name, fn_def.params.len());
                 lib.insert(hash_script, fn_def);
@@ -1696,7 +1690,7 @@ impl Engine {
             return Ok(root_expr);
         }
 
-        self.parse_postfix(input, state, lib, root_expr, settings)
+        self.parse_postfix(input, state, lib, settings, root_expr)
     }
 
     /// Tail processing of all possible postfix operators of a primary expression.
@@ -1705,8 +1699,8 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        mut lhs: Expr,
         settings: ParseSettings,
+        mut lhs: Expr,
     ) -> ParseResult<Expr> {
         let mut settings = settings;
 
@@ -1753,14 +1747,14 @@ impl Engine {
 
                     let (.., ns, _, name) = *x;
                     settings.pos = pos;
-                    self.parse_fn_call(input, state, lib, name, no_args, true, ns, settings)?
+                    self.parse_fn_call(input, state, lib, settings, name, no_args, true, ns)?
                 }
                 // Function call
                 (Expr::Variable(x, .., pos), t @ (Token::LeftParen | Token::Unit)) => {
                     let (.., ns, _, name) = *x;
                     let no_args = t == Token::Unit;
                     settings.pos = pos;
-                    self.parse_fn_call(input, state, lib, name, no_args, false, ns, settings)?
+                    self.parse_fn_call(input, state, lib, settings, name, no_args, false, ns)?
                 }
                 // module access
                 #[cfg(not(feature = "no_module"))]
@@ -1786,7 +1780,7 @@ impl Engine {
                         _ => unreachable!("`[` or `?[`"),
                     };
                     let settings = settings.level_up()?;
-                    self.parse_index_chain(input, state, lib, expr, opt, true, settings)?
+                    self.parse_index_chain(input, state, lib, settings, expr, opt, true)?
                 }
                 // Property access
                 #[cfg(not(feature = "no_object"))]
@@ -1807,7 +1801,7 @@ impl Engine {
                         (.., pos) => return Err(PERR::PropertyExpected.into_err(*pos)),
                     }
 
-                    let rhs = self.parse_primary(input, state, lib, true, settings.level_up()?)?;
+                    let rhs = self.parse_primary(input, state, lib, settings.level_up()?, true)?;
                     let op_flags = match op {
                         Token::Period => ASTFlags::NONE,
                         Token::Elvis => ASTFlags::NEGATED,
@@ -1984,7 +1978,7 @@ impl Engine {
             // <EOF>
             Token::EOF => Err(PERR::UnexpectedEOF.into_err(settings.pos)),
             // All other tokens
-            _ => self.parse_primary(input, state, lib, false, settings),
+            _ => self.parse_primary(input, state, lib, settings, false),
         }
     }
 
@@ -2234,9 +2228,9 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
+        settings: ParseSettings,
         parent_precedence: Option<Precedence>,
         lhs: Expr,
-        settings: ParseSettings,
     ) -> ParseResult<Expr> {
         let mut settings = settings;
         settings.pos = lhs.position();
@@ -2294,7 +2288,7 @@ impl Engine {
             // If same precedence, then check if the operator binds right
             let rhs =
                 if (precedence == next_precedence && bind_right) || precedence < next_precedence {
-                    self.parse_binary_op(input, state, lib, precedence, rhs, settings)?
+                    self.parse_binary_op(input, state, lib, settings, precedence, rhs)?
                 } else {
                     // Otherwise bind to left (even if next operator has the same precedence)
                     rhs
@@ -2629,7 +2623,7 @@ impl Engine {
         let precedence = Precedence::new(1);
         let settings = settings.level_up()?;
         let lhs = self.parse_unary(input, state, lib, settings)?;
-        self.parse_binary_op(input, state, lib, precedence, lhs, settings)
+        self.parse_binary_op(input, state, lib, settings, precedence, lhs)
     }
 
     /// Parse an if statement.
@@ -2863,9 +2857,9 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
+        settings: ParseSettings,
         access: AccessMode,
         is_export: bool,
-        settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // let/const... (specified in `var_type`)
         let mut settings = settings;
@@ -3016,7 +3010,7 @@ impl Engine {
                 let pos = *pos;
                 let settings = settings.level_up()?;
                 let mut stmt =
-                    self.parse_let(input, state, lib, AccessMode::ReadWrite, true, settings)?;
+                    self.parse_let(input, state, lib, settings, AccessMode::ReadWrite, true)?;
                 stmt.set_position(pos);
                 return Ok(stmt);
             }
@@ -3024,7 +3018,7 @@ impl Engine {
                 let pos = *pos;
                 let settings = settings.level_up()?;
                 let mut stmt =
-                    self.parse_let(input, state, lib, AccessMode::ReadOnly, true, settings)?;
+                    self.parse_let(input, state, lib, settings, AccessMode::ReadOnly, true)?;
                 stmt.set_position(pos);
                 return Ok(stmt);
             }
@@ -3344,8 +3338,8 @@ impl Engine {
                             input,
                             new_state,
                             lib,
-                            access,
                             new_settings,
+                            access,
                             #[cfg(feature = "metadata")]
                             comments,
                         )?;
@@ -3455,9 +3449,9 @@ impl Engine {
 
             Token::Try => self.parse_try_catch(input, state, lib, settings.level_up()?),
 
-            Token::Let => self.parse_let(input, state, lib, ReadWrite, false, settings.level_up()?),
+            Token::Let => self.parse_let(input, state, lib, settings.level_up()?, ReadWrite, false),
             Token::Const => {
-                self.parse_let(input, state, lib, ReadOnly, false, settings.level_up()?)
+                self.parse_let(input, state, lib, settings.level_up()?, ReadOnly, false)
             }
 
             #[cfg(not(feature = "no_module"))]
@@ -3555,8 +3549,8 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        access: crate::FnAccess,
         settings: ParseSettings,
+        access: crate::FnAccess,
         #[cfg(feature = "metadata")] comments: impl IntoIterator<Item = Identifier>,
     ) -> ParseResult<ScriptFnDef> {
         let settings = settings.level_up()?;
@@ -3712,9 +3706,9 @@ impl Engine {
         &self,
         input: &mut TokenStream,
         state: &mut ParseState,
-        _parent: &mut ParseState,
         lib: &mut FnLib,
         settings: ParseSettings,
+        _parent: &mut ParseState,
     ) -> ParseResult<(Expr, Shared<ScriptFnDef>)> {
         let settings = settings.level_up()?;
         let mut params_list = StaticVec::<ImmutableString>::new_const();

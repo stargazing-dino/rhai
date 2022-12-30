@@ -371,6 +371,7 @@ impl FnPtr {
     /// of arguments to call it directly (one version attaches extra arguments).
     #[cfg(not(feature = "internals"))]
     #[inline(always)]
+    #[allow(dead_code)]
     pub(crate) fn call_raw_with_extra_args<const N: usize, const E: usize>(
         &self,
         fn_name: &str,

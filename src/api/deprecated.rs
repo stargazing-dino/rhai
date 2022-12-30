@@ -1,7 +1,6 @@
 //! Module containing all deprecated API that will be removed in the next major version.
 
 use crate::func::RegisterNativeFunction;
-use crate::plugin::*;
 use crate::types::dynamic::Variant;
 use crate::{
     Dynamic, Engine, EvalAltResult, FnPtr, Identifier, ImmutableString, Module, NativeCallContext,
@@ -632,6 +631,9 @@ impl Module {
         Self::new()
     }
 }
+
+#[cfg(not(feature = "no_index"))]
+use crate::plugin::*;
 
 #[cfg(not(feature = "no_index"))]
 #[export_module]

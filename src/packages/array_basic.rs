@@ -237,7 +237,7 @@ pub mod array_functions {
         #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_array_size() > 0 {
             let pad = len - array.len();
-            let (a, m, s) = Dynamic::calc_array_sizes(array, true);
+            let (a, m, s) = Dynamic::calc_array_sizes(array);
             let (ax, mx, sx) = item.calc_data_sizes(true);
 
             _ctx.engine()
