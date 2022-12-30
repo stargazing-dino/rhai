@@ -90,6 +90,7 @@ fn test_expressions() -> Result<(), Box<EvalAltResult>> {
 #[test]
 #[cfg(not(feature = "no_object"))]
 fn test_expressions_eval() -> Result<(), Box<EvalAltResult>> {
+    #[allow(clippy::upper_case_acronyms)]
     #[derive(Debug, Clone)]
     struct AGENT {
         pub gender: String,
@@ -124,14 +125,12 @@ fn test_expressions_eval() -> Result<(), Box<EvalAltResult>> {
     scope.push_constant("agent", my_agent);
 
     // Evaluate the expression
-    let result: bool = engine.eval_expression_with_scope(
+    assert!(engine.eval_expression_with_scope(
         &mut scope,
         r#"
             agent.age > 10 && agent.gender == "male"
         "#,
-    )?;
-
-    assert_eq!(result, true);
+    )?);
 
     Ok(())
 }

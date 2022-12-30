@@ -33,12 +33,12 @@ fn test_native_context_fn_name() -> Result<(), Box<EvalAltResult>> {
     engine
         .register_raw_fn(
             "add_double",
-            &[TypeId::of::<INT>(), TypeId::of::<INT>()],
+            [TypeId::of::<INT>(), TypeId::of::<INT>()],
             add_double,
         )
         .register_raw_fn(
             "append_x2",
-            &[TypeId::of::<INT>(), TypeId::of::<INT>()],
+            [TypeId::of::<INT>(), TypeId::of::<INT>()],
             add_double,
         );
 

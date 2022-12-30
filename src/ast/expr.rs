@@ -287,6 +287,7 @@ pub enum Expr {
     Array(Box<StaticVec<Expr>>, Position),
     /// #{ name:expr, ... }
     Map(
+        #[allow(clippy::type_complexity)]
         Box<(StaticVec<(Ident, Expr)>, BTreeMap<Identifier, Dynamic>)>,
         Position,
     ),
@@ -304,6 +305,7 @@ pub enum Expr {
     ),
     /// Property access - ((getter, hash), (setter, hash), prop)
     Property(
+        #[allow(clippy::type_complexity)]
         Box<(
             (ImmutableString, u64),
             (ImmutableString, u64),

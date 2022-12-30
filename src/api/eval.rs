@@ -245,16 +245,16 @@ impl Engine {
             g.source = orig_source;
         });
 
-        self.eval_global_statements(global, caches, scope, ast.statements())
-            .and_then(|r| {
-                #[cfg(feature = "debugging")]
-                if self.is_debugger_registered() {
-                    global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
-                    let node = &crate::ast::Stmt::Noop(Position::NONE);
-                    self.run_debugger(global, caches, scope, None, node)?;
-                }
-                Ok(r)
-            })
+        let r = self.eval_global_statements(global, caches, scope, ast.statements())?;
+
+        #[cfg(feature = "debugging")]
+        if self.is_debugger_registered() {
+            global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
+            let node = &crate::ast::Stmt::Noop(Position::NONE);
+            self.run_debugger(global, caches, scope, None, node)?;
+        }
+
+        Ok(r)
     }
 }
 

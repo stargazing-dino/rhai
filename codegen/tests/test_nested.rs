@@ -92,6 +92,7 @@ mod export_nested_by_prefix {
             }
         }
 
+        #[allow(dead_code)] // used inside a `exported_module!`
         #[rhai_mod(name = "foo_third_adders")]
         pub mod baz_third_adders {
             use rhai::{FLOAT, INT};
@@ -105,6 +106,7 @@ mod export_nested_by_prefix {
             }
         }
 
+        #[allow(dead_code)] // used inside a `exported_module!`
         pub mod bar_fourth_adders {
             use rhai::{FLOAT, INT};
 
@@ -153,7 +155,7 @@ fn export_nested_by_prefix_test() -> Result<(), Box<EvalAltResult>> {
             let fx = Math::Advanced::foo_third_adders::add_float(ex, 1.0);
             fx
         ").unwrap_err(),
-        EvalAltResult::ErrorFunctionNotFound(s, p)
+        EvalAltResult::ErrorFunctionNotFound(s, ..)
             if s == "Math::Advanced::foo_third_adders::add_float (f64, f64)"));
 
     assert!(matches!(*engine.eval::<FLOAT>(
@@ -162,7 +164,7 @@ fn export_nested_by_prefix_test() -> Result<(), Box<EvalAltResult>> {
             let fx = Math::Advanced::foo_third_adders::add_int(ex, 1);
             fx
         ").unwrap_err(),
-        EvalAltResult::ErrorFunctionNotFound(s, p)
+        EvalAltResult::ErrorFunctionNotFound(s, ..)
             if s == "Math::Advanced::foo_third_adders::add_int (i64, i64)"));
 
     assert!(matches!(*engine.eval::<FLOAT>(
@@ -171,7 +173,7 @@ fn export_nested_by_prefix_test() -> Result<(), Box<EvalAltResult>> {
             let fx = Math::Advanced::bar_fourth_adders::add_int(ex, 1);
             fx
         ").unwrap_err(),
-        EvalAltResult::ErrorFunctionNotFound(s, p)
+        EvalAltResult::ErrorFunctionNotFound(s, ..)
             if s == "Math::Advanced::bar_fourth_adders::add_int (i64, i64)"));
 
     assert!(matches!(*engine.eval::<FLOAT>(
@@ -180,7 +182,7 @@ fn export_nested_by_prefix_test() -> Result<(), Box<EvalAltResult>> {
             let fx = Math::Advanced::bar_fourth_adders::add_float(ex, 1.0);
             fx
         ").unwrap_err(),
-        EvalAltResult::ErrorFunctionNotFound(s, p)
+        EvalAltResult::ErrorFunctionNotFound(s, ..)
             if s == "Math::Advanced::bar_fourth_adders::add_float (f64, f64)"));
 
     Ok(())

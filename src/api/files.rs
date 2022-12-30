@@ -97,7 +97,7 @@ impl Engine {
     ///
     /// // Compile a script to an AST and store it for later evaluation.
     /// // Notice that a PathBuf is required which can easily be constructed from a string.
-    /// let ast = engine.compile_file_with_scope(&mut scope, "script.rhai".into())?;
+    /// let ast = engine.compile_file_with_scope(&scope, "script.rhai".into())?;
     ///
     /// let result = engine.eval_ast::<i64>(&ast)?;
     /// # }

@@ -1,9 +1,12 @@
 #![cfg(not(feature = "no_module"))]
 use rhai::{
     module_resolvers::{DummyModuleResolver, StaticModuleResolver},
-    Dynamic, Engine, EvalAltResult, FnNamespace, FnPtr, ImmutableString, Module, NativeCallContext,
-    ParseError, ParseErrorType, Scope, INT,
+    Dynamic, Engine, EvalAltResult, FnNamespace, ImmutableString, Module, ParseError,
+    ParseErrorType, Scope, INT,
 };
+//
+#[cfg(all(not(feature = "no_function"), feature = "internals"))]
+use rhai::{FnPtr, NativeCallContext};
 
 #[test]
 fn test_module() {
@@ -241,7 +244,7 @@ fn test_module_resolver() -> Result<(), Box<EvalAltResult>> {
                     "#
                 )
                 .expect_err("should error"),
-            EvalAltResult::ErrorInFunctionCall(fn_name, _, ..) if fn_name == "foo"
+            EvalAltResult::ErrorInFunctionCall(fn_name, ..) if fn_name == "foo"
         ));
 
         engine.set_max_modules(1000);
@@ -269,9 +272,9 @@ fn test_module_resolver() -> Result<(), Box<EvalAltResult>> {
             }
             foo(1) + { import "hello" as h; h::answer }
         "#;
-        let mut scope = Scope::new();
+        let scope = Scope::new();
 
-        let ast = engine.compile_into_self_contained(&mut scope, script)?;
+        let ast = engine.compile_into_self_contained(&scope, script)?;
 
         engine.set_module_resolver(DummyModuleResolver::new());
 
@@ -329,15 +332,15 @@ fn test_module_from_ast() -> Result<(), Box<EvalAltResult>> {
             private fn hidden() {
                 throw "you shouldn't see me!";
             }
-        
+
             // Imported modules become sub-modules
             import "another module" as extra;
-        
+
             // Variables defined at global level become module variables
             export const x = 123;
             let foo = 41;
             let hello;
-        
+
             // Final variable values become constant module variable values
             foo = calc(foo);
             hello = `hello, ${foo} worlds!`;
@@ -527,8 +530,7 @@ fn test_module_ast_namespace2() -> Result<(), Box<EvalAltResult>> {
     Ok(())
 }
 
-#[cfg(not(feature = "no_function"))]
-#[cfg(feature = "internals")]
+#[cfg(all(not(feature = "no_function"), feature = "internals"))]
 #[test]
 fn test_module_context() -> Result<(), Box<EvalAltResult>> {
     let script = "fn bar() { calc(|x| x + 1) }";

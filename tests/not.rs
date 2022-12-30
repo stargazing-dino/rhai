@@ -4,15 +4,14 @@ use rhai::{Engine, EvalAltResult};
 fn test_not() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
 
-    assert_eq!(
-        engine.eval::<bool>("let not_true = !true; not_true")?,
-        false
-    );
+    assert!(!engine
+        .eval::<bool>("let not_true = !true; not_true")
+        .unwrap());
 
     #[cfg(not(feature = "no_function"))]
-    assert_eq!(engine.eval::<bool>("fn not(x) { !x } not(false)")?, true);
+    assert!(engine.eval::<bool>("fn not(x) { !x } not(false)").unwrap());
 
-    assert_eq!(engine.eval::<bool>("!!!!true")?, true);
+    assert!(engine.eval::<bool>("!!!!true").unwrap());
 
     Ok(())
 }

@@ -28,7 +28,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &mut Scope,
-        mut this_ptr: Option<&mut Dynamic>,
+        this_ptr: Option<&mut Dynamic>,
         _environ: Option<&EncapsulatedEnviron>,
         fn_def: &ScriptFnDef,
         args: &mut FnCallArgs,
@@ -108,19 +108,12 @@ impl Engine {
         #[cfg(feature = "debugging")]
         if self.is_debugger_registered() {
             let node = crate::ast::Stmt::Noop(fn_def.body.position());
-            self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), &node)?;
+            self.run_debugger(global, caches, scope, this_ptr, &node)?;
         }
 
         // Evaluate the function
         let mut _result: RhaiResult = self
-            .eval_stmt_block(
-                global,
-                caches,
-                scope,
-                this_ptr.as_deref_mut(),
-                &fn_def.body,
-                rewind_scope,
-            )
+            .eval_stmt_block(global, caches, scope, this_ptr, &fn_def.body, rewind_scope)
             .or_else(|err| match *err {
                 // Convert return statement to return value
                 ERR::Return(x, ..) => Ok(x),

@@ -267,7 +267,7 @@ fn test_get_set_collection() -> Result<(), Box<EvalAltResult>> {
     engine
         .register_type_with_name::<MyBag>("MyBag")
         .register_iterator::<MyBag>()
-        .register_fn("new_bag", || MyBag::new())
+        .register_fn("new_bag", MyBag::new)
         .register_fn("len", |col: &mut MyBag| col.len() as INT)
         .register_get("len", |col: &mut MyBag| col.len() as INT)
         .register_fn("clear", |col: &mut MyBag| col.clear())
@@ -314,7 +314,7 @@ fn test_get_set_indexer() -> Result<(), Box<EvalAltResult>> {
 
     engine
         .register_type_with_name::<MyMap>("MyMap")
-        .register_fn("new_map", || MyMap::new())
+        .register_fn("new_map", MyMap::new)
         .register_indexer_get(
             |map: &mut MyMap, index: &str| -> Result<_, Box<EvalAltResult>> {
                 map.get(index).cloned().ok_or_else(|| {
@@ -376,7 +376,7 @@ fn test_get_set_indexer() -> Result<(), Box<EvalAltResult>> {
             r#"
                 let my_map = new_map();
                 my_map["eggs"] = 42;
-            
+
                 try {
                     let eggs = my_map["eggs"];
                     let eggs = my_map["not found"];
@@ -385,7 +385,7 @@ fn test_get_set_indexer() -> Result<(), Box<EvalAltResult>> {
                 {
                     print("Not found!");
                 }
-            
+
                 my_map["eggs"]
             "#,
         )?,
@@ -399,9 +399,11 @@ fn test_get_set_indexer() -> Result<(), Box<EvalAltResult>> {
 fn test_get_set_elvis() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
 
-    assert_eq!(engine.eval::<()>("let x = (); x?.foo.bar.baz")?, ());
-    assert_eq!(engine.eval::<()>("let x = (); x?.foo(1,2,3)")?, ());
-    assert_eq!(engine.eval::<()>("let x = #{a:()}; x.a?.foo.bar.baz")?, ());
+    engine.eval::<()>("let x = (); x?.foo.bar.baz").unwrap();
+    engine.eval::<()>("let x = (); x?.foo(1,2,3)").unwrap();
+    engine
+        .eval::<()>("let x = #{a:()}; x.a?.foo.bar.baz")
+        .unwrap();
     assert_eq!(engine.eval::<String>("let x = 'x'; x?.type_of()")?, "char");
 
     Ok(())

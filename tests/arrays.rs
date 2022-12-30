@@ -1,10 +1,10 @@
 #![cfg(not(feature = "no_index"))]
 use rhai::{Array, Dynamic, Engine, EvalAltResult, ParseErrorType, INT};
+use std::iter::FromIterator;
 
 #[test]
 fn test_arrays() -> Result<(), Box<EvalAltResult>> {
-    let mut a = Array::new();
-    a.push((42 as INT).into());
+    let a = Array::from_iter([(42 as INT).into()]);
 
     assert_eq!(a[0].clone_cast::<INT>(), 42);
 
@@ -125,7 +125,7 @@ fn test_arrays() -> Result<(), Box<EvalAltResult>> {
                         let y = [4, 5];
                         x.append(y);
 
-                        x 
+                        x
                     "
                 )?
                 .into_typed_array::<INT>()?,
@@ -501,15 +501,14 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
         3
     );
 
-    assert_eq!(
-        engine.eval::<()>(
+    engine
+        .eval::<()>(
             "
                 let x = [1, 2, 3, 2, 1];
                 x.find(|v| v > 4)
-            "
-        )?,
-        ()
-    );
+            ",
+        )
+        .unwrap();
 
     assert_eq!(
         engine.eval::<INT>(
@@ -521,15 +520,14 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
         2
     );
 
-    assert_eq!(
-        engine.eval::<()>(
+    engine
+        .eval::<()>(
             "
                 let x = [#{alice: 1}, #{bob: 2}, #{clara: 3}];
                 x.find_map(|v| v.dave)
-            "
-        )?,
-        ()
-    );
+            ",
+        )
+        .unwrap();
 
     Ok(())
 }
@@ -538,7 +536,7 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
 fn test_arrays_elvis() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
 
-    assert_eq!(engine.eval::<()>("let x = (); x?[2]")?, ());
+    engine.eval::<()>("let x = (); x?[2]").unwrap();
 
     engine.run("let x = (); x?[2] = 42")?;
 

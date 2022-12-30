@@ -235,7 +235,7 @@ mod generate_tests {
     fn assert_streams_eq(actual: TokenStream, expected: TokenStream) {
         let actual = actual.to_string();
         let expected = expected.to_string();
-        if &actual != &expected {
+        if actual != expected {
             let mut counter = 0;
             let _iter = actual.chars().zip(expected.chars()).skip_while(|(a, e)| {
                 if *a == *e {

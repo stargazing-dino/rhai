@@ -84,8 +84,7 @@ mod string_functions {
     }
 
     #[rhai_fn(name = "+")]
-    pub fn add_append_unit(string: ImmutableString, item: ()) -> ImmutableString {
-        let _ = item;
+    pub fn add_append_unit(string: ImmutableString, _item: ()) -> ImmutableString {
         string
     }
     #[rhai_fn(name = "+")]
@@ -102,9 +101,8 @@ mod string_functions {
         *string += character;
     }
     #[rhai_fn(name = "+=")]
-    pub fn add_assign_append_unit(string: &mut ImmutableString, item: ()) {
+    pub fn add_assign_append_unit(string: &mut ImmutableString, _item: ()) {
         let _ = string;
-        let _ = item;
     }
 
     #[cfg(not(feature = "no_index"))]

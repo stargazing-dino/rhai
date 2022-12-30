@@ -42,7 +42,7 @@
 //!
 //! #   #[cfg(not(feature = "no_std"))]
 //! #   #[cfg(not(target_family = "wasm"))]
-//! #   
+//! #
 //!     // Evaluate the script, expecting a 'bool' result
 //!     let result: bool = engine.eval_file("my_script.rhai".into())?;
 //!
@@ -82,8 +82,8 @@
 // The lints below can be turned off to reduce signal/noise ratio
 // #![allow(clippy::too_many_lines)]
 // #![allow(clippy::let_underscore_drop)]
-// #![allow(clippy::absurd_extreme_comparisons)]
-// #![allow(clippy::unnecessary_cast)]
+#![allow(clippy::absurd_extreme_comparisons)]
+#![allow(clippy::unnecessary_cast)]
 // #![allow(clippy::wildcard_imports)]
 
 #[cfg(feature = "no_std")]

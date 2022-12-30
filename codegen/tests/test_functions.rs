@@ -75,10 +75,9 @@ fn raw_fn_str_test() -> Result<(), Box<EvalAltResult>> {
     rhai::set_exported_fn!(m, "write_out_str", raw_fn_str::write_out_str);
     engine.register_static_module("Host::IO", m.into());
 
-    assert_eq!(
-        engine.eval::<bool>(r#"let x = Host::IO::write_out_str("hello world!"); x"#)?,
-        true
-    );
+    assert!(engine
+        .eval::<bool>(r#"let x = Host::IO::write_out_str("hello world!"); x"#)
+        .unwrap());
     Ok(())
 }
 
@@ -86,6 +85,7 @@ mod mut_opaque_ref {
     use rhai::plugin::*;
     use rhai::INT;
 
+    #[allow(dead_code)] // used inside `export_module!`
     #[derive(Clone)]
     pub struct StatusMessage {
         os_code: Option<INT>,
@@ -127,17 +127,16 @@ fn mut_opaque_ref_test() -> Result<(), Box<EvalAltResult>> {
     rhai::set_exported_fn!(m, "write_out_message", mut_opaque_ref::write_out_message);
     engine.register_static_module("Host::Msg", m.into());
 
-    assert_eq!(
-        engine.eval::<bool>(
+    assert!(engine
+        .eval::<bool>(
             r#"
             let message1 = Host::Msg::new_message(true, "it worked");
             let ok1 = Host::Msg::write_out_message(message1);
             let message2 = Host::Msg::new_os_message(true, 0);
             let ok2 = Host::Msg::write_out_message(message2);
             ok1 && ok2"#
-        )?,
-        true
-    );
+        )
+        .unwrap());
     Ok(())
 }
 

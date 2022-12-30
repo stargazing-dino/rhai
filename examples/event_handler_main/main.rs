@@ -69,7 +69,7 @@ pub fn main() {
     // Compile the handler script.
     println!("> Loading script file: {path}");
 
-    let ast = match engine.compile_file_with_scope(&mut scope, path.into()) {
+    let ast = match engine.compile_file_with_scope(&scope, path.into()) {
         Ok(ast) => ast,
         Err(err) => {
             eprintln!("! Error: {}", err);

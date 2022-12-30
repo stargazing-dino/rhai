@@ -83,7 +83,7 @@ fn test_options_strict_var() -> Result<(), Box<EvalAltResult>> {
     assert!(engine.compile("let x = if y { z } else { w };").is_err());
 
     #[cfg(not(feature = "no_object"))]
-    engine.compile_with_scope(&mut scope, "if x.abs() { y } else { x + y.len };")?;
+    engine.compile_with_scope(&scope, "if x.abs() { y } else { x + y.len };")?;
 
     engine.compile("let y = 42; let x = y;")?;
 
