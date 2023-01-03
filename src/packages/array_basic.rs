@@ -651,6 +651,8 @@ pub mod array_functions {
     ///
     /// Array element (mutable) is bound to `this`.
     ///
+    /// This method is marked _pure_; the `mapper` function should not mutate array elements.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -669,7 +671,7 @@ pub mod array_functions {
     ///
     /// print(y);       // prints "[0, 2, 6, 12, 20]"
     /// ```
-    #[rhai_fn(return_raw)]
+    #[rhai_fn(return_raw, pure)]
     pub fn map(ctx: NativeCallContext, array: &mut Array, map: FnPtr) -> RhaiResultOf<Array> {
         if array.is_empty() {
             return Ok(Array::new());
@@ -692,6 +694,8 @@ pub mod array_functions {
     ///
     /// Array element (mutable) is bound to `this`.
     ///
+    /// This method is marked _pure_; the `filter` function should not mutate array elements.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -710,7 +714,7 @@ pub mod array_functions {
     ///
     /// print(y);       // prints "[12, 20]"
     /// ```
-    #[rhai_fn(return_raw)]
+    #[rhai_fn(return_raw, pure)]
     pub fn filter(ctx: NativeCallContext, array: &mut Array, filter: FnPtr) -> RhaiResultOf<Array> {
         if array.is_empty() {
             return Ok(Array::new());
@@ -882,6 +886,8 @@ pub mod array_functions {
     ///
     /// Array element (mutable) is bound to `this`.
     ///
+    /// This method is marked _pure_; the `filter` function should not mutate array elements.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -921,6 +927,8 @@ pub mod array_functions {
     /// # No Function Parameter
     ///
     /// Array element (mutable) is bound to `this`.
+    ///
+    /// This method is marked _pure_; the `filter` function should not mutate array elements.
     ///
     /// # Function Parameters
     ///
@@ -1011,6 +1019,8 @@ pub mod array_functions {
     ///
     /// Array element (mutable) is bound to `this`.
     ///
+    /// This method is marked _pure_; the `filter` function should not mutate array elements.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -1055,6 +1065,8 @@ pub mod array_functions {
     ///
     /// Array element (mutable) is bound to `this`.
     ///
+    /// This method is marked _pure_; the `mapper` function should not mutate array elements.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -1086,6 +1098,8 @@ pub mod array_functions {
     /// # No Function Parameter
     ///
     /// Array element (mutable) is bound to `this`.
+    ///
+    /// This method is marked _pure_; the `mapper` function should not mutate array elements.
     ///
     /// # Function Parameters
     ///
@@ -1143,6 +1157,8 @@ pub mod array_functions {
     ///
     /// Array element (mutable) is bound to `this`.
     ///
+    /// This method is marked _pure_; the `filter` function should not mutate array elements.
+    ///
     /// # Function Parameters
     ///
     /// * `element`: copy of array element
@@ -1184,6 +1200,8 @@ pub mod array_functions {
     /// # No Function Parameter
     ///
     /// Array element (mutable) is bound to `this`.
+    ///
+    /// This method is marked _pure_; the `filter` function should not mutate array elements.
     ///
     /// # Function Parameters
     ///
@@ -1281,8 +1299,10 @@ pub mod array_functions {
     /// # Function Parameters
     ///
     /// * `result`: accumulated result, initially `()`
-    /// * `element`: copy of array element
+    /// * `element`: copy of array element, or bound to `this` if omitted
     /// * `index` _(optional)_: current index in the array
+    ///
+    /// This method is marked _pure_; the `reducer` function should not mutate array elements.
     ///
     /// # Example
     ///
@@ -1306,8 +1326,10 @@ pub mod array_functions {
     /// # Function Parameters
     ///
     /// * `result`: accumulated result, starting with the value of `initial`
-    /// * `element`: copy of array element
+    /// * `element`: copy of array element, or bound to `this` if omitted
     /// * `index` _(optional)_: current index in the array
+    ///
+    /// This method is marked _pure_; the `reducer` function should not mutate array elements.
     ///
     /// # Example
     ///
@@ -1347,8 +1369,10 @@ pub mod array_functions {
     /// # Function Parameters
     ///
     /// * `result`: accumulated result, initially `()`
-    /// * `element`: copy of array element
+    /// * `element`: copy of array element, or bound to `this` if omitted
     /// * `index` _(optional)_: current index in the array
+    ///
+    /// This method is marked _pure_; the `reducer` function should not mutate array elements.
     ///
     /// # Example
     ///
@@ -1373,8 +1397,10 @@ pub mod array_functions {
     /// # Function Parameters
     ///
     /// * `result`: accumulated result, starting with the value of `initial`
-    /// * `element`: copy of array element
+    /// * `element`: copy of array element, or bound to `this` if omitted
     /// * `index` _(optional)_: current index in the array
+    ///
+    /// This method is marked _pure_; the `reducer` function should not mutate array elements.
     ///
     /// # Example
     ///
