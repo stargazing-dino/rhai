@@ -2102,8 +2102,10 @@ impl Engine {
         op_pos: Position,
     ) -> ParseResult<Expr> {
         match (lhs, rhs) {
-            // lhs[idx_expr].rhs
-            (Expr::Index(mut x, options, pos), rhs) => {
+            // lhs[...][...].rhs
+            (Expr::Index(mut x, options, pos), rhs)
+                if !parent_options.contains(ASTFlags::BREAK) =>
+            {
                 let options = options | parent_options;
                 x.rhs = Self::make_dot_expr(state, x.rhs, rhs, options, op_flags, op_pos)?;
                 Ok(Expr::Index(x, ASTFlags::NONE, pos))
