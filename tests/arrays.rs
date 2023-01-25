@@ -133,6 +133,20 @@ fn test_arrays() -> Result<(), Box<EvalAltResult>> {
         );
     }
 
+    #[cfg(not(feature = "no_object"))]
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let x = #{ foo: 42 };
+                let n = 0;
+                let a = [[x]];
+                let i = [n];
+                a[n][i[n]].foo
+            "
+        )?,
+        42
+    );
+
     assert_eq!(
         engine
             .eval::<Dynamic>(

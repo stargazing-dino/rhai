@@ -1,6 +1,16 @@
 Rhai Release Notes
 ==================
 
+Version 1.13.0
+==============
+
+Bug fixes
+---------
+
+* Complex indexing/dotting chains now parse correctly, for example: `a[b][c[d]].e`
+* `map` and `filter` for arrays are marked `pure`. Warnings are added to the documentation of pure array methods that take `this` closures.
+
+
 Version 1.12.0
 ==============
 

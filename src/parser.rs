@@ -55,7 +55,7 @@ pub struct ParseState<'e, 's> {
     /// Strings interner.
     pub interned_strings: &'s mut StringsInterner,
     /// External [scope][Scope] with constants.
-    pub scope: &'e Scope<'e>,
+    pub external_constants: Option<&'e Scope<'e>>,
     /// Global runtime state.
     pub global: Option<Box<GlobalRuntimeState>>,
     /// Encapsulates a local stack with variable names to simulate an actual runtime scope.
@@ -87,7 +87,7 @@ impl fmt::Debug for ParseState<'_, '_> {
 
         f.field("tokenizer_control", &self.tokenizer_control)
             .field("interned_strings", &self.interned_strings)
-            .field("scope", &self.scope)
+            .field("external_constants_scope", &self.external_constants)
             .field("global", &self.global)
             .field("stack", &self.stack)
             .field("block_stack_len", &self.block_stack_len);
@@ -109,7 +109,7 @@ impl<'e, 's> ParseState<'e, 's> {
     #[inline]
     #[must_use]
     pub fn new(
-        scope: &'e Scope,
+        external_constants: Option<&'e Scope>,
         interned_strings: &'s mut StringsInterner,
         tokenizer_control: TokenizerControl,
     ) -> Self {
@@ -121,7 +121,7 @@ impl<'e, 's> ParseState<'e, 's> {
             #[cfg(not(feature = "no_closure"))]
             allow_capture: true,
             interned_strings,
-            scope,
+            external_constants,
             global: None,
             stack: None,
             block_stack_len: 0,
@@ -1416,7 +1416,7 @@ impl Engine {
                 // Build new parse state
                 let new_interner = &mut StringsInterner::new();
                 let new_state = &mut ParseState::new(
-                    state.scope,
+                    state.external_constants,
                     new_interner,
                     state.tokenizer_control.clone(),
                 );
@@ -1476,7 +1476,9 @@ impl Engine {
                         && index.is_none()
                         && !settings.has_flag(ParseSettingFlags::CLOSURE_SCOPE)
                         && settings.has_option(LangOptions::STRICT_VAR)
-                        && !state.scope.contains(name)
+                        && !state
+                            .external_constants
+                            .map_or(false, |scope| scope.contains(name))
                     {
                         // If the parent scope is not inside another capturing closure
                         // then we can conclude that the captured variable doesn't exist.
@@ -1624,7 +1626,9 @@ impl Engine {
                             && !is_func
                             && index.is_none()
                             && settings.has_option(LangOptions::STRICT_VAR)
-                            && !state.scope.contains(&s)
+                            && !state
+                                .external_constants
+                                .map_or(false, |scope| scope.contains(&s))
                         {
                             return Err(
                                 PERR::VariableUndefined(s.to_string()).into_err(settings.pos)
@@ -2098,8 +2102,10 @@ impl Engine {
         op_pos: Position,
     ) -> ParseResult<Expr> {
         match (lhs, rhs) {
-            // lhs[idx_expr].rhs
-            (Expr::Index(mut x, options, pos), rhs) => {
+            // lhs[...][...].rhs
+            (Expr::Index(mut x, options, pos), rhs)
+                if !parent_options.contains(ASTFlags::BREAK) =>
+            {
                 let options = options | parent_options;
                 x.rhs = Self::make_dot_expr(state, x.rhs, rhs, options, op_flags, op_pos)?;
                 Ok(Expr::Index(x, ASTFlags::NONE, pos))
@@ -3298,7 +3304,7 @@ impl Engine {
                     (Token::Fn, pos) => {
                         // Build new parse state
                         let new_state = &mut ParseState::new(
-                            state.scope,
+                            state.external_constants,
                             state.interned_strings,
                             state.tokenizer_control.clone(),
                         );
@@ -3848,7 +3854,7 @@ impl Engine {
 
         #[cfg(not(feature = "no_optimize"))]
         return Ok(self.optimize_into_ast(
-            state.scope,
+            state.external_constants,
             statements,
             #[cfg(not(feature = "no_function"))]
             functions.into_iter().map(|(.., v)| v).collect(),
@@ -3934,7 +3940,7 @@ impl Engine {
 
         #[cfg(not(feature = "no_optimize"))]
         return Ok(self.optimize_into_ast(
-            state.scope,
+            state.external_constants,
             statements,
             #[cfg(not(feature = "no_function"))]
             _lib,

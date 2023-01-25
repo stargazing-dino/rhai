@@ -1288,7 +1288,7 @@ impl Engine {
     fn optimize_top_level(
         &self,
         statements: StmtBlockContainer,
-        scope: &Scope,
+        scope: Option<&Scope>,
         lib: &[crate::SharedModule],
         optimization_level: OptimizationLevel,
     ) -> StmtBlockContainer {
@@ -1309,11 +1309,13 @@ impl Engine {
         }
 
         // Add constants and variables from the scope
-        for (name, constant, value) in scope.iter() {
-            if constant {
-                state.push_var(name, AccessMode::ReadOnly, Some(value));
-            } else {
-                state.push_var(name, AccessMode::ReadWrite, None);
+        if let Some(scope) = scope {
+            for (name, constant, value) in scope.iter() {
+                if constant {
+                    state.push_var(name, AccessMode::ReadOnly, Some(value));
+                } else {
+                    state.push_var(name, AccessMode::ReadWrite, None);
+                }
             }
         }
 
@@ -1323,7 +1325,7 @@ impl Engine {
     /// Optimize a collection of statements and functions into an [`AST`].
     pub(crate) fn optimize_into_ast(
         &self,
-        scope: &Scope,
+        scope: Option<&Scope>,
         statements: StmtBlockContainer,
         #[cfg(not(feature = "no_function"))] functions: StaticVec<
             crate::Shared<crate::ast::ScriptFnDef>,

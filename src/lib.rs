@@ -100,8 +100,6 @@ use std::prelude::v1::*;
 mod reify;
 #[macro_use]
 mod restore;
-#[macro_use]
-mod types;
 
 mod api;
 mod ast;
@@ -117,6 +115,7 @@ mod parser;
 pub mod serde;
 mod tests;
 mod tokenizer;
+mod types;
 
 /// Error encountered when parsing a script.
 type PERR = ParseErrorType;

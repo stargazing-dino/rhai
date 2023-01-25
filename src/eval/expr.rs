@@ -298,7 +298,7 @@ impl Engine {
                         let source = global.source();
                         let context = &(self, FUNC_TO_STRING, source, &*global, pos).into();
                         let display = print_with_func(FUNC_TO_STRING, context, item);
-                        write!(concat, "{}", display).unwrap();
+                        write!(concat, "{display}").unwrap();
                     }
 
                     #[cfg(not(feature = "unchecked"))]

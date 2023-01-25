@@ -4,7 +4,7 @@ use crate::parser::{ParseResult, ParseState};
 use crate::types::StringsInterner;
 use crate::{
     Engine, ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, OptimizationLevel, Position,
-    RhaiError, Scope, SmartString, ERR,
+    RhaiError, SmartString, ERR,
 };
 use std::any::type_name;
 #[cfg(feature = "no_std")]
@@ -282,9 +282,8 @@ impl Engine {
         let (mut stream, tc) = self.lex_raw(&scripts, self.token_mapper.as_deref());
         tc.borrow_mut().compressed = Some(String::new());
         stream.state.last_token = Some(SmartString::new_const());
-        let scope = Scope::new();
         let mut interner = StringsInterner::new();
-        let mut state = ParseState::new(&scope, &mut interner, tc);
+        let mut state = ParseState::new(None, &mut interner, tc);
         let mut _ast = self.parse(
             stream.peekable(),
             &mut state,

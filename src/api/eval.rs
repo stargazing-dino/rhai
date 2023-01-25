@@ -69,7 +69,7 @@ impl Engine {
         script: &str,
     ) -> RhaiResultOf<T> {
         let ast = self.compile_with_scope_and_optimization_level(
-            scope,
+            Some(scope),
             [script],
             self.optimization_level,
         )?;
@@ -123,7 +123,7 @@ impl Engine {
 
             let (stream, tc) = self.lex_raw(&scripts, self.token_mapper.as_deref());
 
-            let state = &mut ParseState::new(scope, interned_strings, tc);
+            let state = &mut ParseState::new(Some(scope), interned_strings, tc);
 
             // No need to optimize a lone expression
             self.parse_global_expr(

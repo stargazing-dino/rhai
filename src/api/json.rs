@@ -4,7 +4,7 @@
 use crate::func::native::locked_write;
 use crate::parser::{ParseSettingFlags, ParseState};
 use crate::tokenizer::Token;
-use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf, Scope};
+use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -115,9 +115,8 @@ impl Engine {
         );
 
         let ast = {
-            let scope = Scope::new();
             let interned_strings = &mut *locked_write(&self.interned_strings);
-            let state = &mut ParseState::new(&scope, interned_strings, tokenizer_control);
+            let state = &mut ParseState::new(None, interned_strings, tokenizer_control);
 
             self.parse_global_expr(
                 stream.peekable(),

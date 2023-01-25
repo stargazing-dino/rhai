@@ -389,6 +389,11 @@ impl Engine {
             )?,
         }
 
+        #[cfg(feature = "debugging")]
+        let scope2 = &mut Scope::new();
+        #[cfg(not(feature = "debugging"))]
+        let scope2 = ();
+
         match lhs {
             // id.??? or id[???]
             Expr::Variable(.., var_pos) => {
@@ -399,7 +404,7 @@ impl Engine {
                 let target = &mut self.search_namespace(global, caches, scope, this_ptr, lhs)?;
 
                 self.eval_dot_index_chain_raw(
-                    global, caches, None, lhs, expr, target, rhs, idx_values, new_val,
+                    global, caches, scope2, None, lhs, expr, target, rhs, idx_values, new_val,
                 )
             }
             // {expr}.??? = ??? or {expr}[???] = ???
@@ -412,7 +417,8 @@ impl Engine {
                 let obj_ptr = &mut value.into();
 
                 self.eval_dot_index_chain_raw(
-                    global, caches, this_ptr, lhs_expr, expr, obj_ptr, rhs, idx_values, new_val,
+                    global, caches, scope2, this_ptr, lhs_expr, expr, obj_ptr, rhs, idx_values,
+                    new_val,
                 )
             }
         }
@@ -523,6 +529,8 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
+        #[cfg(feature = "debugging")] scope: &mut Scope,
+        #[cfg(not(feature = "debugging"))] scope: (),
         this_ptr: Option<&mut Dynamic>,
         root: &Expr,
         parent: &Expr,
@@ -536,9 +544,6 @@ impl Engine {
 
         #[cfg(feature = "debugging")]
         let mut this_ptr = this_ptr;
-
-        #[cfg(feature = "debugging")]
-        let scope = &mut Scope::new();
 
         match ChainType::from(parent) {
             #[cfg(not(feature = "no_index"))]
@@ -570,8 +575,8 @@ impl Engine {
                             let obj_ptr = &mut obj;
 
                             match self.eval_dot_index_chain_raw(
-                                global, caches, this_ptr, root, rhs, obj_ptr, &x.rhs, idx_values,
-                                new_val,
+                                global, caches, scope, this_ptr, root, rhs, obj_ptr, &x.rhs,
+                                idx_values, new_val,
                             ) {
                                 Ok((result, true)) if is_obj_temp_val => {
                                     (Some(obj.take_or_clone()), (result, true))
@@ -880,8 +885,8 @@ impl Engine {
                         };
 
                         self.eval_dot_index_chain_raw(
-                            global, caches, _this_ptr, root, rhs, val_target, &x.rhs, idx_values,
-                            new_val,
+                            global, caches, scope, _this_ptr, root, rhs, val_target, &x.rhs,
+                            idx_values, new_val,
                         )
                     }
                     // xxx.sub_lhs[expr] | xxx.sub_lhs.expr
@@ -926,8 +931,8 @@ impl Engine {
                                 let val = &mut (&mut val).into();
 
                                 let (result, may_be_changed) = self.eval_dot_index_chain_raw(
-                                    global, caches, _this_ptr, root, rhs, val, &x.rhs, idx_values,
-                                    new_val,
+                                    global, caches, scope, _this_ptr, root, rhs, val, &x.rhs,
+                                    idx_values, new_val,
                                 )?;
 
                                 // Feed the value back via a setter just in case it has been updated
@@ -994,8 +999,8 @@ impl Engine {
                                 let val = &mut val.into();
 
                                 self.eval_dot_index_chain_raw(
-                                    global, caches, _this_ptr, root, rhs, val, &x.rhs, idx_values,
-                                    new_val,
+                                    global, caches, scope, _this_ptr, root, rhs, val, &x.rhs,
+                                    idx_values, new_val,
                                 )
                             }
                             // xxx.module::fn_name(...) - syntax error
