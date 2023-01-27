@@ -174,9 +174,18 @@ impl Engine {
 
         // Check the variable resolver, if any
         if let Some(ref resolve_var) = self.resolve_var {
+            let orig_scope_len = scope.len();
+
             let context = EvalContext::new(self, global, caches, scope, this_ptr);
             let var_name = expr.get_variable_name(true).expect("`Expr::Variable`");
-            match resolve_var(var_name, index, context) {
+            let resolved_var = resolve_var(var_name, index, context);
+
+            if orig_scope_len != scope.len() {
+                // The scope is changed, always search from now on
+                global.always_search_scope = true;
+            }
+
+            match resolved_var {
                 Ok(Some(mut result)) => {
                     result.set_access_mode(AccessMode::ReadOnly);
                     return Ok(result.into());
