@@ -65,12 +65,15 @@ pub struct ParseState<'e, 's> {
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
     #[cfg(not(feature = "no_closure"))]
     pub external_vars: Option<Box<crate::FnArgsVec<Ident>>>,
-    /// An indicator that disables variable capturing into externals one single time
-    /// up until the nearest consumed Identifier token.
-    /// If set to false the next call to [`access_var`][ParseState::access_var] will not capture the variable.
-    /// All consequent calls to [`access_var`][ParseState::access_var] will not be affected.
+    /// An indicator that, when set to `false`, disables variable capturing into externals one
+    /// single time up until the nearest consumed Identifier token.
+    /// If set to false the next call to [`access_var`][ParseState::access_var] will not capture the
+    /// variable. All consequent calls to [`access_var`][ParseState::access_var] will not be affected.
     #[cfg(not(feature = "no_closure"))]
     pub allow_capture: bool,
+    /// If set to `false`, no namespace-qualified identifiers are parsed.
+    #[cfg(not(feature = "no_module"))]
+    pub allow_namespace: bool,
     /// Encapsulates a local stack with imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
     pub imports: Option<Box<StaticVec<ImmutableString>>>,
@@ -98,7 +101,8 @@ impl fmt::Debug for ParseState<'_, '_> {
 
         #[cfg(not(feature = "no_module"))]
         f.field("imports", &self.imports)
-            .field("global_imports", &self.global_imports);
+            .field("global_imports", &self.global_imports)
+            .field("allow_namespace", &self.allow_namespace);
 
         f.finish()
     }
@@ -120,6 +124,8 @@ impl<'e, 's> ParseState<'e, 's> {
             external_vars: None,
             #[cfg(not(feature = "no_closure"))]
             allow_capture: true,
+            #[cfg(not(feature = "no_module"))]
+            allow_namespace: true,
             interned_strings,
             external_constants,
             global: None,
@@ -456,8 +462,8 @@ fn ensure_not_statement_expr(
 /// Make sure that the next expression is not a mis-typed assignment (i.e. `a = b` instead of `a == b`).
 fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
     match input.peek().expect(NEVER_ENDS) {
-        (Token::Equals, pos) => Err(LexError::ImproperSymbol(
-            "=".into(),
+        (token @ Token::Equals, pos) => Err(LexError::ImproperSymbol(
+            token.literal_syntax().into(),
             "Possibly a typo of '=='?".into(),
         )
         .into_err(*pos)),
@@ -1593,9 +1599,9 @@ impl Engine {
                     token => unreachable!("Token::Identifier expected but gets {:?}", token),
                 };
 
-                match input.peek().expect(NEVER_ENDS).0 {
+                match input.peek().expect(NEVER_ENDS) {
                     // Function call
-                    Token::LeftParen | Token::Bang | Token::Unit => {
+                    (Token::LeftParen | Token::Bang | Token::Unit, _) => {
                         #[cfg(not(feature = "no_closure"))]
                         {
                             // Once the identifier consumed we must enable next variables capturing
@@ -1609,7 +1615,15 @@ impl Engine {
                     }
                     // Namespace qualification
                     #[cfg(not(feature = "no_module"))]
-                    Token::DoubleColon => {
+                    (token @ Token::DoubleColon, pos) => {
+                        if !state.allow_namespace {
+                            return Err(LexError::ImproperSymbol(
+                                token.literal_syntax().into(),
+                                String::new(),
+                            )
+                            .into_err(*pos));
+                        }
+
                         #[cfg(not(feature = "no_closure"))]
                         {
                             // Once the identifier consumed we must enable next variables capturing
@@ -1751,6 +1765,10 @@ impl Engine {
 
                     let (.., ns, _, name) = *x;
                     settings.pos = pos;
+
+                    #[cfg(not(feature = "no_module"))]
+                    auto_restore! { let orig_allow_namespace = state.allow_namespace; state.allow_namespace = true }
+
                     self.parse_fn_call(input, state, lib, settings, name, no_args, true, ns)?
                 }
                 // Function call
@@ -1758,7 +1776,20 @@ impl Engine {
                     let (.., ns, _, name) = *x;
                     let no_args = t == Token::Unit;
                     settings.pos = pos;
+
+                    #[cfg(not(feature = "no_module"))]
+                    auto_restore! { let orig_allow_namespace = state.allow_namespace; state.allow_namespace = true }
+
                     self.parse_fn_call(input, state, lib, settings, name, no_args, false, ns)?
+                }
+                // Disallowed module separator
+                #[cfg(not(feature = "no_module"))]
+                (_, token @ Token::DoubleColon) if !state.allow_namespace => {
+                    return Err(LexError::ImproperSymbol(
+                        token.literal_syntax().into(),
+                        String::new(),
+                    )
+                    .into_err(tail_pos))
                 }
                 // module access
                 #[cfg(not(feature = "no_module"))]
@@ -1769,15 +1800,16 @@ impl Engine {
 
                     namespace.push(var_name_def);
 
-                    Expr::Variable(
-                        (None, namespace, 0, state.get_interned_string(id2)).into(),
-                        None,
-                        pos2,
-                    )
+                    let var_name = state.get_interned_string(id2);
+
+                    Expr::Variable((None, namespace, 0, var_name).into(), None, pos2)
                 }
                 // Indexing
                 #[cfg(not(feature = "no_index"))]
                 (expr, token @ (Token::LeftBracket | Token::QuestionBracket)) => {
+                    #[cfg(not(feature = "no_module"))]
+                    auto_restore! { let orig_allow_namespace = state.allow_namespace; state.allow_namespace = true }
+
                     let opt = match token {
                         Token::LeftBracket => ASTFlags::NONE,
                         Token::QuestionBracket => ASTFlags::NEGATED,
@@ -1805,7 +1837,13 @@ impl Engine {
                         (.., pos) => return Err(PERR::PropertyExpected.into_err(*pos)),
                     }
 
-                    let rhs = self.parse_primary(input, state, lib, settings.level_up()?, true)?;
+                    let rhs = {
+                        #[cfg(not(feature = "no_module"))]
+                        auto_restore! { let orig_allow_namespace = state.allow_namespace; state.allow_namespace = false }
+
+                        self.parse_primary(input, state, lib, settings.level_up()?, true)?
+                    };
+
                     let op_flags = match op {
                         Token::Period => ASTFlags::NONE,
                         Token::Elvis => ASTFlags::NEGATED,
@@ -2081,11 +2119,13 @@ impl Engine {
                 }
             }
             // ??? && ??? = rhs, ??? || ??? = rhs, xxx ?? xxx = rhs
-            Expr::And(..) | Expr::Or(..) | Expr::Coalesce(..) => Err(LexError::ImproperSymbol(
-                "=".into(),
-                "Possibly a typo of '=='?".into(),
-            )
-            .into_err(op_pos)),
+            Expr::And(..) | Expr::Or(..) | Expr::Coalesce(..) if !op_info.is_op_assignment() => {
+                Err(LexError::ImproperSymbol(
+                    Token::Equals.literal_syntax().into(),
+                    "Possibly a typo of '=='?".into(),
+                )
+                .into_err(op_pos))
+            }
             // expr = rhs
             _ => Err(PERR::AssignmentToInvalidLHS(String::new()).into_err(lhs.position())),
         }
