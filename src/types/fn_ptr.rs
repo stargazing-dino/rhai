@@ -71,6 +71,7 @@ impl FnPtr {
     /// Create a new function pointer without checking its parameters.
     #[inline(always)]
     #[must_use]
+    #[allow(dead_code)]
     pub(crate) fn new_unchecked(
         name: impl Into<ImmutableString>,
         curry: StaticVec<Dynamic>,

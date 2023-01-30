@@ -543,6 +543,7 @@ impl Engine {
         let op_pos = parent.position();
 
         #[cfg(feature = "debugging")]
+        #[allow(unused_mut)]
         let mut this_ptr = this_ptr;
 
         match ChainType::from(parent) {
