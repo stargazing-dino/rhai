@@ -15,6 +15,13 @@ fn test_module() {
 }
 
 #[test]
+fn test_module_syntax() {
+    let engine = Engine::new();
+    assert!(engine.compile("abc.def::xyz").is_err());
+    assert!(engine.compile("abc.def::xyz()").is_err());
+}
+
+#[test]
 fn test_module_sub_module() -> Result<(), Box<EvalAltResult>> {
     let mut module = Module::new();
 

@@ -65,11 +65,13 @@ pub struct ParseState<'e, 's> {
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
     #[cfg(not(feature = "no_closure"))]
     pub external_vars: Option<Box<crate::FnArgsVec<Ident>>>,
-    /// An indicator that disables variable capturing into externals one single time
-    /// up until the nearest consumed Identifier token.
-    /// If set to false the next call to [`access_var`][ParseState::access_var] will not capture the variable.
+    /// An indicator that, when set to `false`, disables variable capturing into externals one
+    /// single time up until the nearest consumed Identifier token.
+    ///
+    /// If set to `false` the next call to [`access_var`][ParseState::access_var] will not capture
+    /// the variable.
+    ///
     /// All consequent calls to [`access_var`][ParseState::access_var] will not be affected.
-    #[cfg(not(feature = "no_closure"))]
     pub allow_capture: bool,
     /// Encapsulates a local stack with imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
@@ -118,7 +120,6 @@ impl<'e, 's> ParseState<'e, 's> {
             expr_filter: |_| true,
             #[cfg(not(feature = "no_closure"))]
             external_vars: None,
-            #[cfg(not(feature = "no_closure"))]
             allow_capture: true,
             interned_strings,
             external_constants,
@@ -296,11 +297,8 @@ bitflags! {
         /// Is the construct being parsed located at global level?
         const GLOBAL_LEVEL = 0b0000_0001;
         /// Is the construct being parsed located inside a function definition?
-        #[cfg(not(feature = "no_function"))]
         const FN_SCOPE = 0b0000_0010;
         /// Is the construct being parsed located inside a closure definition?
-        #[cfg(not(feature = "no_function"))]
-        #[cfg(not(feature = "no_closure"))]
         const CLOSURE_SCOPE = 0b0000_0100;
         /// Is the construct being parsed located inside a breakable loop?
         const BREAKABLE = 0b0000_1000;
@@ -309,6 +307,16 @@ bitflags! {
         const DISALLOW_STATEMENTS_IN_BLOCKS = 0b0001_0000;
         /// Disallow unquoted map properties?
         const DISALLOW_UNQUOTED_MAP_PROPERTIES = 0b0010_0000;
+    }
+}
+
+bitflags! {
+    /// Bit-flags containing all status for parsing property/indexing/namespace chains.
+    struct ChainingFlags: u8 {
+        /// Is the construct being parsed a property?
+        const PROPERTY = 0b0000_0001;
+        /// Disallow namespaces?
+        const DISALLOW_NAMESPACES = 0b0000_0010;
     }
 }
 
@@ -456,8 +464,8 @@ fn ensure_not_statement_expr(
 /// Make sure that the next expression is not a mis-typed assignment (i.e. `a = b` instead of `a == b`).
 fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
     match input.peek().expect(NEVER_ENDS) {
-        (Token::Equals, pos) => Err(LexError::ImproperSymbol(
-            "=".into(),
+        (token @ Token::Equals, pos) => Err(LexError::ImproperSymbol(
+            token.literal_syntax().into(),
             "Possibly a typo of '=='?".into(),
         )
         .into_err(*pos)),
@@ -1308,7 +1316,7 @@ impl Engine {
         state: &mut ParseState,
         lib: &mut FnLib,
         settings: ParseSettings,
-        is_property: bool,
+        options: ChainingFlags,
     ) -> ParseResult<Expr> {
         let (token, token_pos) = input.peek().expect(NEVER_ENDS);
 
@@ -1444,14 +1452,12 @@ impl Engine {
                 #[cfg(feature = "no_closure")]
                 let options = self.options | (settings.options & LangOptions::STRICT_VAR);
 
-                // Brand new flags, turn on function scope
+                // Brand new flags, turn on function scope and closure scope
                 let flags = ParseSettingFlags::FN_SCOPE
+                    | ParseSettingFlags::CLOSURE_SCOPE
                     | (settings.flags
                         & (ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES
                             | ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS));
-
-                #[cfg(not(feature = "no_closure"))]
-                let flags = flags | ParseSettingFlags::CLOSURE_SCOPE; // turn on closure scope
 
                 let new_settings = ParseSettings {
                     flags,
@@ -1593,14 +1599,12 @@ impl Engine {
                     token => unreachable!("Token::Identifier expected but gets {:?}", token),
                 };
 
-                match input.peek().expect(NEVER_ENDS).0 {
+                match input.peek().expect(NEVER_ENDS) {
                     // Function call
-                    Token::LeftParen | Token::Bang | Token::Unit => {
-                        #[cfg(not(feature = "no_closure"))]
-                        {
-                            // Once the identifier consumed we must enable next variables capturing
-                            state.allow_capture = true;
-                        }
+                    (Token::LeftParen | Token::Bang | Token::Unit, _) => {
+                        // Once the identifier consumed we must enable next variables capturing
+                        state.allow_capture = true;
+
                         Expr::Variable(
                             (None, ns, 0, state.get_interned_string(*s)).into(),
                             None,
@@ -1609,12 +1613,18 @@ impl Engine {
                     }
                     // Namespace qualification
                     #[cfg(not(feature = "no_module"))]
-                    Token::DoubleColon => {
-                        #[cfg(not(feature = "no_closure"))]
-                        {
-                            // Once the identifier consumed we must enable next variables capturing
-                            state.allow_capture = true;
+                    (token @ Token::DoubleColon, pos) => {
+                        if options.contains(ChainingFlags::DISALLOW_NAMESPACES) {
+                            return Err(LexError::ImproperSymbol(
+                                token.literal_syntax().into(),
+                                String::new(),
+                            )
+                            .into_err(*pos));
                         }
+
+                        // Once the identifier consumed we must enable next variables capturing
+                        state.allow_capture = true;
+
                         let name = state.get_interned_string(*s);
                         Expr::Variable((None, ns, 0, name).into(), None, settings.pos)
                     }
@@ -1622,7 +1632,7 @@ impl Engine {
                     _ => {
                         let (index, is_func) = state.access_var(&s, lib, settings.pos);
 
-                        if !is_property
+                        if !options.contains(ChainingFlags::PROPERTY)
                             && !is_func
                             && index.is_none()
                             && settings.has_option(LangOptions::STRICT_VAR)
@@ -1694,7 +1704,14 @@ impl Engine {
             return Ok(root_expr);
         }
 
-        self.parse_postfix(input, state, lib, settings, root_expr)
+        self.parse_postfix(
+            input,
+            state,
+            lib,
+            settings,
+            root_expr,
+            ChainingFlags::empty(),
+        )
     }
 
     /// Tail processing of all possible postfix operators of a primary expression.
@@ -1705,6 +1722,7 @@ impl Engine {
         lib: &mut FnLib,
         settings: ParseSettings,
         mut lhs: Expr,
+        options: ChainingFlags,
     ) -> ParseResult<Expr> {
         let mut settings = settings;
 
@@ -1751,6 +1769,7 @@ impl Engine {
 
                     let (.., ns, _, name) = *x;
                     settings.pos = pos;
+
                     self.parse_fn_call(input, state, lib, settings, name, no_args, true, ns)?
                 }
                 // Function call
@@ -1758,7 +1777,19 @@ impl Engine {
                     let (.., ns, _, name) = *x;
                     let no_args = t == Token::Unit;
                     settings.pos = pos;
+
                     self.parse_fn_call(input, state, lib, settings, name, no_args, false, ns)?
+                }
+                // Disallowed module separator
+                #[cfg(not(feature = "no_module"))]
+                (_, token @ Token::DoubleColon)
+                    if options.contains(ChainingFlags::DISALLOW_NAMESPACES) =>
+                {
+                    return Err(LexError::ImproperSymbol(
+                        token.literal_syntax().into(),
+                        String::new(),
+                    )
+                    .into_err(tail_pos))
                 }
                 // module access
                 #[cfg(not(feature = "no_module"))]
@@ -1769,11 +1800,9 @@ impl Engine {
 
                     namespace.push(var_name_def);
 
-                    Expr::Variable(
-                        (None, namespace, 0, state.get_interned_string(id2)).into(),
-                        None,
-                        pos2,
-                    )
+                    let var_name = state.get_interned_string(id2);
+
+                    Expr::Variable((None, namespace, 0, var_name).into(), None, pos2)
                 }
                 // Indexing
                 #[cfg(not(feature = "no_index"))]
@@ -1792,11 +1821,8 @@ impl Engine {
                     // Expression after dot must start with an identifier
                     match input.peek().expect(NEVER_ENDS) {
                         (Token::Identifier(..), ..) => {
-                            #[cfg(not(feature = "no_closure"))]
-                            {
-                                // Prevents capturing of the object properties as vars: xxx.<var>
-                                state.allow_capture = false;
-                            }
+                            // Prevents capturing of the object properties as vars: xxx.<var>
+                            state.allow_capture = false;
                         }
                         (Token::Reserved(s), ..) if is_keyword_function(s).1 => (),
                         (Token::Reserved(s), pos) => {
@@ -1805,12 +1831,15 @@ impl Engine {
                         (.., pos) => return Err(PERR::PropertyExpected.into_err(*pos)),
                     }
 
-                    let rhs = self.parse_primary(input, state, lib, settings.level_up()?, true)?;
                     let op_flags = match op {
                         Token::Period => ASTFlags::NONE,
                         Token::Elvis => ASTFlags::NEGATED,
                         _ => unreachable!("`.` or `?.`"),
                     };
+                    let options = ChainingFlags::PROPERTY | ChainingFlags::DISALLOW_NAMESPACES;
+                    let rhs =
+                        self.parse_primary(input, state, lib, settings.level_up()?, options)?;
+
                     Self::make_dot_expr(state, expr, rhs, ASTFlags::NONE, op_flags, tail_pos)?
                 }
                 // Unknown postfix operator
@@ -1982,7 +2011,7 @@ impl Engine {
             // <EOF>
             Token::EOF => Err(PERR::UnexpectedEOF.into_err(settings.pos)),
             // All other tokens
-            _ => self.parse_primary(input, state, lib, settings, false),
+            _ => self.parse_primary(input, state, lib, settings, ChainingFlags::empty()),
         }
     }
 
@@ -2081,11 +2110,13 @@ impl Engine {
                 }
             }
             // ??? && ??? = rhs, ??? || ??? = rhs, xxx ?? xxx = rhs
-            Expr::And(..) | Expr::Or(..) | Expr::Coalesce(..) => Err(LexError::ImproperSymbol(
-                "=".into(),
-                "Possibly a typo of '=='?".into(),
-            )
-            .into_err(op_pos)),
+            Expr::And(..) | Expr::Or(..) | Expr::Coalesce(..) if !op_info.is_op_assignment() => {
+                Err(LexError::ImproperSymbol(
+                    Token::Equals.literal_syntax().into(),
+                    "Possibly a typo of '=='?".into(),
+                )
+                .into_err(op_pos))
+            }
             // expr = rhs
             _ => Err(PERR::AssignmentToInvalidLHS(String::new()).into_err(lhs.position())),
         }

@@ -143,6 +143,21 @@ fn test_functions_global_module() -> Result<(), Box<EvalAltResult>> {
         123
     );
 
+    // Other globals
+    let mut module = Module::new();
+    module.set_var("ANSWER", 123 as INT);
+    engine.register_global_module(module.into());
+
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                fn foo() { global::ANSWER }
+                foo()
+            "
+        )?,
+        123
+    );
+
     Ok(())
 }
 

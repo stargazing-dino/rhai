@@ -728,10 +728,17 @@ impl Engine {
                         nesting_level: global.scope_level,
                         will_shadow,
                     };
+                    let orig_scope_len = scope.len();
                     let context =
                         EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());
+                    let filter_result = filter(true, info, context);
 
-                    if !filter(true, info, context)? {
+                    if orig_scope_len != scope.len() {
+                        // The scope is changed, always search from now on
+                        global.always_search_scope = true;
+                    }
+
+                    if !filter_result? {
                         return Err(ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into());
                     }
                 }
