@@ -98,7 +98,7 @@ pub struct Engine {
     #[cfg(not(feature = "no_module"))]
     pub(crate) module_resolver: Box<dyn crate::ModuleResolver>,
 
-    /// An empty [`ImmutableString`] for cloning purposes.
+    /// Strings interner.
     pub(crate) interned_strings: Locked<StringsInterner>,
 
     /// A set of symbols to disable.
