@@ -462,7 +462,8 @@ impl Module {
         self.dynamic_functions_filter = None;
         self.type_iterators = None;
         self.all_type_iterators = None;
-        self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
+        self.flags
+            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
     }
 
     /// Map a custom type to a friendly display name.
@@ -746,7 +747,8 @@ impl Module {
                     func: fn_def.into(),
                 },
             );
-        self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
+        self.flags
+            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
         hash_script
     }
 
@@ -785,7 +787,8 @@ impl Module {
         self.all_functions = None;
         self.all_variables = None;
         self.all_type_iterators = None;
-        self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
+        self.flags
+            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
 
         self.modules.get_or_insert_with(Default::default)
     }
@@ -851,7 +854,8 @@ impl Module {
         self.modules
             .get_or_insert_with(Default::default)
             .insert(name.into(), sub_module.into());
-        self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
+        self.flags
+            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
         self
     }
 
@@ -962,7 +966,8 @@ impl Module {
     pub fn update_fn_namespace(&mut self, hash_fn: u64, namespace: FnNamespace) -> &mut Self {
         if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
             f.metadata.namespace = namespace;
-            self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
+            self.flags
+                .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
         }
         self
     }
@@ -1078,7 +1083,8 @@ impl Module {
                 },
             );
 
-        self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
+        self.flags
+            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
 
         hash_fn
     }
@@ -1676,7 +1682,8 @@ impl Module {
         self.all_functions = None;
         self.all_variables = None;
         self.all_type_iterators = None;
-        self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
+        self.flags
+            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
 
         #[cfg(feature = "metadata")]
         if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
@@ -1732,7 +1739,8 @@ impl Module {
         self.all_functions = None;
         self.all_variables = None;
         self.all_type_iterators = None;
-        self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
+        self.flags
+            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
 
         #[cfg(feature = "metadata")]
         if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
@@ -1797,7 +1805,8 @@ impl Module {
         self.all_functions = None;
         self.all_variables = None;
         self.all_type_iterators = None;
-        self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
+        self.flags
+            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
 
         #[cfg(feature = "metadata")]
         if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
@@ -1880,7 +1889,8 @@ impl Module {
         self.all_functions = None;
         self.all_variables = None;
         self.all_type_iterators = None;
-        self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
+        self.flags
+            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
 
         #[cfg(feature = "metadata")]
         if !other.doc.as_deref().map_or(true, SmartString::is_empty) {
@@ -1923,7 +1933,8 @@ impl Module {
         self.all_functions = None;
         self.all_variables = None;
         self.all_type_iterators = None;
-        self.flags &= !ModuleFlags::INDEXED & !ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
+        self.flags
+            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
         self
     }
 
@@ -2306,7 +2317,7 @@ impl Module {
 
             path.push("");
 
-            let r = index_module(
+            let has_global_functions = index_module(
                 self,
                 &mut path,
                 &mut variables,
@@ -2314,9 +2325,8 @@ impl Module {
                 &mut type_iterators,
             );
 
-            if r {
-                self.flags |= ModuleFlags::INDEXED_GLOBAL_FUNCTIONS;
-            }
+            self.flags
+                .set(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS, has_global_functions);
 
             self.all_variables = if variables.is_empty() {
                 None

@@ -2769,7 +2769,7 @@ impl Engine {
         };
 
         if !orig_breakable {
-            settings.flags &= !ParseSettingFlags::BREAKABLE;
+            settings.flags.remove(ParseSettingFlags::BREAKABLE);
         }
 
         ensure_not_statement_expr(input, "a boolean")?;
@@ -3146,7 +3146,7 @@ impl Engine {
             }
 
             // Parse statements inside the block
-            settings.flags &= !ParseSettingFlags::GLOBAL_LEVEL;
+            settings.flags.remove(ParseSettingFlags::GLOBAL_LEVEL);
 
             let stmt = self.parse_stmt(input, state, lib, settings)?;
 
