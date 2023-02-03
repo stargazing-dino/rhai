@@ -10,9 +10,9 @@ use crate::{
     Dynamic, ExclusiveRange, ImmutableString, InclusiveRange, NativeCallContext, RhaiResult,
     SmartString, INT,
 };
+use std::any::TypeId;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{any::TypeId, fmt::Write};
 
 #[cfg(not(feature = "no_float"))]
 use crate::FLOAT;
@@ -753,7 +753,7 @@ pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Opti
                         let x = &mut *args[0].write_lock::<Dynamic>().unwrap();
 
                         let mut buf = SmartString::new_const();
-                        write!(&mut buf, "{y}").unwrap();
+                        buf.push(x.as_char().unwrap());
                         buf.push(y);
 
                         Ok((*x = buf.into()).into())
