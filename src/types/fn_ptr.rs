@@ -99,7 +99,6 @@ impl FnPtr {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    #[allow(clippy::type_complexity)]
     pub(crate) fn take_data(
         self,
     ) -> (

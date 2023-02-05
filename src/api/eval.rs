@@ -212,12 +212,12 @@ impl Engine {
     }
     /// Evaluate an [`AST`] with own scope, returning the result value or an error.
     #[inline]
-    pub(crate) fn eval_ast_with_scope_raw<'a>(
+    pub(crate) fn eval_ast_with_scope_raw(
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &mut Scope,
-        ast: &'a AST,
+        ast: &AST,
     ) -> RhaiResult {
         let orig_source = mem::replace(&mut global.source, ast.source_raw().cloned());
 

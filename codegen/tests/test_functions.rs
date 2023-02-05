@@ -62,7 +62,7 @@ mod raw_fn_str {
 
     #[export_fn]
     pub fn write_out_str(message: &str) -> bool {
-        eprintln!("{}", message);
+        eprintln!("{message}");
         true
     }
 }

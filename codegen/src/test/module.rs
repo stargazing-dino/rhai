@@ -301,7 +301,7 @@ mod generate_tests {
                 }
                 (actual_diff, expected_diff)
             };
-            eprintln!("actual != expected, diverge at char {}", counter);
+            eprintln!("actual != expected, diverge at char {counter}");
             // eprintln!("  actual: {}", _actual_diff);
             // eprintln!("expected: {}", _expected_diff);
             // assert!(false);

@@ -44,7 +44,7 @@ pub fn main() {
     let mut input = String::new();
 
     // Read script file
-    print!("Script file [{}]: ", SCRIPT_FILE);
+    print!("Script file [{SCRIPT_FILE}]: ");
     stdout().flush().expect("flush stdout");
 
     input.clear();

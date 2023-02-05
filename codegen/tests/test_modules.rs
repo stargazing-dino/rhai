@@ -82,7 +82,7 @@ pub mod raw_fn_str_module {
     #[export_module]
     pub mod host_io {
         pub fn write_out_str(message: &str) -> bool {
-            eprintln!("{}", message);
+            eprintln!("{message}");
             true
         }
     }
