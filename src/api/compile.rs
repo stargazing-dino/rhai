@@ -202,7 +202,11 @@ impl Engine {
         scope: &Scope,
         scripts: impl AsRef<[S]>,
     ) -> ParseResult<AST> {
-        self.compile_with_scope_and_optimization_level(scope, scripts, self.optimization_level)
+        self.compile_with_scope_and_optimization_level(
+            Some(scope),
+            scripts,
+            self.optimization_level,
+        )
     }
     /// Join a list of strings and compile into an [`AST`] using own scope at a specific optimization level.
     ///
@@ -214,7 +218,7 @@ impl Engine {
     #[inline]
     pub(crate) fn compile_with_scope_and_optimization_level<S: AsRef<str>>(
         &self,
-        scope: &Scope,
+        scope: Option<&Scope>,
         scripts: impl AsRef<[S]>,
         optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
@@ -291,7 +295,7 @@ impl Engine {
         let scripts = [script];
         let (stream, t) = self.lex_raw(&scripts, self.token_mapper.as_deref());
         let interned_strings = &mut *locked_write(&self.interned_strings);
-        let state = &mut ParseState::new(scope, interned_strings, t);
+        let state = &mut ParseState::new(Some(scope), interned_strings, t);
         self.parse_global_expr(stream.peekable(), state, |_| {}, self.optimization_level)
     }
 }

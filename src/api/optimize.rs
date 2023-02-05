@@ -52,7 +52,7 @@ impl Engine {
         let mut ast = ast;
 
         let mut _new_ast = self.optimize_into_ast(
-            scope,
+            Some(scope),
             ast.take_statements(),
             #[cfg(not(feature = "no_function"))]
             ast.shared_lib()

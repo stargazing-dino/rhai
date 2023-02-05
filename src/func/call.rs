@@ -11,7 +11,7 @@ use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token};
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString,
-    OptimizationLevel, Position, RhaiError, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
+    OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
 };
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
@@ -1053,7 +1053,7 @@ impl Engine {
                         let mut arg_values = curry
                             .into_iter()
                             .map(Ok)
-                            .chain(a_expr.iter().map(|expr| -> Result<_, RhaiError> {
+                            .chain(a_expr.iter().map(|expr| -> Result<_, crate::RhaiError> {
                                 let this_ptr = this_ptr.as_deref_mut();
                                 self.get_arg_value(global, caches, scope, this_ptr, expr)
                                     .map(|(v, ..)| v)
@@ -1518,7 +1518,7 @@ impl Engine {
         // Compile the script text
         // No optimizations because we only run it once
         let ast = self.compile_with_scope_and_optimization_level(
-            &Scope::new(),
+            None,
             [script],
             #[cfg(not(feature = "no_optimize"))]
             OptimizationLevel::None,

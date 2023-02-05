@@ -60,7 +60,7 @@ impl Engine {
         let ast = {
             let (stream, tc) = self.lex_raw(&scripts, self.token_mapper.as_deref());
             let interned_strings = &mut *locked_write(&self.interned_strings);
-            let state = &mut ParseState::new(scope, interned_strings, tc);
+            let state = &mut ParseState::new(Some(scope), interned_strings, tc);
             self.parse(stream.peekable(), state, self.optimization_level)?
         };
         self.run_ast_with_scope(scope, &ast)

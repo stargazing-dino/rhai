@@ -276,8 +276,6 @@ pub enum Token {
     /// End of the input stream.
     /// Used as a placeholder for the end of input.
     EOF,
-    /// Placeholder to indicate the lack of a token.
-    NONE,
 }
 
 impl fmt::Display for Token {
@@ -303,7 +301,6 @@ impl fmt::Display for Token {
             Comment(s) => f.write_str(s),
 
             EOF => f.write_str("{EOF}"),
-            NONE => f.write_str("{NONE}"),
 
             token => f.write_str(token.literal_syntax()),
         }
@@ -332,7 +329,7 @@ impl Token {
             Custom(..) => false,
             LexError(..) | Comment(..) => false,
 
-            EOF | NONE => false,
+            EOF => false,
 
             _ => true,
         }
