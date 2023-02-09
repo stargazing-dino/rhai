@@ -12,6 +12,11 @@ Bug fixes
 * Syntax such as `foo.bar::baz` no longer panics, but returns a proper parse error.
 * `x += y` where `x` and `y` are `char` now works correctly.
 
+Enhancements
+------------
+
+* The functions `min` and `max` are added for numbers.
+
 
 Version 1.12.0
 ==============

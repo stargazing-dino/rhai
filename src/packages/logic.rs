@@ -21,6 +21,8 @@ macro_rules! gen_cmp_functions {
                 #[rhai_fn(name = ">=")] pub fn gte(x: $arg_type, y: $arg_type) -> bool { x >= y }
                 #[rhai_fn(name = "==")] pub fn eq(x: $arg_type, y: $arg_type) -> bool { x == y }
                 #[rhai_fn(name = "!=")] pub fn ne(x: $arg_type, y: $arg_type) -> bool { x != y }
+                pub fn max(x: $arg_type, y: $arg_type) -> $arg_type { if x >= y { x } else { y } }
+                pub fn min(x: $arg_type, y: $arg_type) -> $arg_type { if x <= y { x } else { y } }
             }
         })* }
     };
@@ -53,14 +55,22 @@ def_package! {
 
         #[cfg(not(feature = "no_float"))]
         {
-            #[cfg(not(feature = "f32_float"))]
-            reg_functions!(lib += float; f32);
-            combine_with_exported_module!(lib, "f32", f32_functions);
+            combine_with_exported_module!(lib, "float", float_functions);
 
+            #[cfg(not(feature = "f32_float"))]
+            {
+                reg_functions!(lib += float; f32);
+                combine_with_exported_module!(lib, "f32", f32_functions);
+            }
             #[cfg(feature = "f32_float")]
-            reg_functions!(lib += float; f64);
-            combine_with_exported_module!(lib, "f64", f64_functions);
+            {
+                reg_functions!(lib += float; f64);
+                combine_with_exported_module!(lib, "f64", f64_functions);
+            }
         }
+
+        #[cfg(feature = "decimal")]
+        combine_with_exported_module!(lib, "decimal", decimal_functions);
 
         combine_with_exported_module!(lib, "logic", logic_functions);
     }
@@ -95,8 +105,89 @@ mod logic_functions {
 #[cfg(not(feature = "no_float"))]
 #[allow(clippy::cast_precision_loss)]
 #[export_module]
-mod f32_functions {
+mod float_functions {
     use crate::INT;
+
+    #[rhai_fn(name = "max")]
+    pub fn max_if_32(x: INT, y: f32) -> f32 {
+        let (x, y) = (x as f32, y as f32);
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "max")]
+    pub fn max_fi_32(x: f32, y: INT) -> f32 {
+        let (x, y) = (x as f32, y as f32);
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_if_32(x: INT, y: f32) -> f32 {
+        let (x, y) = (x as f32, y as f32);
+        if x <= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_fi_32(x: f32, y: INT) -> f32 {
+        let (x, y) = (x as f32, y as f32);
+        if x <= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "max")]
+    pub fn max_if_64(x: INT, y: f64) -> f64 {
+        let (x, y) = (x as f64, y as f64);
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "max")]
+    pub fn max_fi_64(x: f64, y: INT) -> f64 {
+        let (x, y) = (x as f64, y as f64);
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_if_64(x: INT, y: f64) -> f64 {
+        let (x, y) = (x as f64, y as f64);
+        if x <= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_fi_64(x: f64, y: INT) -> f64 {
+        let (x, y) = (x as f64, y as f64);
+        if x <= y {
+            x
+        } else {
+            y
+        }
+    }
+}
+
+#[cfg(not(feature = "no_float"))]
+#[cfg(not(feature = "f32_float"))]
+#[allow(clippy::cast_precision_loss)]
+#[export_module]
+mod f32_functions {
+    use crate::{FLOAT, INT};
 
     #[rhai_fn(name = "==")]
     pub fn eq_if(x: INT, y: f32) -> bool {
@@ -146,13 +237,51 @@ mod f32_functions {
     pub fn lte_fi(x: f32, y: INT) -> bool {
         (x as f32) <= (y as f32)
     }
+
+    #[rhai_fn(name = "max")]
+    pub fn max_64_32(x: FLOAT, y: f32) -> FLOAT {
+        let (x, y) = (x as FLOAT, y as FLOAT);
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "max")]
+    pub fn max_32_64(x: f32, y: FLOAT) -> FLOAT {
+        let (x, y) = (x as FLOAT, y as FLOAT);
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_64_32(x: FLOAT, y: f32) -> FLOAT {
+        let (x, y) = (x as FLOAT, y as FLOAT);
+        if x <= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_32_64(x: f32, y: FLOAT) -> FLOAT {
+        let (x, y) = (x as FLOAT, y as FLOAT);
+        if x <= y {
+            x
+        } else {
+            y
+        }
+    }
 }
 
 #[cfg(not(feature = "no_float"))]
+#[cfg(feature = "f32_float")]
 #[allow(clippy::cast_precision_loss)]
 #[export_module]
 mod f64_functions {
-    use crate::INT;
+    use crate::{FLOAT, INT};
 
     #[rhai_fn(name = "==")]
     pub fn eq_if(x: INT, y: f64) -> bool {
@@ -201,5 +330,86 @@ mod f64_functions {
     #[rhai_fn(name = "<=")]
     pub fn lte_fi(x: f64, y: INT) -> bool {
         (x as f64) <= (y as f64)
+    }
+
+    #[rhai_fn(name = "max")]
+    pub fn max_32_64(x: FLOAT, y: f64) -> FLOAT {
+        let (x, y) = (x as FLOAT, y as FLOAT);
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "max")]
+    pub fn max_64_32(x: f64, y: FLOAT) -> FLOAT {
+        let (x, y) = (x as FLOAT, y as FLOAT);
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_32_64(x: FLOAT, y: f64) -> FLOAT {
+        let (x, y) = (x as FLOAT, y as FLOAT);
+        if x <= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_64_32(x: f64, y: FLOAT) -> FLOAT {
+        let (x, y) = (x as FLOAT, y as FLOAT);
+        if x <= y {
+            x
+        } else {
+            y
+        }
+    }
+}
+
+#[cfg(feature = "decimal")]
+#[export_module]
+mod decimal_functions {
+    use crate::INT;
+    use rust_decimal::Decimal;
+
+    #[rhai_fn(name = "max")]
+    pub fn max_id(x: INT, y: Decimal) -> Decimal {
+        let x = x.into();
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "max")]
+    pub fn max_di(x: Decimal, y: INT) -> Decimal {
+        let y = y.into();
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_id(x: INT, y: Decimal) -> Decimal {
+        let x = x.into();
+        if x <= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_di(x: Decimal, y: INT) -> Decimal {
+        let y = y.into();
+        if x <= y {
+            x
+        } else {
+            y
+        }
     }
 }
