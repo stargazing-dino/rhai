@@ -229,7 +229,7 @@ fn optimize_stmt_block(
         });
 
         // Optimize each statement in the block
-        for stmt in &mut statements {
+        statements.iter_mut().for_each(|stmt| {
             match stmt {
                 Stmt::Var(x, options, ..) => {
                     if options.contains(ASTFlags::CONSTANT) {
@@ -252,7 +252,7 @@ fn optimize_stmt_block(
                 // Optimize the statement
                 _ => optimize_stmt(stmt, state, preserve_result),
             }
-        }
+        });
 
         // Remove all pure statements except the last one
         let mut index = 0;
@@ -626,11 +626,11 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                         state.set_dirty();
                     }
 
-                    for r in &*ranges {
+                    ranges.iter().for_each(|r| {
                         let b = &mut expressions[r.index()];
                         optimize_expr(&mut b.condition, state, false);
                         optimize_expr(&mut b.expr, state, false);
-                    }
+                    });
                     return;
                 }
             }
@@ -663,7 +663,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             optimize_expr(match_expr, state, false);
 
             // Optimize blocks
-            for b in expressions.as_mut() {
+            expressions.iter_mut().for_each(|b| {
                 optimize_expr(&mut b.condition, state, false);
                 optimize_expr(&mut b.expr, state, false);
 
@@ -671,7 +671,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                     b.expr = Expr::Unit(b.expr.position());
                     state.set_dirty();
                 }
-            }
+            });
 
             // Remove false cases
             cases.retain(|_, list| {
@@ -718,12 +718,12 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             }
 
             // Remove unused block statements
-            for index in 0..expressions.len() {
+            (0..expressions.len()).into_iter().for_each(|index| {
                 if *def_case == Some(index)
                     || cases.values().flat_map(|c| c.iter()).any(|&n| n == index)
                     || ranges.iter().any(|r| r.index() == index)
                 {
-                    continue;
+                    return;
                 }
 
                 let b = &mut expressions[index];
@@ -732,7 +732,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                     b.expr = Expr::Unit(b.expr.position());
                     state.set_dirty();
                 }
-            }
+            });
         }
 
         // while false { block } -> Noop
@@ -1159,8 +1159,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             x.args.iter_mut().for_each(|a| optimize_expr(a, state, false));
 
             // Move constant arguments
-            for arg in &mut x.args {
-                match arg {
+            x.args.iter_mut().for_each(|arg| match arg {
                     Expr::DynamicConstant(..) | Expr::Unit(..)
                     | Expr::StringConstant(..) | Expr::CharConstant(..)
                     | Expr::BoolConstant(..) | Expr::IntegerConstant(..) => (),
@@ -1172,8 +1171,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                         state.set_dirty();
                         *arg = Expr::DynamicConstant(value.into(), arg.start_position());
                     },
-                }
-            }
+                });
         }
 
         // Eagerly call functions
@@ -1209,7 +1207,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         }
 
         // id(args ..) or xxx.id(args ..) -> optimize function call arguments
-        Expr::FnCall(x, ..) | Expr::MethodCall(x, ..) => for arg in &mut x.args {
+        Expr::FnCall(x, ..) | Expr::MethodCall(x, ..) => x.args.iter_mut().for_each(|arg| {
             optimize_expr(arg, state, false);
 
             // Move constant arguments
@@ -1226,7 +1224,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     *arg = Expr::DynamicConstant(value.into(), arg.start_position());
                 },
             }
-        },
+        }),
 
         // constant-name
         #[cfg(not(feature = "no_module"))]
@@ -1304,20 +1302,25 @@ impl Engine {
         let mut state = OptimizerState::new(self, lib, optimization_level);
 
         // Add constants from global modules
-        for (name, value) in self.global_modules.iter().rev().flat_map(|m| m.iter_var()) {
-            state.push_var(name, AccessMode::ReadOnly, Some(value.clone()));
-        }
+        self.global_modules
+            .iter()
+            .rev()
+            .flat_map(|m| m.iter_var())
+            .for_each(|(name, value)| {
+                state.push_var(name, AccessMode::ReadOnly, Some(value.clone()))
+            });
 
         // Add constants and variables from the scope
-        if let Some(scope) = scope {
-            for (name, constant, value) in scope.iter() {
+        scope
+            .into_iter()
+            .flat_map(Scope::iter)
+            .for_each(|(name, constant, value)| {
                 if constant {
                     state.push_var(name, AccessMode::ReadOnly, Some(value));
                 } else {
                     state.push_var(name, AccessMode::ReadWrite, None);
                 }
-            }
-        }
+            });
 
         optimize_stmt_block(statements, &mut state, true, false, true)
     }
@@ -1339,15 +1342,16 @@ impl Engine {
             let mut module = crate::Module::new();
 
             if optimization_level == OptimizationLevel::None {
-                for fn_def in functions {
+                functions.into_iter().for_each(|fn_def| {
                     module.set_script_fn(fn_def);
-                }
+                });
             } else {
                 // We only need the script library's signatures for optimization purposes
                 let mut lib2 = crate::Module::new();
 
-                for fn_def in &functions {
-                    lib2.set_script_fn(crate::ast::ScriptFnDef {
+                functions
+                    .iter()
+                    .map(|fn_def| crate::ast::ScriptFnDef {
                         name: fn_def.name.clone(),
                         access: fn_def.access,
                         body: crate::ast::StmtBlock::NONE,
@@ -1355,12 +1359,14 @@ impl Engine {
                         #[cfg(not(feature = "no_function"))]
                         #[cfg(feature = "metadata")]
                         comments: Box::default(),
+                    })
+                    .for_each(|script_def| {
+                        lib2.set_script_fn(script_def);
                     });
-                }
 
                 let lib2 = &[lib2.into()];
 
-                for fn_def in functions {
+                functions.into_iter().for_each(|fn_def| {
                     let mut fn_def = crate::func::shared_take_or_clone(fn_def);
 
                     // Optimize the function body
@@ -1369,7 +1375,7 @@ impl Engine {
                     *fn_def.body = self.optimize_top_level(body, scope, lib2, optimization_level);
 
                     module.set_script_fn(fn_def);
-                }
+                });
             }
 
             module.into()

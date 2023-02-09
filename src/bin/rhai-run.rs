@@ -51,6 +51,7 @@ fn main() {
         };
 
         // Initialize scripting engine
+        #[allow(unused_mut)]
         let mut engine = Engine::new();
 
         #[cfg(not(feature = "no_optimize"))]

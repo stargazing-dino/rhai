@@ -1244,14 +1244,14 @@ impl Engine {
                             if !has_condition && ranges.is_empty() && r.len() <= SMALL_SWITCH_RANGE
                             {
                                 // Unroll small range
-                                for n in r {
+                                r.into_iter().for_each(|n| {
                                     let hasher = &mut get_hasher();
                                     Dynamic::from_int(n).hash(hasher);
                                     cases
                                         .entry(hasher.finish())
                                         .and_modify(|cases| cases.push(index))
                                         .or_insert_with(|| [index].into());
-                                }
+                                });
                             } else {
                                 // Other range
                                 r.set_index(index);
@@ -2769,7 +2769,7 @@ impl Engine {
         };
 
         if !orig_breakable {
-            settings.flags &= !ParseSettingFlags::BREAKABLE;
+            settings.flags.remove(ParseSettingFlags::BREAKABLE);
         }
 
         ensure_not_statement_expr(input, "a boolean")?;
@@ -3146,7 +3146,7 @@ impl Engine {
             }
 
             // Parse statements inside the block
-            settings.flags &= !ParseSettingFlags::GLOBAL_LEVEL;
+            settings.flags.remove(ParseSettingFlags::GLOBAL_LEVEL);
 
             let stmt = self.parse_stmt(input, state, lib, settings)?;
 
@@ -3983,9 +3983,9 @@ impl Engine {
         {
             let mut m = crate::Module::new();
 
-            for fn_def in _lib {
+            _lib.into_iter().for_each(|fn_def| {
                 m.set_script_fn(fn_def);
-            }
+            });
 
             return Ok(AST::new(statements, m));
         }

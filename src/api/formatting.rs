@@ -3,8 +3,8 @@ use crate::packages::iter_basic::{BitRange, CharsStream, StepRange};
 use crate::parser::{ParseResult, ParseState};
 use crate::types::StringsInterner;
 use crate::{
-    Engine, ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, OptimizationLevel, Position,
-    RhaiError, SmartString, ERR,
+    Engine, ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, Position, RhaiError,
+    SmartString, ERR,
 };
 use std::any::type_name;
 #[cfg(feature = "no_std")]
@@ -288,7 +288,7 @@ impl Engine {
             stream.peekable(),
             &mut state,
             #[cfg(not(feature = "no_optimize"))]
-            OptimizationLevel::None,
+            crate::OptimizationLevel::None,
             #[cfg(feature = "no_optimize")]
             (),
         )?;

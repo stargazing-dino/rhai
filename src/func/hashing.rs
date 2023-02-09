@@ -51,11 +51,7 @@ impl Hasher for StraightHasher {
     }
     #[inline(always)]
     fn write_u64(&mut self, i: u64) {
-        if i == 0 {
-            self.0 = ALT_ZERO_HASH;
-        } else {
-            self.0 = i;
-        }
+        self.0 = i;
     }
 }
 
@@ -69,7 +65,7 @@ impl BuildHasher for StraightHasherBuilder {
     #[inline(always)]
     #[must_use]
     fn build_hasher(&self) -> Self::Hasher {
-        StraightHasher(ALT_ZERO_HASH)
+        StraightHasher(0)
     }
 }
 
@@ -99,16 +95,19 @@ pub fn get_hasher() -> ahash::AHasher {
 /// The first module name is skipped.  Hashing starts from the _second_ module in the chain.
 #[inline]
 #[must_use]
-pub fn calc_var_hash<'a>(
-    modules: impl IntoIterator<Item = &'a str, IntoIter = impl ExactSizeIterator<Item = &'a str>>,
-    var_name: &str,
-) -> u64 {
+pub fn calc_var_hash<'a>(namespace: impl IntoIterator<Item = &'a str>, var_name: &str) -> u64 {
     let s = &mut get_hasher();
+    let mut count = 0;
 
     // We always skip the first module
-    let iter = modules.into_iter();
-    iter.len().hash(s);
-    iter.skip(1).for_each(|m| m.hash(s));
+    namespace.into_iter().for_each(|m| {
+        // We always skip the first module
+        if count > 0 {
+            m.hash(s);
+        }
+        count += 1;
+    });
+    count.hash(s);
     var_name.hash(s);
 
     match s.finish() {
@@ -135,16 +134,21 @@ pub fn calc_var_hash<'a>(
 #[inline]
 #[must_use]
 pub fn calc_fn_hash<'a>(
-    namespace: impl IntoIterator<Item = &'a str, IntoIter = impl ExactSizeIterator<Item = &'a str>>,
+    namespace: impl IntoIterator<Item = &'a str>,
     fn_name: &str,
     num: usize,
 ) -> u64 {
     let s = &mut get_hasher();
+    let mut count = 0;
 
-    // We always skip the first module
-    let iter = namespace.into_iter();
-    iter.len().hash(s);
-    iter.skip(1).for_each(|m| m.hash(s));
+    namespace.into_iter().for_each(|m| {
+        // We always skip the first module
+        if count > 0 {
+            m.hash(s);
+        }
+        count += 1;
+    });
+    count.hash(s);
     fn_name.hash(s);
     num.hash(s);
 
@@ -163,17 +167,15 @@ pub fn calc_fn_hash<'a>(
 /// If the hash happens to be zero, it is mapped to `ALT_ZERO_HASH`.
 #[inline]
 #[must_use]
-pub fn calc_fn_hash_full(
-    base: u64,
-    params: impl IntoIterator<Item = TypeId, IntoIter = impl ExactSizeIterator<Item = TypeId>>,
-) -> u64 {
+pub fn calc_fn_hash_full(base: u64, params: impl IntoIterator<Item = TypeId>) -> u64 {
     let s = &mut get_hasher();
     base.hash(s);
-    let iter = params.into_iter();
-    iter.len().hash(s);
-    iter.for_each(|t| {
+    let mut count = 0;
+    params.into_iter().for_each(|t| {
         t.hash(s);
+        count += 1;
     });
+    count.hash(s);
 
     match s.finish() {
         0 => ALT_ZERO_HASH,

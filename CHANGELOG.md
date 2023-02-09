@@ -10,6 +10,12 @@ Bug fixes
 * Complex indexing/dotting chains now parse correctly, for example: `a[b][c[d]].e`
 * `map` and `filter` for arrays are marked `pure`. Warnings are added to the documentation of pure array methods that take `this` closures.
 * Syntax such as `foo.bar::baz` no longer panics, but returns a proper parse error.
+* `x += y` where `x` and `y` are `char` now works correctly.
+
+Enhancements
+------------
+
+* The functions `min` and `max` are added for numbers.
 
 
 Version 1.12.0
