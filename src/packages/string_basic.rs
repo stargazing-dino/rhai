@@ -140,13 +140,15 @@ mod print_debug_functions {
     }
 
     /// Return the empty string.
+    #[allow(unused_variables)]
     #[rhai_fn(name = "print", name = "to_string")]
-    pub fn print_unit(ctx: NativeCallContext, _unit: ()) -> ImmutableString {
+    pub fn print_unit(ctx: NativeCallContext, unit: ()) -> ImmutableString {
         ctx.engine().const_empty_string()
     }
     /// Convert the unit into a string in debug format.
+    #[allow(unused_variables)]
     #[rhai_fn(name = "debug", name = "to_debug")]
-    pub fn debug_unit(_unit: ()) -> ImmutableString {
+    pub fn debug_unit(unit: ()) -> ImmutableString {
         "()".into()
     }
 
