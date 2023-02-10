@@ -83,12 +83,14 @@ mod string_functions {
         buf.into()
     }
 
+    #[allow(unused_variables)]
     #[rhai_fn(name = "+")]
-    pub fn add_append_unit(string: ImmutableString, _item: ()) -> ImmutableString {
+    pub fn add_append_unit(string: ImmutableString, item: ()) -> ImmutableString {
         string
     }
+    #[allow(unused_variables)]
     #[rhai_fn(name = "+")]
-    pub fn add_prepend_unit(_item: (), string: ImmutableString) -> ImmutableString {
+    pub fn add_prepend_unit(item: (), string: ImmutableString) -> ImmutableString {
         string
     }
 
@@ -100,10 +102,9 @@ mod string_functions {
     pub fn add_assign_append_char(string: &mut ImmutableString, character: char) {
         *string += character;
     }
+    #[allow(unused_variables)]
     #[rhai_fn(name = "+=")]
-    pub fn add_assign_append_unit(string: &mut ImmutableString, _item: ()) {
-        let _ = string;
-    }
+    pub fn add_assign_append_unit(string: &mut ImmutableString, item: ()) {}
 
     #[cfg(not(feature = "no_index"))]
     pub mod blob_functions {
