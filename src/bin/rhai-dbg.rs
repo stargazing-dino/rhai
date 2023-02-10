@@ -166,10 +166,7 @@ fn load_script(engine: &Engine) -> (rhai::AST, String) {
 
         let filename = match Path::new(&filename).canonicalize() {
             Err(err) => {
-                eprintln!(
-                    "\x1b[31mError script file path: {}\n{}\x1b[39m",
-                    filename, err
-                );
+                eprintln!("\x1b[31mError script file path: {filename}\n{err}\x1b[39m");
                 exit(1);
             }
             Ok(f) => {
@@ -315,7 +312,7 @@ fn debug_callback(
                 }
                 ["node"] => {
                     if pos.is_none() {
-                        println!("{:?}", node);
+                        println!("{node:?}");
                     } else {
                         match source {
                             Some(source) => println!("{node:?} {source} @ {pos:?}"),
@@ -400,7 +397,7 @@ fn debug_callback(
                         #[cfg(not(feature = "no_position"))]
                         rhai::debugger::BreakPoint::AtPosition { pos, .. } => {
                             let line_num = format!("[{}] line ", i + 1);
-                            print!("{}", line_num);
+                            print!("{line_num}");
                             print_source(lines, *pos, line_num.len(), (0, 0));
                         }
                         _ => println!("[{}] {bp}", i + 1),

@@ -109,10 +109,10 @@ mod core_functions {
     /// ```
     #[cfg(not(feature = "no_std"))]
     pub fn sleep(seconds: INT) {
-        if seconds <= 0 {
-            return;
+        if seconds > 0 {
+            #[allow(clippy::cast_sign_loss)]
+            std::thread::sleep(std::time::Duration::from_secs(seconds as u64));
         }
-        std::thread::sleep(std::time::Duration::from_secs(seconds as u64));
     }
 
     /// Parse a JSON string into a value.
@@ -142,23 +142,23 @@ mod reflection_functions {
 
     /// Return an array of object maps containing metadata of all script-defined functions.
     pub fn get_fn_metadata_list(ctx: NativeCallContext) -> Array {
-        collect_fn_metadata(ctx, |_, _, _, _, _| true)
+        collect_fn_metadata(&ctx, |_, _, _, _, _| true)
     }
     /// Return an array of object maps containing metadata of all script-defined functions
     /// matching the specified name.
     #[rhai_fn(name = "get_fn_metadata_list")]
     pub fn get_fn_metadata(ctx: NativeCallContext, name: &str) -> Array {
-        collect_fn_metadata(ctx, |_, _, n, _, _| n == name)
+        collect_fn_metadata(&ctx, |_, _, n, _, _| n == name)
     }
     /// Return an array of object maps containing metadata of all script-defined functions
     /// matching the specified name and arity (number of parameters).
     #[rhai_fn(name = "get_fn_metadata_list")]
     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn get_fn_metadata2(ctx: NativeCallContext, name: &str, params: INT) -> Array {
-        if !(0..=crate::MAX_USIZE_INT).contains(&params) {
-            Array::new()
+        if (0..=crate::MAX_USIZE_INT).contains(&params) {
+            collect_fn_metadata(&ctx, |_, _, n, p, _| p == (params as usize) && n == name)
         } else {
-            collect_fn_metadata(ctx, |_, _, n, p, _| p == (params as usize) && n == name)
+            Array::new()
         }
     }
 }
@@ -167,7 +167,7 @@ mod reflection_functions {
 #[cfg(not(feature = "no_index"))]
 #[cfg(not(feature = "no_object"))]
 fn collect_fn_metadata(
-    ctx: NativeCallContext,
+    ctx: &NativeCallContext,
     filter: impl Fn(FnNamespace, FnAccess, &str, usize, &crate::Shared<crate::ast::ScriptFnDef>) -> bool
         + Copy,
 ) -> crate::Array {

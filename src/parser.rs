@@ -3560,7 +3560,9 @@ impl Engine {
         // try { try_block } catch ( var ) { catch_block }
         let branch = self.parse_block(input, state, lib, settings)?.into();
 
-        let expr = if !catch_var.is_empty() {
+        let expr = if catch_var.is_empty() {
+            Expr::Unit(catch_var.pos)
+        } else {
             // Remove the error variable from the stack
             state.stack.as_deref_mut().unwrap().pop();
 
@@ -3569,12 +3571,10 @@ impl Engine {
                 None,
                 catch_var.pos,
             )
-        } else {
-            Expr::Unit(catch_var.pos)
         };
 
         Ok(Stmt::TryCatch(
-            FlowControl { body, expr, branch }.into(),
+            FlowControl { expr, body, branch }.into(),
             settings.pos,
         ))
     }

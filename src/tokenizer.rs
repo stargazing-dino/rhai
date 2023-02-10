@@ -1830,10 +1830,10 @@ fn get_next_token_inner(
                             return Some((Token::NotIn, start_pos));
                         }
                     }
-                } else {
-                    stream.unget('i');
-                    return Some((Token::Bang, start_pos));
                 }
+
+                stream.unget('i');
+                return Some((Token::Bang, start_pos));
             }
             ('!', '=') => {
                 eat_next_and_advance(stream, pos);
@@ -2137,7 +2137,7 @@ impl InputStream for MultiInputsStream<'_> {
     }
     fn peek_next(&mut self) -> Option<char> {
         if let ch @ Some(..) = self.buf.last() {
-            return ch.cloned();
+            return ch.copied();
         }
 
         loop {

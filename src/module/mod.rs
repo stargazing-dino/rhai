@@ -233,7 +233,7 @@ impl fmt::Debug for Module {
                     .modules
                     .as_deref()
                     .into_iter()
-                    .flat_map(|m| m.keys())
+                    .flat_map(BTreeMap::keys)
                     .map(SmartString::as_str)
                     .collect::<Vec<_>>(),
             )
@@ -2202,7 +2202,7 @@ impl Module {
                     environ: ref mut e, ..
                 } = f.func
                 {
-                    *e = Some(environ.clone())
+                    *e = Some(environ.clone());
                 }
             });
 

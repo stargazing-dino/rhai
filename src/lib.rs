@@ -80,11 +80,14 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::match_same_arms)]
 // The lints below can be turned off to reduce signal/noise ratio
-// #![allow(clippy::too_many_lines)]
-// #![allow(clippy::let_underscore_drop)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::let_underscore_drop)]
 #![allow(clippy::absurd_extreme_comparisons)]
 #![allow(clippy::unnecessary_cast)]
-// #![allow(clippy::wildcard_imports)]
+#![allow(clippy::wildcard_imports)]
+#![allow(clippy::no_effect_underscore_binding)]
+#![allow(clippy::semicolon_if_nothing_returned)]
+#![allow(clippy::type_complexity)]
 
 #[cfg(feature = "no_std")]
 extern crate alloc;
