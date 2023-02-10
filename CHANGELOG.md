@@ -11,6 +11,7 @@ Bug fixes
 * `map` and `filter` for arrays are marked `pure`. Warnings are added to the documentation of pure array methods that take `this` closures.
 * Syntax such as `foo.bar::baz` no longer panics, but returns a proper parse error.
 * `x += y` where `x` and `y` are `char` now works correctly.
+* Expressions such as `!inside` now parses correctly instead of as `!in` followed by `side`.
 
 Enhancements
 ------------
