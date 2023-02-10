@@ -86,7 +86,7 @@ fn const_false_fn(_: Option<NativeCallContext>, _: &mut [&mut Dynamic]) -> RhaiR
 ///
 /// The return function will be registered as a _method_, so the first parameter cannot be consumed.
 #[must_use]
-pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<FnBuiltin> {
+pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<FnBuiltin> {
     let type1 = x.type_id();
     let type2 = y.type_id();
 
@@ -621,7 +621,7 @@ pub fn get_builtin_binary_op_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<F
 ///
 /// The return function is registered as a _method_, so the first parameter cannot be consumed.
 #[must_use]
-pub fn get_builtin_op_assignment_fn(op: Token, x: &Dynamic, y: &Dynamic) -> Option<FnBuiltin> {
+pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<FnBuiltin> {
     let type1 = x.type_id();
     let type2 = y.type_id();
 

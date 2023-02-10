@@ -164,7 +164,7 @@ impl Engine {
         _global: &GlobalRuntimeState,
         caches: &'s mut Caches,
         local_entry: &'s mut Option<FnResolutionCacheEntry>,
-        op_token: Option<Token>,
+        op_token: Option<&Token>,
         hash_base: u64,
         args: Option<&mut FnCallArgs>,
         allow_dynamic: bool,
@@ -345,7 +345,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         name: &str,
-        op_token: Option<Token>,
+        op_token: Option<&Token>,
         hash: u64,
         args: &mut FnCallArgs,
         is_ref_mut: bool,
@@ -567,7 +567,7 @@ impl Engine {
         caches: &mut Caches,
         _scope: Option<&mut Scope>,
         fn_name: &str,
-        op_token: Option<Token>,
+        op_token: Option<&Token>,
         hashes: FnCallHashes,
         mut _args: &mut FnCallArgs,
         is_ref_mut: bool,
@@ -1000,7 +1000,7 @@ impl Engine {
         scope: &mut Scope,
         mut this_ptr: Option<&mut Dynamic>,
         fn_name: &str,
-        op_token: Option<Token>,
+        op_token: Option<&Token>,
         first_arg: Option<&Expr>,
         args_expr: &[Expr],
         hashes: FnCallHashes,
@@ -1564,10 +1564,10 @@ impl Engine {
             ..
         } = expr;
 
-        let op_token = op_token.clone();
+        let op_token = op_token.as_ref();
 
         // Short-circuit native unary operator call if under Fast Operators mode
-        if op_token == Some(Token::Bang) && self.fast_operators() && args.len() == 1 {
+        if op_token == Some(&Token::Bang) && self.fast_operators() && args.len() == 1 {
             let mut value = self
                 .get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), &args[0])?
                 .0
@@ -1597,7 +1597,7 @@ impl Engine {
             let operands = &mut [&mut lhs, &mut rhs];
 
             if let Some((func, need_context)) =
-                get_builtin_binary_op_fn(op_token.clone().unwrap(), operands[0], operands[1])
+                get_builtin_binary_op_fn(op_token.as_ref().unwrap(), operands[0], operands[1])
             {
                 // Built-in found
                 auto_restore! { let orig_level = global.level; global.level += 1 }

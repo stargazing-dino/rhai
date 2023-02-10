@@ -141,7 +141,7 @@ impl Engine {
 
             if self.fast_operators() {
                 if let Some((func, need_context)) =
-                    get_builtin_op_assignment_fn(op_assign.clone(), args[0], args[1])
+                    get_builtin_op_assignment_fn(op_assign, args[0], args[1])
                 {
                     // Built-in found
                     auto_restore! { let orig_level = global.level; global.level += 1 }
@@ -157,7 +157,7 @@ impl Engine {
                 }
             }
 
-            let token = Some(op_assign.clone());
+            let token = Some(op_assign);
             let op_assign = op_assign.literal_syntax();
 
             match self.exec_native_fn_call(global, caches, op_assign, token, hash, args, true, *pos)
@@ -166,7 +166,7 @@ impl Engine {
                 Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
                 {
                     // Expand to `var = var op rhs`
-                    let token = Some(op.clone());
+                    let token = Some(op);
                     let op = op.literal_syntax();
 
                     *args[0] = self
