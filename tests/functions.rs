@@ -8,6 +8,7 @@ fn test_functions_trait_object() -> Result<(), Box<EvalAltResult>> {
         fn greet(&self) -> INT;
     }
 
+    #[allow(clippy::upper_case_acronyms)]
     #[derive(Debug, Clone)]
     struct ABC(INT);
 

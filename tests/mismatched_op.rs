@@ -13,6 +13,7 @@ fn test_mismatched_op() {
 #[test]
 #[cfg(not(feature = "no_object"))]
 fn test_mismatched_op_custom_type() -> Result<(), Box<EvalAltResult>> {
+    #[allow(dead_code)] // used inside `register_type_with_name`
     #[derive(Debug, Clone)]
     struct TestStruct {
         x: INT,

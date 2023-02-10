@@ -56,7 +56,7 @@ fn test_method_call_with_full_optimization() -> Result<(), Box<EvalAltResult>> {
     engine.set_optimization_level(rhai::OptimizationLevel::Full);
 
     engine
-        .register_fn("new_ts", || TestStruct::new())
+        .register_fn("new_ts", TestStruct::new)
         .register_fn("ymd", |_: INT, _: INT, _: INT| 42 as INT)
         .register_fn("range", |_: &mut TestStruct, _: INT, _: INT| {
             TestStruct::new()

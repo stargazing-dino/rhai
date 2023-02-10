@@ -10,10 +10,9 @@ fn test_switch() -> Result<(), Box<EvalAltResult>> {
         engine.eval::<char>("switch 2 { 1 => (), 2 => 'a', 42 => true }")?,
         'a'
     );
-    assert_eq!(
-        engine.run("switch 3 { 1 => (), 2 => 'a', 42 => true }")?,
-        ()
-    );
+    engine
+        .run("switch 3 { 1 => (), 2 => 'a', 42 => true }")
+        .unwrap();
     assert_eq!(
         engine.eval::<INT>("switch 3 { 1 => (), 2 => 'a', 42 => true, _ => 123 }")?,
         123
@@ -32,18 +31,16 @@ fn test_switch() -> Result<(), Box<EvalAltResult>> {
         )?,
         'a'
     );
-    assert_eq!(
-        engine.eval_with_scope::<bool>(&mut scope, "switch x { 1 => (), 2 => 'a', 42 => true }")?,
-        true
-    );
-    assert_eq!(
-        engine.eval_with_scope::<bool>(&mut scope, "switch x { 1 => (), 2 => 'a', _ => true }")?,
-        true
-    );
-    assert_eq!(
-        engine.eval_with_scope::<()>(&mut scope, "switch x { 1 => 123, 2 => 'a' }")?,
-        ()
-    );
+    assert!(engine
+        .eval_with_scope::<bool>(&mut scope, "switch x { 1 => (), 2 => 'a', 42 => true }")
+        .unwrap());
+    assert!(engine
+        .eval_with_scope::<bool>(&mut scope, "switch x { 1 => (), 2 => 'a', _ => true }")
+        .unwrap());
+    let _: () = engine
+        .eval_with_scope::<()>(&mut scope, "switch x { 1 => 123, 2 => 'a' }")
+        .unwrap();
+
     assert_eq!(
         engine.eval_with_scope::<INT>(
             &mut scope,

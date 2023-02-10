@@ -212,12 +212,12 @@ impl Engine {
     }
     /// Evaluate an [`AST`] with own scope, returning the result value or an error.
     #[inline]
-    pub(crate) fn eval_ast_with_scope_raw<'a>(
+    pub(crate) fn eval_ast_with_scope_raw(
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &mut Scope,
-        ast: &'a AST,
+        ast: &AST,
     ) -> RhaiResult {
         let orig_source = mem::replace(&mut global.source, ast.source_raw().cloned());
 
@@ -245,16 +245,16 @@ impl Engine {
             g.source = orig_source;
         });
 
-        self.eval_global_statements(global, caches, scope, ast.statements())
-            .and_then(|r| {
-                #[cfg(feature = "debugging")]
-                if self.is_debugger_registered() {
-                    global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
-                    let node = &crate::ast::Stmt::Noop(Position::NONE);
-                    self.run_debugger(global, caches, scope, None, node)?;
-                }
-                Ok(r)
-            })
+        let r = self.eval_global_statements(global, caches, scope, ast.statements())?;
+
+        #[cfg(feature = "debugging")]
+        if self.is_debugger_registered() {
+            global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
+            let node = &crate::ast::Stmt::Noop(Position::NONE);
+            self.run_debugger(global, caches, scope, None, node)?;
+        }
+
+        Ok(r)
     }
 }
 

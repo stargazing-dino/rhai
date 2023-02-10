@@ -1,12 +1,10 @@
 #![cfg(not(feature = "no_index"))]
 use rhai::{Blob, Engine, EvalAltResult, Scope, INT};
+use std::iter::FromIterator;
 
 #[test]
 fn test_blobs() -> Result<(), Box<EvalAltResult>> {
-    let mut a = Blob::new();
-    a.push(1);
-    a.push(2);
-    a.push(3);
+    let a = Blob::from_iter([1, 2, 3]);
 
     let engine = Engine::new();
     let mut scope = Scope::new();

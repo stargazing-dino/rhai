@@ -155,7 +155,9 @@ mod time_functions {
                         })
                 }
             } else {
-                Ok(timestamp - Duration::from_millis((seconds * 1000.0) as u64))
+                Ok(timestamp
+                    .checked_sub(Duration::from_millis((seconds * 1000.0) as u64))
+                    .unwrap())
             }
         }
 
@@ -212,7 +214,9 @@ mod time_functions {
                     ))
                 })
         } else {
-            Ok(timestamp - Duration::from_secs(seconds as u64))
+            Ok(timestamp
+                .checked_sub(Duration::from_secs(seconds as u64))
+                .unwrap())
         }
     }
 

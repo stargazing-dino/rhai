@@ -103,11 +103,11 @@ impl Dynamic {
     pub(crate) fn calc_data_sizes(&self, _top: bool) -> (usize, usize, usize) {
         match self.0 {
             #[cfg(not(feature = "no_index"))]
-            Union::Array(ref arr, ..) => Self::calc_array_sizes(&**arr),
+            Union::Array(ref arr, ..) => Self::calc_array_sizes(arr),
             #[cfg(not(feature = "no_index"))]
             Union::Blob(ref blob, ..) => (blob.len(), 0, 0),
             #[cfg(not(feature = "no_object"))]
-            Union::Map(ref map, ..) => Self::calc_map_sizes(&**map),
+            Union::Map(ref map, ..) => Self::calc_map_sizes(map),
             Union::Str(ref s, ..) => (0, 0, s.len()),
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) if _top => self.read_lock::<Self>().unwrap().calc_data_sizes(true),

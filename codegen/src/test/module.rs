@@ -86,11 +86,7 @@ mod module_tests {
         assert_eq!(item_mod.fns().len(), 1);
         assert_eq!(item_mod.fns()[0].name().to_string(), "get_mystic_number");
         assert_eq!(
-            item_mod.fns()[0]
-                .comments()
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>(),
+            item_mod.fns()[0].comments().to_vec(),
             vec![
                 "\
                 /// This is a doc-comment.\n\
@@ -286,7 +282,7 @@ mod generate_tests {
     fn assert_streams_eq(actual: TokenStream, expected: TokenStream) {
         let actual = actual.to_string();
         let expected = expected.to_string();
-        if &actual != &expected {
+        if actual != expected {
             let mut counter = 0;
             let _iter = actual.chars().zip(expected.chars()).skip_while(|(a, e)| {
                 if *a == *e {
@@ -305,7 +301,7 @@ mod generate_tests {
                 }
                 (actual_diff, expected_diff)
             };
-            eprintln!("actual != expected, diverge at char {}", counter);
+            eprintln!("actual != expected, diverge at char {counter}");
             // eprintln!("  actual: {}", _actual_diff);
             // eprintln!("expected: {}", _expected_diff);
             // assert!(false);

@@ -19,6 +19,7 @@ impl Command {
     }
 }
 
+#[allow(clippy::upper_case_acronyms)]
 type API = Arc<Mutex<Command>>;
 
 #[cfg(not(feature = "no_object"))]

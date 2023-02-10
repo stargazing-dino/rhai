@@ -91,11 +91,12 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
                 }
 
                 // Do not rewind if the variable is upper-case
-                if var_name.to_uppercase() == var_name {
-                    context.eval_expression_tree_raw(stmt, false)?;
+                let _: Dynamic = if var_name.to_uppercase() == var_name {
+                    #[allow(deprecated)] // not deprecated but unstable
+                    context.eval_expression_tree_raw(stmt, false)
                 } else {
-                    context.eval_expression_tree(stmt)?;
-                }
+                    context.eval_expression_tree(stmt)
+                }?;
 
                 count += 1;
 
