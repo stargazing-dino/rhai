@@ -1468,10 +1468,9 @@ pub mod array_functions {
     ///
     /// print(x);       // prints "[10, 9, 8, 7, 6, 5, 4, 3, 2, 1]"
     /// ```
-    #[rhai_fn(return_raw)]
-    pub fn sort(ctx: NativeCallContext, array: &mut Array, comparer: FnPtr) -> RhaiResultOf<()> {
+    pub fn sort(ctx: NativeCallContext, array: &mut Array, comparer: FnPtr) {
         if array.len() <= 1 {
-            return Ok(());
+            return;
         }
 
         array.sort_by(|x, y| {
@@ -1489,8 +1488,6 @@ pub mod array_functions {
                     },
                 )
         });
-
-        Ok(())
     }
     /// Sort the array.
     ///
