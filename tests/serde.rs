@@ -127,6 +127,7 @@ fn test_serde_ser_unit_enum() -> Result<(), Box<EvalAltResult>> {
 #[test]
 #[cfg(not(feature = "no_object"))]
 fn test_serde_ser_externally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
+    #[allow(clippy::enum_variant_names)]
     #[derive(Serialize)]
     enum MyEnum {
         VariantUnit,
@@ -227,6 +228,7 @@ fn test_serde_ser_internally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
 #[test]
 #[cfg(not(feature = "no_object"))]
 fn test_serde_ser_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
+    #[allow(clippy::enum_variant_names)]
     #[derive(Serialize)]
     #[serde(tag = "tag", content = "content")]
     enum MyEnum {
@@ -355,8 +357,8 @@ fn test_serde_ser_untagged_enum() -> Result<(), Box<EvalAltResult>> {
 fn test_serde_de_primary_types() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(42, from_dynamic::<u16>(&Dynamic::from(42_u16))?);
     assert_eq!(42, from_dynamic::<INT>(&(42 as INT).into())?);
-    assert_eq!(true, from_dynamic::<bool>(&true.into())?);
-    assert_eq!((), from_dynamic::<()>(&().into())?);
+    assert!(from_dynamic::<bool>(&true.into())?);
+    let _: () = from_dynamic::<()>(&().into()).unwrap();
 
     #[cfg(not(feature = "no_float"))]
     {
@@ -447,12 +449,14 @@ fn test_serde_de_struct() -> Result<(), Box<EvalAltResult>> {
 #[cfg(not(feature = "no_object"))]
 #[cfg(not(feature = "no_float"))]
 fn test_serde_de_script() -> Result<(), Box<EvalAltResult>> {
+    #[allow(dead_code)]
     #[derive(Debug, Deserialize)]
     struct Point {
         x: FLOAT,
         y: FLOAT,
     }
 
+    #[allow(dead_code)]
     #[derive(Debug, Deserialize)]
     struct MyStruct {
         a: i64,
@@ -500,6 +504,7 @@ fn test_serde_de_unit_enum() -> Result<(), Box<EvalAltResult>> {
 #[test]
 #[cfg(not(feature = "no_object"))]
 fn test_serde_de_externally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
+    #[allow(clippy::enum_variant_names)]
     #[derive(Debug, PartialEq, Deserialize)]
     #[serde(deny_unknown_fields)]
     enum MyEnum {
@@ -598,6 +603,7 @@ fn test_serde_de_internally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
 #[test]
 #[cfg(not(feature = "no_object"))]
 fn test_serde_de_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
+    #[allow(clippy::enum_variant_names)]
     #[derive(Debug, PartialEq, Deserialize)]
     #[serde(tag = "tag", content = "content", deny_unknown_fields)]
     enum MyEnum {
@@ -814,7 +820,7 @@ fn test_serde_optional() -> Result<(), Box<EvalAltResult>> {
     let map = r.cast::<Map>();
 
     assert_eq!(map.len(), 1);
-    assert_eq!(map.get("foo").unwrap().as_unit().unwrap(), ());
+    let _: () = map.get("foo").unwrap().as_unit().unwrap();
 
     Ok(())
 }
@@ -882,7 +888,7 @@ fn test_serde_scope() {
 
     assert_eq!(scope.len(), 3);
     assert_eq!(scope.get_value::<INT>("x").unwrap(), 42);
-    assert_eq!(scope.get_value::<bool>("y").unwrap(), true);
+    assert!(scope.get_value::<bool>("y").unwrap());
     assert_eq!(
         scope.get_value::<String>("z").unwrap(),
         "serde::test_serde_scope::TestStruct"

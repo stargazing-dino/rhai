@@ -2,6 +2,7 @@ use rhai::{Engine, EvalAltResult, INT};
 
 #[test]
 fn test_type_of() -> Result<(), Box<EvalAltResult>> {
+    #[allow(dead_code)]
     #[derive(Clone)]
     struct TestStruct {
         x: INT,

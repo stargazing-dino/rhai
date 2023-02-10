@@ -1204,7 +1204,7 @@ const fn is_hex_digit(c: char) -> bool {
 /// Test if the given character is a numeric digit.
 #[inline(always)]
 const fn is_numeric_digit(c: char) -> bool {
-    matches!(c, '0'..='9')
+    c.is_ascii_digit()
 }
 
 /// Test if the comment block is a doc-comment.

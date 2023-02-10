@@ -169,7 +169,7 @@ fn test_fn_ptr_raw() -> Result<(), Box<EvalAltResult>> {
         .register_fn("mul", |x: &mut INT, y: INT| *x *= y)
         .register_raw_fn(
             "bar",
-            &[
+            [
                 TypeId::of::<INT>(),
                 TypeId::of::<FnPtr>(),
                 TypeId::of::<INT>(),

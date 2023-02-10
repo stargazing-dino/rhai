@@ -10,13 +10,15 @@ fn test_unit() -> Result<(), Box<EvalAltResult>> {
 #[test]
 fn test_unit_eq() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
-    assert_eq!(engine.eval::<bool>("let x = (); let y = (); x == y")?, true);
+    assert!(engine
+        .eval::<bool>("let x = (); let y = (); x == y")
+        .unwrap());
     Ok(())
 }
 
 #[test]
 fn test_unit_with_spaces() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
-    engine.run("let x = ( ); x").expect_err("should error");
+    let _ = engine.run("let x = ( ); x").expect_err("should error");
     Ok(())
 }

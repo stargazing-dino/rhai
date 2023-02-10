@@ -167,6 +167,7 @@ fn test_var_resolver() -> Result<(), Box<EvalAltResult>> {
     #[cfg(not(feature = "no_closure"))]
     let shared = base.clone();
 
+    #[allow(deprecated)] // not deprecated but unstable
     engine.on_var(move |name, _, context| {
         match name {
             "MYSTIC_NUMBER" => Ok(Some((42 as INT).into())),
@@ -222,6 +223,7 @@ fn test_var_def_filter() -> Result<(), Box<EvalAltResult>> {
     let ast = engine.compile("let x = 42;")?;
     engine.run_ast(&ast)?;
 
+    #[allow(deprecated)] // not deprecated but unstable
     engine.on_def_var(|_, info, _| match (info.name, info.nesting_level) {
         ("x", 0 | 1) => Ok(false),
         _ => Ok(true),

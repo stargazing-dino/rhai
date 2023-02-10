@@ -3,6 +3,7 @@ use rhai::{Array, Engine, EvalAltResult, FLOAT, INT};
 pub mod empty_module {
     use rhai::plugin::*;
 
+    #[allow(non_snake_case)]
     #[export_module]
     pub mod EmptyModule {}
 }
@@ -81,7 +82,7 @@ pub mod raw_fn_str_module {
     #[export_module]
     pub mod host_io {
         pub fn write_out_str(message: &str) -> bool {
-            eprintln!("{}", message);
+            eprintln!("{message}");
             true
         }
     }
@@ -93,10 +94,9 @@ fn raw_fn_str_module_test() -> Result<(), Box<EvalAltResult>> {
     let m = rhai::exported_module!(crate::raw_fn_str_module::host_io);
     engine.register_static_module("Host::IO", m.into());
 
-    assert_eq!(
-        engine.eval::<bool>(r#"let x = Host::IO::write_out_str("hello world!"); x"#)?,
-        true
-    );
+    assert!(engine
+        .eval::<bool>(r#"let x = Host::IO::write_out_str("hello world!"); x"#)
+        .unwrap());
     Ok(())
 }
 
@@ -104,6 +104,7 @@ pub mod mut_opaque_ref_module {
     use rhai::plugin::*;
     use rhai::INT;
 
+    #[allow(dead_code)] // used inside `exported_module!`
     #[derive(Clone)]
     pub struct StatusMessage {
         os_code: Option<INT>,
@@ -144,8 +145,8 @@ fn mut_opaque_ref_test() -> Result<(), Box<EvalAltResult>> {
     let m = rhai::exported_module!(crate::mut_opaque_ref_module::host_msg);
     engine.register_static_module("Host::Msg", m.into());
 
-    assert_eq!(
-        engine.eval::<bool>(
+    assert!(engine
+        .eval::<bool>(
             r#"
                 let success = "it worked";
                 let message1 = Host::Msg::new_message(true, success);
@@ -154,9 +155,8 @@ fn mut_opaque_ref_test() -> Result<(), Box<EvalAltResult>> {
                 let ok2 = Host::Msg::write_out_message(message2);
                 ok1 && ok2
             "#
-        )?,
-        true
-    );
+        )
+        .unwrap());
     Ok(())
 }
 
@@ -267,6 +267,7 @@ fn multiple_fn_rename_test() -> Result<(), Box<EvalAltResult>> {
     Ok(())
 }
 
+#[allow(dead_code)] // used inside `export_module!`
 mod export_by_prefix {
     use rhai::plugin::*;
 
@@ -331,7 +332,7 @@ fn export_by_prefix_test() -> Result<(), Box<EvalAltResult>> {
             let fx = Math::Advanced::foo_add_float2(ex, 1.0);
             fx
         ").unwrap_err(),
-        EvalAltResult::ErrorFunctionNotFound(s, p)
+        EvalAltResult::ErrorFunctionNotFound(s, ..)
             if s == "Math::Advanced::foo_add_float2 (f64, f64)"));
 
     assert!(matches!(*engine.eval::<FLOAT>(
@@ -340,12 +341,13 @@ fn export_by_prefix_test() -> Result<(), Box<EvalAltResult>> {
             let fx = Math::Advanced::bar_m(ex, 1.0);
             fx
         ").unwrap_err(),
-        EvalAltResult::ErrorFunctionNotFound(s, p)
+        EvalAltResult::ErrorFunctionNotFound(s, ..)
             if s == "Math::Advanced::bar_m (f64, f64)"));
 
     Ok(())
 }
 
+#[allow(dead_code)] // used inside `export_module!`
 mod export_all {
     use rhai::plugin::*;
 
@@ -411,7 +413,7 @@ fn export_all_test() -> Result<(), Box<EvalAltResult>> {
             let fx = Math::Advanced::foo_p(ex, 1);
             fx
         ").unwrap_err(),
-        EvalAltResult::ErrorFunctionNotFound(s, p)
+        EvalAltResult::ErrorFunctionNotFound(s, ..)
             if s == "Math::Advanced::foo_p (i64, i64)"));
 
     Ok(())

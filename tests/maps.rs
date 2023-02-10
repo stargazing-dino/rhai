@@ -111,7 +111,7 @@ b`: 1}; y["a\nb"]
 fn test_map_prop() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
 
-    assert_eq!(engine.eval::<()>("let x = #{a: 42}; x.b")?, ());
+    engine.eval::<()>("let x = #{a: 42}; x.b").unwrap();
 
     engine.set_fail_on_invalid_map_property(true);
 
@@ -182,7 +182,7 @@ fn test_map_assign() -> Result<(), Box<EvalAltResult>> {
     let x = engine.eval::<Map>(r#"let x = #{a: 1, b: true, "c$": "hello"}; x"#)?;
 
     assert_eq!(x["a"].as_int().unwrap(), 1);
-    assert_eq!(x["b"].as_bool().unwrap(), true);
+    assert!(x["b"].as_bool().unwrap());
     assert_eq!(x["c$"].clone_cast::<String>(), "hello");
 
     Ok(())
@@ -195,7 +195,7 @@ fn test_map_return() -> Result<(), Box<EvalAltResult>> {
     let x = engine.eval::<Map>(r#"#{a: 1, b: true, "c$": "hello"}"#)?;
 
     assert_eq!(x["a"].as_int().unwrap(), 1);
-    assert_eq!(x["b"].as_bool().unwrap(), true);
+    assert!(x["b"].as_bool().unwrap());
     assert_eq!(x["c$"].clone_cast::<String>(), "hello");
 
     Ok(())
@@ -240,10 +240,10 @@ fn test_map_json() -> Result<(), Box<EvalAltResult>> {
     assert!(!map.contains_key("x"));
 
     assert_eq!(map["a"].as_int().unwrap(), 1);
-    assert_eq!(map["b"].as_bool().unwrap(), true);
+    assert!(map["b"].as_bool().unwrap());
     assert_eq!(map["c"].as_int().unwrap(), 42);
     assert_eq!(map["$d e f!"].clone_cast::<String>(), "hello");
-    assert_eq!(map["z"].as_unit().unwrap(), ());
+    let _: () = map["z"].as_unit().unwrap();
 
     #[cfg(not(feature = "no_index"))]
     {

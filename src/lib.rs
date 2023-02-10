@@ -42,7 +42,7 @@
 //!
 //! #   #[cfg(not(feature = "no_std"))]
 //! #   #[cfg(not(target_family = "wasm"))]
-//! #   
+//! #
 //!     // Evaluate the script, expecting a 'bool' result
 //!     let result: bool = engine.eval_file("my_script.rhai".into())?;
 //!
@@ -82,8 +82,8 @@
 // The lints below can be turned off to reduce signal/noise ratio
 // #![allow(clippy::too_many_lines)]
 // #![allow(clippy::let_underscore_drop)]
-// #![allow(clippy::absurd_extreme_comparisons)]
-// #![allow(clippy::unnecessary_cast)]
+#![allow(clippy::absurd_extreme_comparisons)]
+#![allow(clippy::unnecessary_cast)]
 // #![allow(clippy::wildcard_imports)]
 
 #[cfg(feature = "no_std")]
@@ -166,8 +166,7 @@ const MAX_USIZE_INT: INT = INT::MAX;
 const MAX_USIZE_INT: INT = usize::MAX as INT;
 
 /// The maximum integer that can fit into a [`usize`].
-#[cfg(feature = "only_i32")]
-#[cfg(target_pointer_width = "32")]
+#[cfg(all(feature = "only_i32", target_pointer_width = "32"))]
 const MAX_USIZE_INT: INT = INT::MAX;
 
 /// Number of bits in [`INT`].
@@ -316,8 +315,7 @@ pub type OptimizationLevel = ();
 #[cfg(feature = "internals")]
 pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant};
 
-#[cfg(feature = "internals")]
-#[cfg(not(feature = "no_float"))]
+#[cfg(all(feature = "internals", not(feature = "no_float")))]
 pub use types::FloatWrapper;
 
 #[cfg(feature = "internals")]
