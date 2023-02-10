@@ -166,7 +166,8 @@ const MAX_USIZE_INT: INT = INT::MAX;
 const MAX_USIZE_INT: INT = usize::MAX as INT;
 
 /// The maximum integer that can fit into a [`usize`].
-#[cfg(all(feature = "only_i32", target_pointer_width = "32"))]
+#[cfg(feature = "only_i32")]
+#[cfg(target_pointer_width = "32")]
 const MAX_USIZE_INT: INT = INT::MAX;
 
 /// Number of bits in [`INT`].
@@ -315,7 +316,8 @@ pub type OptimizationLevel = ();
 #[cfg(feature = "internals")]
 pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant};
 
-#[cfg(all(feature = "internals", not(feature = "no_float")))]
+#[cfg(feature = "internals")]
+#[cfg(not(feature = "no_float"))]
 pub use types::FloatWrapper;
 
 #[cfg(feature = "internals")]
