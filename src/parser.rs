@@ -625,9 +625,9 @@ impl Engine {
                 let hash = calc_fn_hash(None, &id, 0);
 
                 let hashes = if is_valid_function_name(&id) {
-                    hash.into()
+                    FnCallHashes::from_hash(hash)
                 } else {
-                    FnCallHashes::from_native(hash)
+                    FnCallHashes::from_native_only(hash)
                 };
 
                 args.shrink_to_fit();
@@ -700,9 +700,9 @@ impl Engine {
                     let hash = calc_fn_hash(None, &id, args.len());
 
                     let hashes = if is_valid_function_name(&id) {
-                        hash.into()
+                        FnCallHashes::from_hash(hash)
                     } else {
-                        FnCallHashes::from_native(hash)
+                        FnCallHashes::from_native_only(hash)
                     };
 
                     args.shrink_to_fit();
@@ -1952,7 +1952,7 @@ impl Engine {
                         Ok(FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string("-"),
-                            hashes: FnCallHashes::from_native(calc_fn_hash(None, "-", 1)),
+                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "-", 1)),
                             args,
                             op_token: Some(token),
                             capture_parent_scope: false,
@@ -1980,7 +1980,7 @@ impl Engine {
                         Ok(FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string("+"),
-                            hashes: FnCallHashes::from_native(calc_fn_hash(None, "+", 1)),
+                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "+", 1)),
                             args,
                             op_token: Some(token),
                             capture_parent_scope: false,
@@ -2001,7 +2001,7 @@ impl Engine {
                 Ok(FnCallExpr {
                     namespace: Namespace::NONE,
                     name: state.get_interned_string("!"),
-                    hashes: FnCallHashes::from_native(calc_fn_hash(None, "!", 1)),
+                    hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "!", 1)),
                     args,
                     op_token: Some(token),
                     capture_parent_scope: false,
@@ -2180,14 +2180,21 @@ impl Engine {
             // lhs.func(...)
             (lhs, Expr::FnCall(mut f, func_pos)) => {
                 // Recalculate hash
+                let args_len = f.args.len() + 1;
                 f.hashes = if is_valid_function_name(&f.name) {
-                    FnCallHashes::from_all(
-                        #[cfg(not(feature = "no_function"))]
-                        calc_fn_hash(None, &f.name, f.args.len()),
-                        calc_fn_hash(None, &f.name, f.args.len() + 1),
-                    )
+                    #[cfg(not(feature = "no_function"))]
+                    {
+                        FnCallHashes::from_script_and_native(
+                            calc_fn_hash(None, &f.name, args_len - 1),
+                            calc_fn_hash(None, &f.name, args_len),
+                        )
+                    }
+                    #[cfg(feature = "no_function")]
+                    {
+                        FnCallHashes::from_native_only(calc_fn_hash(None, &f.name, args_len))
+                    }
                 } else {
-                    FnCallHashes::from_native(calc_fn_hash(None, &f.name, f.args.len() + 1))
+                    FnCallHashes::from_native_only(calc_fn_hash(None, &f.name, args_len))
                 };
 
                 let rhs = Expr::MethodCall(f, func_pos);
@@ -2228,14 +2235,23 @@ impl Engine {
                     // lhs.func().dot_rhs or lhs.func()[idx_rhs]
                     Expr::FnCall(mut f, func_pos) => {
                         // Recalculate hash
+                        let args_len = f.args.len() + 1;
                         f.hashes = if is_valid_function_name(&f.name) {
-                            FnCallHashes::from_all(
-                                #[cfg(not(feature = "no_function"))]
-                                calc_fn_hash(None, &f.name, f.args.len()),
-                                calc_fn_hash(None, &f.name, f.args.len() + 1),
-                            )
+                            #[cfg(not(feature = "no_function"))]
+                            {
+                                FnCallHashes::from_script_and_native(
+                                    calc_fn_hash(None, &f.name, args_len - 1),
+                                    calc_fn_hash(None, &f.name, args_len),
+                                )
+                            }
+                            #[cfg(feature = "no_function")]
+                            {
+                                FnCallHashes::from_native_only(calc_fn_hash(
+                                    None, &f.name, args_len,
+                                ))
+                            }
                         } else {
-                            FnCallHashes::from_native(calc_fn_hash(None, &f.name, f.args.len() + 1))
+                            FnCallHashes::from_native_only(calc_fn_hash(None, &f.name, args_len))
                         };
 
                         let new_lhs = BinaryExpr {
@@ -2351,7 +2367,7 @@ impl Engine {
             let mut op_base = FnCallExpr {
                 namespace: Namespace::NONE,
                 name: state.get_interned_string(&op),
-                hashes: FnCallHashes::from_native(hash),
+                hashes: FnCallHashes::from_native_only(hash),
                 args,
                 op_token: operator_token,
                 capture_parent_scope: false,
@@ -2394,7 +2410,7 @@ impl Engine {
                     op_base.args.shrink_to_fit();
 
                     // Convert into a call to `contains`
-                    op_base.hashes = calc_fn_hash(None, OP_CONTAINS, 2).into();
+                    op_base.hashes = FnCallHashes::from_hash(calc_fn_hash(None, OP_CONTAINS, 2));
                     op_base.name = state.get_interned_string(OP_CONTAINS);
                     let fn_call = op_base.into_fn_call_expr(pos);
 
@@ -2409,7 +2425,7 @@ impl Engine {
                         let not_base = FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string(op),
-                            hashes: FnCallHashes::from_native(calc_fn_hash(None, op, 1)),
+                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, op, 1)),
                             args,
                             op_token: Some(Token::Bang),
                             capture_parent_scope: false,
@@ -2427,9 +2443,9 @@ impl Engine {
                         .map_or(false, Option::is_some) =>
                 {
                     op_base.hashes = if is_valid_script_function {
-                        calc_fn_hash(None, &s, 2).into()
+                        FnCallHashes::from_hash(calc_fn_hash(None, &s, 2))
                     } else {
-                        FnCallHashes::from_native(calc_fn_hash(None, &s, 2))
+                        FnCallHashes::from_native_only(calc_fn_hash(None, &s, 2))
                     };
                     op_base.into_fn_call_expr(pos)
                 }
@@ -3709,7 +3725,7 @@ impl Engine {
         let expr = FnCallExpr {
             namespace: Namespace::NONE,
             name: state.get_interned_string(crate::engine::KEYWORD_FN_PTR_CURRY),
-            hashes: FnCallHashes::from_native(calc_fn_hash(
+            hashes: FnCallHashes::from_native_only(calc_fn_hash(
                 None,
                 crate::engine::KEYWORD_FN_PTR_CURRY,
                 num_externals + 1,

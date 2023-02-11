@@ -124,34 +124,35 @@ impl fmt::Debug for FnCallHashes {
     }
 }
 
-impl From<u64> for FnCallHashes {
+impl FnCallHashes {
+    /// Create a [`FnCallHashes`] from a single hash.
     #[inline]
-    fn from(hash: u64) -> Self {
+    #[must_use]
+    pub const fn from_hash(hash: u64) -> Self {
         Self {
             #[cfg(not(feature = "no_function"))]
             script: Some(hash),
             native: hash,
         }
     }
-}
-
-impl FnCallHashes {
     /// Create a [`FnCallHashes`] with only the native Rust hash.
     #[inline]
     #[must_use]
-    pub fn from_native(hash: u64) -> Self {
+    pub const fn from_native_only(hash: u64) -> Self {
         Self {
             #[cfg(not(feature = "no_function"))]
             script: None,
             native: hash,
         }
     }
-    /// Create a [`FnCallHashes`] with both native Rust and script function hashes.
+    /// Create a [`FnCallHashes`] with both script function and native Rust hashes.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
     #[inline]
     #[must_use]
-    pub fn from_all(#[cfg(not(feature = "no_function"))] script: u64, native: u64) -> Self {
+    pub const fn from_script_and_native(script: u64, native: u64) -> Self {
         Self {
-            #[cfg(not(feature = "no_function"))]
             script: Some(script),
             native,
         }
@@ -577,7 +578,7 @@ impl Expr {
                 FnCallExpr {
                     namespace: Namespace::NONE,
                     name: KEYWORD_FN_PTR.into(),
-                    hashes: calc_fn_hash(None, f.fn_name(), 1).into(),
+                    hashes: FnCallHashes::from_hash(calc_fn_hash(None, f.fn_name(), 1)),
                     args: once(Self::StringConstant(f.fn_name().into(), pos)).collect(),
                     capture_parent_scope: false,
                     op_token: None,

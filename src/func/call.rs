@@ -785,9 +785,9 @@ impl Engine {
                 let fn_name = fn_ptr.fn_name();
                 // Recalculate hashes
                 let new_hash = if !is_anon && !is_valid_function_name(fn_name) {
-                    FnCallHashes::from_native(calc_fn_hash(None, fn_name, args.len()))
+                    FnCallHashes::from_native_only(calc_fn_hash(None, fn_name, args.len()))
                 } else {
-                    calc_fn_hash(None, fn_name, args.len()).into()
+                    FnCallHashes::from_hash(calc_fn_hash(None, fn_name, args.len()))
                 };
 
                 // Map it to name(args) in function-call style
@@ -867,14 +867,17 @@ impl Engine {
                 args.insert(0, target.as_mut());
 
                 // Recalculate hash
-                let new_hash = if !is_anon && !is_valid_function_name(&fn_name) {
-                    FnCallHashes::from_native(calc_fn_hash(None, &fn_name, args.len()))
-                } else {
-                    FnCallHashes::from_all(
-                        #[cfg(not(feature = "no_function"))]
+                let new_hash = match is_anon {
+                    false if !is_valid_function_name(&fn_name) => {
+                        FnCallHashes::from_native_only(calc_fn_hash(None, &fn_name, args.len()))
+                    }
+                    #[cfg(not(feature = "no_function"))]
+                    _ => FnCallHashes::from_script_and_native(
                         calc_fn_hash(None, &fn_name, args.len() - 1),
                         calc_fn_hash(None, &fn_name, args.len()),
-                    )
+                    ),
+                    #[cfg(feature = "no_function")]
+                    _ => FnCallHashes::from_native_only(calc_fn_hash(None, &fn_name, args.len())),
                 };
 
                 // Map it to name(args) in function-call style
@@ -943,18 +946,22 @@ impl Engine {
                                 call_args = &mut _arg_values;
                             }
                             // Recalculate the hash based on the new function name and new arguments
-                            hash = if !is_anon && !is_valid_function_name(fn_name) {
-                                FnCallHashes::from_native(calc_fn_hash(
-                                    None,
-                                    fn_name,
-                                    call_args.len() + 1,
-                                ))
-                            } else {
-                                FnCallHashes::from_all(
-                                    #[cfg(not(feature = "no_function"))]
-                                    calc_fn_hash(None, fn_name, call_args.len()),
-                                    calc_fn_hash(None, fn_name, call_args.len() + 1),
-                                )
+                            let args_len = call_args.len() + 1;
+                            hash = match is_anon {
+                                false if !is_valid_function_name(fn_name) => {
+                                    FnCallHashes::from_native_only(calc_fn_hash(
+                                        None, fn_name, args_len,
+                                    ))
+                                }
+                                #[cfg(not(feature = "no_function"))]
+                                _ => FnCallHashes::from_script_and_native(
+                                    calc_fn_hash(None, fn_name, args_len - 1),
+                                    calc_fn_hash(None, fn_name, args_len),
+                                ),
+                                #[cfg(feature = "no_function")]
+                                _ => FnCallHashes::from_native_only(calc_fn_hash(
+                                    None, fn_name, args_len,
+                                )),
                             };
                         }
                     }
@@ -1080,9 +1087,9 @@ impl Engine {
                 let args_len = total_args + curry.len();
 
                 hashes = if !is_anon && !is_valid_function_name(name) {
-                    FnCallHashes::from_native(calc_fn_hash(None, name, args_len))
+                    FnCallHashes::from_native_only(calc_fn_hash(None, name, args_len))
                 } else {
-                    calc_fn_hash(None, name, args_len).into()
+                    FnCallHashes::from_hash(calc_fn_hash(None, name, args_len))
                 };
             }
             // Handle Fn()
