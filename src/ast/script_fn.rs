@@ -34,7 +34,7 @@ pub struct ScriptFnDef {
     ///
     /// Each line in non-block doc-comments starts with `///`.
     #[cfg(feature = "metadata")]
-    pub comments: Box<[crate::Identifier]>,
+    pub comments: Box<[crate::SmartString]>,
 }
 
 impl fmt::Display for ScriptFnDef {

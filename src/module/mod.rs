@@ -85,7 +85,7 @@ pub struct FuncInfoMetadata {
     pub return_type: Identifier,
     /// Comments.
     #[cfg(feature = "metadata")]
-    pub comments: Box<[Identifier]>,
+    pub comments: Box<[SmartString]>,
 }
 
 /// A type containing a single registered function.
