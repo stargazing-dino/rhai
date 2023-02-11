@@ -495,13 +495,13 @@ impl Engine {
     ///
     /// It is up to the [`Engine`] to reactivate the debugger.
     #[inline]
-    pub(crate) fn run_debugger_raw<'a>(
+    pub(crate) fn run_debugger_raw(
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         scope: &mut Scope,
         this_ptr: Option<&mut Dynamic>,
-        node: ASTNode<'a>,
+        node: ASTNode,
         event: DebuggerEvent,
     ) -> Result<Option<DebuggerStatus>, Box<crate::EvalAltResult>> {
         if let Some(ref x) = self.debugger_interface {

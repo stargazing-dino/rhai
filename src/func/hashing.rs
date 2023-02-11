@@ -13,25 +13,7 @@ pub type StraightHashMap<V> = hashbrown::HashMap<u64, V, StraightHasherBuilder>;
 
 #[cfg(not(feature = "no_std"))]
 pub type StraightHashMap<V> = std::collections::HashMap<u64, V, StraightHasherBuilder>;
-
-/// Dummy hash value to map zeros to. This value can be anything.
-///
-/// # Notes
-///
-/// Hashes are `u64`, and they can be zero (although extremely unlikely).
-/// It is possible to hijack the zero value to indicate non-existence,
-/// like [`None`] in [`Option<u64>`].
-///
-/// When a hash is calculated to be zero, it gets mapped to this alternate hash value.
-/// This has the effect of releasing the zero value at the expense of causing the probability of
-/// this value to double, which has minor impacts.
-pub const ALT_ZERO_HASH: u64 = 42;
-
-/// A hasher that only takes one single [`u64`] and returns it as a non-zero hash key.
-///
-/// # Zeros
-///
-/// If the value is zero, it is mapped to `ALT_ZERO_HASH`.
+/// A hasher that only takes one single [`u64`] and returns it as a hash key.
 ///
 /// # Panics
 ///
@@ -81,14 +63,10 @@ pub fn get_hasher() -> ahash::AHasher {
     }
 }
 
-/// Calculate a non-zero [`u64`] hash key from a namespace-qualified variable name.
+/// Calculate a [`u64`] hash key from a namespace-qualified variable name.
 ///
 /// Module names are passed in via `&str` references from an iterator.
 /// Parameter types are passed in via [`TypeId`] values from an iterator.
-///
-/// # Zeros
-///
-/// If the hash happens to be zero, it is mapped to `ALT_ZERO_HASH`.
 ///
 /// # Note
 ///
@@ -110,23 +88,16 @@ pub fn calc_var_hash<'a>(namespace: impl IntoIterator<Item = &'a str>, var_name:
     count.hash(s);
     var_name.hash(s);
 
-    match s.finish() {
-        0 => ALT_ZERO_HASH,
-        r => r,
-    }
+    s.finish()
 }
 
-/// Calculate a non-zero [`u64`] hash key from a namespace-qualified function name
+/// Calculate a [`u64`] hash key from a namespace-qualified function name
 /// and the number of parameters, but no parameter types.
 ///
 /// Module names making up the namespace are passed in via `&str` references from an iterator.
 /// Parameter types are passed in via [`TypeId`] values from an iterator.
 ///
 /// If the function is not namespace-qualified, pass [`None`] as the namespace.
-///
-/// # Zeros
-///
-/// If the hash happens to be zero, it is mapped to `ALT_ZERO_HASH`.
 ///
 /// # Note
 ///
@@ -152,19 +123,12 @@ pub fn calc_fn_hash<'a>(
     fn_name.hash(s);
     num.hash(s);
 
-    match s.finish() {
-        0 => ALT_ZERO_HASH,
-        r => r,
-    }
+    s.finish()
 }
 
-/// Calculate a non-zero [`u64`] hash key from a base [`u64`] hash key and a list of parameter types.
+/// Calculate a [`u64`] hash key from a base [`u64`] hash key and a list of parameter types.
 ///
 /// Parameter types are passed in via [`TypeId`] values from an iterator.
-///
-/// # Zeros
-///
-/// If the hash happens to be zero, it is mapped to `ALT_ZERO_HASH`.
 #[inline]
 #[must_use]
 pub fn calc_fn_hash_full(base: u64, params: impl IntoIterator<Item = TypeId>) -> u64 {
@@ -177,8 +141,5 @@ pub fn calc_fn_hash_full(base: u64, params: impl IntoIterator<Item = TypeId>) ->
     });
     count.hash(s);
 
-    match s.finish() {
-        0 => ALT_ZERO_HASH,
-        r => r,
-    }
+    s.finish()
 }

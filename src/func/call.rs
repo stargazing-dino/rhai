@@ -164,15 +164,11 @@ impl Engine {
         _global: &GlobalRuntimeState,
         caches: &'s mut Caches,
         local_entry: &'s mut Option<FnResolutionCacheEntry>,
-        op_token: Option<Token>,
+        op_token: Option<&Token>,
         hash_base: u64,
         args: Option<&mut FnCallArgs>,
         allow_dynamic: bool,
     ) -> Option<&'s FnResolutionCacheEntry> {
-        if hash_base == 0 {
-            return None;
-        }
-
         let mut hash = args.as_deref().map_or(hash_base, |args| {
             calc_fn_hash_full(hash_base, args.iter().map(|a| a.type_id()))
         });
@@ -345,7 +341,7 @@ impl Engine {
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
         name: &str,
-        op_token: Option<Token>,
+        op_token: Option<&Token>,
         hash: u64,
         args: &mut FnCallArgs,
         is_ref_mut: bool,
@@ -567,7 +563,7 @@ impl Engine {
         caches: &mut Caches,
         _scope: Option<&mut Scope>,
         fn_name: &str,
-        op_token: Option<Token>,
+        op_token: Option<&Token>,
         hashes: FnCallHashes,
         mut _args: &mut FnCallArgs,
         is_ref_mut: bool,
@@ -789,9 +785,9 @@ impl Engine {
                 let fn_name = fn_ptr.fn_name();
                 // Recalculate hashes
                 let new_hash = if !is_anon && !is_valid_function_name(fn_name) {
-                    FnCallHashes::from_native(calc_fn_hash(None, fn_name, args.len()))
+                    FnCallHashes::from_native_only(calc_fn_hash(None, fn_name, args.len()))
                 } else {
-                    calc_fn_hash(None, fn_name, args.len()).into()
+                    FnCallHashes::from_hash(calc_fn_hash(None, fn_name, args.len()))
                 };
 
                 // Map it to name(args) in function-call style
@@ -871,14 +867,17 @@ impl Engine {
                 args.insert(0, target.as_mut());
 
                 // Recalculate hash
-                let new_hash = if !is_anon && !is_valid_function_name(&fn_name) {
-                    FnCallHashes::from_native(calc_fn_hash(None, &fn_name, args.len()))
-                } else {
-                    FnCallHashes::from_all(
-                        #[cfg(not(feature = "no_function"))]
+                let new_hash = match is_anon {
+                    false if !is_valid_function_name(&fn_name) => {
+                        FnCallHashes::from_native_only(calc_fn_hash(None, &fn_name, args.len()))
+                    }
+                    #[cfg(not(feature = "no_function"))]
+                    _ => FnCallHashes::from_script_and_native(
                         calc_fn_hash(None, &fn_name, args.len() - 1),
                         calc_fn_hash(None, &fn_name, args.len()),
-                    )
+                    ),
+                    #[cfg(feature = "no_function")]
+                    _ => FnCallHashes::from_native_only(calc_fn_hash(None, &fn_name, args.len())),
                 };
 
                 // Map it to name(args) in function-call style
@@ -947,18 +946,22 @@ impl Engine {
                                 call_args = &mut _arg_values;
                             }
                             // Recalculate the hash based on the new function name and new arguments
-                            hash = if !is_anon && !is_valid_function_name(fn_name) {
-                                FnCallHashes::from_native(calc_fn_hash(
-                                    None,
-                                    fn_name,
-                                    call_args.len() + 1,
-                                ))
-                            } else {
-                                FnCallHashes::from_all(
-                                    #[cfg(not(feature = "no_function"))]
-                                    calc_fn_hash(None, fn_name, call_args.len()),
-                                    calc_fn_hash(None, fn_name, call_args.len() + 1),
-                                )
+                            let args_len = call_args.len() + 1;
+                            hash = match is_anon {
+                                false if !is_valid_function_name(fn_name) => {
+                                    FnCallHashes::from_native_only(calc_fn_hash(
+                                        None, fn_name, args_len,
+                                    ))
+                                }
+                                #[cfg(not(feature = "no_function"))]
+                                _ => FnCallHashes::from_script_and_native(
+                                    calc_fn_hash(None, fn_name, args_len - 1),
+                                    calc_fn_hash(None, fn_name, args_len),
+                                ),
+                                #[cfg(feature = "no_function")]
+                                _ => FnCallHashes::from_native_only(calc_fn_hash(
+                                    None, fn_name, args_len,
+                                )),
                             };
                         }
                     }
@@ -1000,7 +1003,7 @@ impl Engine {
         scope: &mut Scope,
         mut this_ptr: Option<&mut Dynamic>,
         fn_name: &str,
-        op_token: Option<Token>,
+        op_token: Option<&Token>,
         first_arg: Option<&Expr>,
         args_expr: &[Expr],
         hashes: FnCallHashes,
@@ -1084,9 +1087,9 @@ impl Engine {
                 let args_len = total_args + curry.len();
 
                 hashes = if !is_anon && !is_valid_function_name(name) {
-                    FnCallHashes::from_native(calc_fn_hash(None, name, args_len))
+                    FnCallHashes::from_native_only(calc_fn_hash(None, name, args_len))
                 } else {
-                    calc_fn_hash(None, name, args_len).into()
+                    FnCallHashes::from_hash(calc_fn_hash(None, name, args_len))
                 };
             }
             // Handle Fn()
@@ -1564,10 +1567,10 @@ impl Engine {
             ..
         } = expr;
 
-        let op_token = op_token.clone();
+        let op_token = op_token.as_ref();
 
         // Short-circuit native unary operator call if under Fast Operators mode
-        if op_token == Some(Token::Bang) && self.fast_operators() && args.len() == 1 {
+        if op_token == Some(&Token::Bang) && self.fast_operators() && args.len() == 1 {
             let mut value = self
                 .get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), &args[0])?
                 .0
@@ -1597,7 +1600,7 @@ impl Engine {
             let operands = &mut [&mut lhs, &mut rhs];
 
             if let Some((func, need_context)) =
-                get_builtin_binary_op_fn(op_token.clone().unwrap(), operands[0], operands[1])
+                get_builtin_binary_op_fn(op_token.as_ref().unwrap(), operands[0], operands[1])
             {
                 // Built-in found
                 auto_restore! { let orig_level = global.level; global.level += 1 }

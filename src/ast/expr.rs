@@ -2,12 +2,11 @@
 
 use super::{ASTFlags, ASTNode, Ident, Namespace, Stmt, StmtBlock};
 use crate::engine::{KEYWORD_FN_PTR, OP_EXCLUSIVE_RANGE, OP_INCLUSIVE_RANGE};
-use crate::func::hashing::ALT_ZERO_HASH;
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
 use crate::{
-    calc_fn_hash, Dynamic, FnPtr, Identifier, ImmutableString, Position, SmartString, StaticVec,
-    INT,
+    calc_fn_hash, Dynamic, FnArgsVec, FnPtr, Identifier, ImmutableString, Position, SmartString,
+    StaticVec, INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -17,7 +16,7 @@ use std::{
     fmt::Write,
     hash::Hash,
     iter::once,
-    num::{NonZeroU64, NonZeroU8, NonZeroUsize},
+    num::{NonZeroU8, NonZeroUsize},
 };
 
 /// _(internals)_ A binary expression.
@@ -103,9 +102,9 @@ impl CustomExpr {
 pub struct FnCallHashes {
     /// Pre-calculated hash for a script-defined function ([`None`] if native functions only).
     #[cfg(not(feature = "no_function"))]
-    script: Option<NonZeroU64>,
+    script: Option<u64>,
     /// Pre-calculated hash for a native Rust function with no parameter types.
-    native: NonZeroU64,
+    native: u64,
 }
 
 impl fmt::Debug for FnCallHashes {
@@ -125,38 +124,37 @@ impl fmt::Debug for FnCallHashes {
     }
 }
 
-impl From<u64> for FnCallHashes {
+impl FnCallHashes {
+    /// Create a [`FnCallHashes`] from a single hash.
     #[inline]
-    fn from(hash: u64) -> Self {
-        let hash = NonZeroU64::new(if hash == 0 { ALT_ZERO_HASH } else { hash }).unwrap();
-
+    #[must_use]
+    pub const fn from_hash(hash: u64) -> Self {
         Self {
             #[cfg(not(feature = "no_function"))]
             script: Some(hash),
             native: hash,
         }
     }
-}
-
-impl FnCallHashes {
     /// Create a [`FnCallHashes`] with only the native Rust hash.
     #[inline]
     #[must_use]
-    pub fn from_native(hash: u64) -> Self {
+    pub const fn from_native_only(hash: u64) -> Self {
         Self {
             #[cfg(not(feature = "no_function"))]
             script: None,
-            native: NonZeroU64::new(if hash == 0 { ALT_ZERO_HASH } else { hash }).unwrap(),
+            native: hash,
         }
     }
-    /// Create a [`FnCallHashes`] with both native Rust and script function hashes.
+    /// Create a [`FnCallHashes`] with both script function and native Rust hashes.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
     #[inline]
     #[must_use]
-    pub fn from_all(#[cfg(not(feature = "no_function"))] script: u64, native: u64) -> Self {
+    pub const fn from_script_and_native(script: u64, native: u64) -> Self {
         Self {
-            #[cfg(not(feature = "no_function"))]
-            script: NonZeroU64::new(if script == 0 { ALT_ZERO_HASH } else { script }),
-            native: NonZeroU64::new(if native == 0 { ALT_ZERO_HASH } else { native }).unwrap(),
+            script: Some(script),
+            native,
         }
     }
     /// Is this [`FnCallHashes`] native-only?
@@ -174,7 +172,7 @@ impl FnCallHashes {
     #[inline(always)]
     #[must_use]
     pub const fn native(&self) -> u64 {
-        self.native.get()
+        self.native
     }
     /// Get the script hash.
     ///
@@ -188,7 +186,7 @@ impl FnCallHashes {
     #[must_use]
     pub fn script(&self) -> u64 {
         assert!(self.script.is_some());
-        self.script.as_ref().unwrap().get()
+        self.script.unwrap()
     }
 }
 
@@ -203,7 +201,7 @@ pub struct FnCallExpr {
     /// Pre-calculated hashes.
     pub hashes: FnCallHashes,
     /// List of function call argument expressions.
-    pub args: StaticVec<Expr>,
+    pub args: FnArgsVec<Expr>,
     /// Does this function call capture the parent scope?
     pub capture_parent_scope: bool,
     /// Is this function call a native operator?
@@ -580,7 +578,7 @@ impl Expr {
                 FnCallExpr {
                     namespace: Namespace::NONE,
                     name: KEYWORD_FN_PTR.into(),
-                    hashes: calc_fn_hash(None, f.fn_name(), 1).into(),
+                    hashes: FnCallHashes::from_hash(calc_fn_hash(None, f.fn_name(), 1)),
                     args: once(Self::StringConstant(f.fn_name().into(), pos)).collect(),
                     capture_parent_scope: false,
                     op_token: None,

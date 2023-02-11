@@ -446,7 +446,7 @@ impl<'a> NativeCallContext<'a> {
                     global,
                     caches,
                     fn_name,
-                    op_token,
+                    op_token.as_ref(),
                     calc_fn_hash(None, fn_name, args_len),
                     args,
                     is_ref_mut,
@@ -457,14 +457,15 @@ impl<'a> NativeCallContext<'a> {
 
         // Native or script
 
-        let hash = if is_method_call {
-            FnCallHashes::from_all(
-                #[cfg(not(feature = "no_function"))]
+        let hash = match is_method_call {
+            #[cfg(not(feature = "no_function"))]
+            true => FnCallHashes::from_script_and_native(
                 calc_fn_hash(None, fn_name, args_len - 1),
                 calc_fn_hash(None, fn_name, args_len),
-            )
-        } else {
-            calc_fn_hash(None, fn_name, args_len).into()
+            ),
+            #[cfg(feature = "no_function")]
+            true => FnCallHashes::from_native_only(calc_fn_hash(None, fn_name, args_len)),
+            _ => FnCallHashes::from_hash(calc_fn_hash(None, fn_name, args_len)),
         };
 
         self.engine()
@@ -473,7 +474,7 @@ impl<'a> NativeCallContext<'a> {
                 caches,
                 None,
                 fn_name,
-                op_token,
+                op_token.as_ref(),
                 hash,
                 args,
                 is_ref_mut,

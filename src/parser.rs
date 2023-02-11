@@ -17,9 +17,9 @@ use crate::tokenizer::{
 use crate::types::dynamic::AccessMode;
 use crate::types::StringsInterner;
 use crate::{
-    calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, Identifier,
-    ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position, Scope,
-    Shared, SmartString, StaticVec, AST, INT, PERR,
+    calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
+    Identifier, ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position,
+    Scope, Shared, SmartString, StaticVec, AST, INT, PERR,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -567,7 +567,7 @@ impl Engine {
         };
 
         let mut _namespace = namespace;
-        let mut args = StaticVec::new_const();
+        let mut args = FnArgsVec::new_const();
 
         match token {
             // id( <EOF>
@@ -625,9 +625,9 @@ impl Engine {
                 let hash = calc_fn_hash(None, &id, 0);
 
                 let hashes = if is_valid_function_name(&id) {
-                    hash.into()
+                    FnCallHashes::from_hash(hash)
                 } else {
-                    FnCallHashes::from_native(hash)
+                    FnCallHashes::from_native_only(hash)
                 };
 
                 args.shrink_to_fit();
@@ -700,9 +700,9 @@ impl Engine {
                     let hash = calc_fn_hash(None, &id, args.len());
 
                     let hashes = if is_valid_function_name(&id) {
-                        hash.into()
+                        FnCallHashes::from_hash(hash)
                     } else {
-                        FnCallHashes::from_native(hash)
+                        FnCallHashes::from_native_only(hash)
                     };
 
                     args.shrink_to_fit();
@@ -1945,14 +1945,14 @@ impl Engine {
 
                     // Call negative function
                     expr => {
-                        let mut args = StaticVec::new_const();
+                        let mut args = FnArgsVec::new_const();
                         args.push(expr);
                         args.shrink_to_fit();
 
                         Ok(FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string("-"),
-                            hashes: FnCallHashes::from_native(calc_fn_hash(None, "-", 1)),
+                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "-", 1)),
                             args,
                             op_token: Some(token),
                             capture_parent_scope: false,
@@ -1973,14 +1973,14 @@ impl Engine {
 
                     // Call plus function
                     expr => {
-                        let mut args = StaticVec::new_const();
+                        let mut args = FnArgsVec::new_const();
                         args.push(expr);
                         args.shrink_to_fit();
 
                         Ok(FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string("+"),
-                            hashes: FnCallHashes::from_native(calc_fn_hash(None, "+", 1)),
+                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "+", 1)),
                             args,
                             op_token: Some(token),
                             capture_parent_scope: false,
@@ -1994,14 +1994,14 @@ impl Engine {
                 let token = token.clone();
                 let pos = eat_token(input, Token::Bang);
 
-                let mut args = StaticVec::new_const();
+                let mut args = FnArgsVec::new_const();
                 args.push(self.parse_unary(input, state, lib, settings.level_up()?)?);
                 args.shrink_to_fit();
 
                 Ok(FnCallExpr {
                     namespace: Namespace::NONE,
                     name: state.get_interned_string("!"),
-                    hashes: FnCallHashes::from_native(calc_fn_hash(None, "!", 1)),
+                    hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "!", 1)),
                     args,
                     op_token: Some(token),
                     capture_parent_scope: false,
@@ -2180,14 +2180,21 @@ impl Engine {
             // lhs.func(...)
             (lhs, Expr::FnCall(mut f, func_pos)) => {
                 // Recalculate hash
+                let args_len = f.args.len() + 1;
                 f.hashes = if is_valid_function_name(&f.name) {
-                    FnCallHashes::from_all(
-                        #[cfg(not(feature = "no_function"))]
-                        calc_fn_hash(None, &f.name, f.args.len()),
-                        calc_fn_hash(None, &f.name, f.args.len() + 1),
-                    )
+                    #[cfg(not(feature = "no_function"))]
+                    {
+                        FnCallHashes::from_script_and_native(
+                            calc_fn_hash(None, &f.name, args_len - 1),
+                            calc_fn_hash(None, &f.name, args_len),
+                        )
+                    }
+                    #[cfg(feature = "no_function")]
+                    {
+                        FnCallHashes::from_native_only(calc_fn_hash(None, &f.name, args_len))
+                    }
                 } else {
-                    FnCallHashes::from_native(calc_fn_hash(None, &f.name, f.args.len() + 1))
+                    FnCallHashes::from_native_only(calc_fn_hash(None, &f.name, args_len))
                 };
 
                 let rhs = Expr::MethodCall(f, func_pos);
@@ -2228,14 +2235,23 @@ impl Engine {
                     // lhs.func().dot_rhs or lhs.func()[idx_rhs]
                     Expr::FnCall(mut f, func_pos) => {
                         // Recalculate hash
+                        let args_len = f.args.len() + 1;
                         f.hashes = if is_valid_function_name(&f.name) {
-                            FnCallHashes::from_all(
-                                #[cfg(not(feature = "no_function"))]
-                                calc_fn_hash(None, &f.name, f.args.len()),
-                                calc_fn_hash(None, &f.name, f.args.len() + 1),
-                            )
+                            #[cfg(not(feature = "no_function"))]
+                            {
+                                FnCallHashes::from_script_and_native(
+                                    calc_fn_hash(None, &f.name, args_len - 1),
+                                    calc_fn_hash(None, &f.name, args_len),
+                                )
+                            }
+                            #[cfg(feature = "no_function")]
+                            {
+                                FnCallHashes::from_native_only(calc_fn_hash(
+                                    None, &f.name, args_len,
+                                ))
+                            }
                         } else {
-                            FnCallHashes::from_native(calc_fn_hash(None, &f.name, f.args.len() + 1))
+                            FnCallHashes::from_native_only(calc_fn_hash(None, &f.name, args_len))
                         };
 
                         let new_lhs = BinaryExpr {
@@ -2343,7 +2359,7 @@ impl Engine {
                 Some(op_token.clone())
             };
 
-            let mut args = StaticVec::new_const();
+            let mut args = FnArgsVec::new_const();
             args.push(root);
             args.push(rhs);
             args.shrink_to_fit();
@@ -2351,7 +2367,7 @@ impl Engine {
             let mut op_base = FnCallExpr {
                 namespace: Namespace::NONE,
                 name: state.get_interned_string(&op),
-                hashes: FnCallHashes::from_native(hash),
+                hashes: FnCallHashes::from_native_only(hash),
                 args,
                 op_token: operator_token,
                 capture_parent_scope: false,
@@ -2394,7 +2410,7 @@ impl Engine {
                     op_base.args.shrink_to_fit();
 
                     // Convert into a call to `contains`
-                    op_base.hashes = calc_fn_hash(None, OP_CONTAINS, 2).into();
+                    op_base.hashes = FnCallHashes::from_hash(calc_fn_hash(None, OP_CONTAINS, 2));
                     op_base.name = state.get_interned_string(OP_CONTAINS);
                     let fn_call = op_base.into_fn_call_expr(pos);
 
@@ -2403,13 +2419,13 @@ impl Engine {
                     } else {
                         // Put a `!` call in front
                         let op = Token::Bang.literal_syntax();
-                        let mut args = StaticVec::new_const();
+                        let mut args = FnArgsVec::new_const();
                         args.push(fn_call);
 
                         let not_base = FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string(op),
-                            hashes: FnCallHashes::from_native(calc_fn_hash(None, op, 1)),
+                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, op, 1)),
                             args,
                             op_token: Some(Token::Bang),
                             capture_parent_scope: false,
@@ -2427,9 +2443,9 @@ impl Engine {
                         .map_or(false, Option::is_some) =>
                 {
                     op_base.hashes = if is_valid_script_function {
-                        calc_fn_hash(None, &s, 2).into()
+                        FnCallHashes::from_hash(calc_fn_hash(None, &s, 2))
                     } else {
-                        FnCallHashes::from_native(calc_fn_hash(None, &s, 2))
+                        FnCallHashes::from_native_only(calc_fn_hash(None, &s, 2))
                     };
                     op_base.into_fn_call_expr(pos)
                 }
@@ -3560,7 +3576,9 @@ impl Engine {
         // try { try_block } catch ( var ) { catch_block }
         let branch = self.parse_block(input, state, lib, settings)?.into();
 
-        let expr = if !catch_var.is_empty() {
+        let expr = if catch_var.is_empty() {
+            Expr::Unit(catch_var.pos)
+        } else {
             // Remove the error variable from the stack
             state.stack.as_deref_mut().unwrap().pop();
 
@@ -3569,12 +3587,10 @@ impl Engine {
                 None,
                 catch_var.pos,
             )
-        } else {
-            Expr::Unit(catch_var.pos)
         };
 
         Ok(Stmt::TryCatch(
-            FlowControl { body, expr, branch }.into(),
+            FlowControl { expr, body, branch }.into(),
             settings.pos,
         ))
     }
@@ -3692,7 +3708,7 @@ impl Engine {
         }
 
         let num_externals = externals.len();
-        let mut args = StaticVec::with_capacity(externals.len() + 1);
+        let mut args = FnArgsVec::with_capacity(externals.len() + 1);
 
         args.push(fn_expr);
 
@@ -3709,7 +3725,7 @@ impl Engine {
         let expr = FnCallExpr {
             namespace: Namespace::NONE,
             name: state.get_interned_string(crate::engine::KEYWORD_FN_PTR_CURRY),
-            hashes: FnCallHashes::from_native(calc_fn_hash(
+            hashes: FnCallHashes::from_native_only(calc_fn_hash(
                 None,
                 crate::engine::KEYWORD_FN_PTR_CURRY,
                 num_externals + 1,

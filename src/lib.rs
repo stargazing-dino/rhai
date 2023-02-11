@@ -80,11 +80,14 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::match_same_arms)]
 // The lints below can be turned off to reduce signal/noise ratio
-// #![allow(clippy::too_many_lines)]
-// #![allow(clippy::let_underscore_drop)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::let_underscore_drop)]
 #![allow(clippy::absurd_extreme_comparisons)]
 #![allow(clippy::unnecessary_cast)]
-// #![allow(clippy::wildcard_imports)]
+#![allow(clippy::wildcard_imports)]
+#![allow(clippy::no_effect_underscore_binding)]
+#![allow(clippy::semicolon_if_nothing_returned)]
+#![allow(clippy::type_complexity)]
 
 #[cfg(feature = "no_std")]
 extern crate alloc;
@@ -166,7 +169,8 @@ const MAX_USIZE_INT: INT = INT::MAX;
 const MAX_USIZE_INT: INT = usize::MAX as INT;
 
 /// The maximum integer that can fit into a [`usize`].
-#[cfg(all(feature = "only_i32", target_pointer_width = "32"))]
+#[cfg(feature = "only_i32")]
+#[cfg(target_pointer_width = "32")]
 const MAX_USIZE_INT: INT = INT::MAX;
 
 /// Number of bits in [`INT`].
@@ -315,7 +319,8 @@ pub type OptimizationLevel = ();
 #[cfg(feature = "internals")]
 pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant};
 
-#[cfg(all(feature = "internals", not(feature = "no_float")))]
+#[cfg(feature = "internals")]
+#[cfg(not(feature = "no_float"))]
 pub use types::FloatWrapper;
 
 #[cfg(feature = "internals")]

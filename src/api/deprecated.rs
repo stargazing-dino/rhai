@@ -1133,7 +1133,7 @@ pub mod deprecated_array_functions {
         array: &mut Array,
         comparer: &str,
     ) -> RhaiResultOf<()> {
-        sort(ctx, array, FnPtr::new(comparer)?)
+        Ok(sort(ctx, array, FnPtr::new(comparer)?))
     }
     /// Remove all elements in the array that returns `true` when applied a function named by `filter`
     /// and return them as a new array.
