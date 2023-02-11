@@ -169,10 +169,6 @@ impl Engine {
         args: Option<&mut FnCallArgs>,
         allow_dynamic: bool,
     ) -> Option<&'s FnResolutionCacheEntry> {
-        if hash_base == 0 {
-            return None;
-        }
-
         let mut hash = args.as_deref().map_or(hash_base, |args| {
             calc_fn_hash_full(hash_base, args.iter().map(|a| a.type_id()))
         });
