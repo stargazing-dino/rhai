@@ -2,6 +2,7 @@
 
 use super::{ASTFlags, ASTNode, BinaryExpr, Expr, FnCallExpr, Ident};
 use crate::engine::KEYWORD_EVAL;
+use crate::func::StraightHashMap;
 use crate::tokenizer::Token;
 use crate::types::Span;
 use crate::{calc_fn_hash, Position, StaticVec, INT};
@@ -9,9 +10,8 @@ use crate::{calc_fn_hash, Position, StaticVec, INT};
 use std::prelude::v1::*;
 use std::{
     borrow::Borrow,
-    collections::BTreeMap,
     fmt,
-    hash::Hash,
+    hash::{Hash, Hasher},
     mem,
     num::NonZeroUsize,
     ops::{Deref, DerefMut, Range, RangeInclusive},
@@ -303,16 +303,29 @@ pub type CaseBlocksList = smallvec::SmallVec<[usize; 1]>;
 
 /// _(internals)_ A type containing all cases for a `switch` statement.
 /// Exported under the `internals` feature only.
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone)]
 pub struct SwitchCasesCollection {
     /// List of [`ConditionalExpr`]'s.
     pub expressions: StaticVec<ConditionalExpr>,
     /// Dictionary mapping value hashes to [`ConditionalExpr`]'s.
-    pub cases: BTreeMap<u64, CaseBlocksList>,
+    pub cases: StraightHashMap<CaseBlocksList>,
     /// List of range cases.
     pub ranges: StaticVec<RangeCase>,
     /// Statements block for the default case (there can be no condition for the default case).
     pub def_case: Option<usize>,
+}
+
+impl Hash for SwitchCasesCollection {
+    #[inline(always)]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.expressions.hash(state);
+
+        self.cases.len().hash(state);
+        self.cases.iter().for_each(|kv| kv.hash(state));
+
+        self.ranges.hash(state);
+        self.def_case.hash(state);
+    }
 }
 
 /// Number of items to keep inline for [`StmtBlockContainer`].

@@ -1121,7 +1121,7 @@ impl Engine {
         }
 
         let mut expressions = StaticVec::<ConditionalExpr>::new();
-        let mut cases = BTreeMap::<u64, CaseBlocksList>::new();
+        let mut cases = StraightHashMap::<CaseBlocksList>::default();
         let mut ranges = StaticVec::<RangeCase>::new();
         let mut def_case = None;
         let mut def_case_pos = Position::NONE;
