@@ -20,7 +20,7 @@ impl Engine {
         global: &GlobalRuntimeState,
         namespace: &crate::ast::Namespace,
     ) -> Option<crate::SharedModule> {
-        assert!(!namespace.is_empty());
+        debug_assert!(!namespace.is_empty());
 
         let root = namespace.root();
 

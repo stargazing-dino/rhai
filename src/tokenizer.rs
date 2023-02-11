@@ -932,7 +932,7 @@ pub fn parse_string_literal(
     }
 
     loop {
-        assert!(
+        debug_assert!(
             !verbatim || escape.is_empty(),
             "verbatim strings should not have any escapes"
         );

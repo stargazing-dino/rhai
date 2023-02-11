@@ -185,7 +185,7 @@ impl FnCallHashes {
     #[inline(always)]
     #[must_use]
     pub fn script(&self) -> u64 {
-        assert!(self.script.is_some());
+        debug_assert!(self.script.is_some());
         self.script.unwrap()
     }
 }

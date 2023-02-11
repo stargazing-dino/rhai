@@ -363,7 +363,7 @@ impl Engine {
         );
 
         if let Some(FnResolutionCacheEntry { func, source }) = func {
-            assert!(func.is_native());
+            debug_assert!(func.is_native());
 
             // Push a new call stack frame
             #[cfg(feature = "debugging")]
@@ -633,7 +633,7 @@ impl Engine {
                 .cloned()
             {
                 // Script function call
-                assert!(func.is_script());
+                debug_assert!(func.is_script());
 
                 let f = func.get_script_fn_def().expect("script-defined function");
                 let environ = func.get_encapsulated_environ();

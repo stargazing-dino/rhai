@@ -343,7 +343,7 @@ impl Engine {
 
                     // First check hashes
                     if let Some(case_blocks_list) = cases.get(&hash) {
-                        assert!(!case_blocks_list.is_empty());
+                        debug_assert!(!case_blocks_list.is_empty());
 
                         for &index in case_blocks_list {
                             let block = &expressions[index];
