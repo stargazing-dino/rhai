@@ -621,7 +621,7 @@ impl Engine {
                                 self.eval_op_assignment(
                                     global, caches, op_info, root, obj_ptr, new_val,
                                 )?;
-                                self.check_data_size(obj_ptr.as_ref(), op_info.pos)?;
+                                self.check_data_size(obj_ptr.as_ref(), op_info.position())?;
                                 None
                             }
                             // Indexed value cannot be referenced - use indexer
@@ -647,7 +647,7 @@ impl Engine {
                                     )?;
                                     // Replace new value
                                     new_val = val.take_or_clone();
-                                    self.check_data_size(&new_val, op_info.pos)?;
+                                    self.check_data_size(&new_val, op_info.position())?;
                                 }
                             }
 
@@ -729,7 +729,7 @@ impl Engine {
                                 global, caches, op_info, root, val_target, new_val,
                             )?;
                         }
-                        self.check_data_size(target.source(), op_info.pos)?;
+                        self.check_data_size(target.source(), op_info.position())?;
                         Ok((Dynamic::UNIT, true))
                     }
                     // {xxx:map}.id

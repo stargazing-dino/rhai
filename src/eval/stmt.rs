@@ -125,18 +125,10 @@ impl Engine {
             return Err(ERR::ErrorAssignmentToConstant(name.to_string(), pos).into());
         }
 
-        if op_info.is_op_assignment() {
-            let OpAssignment {
-                hash_op_assign,
-                hash_op,
-                op_assign,
-                op,
-                pos,
-            } = op_info;
+        let pos = op_info.position();
 
+        if let Some((hash1, hash2, op_assign, op)) = op_info.get_op_assignment_info() {
             let mut lock_guard = target.write_lock::<Dynamic>().unwrap();
-
-            let hash = *hash_op_assign;
             let args = &mut [&mut *lock_guard, &mut new_val];
 
             if self.fast_operators() {
@@ -149,7 +141,7 @@ impl Engine {
                     let context = if need_context {
                         let op = op_assign.literal_syntax();
                         let source = global.source();
-                        Some((self, op, source, &*global, *pos).into())
+                        Some((self, op, source, &*global, pos).into())
                     } else {
                         None
                     };
@@ -160,7 +152,7 @@ impl Engine {
             let token = Some(op_assign);
             let op_assign = op_assign.literal_syntax();
 
-            match self.exec_native_fn_call(global, caches, op_assign, token, hash, args, true, *pos)
+            match self.exec_native_fn_call(global, caches, op_assign, token, hash1, args, true, pos)
             {
                 Ok(_) => (),
                 Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
@@ -170,7 +162,7 @@ impl Engine {
                     let op = op.literal_syntax();
 
                     *args[0] = self
-                        .exec_native_fn_call(global, caches, op, token, *hash_op, args, true, *pos)?
+                        .exec_native_fn_call(global, caches, op, token, hash2, args, true, pos)?
                         .0;
                 }
                 Err(err) => return Err(err),
@@ -189,7 +181,7 @@ impl Engine {
             }
         }
 
-        target.propagate_changed_value(op_info.pos)
+        target.propagate_changed_value(pos)
     }
 
     /// Evaluate a statement.

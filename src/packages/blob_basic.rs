@@ -513,7 +513,11 @@ pub mod blob_functions {
     ///
     /// print(b);           // prints "[030405]"
     /// ```
-    #[allow(clippy::cast_sign_loss, clippy::needless_pass_by_value, clippy::cast_possible_truncation)]
+    #[allow(
+        clippy::cast_sign_loss,
+        clippy::needless_pass_by_value,
+        clippy::cast_possible_truncation
+    )]
     pub fn chop(blob: &mut Blob, len: INT) {
         if !blob.is_empty() {
             if len <= 0 {

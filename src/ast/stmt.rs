@@ -24,15 +24,15 @@ use std::{
 #[derive(Clone, PartialEq, Hash)]
 pub struct OpAssignment {
     /// Hash of the op-assignment call.
-    pub hash_op_assign: u64,
+    hash_op_assign: u64,
     /// Hash of the underlying operator call (for fallback).
-    pub hash_op: u64,
+    hash_op: u64,
     /// Op-assignment operator.
-    pub op_assign: Token,
+    op_assign: Token,
     /// Underlying operator.
-    pub op: Token,
+    op: Token,
     /// [Position] of the op-assignment operator.
-    pub pos: Position,
+    pos: Position,
 }
 
 impl OpAssignment {
@@ -51,8 +51,31 @@ impl OpAssignment {
     /// Is this an op-assignment?
     #[must_use]
     #[inline(always)]
-    pub const fn is_op_assignment(&self) -> bool {
-        self.hash_op_assign != 0 || self.hash_op != 0
+    pub fn is_op_assignment(&self) -> bool {
+        !matches!(self.op, Token::Equals)
+    }
+    /// Get information if this [`OpAssignment`] is an op-assignment.
+    ///
+    /// Returns `( hash_op_assign, hash_op, op_assign, op )`:
+    ///
+    /// * `hash_op_assign`: Hash of the op-assignment call.
+    /// * `hash_op`: Hash of the underlying operator call (for fallback).
+    /// * `op_assign`: Op-assignment operator.
+    /// * `op`: Underlying operator.
+    #[must_use]
+    #[inline]
+    pub fn get_op_assignment_info(&self) -> Option<(u64, u64, &Token, &Token)> {
+        if self.is_op_assignment() {
+            Some((self.hash_op_assign, self.hash_op, &self.op_assign, &self.op))
+        } else {
+            None
+        }
+    }
+    /// Get the [position][Position] of this [`OpAssignment`].
+    #[must_use]
+    #[inline(always)]
+    pub const fn position(&self) -> Position {
+        self.pos
     }
     /// Create a new [`OpAssignment`].
     ///

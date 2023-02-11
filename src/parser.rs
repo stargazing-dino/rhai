@@ -17,9 +17,9 @@ use crate::tokenizer::{
 use crate::types::dynamic::AccessMode;
 use crate::types::StringsInterner;
 use crate::{
-    calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, Identifier,
-    ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position, Scope,
-    Shared, SmartString, StaticVec, AST, INT, PERR,
+    calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
+    Identifier, ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position,
+    Scope, Shared, SmartString, StaticVec, AST, INT, PERR,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -567,7 +567,7 @@ impl Engine {
         };
 
         let mut _namespace = namespace;
-        let mut args = StaticVec::new_const();
+        let mut args = FnArgsVec::new_const();
 
         match token {
             // id( <EOF>
@@ -1945,7 +1945,7 @@ impl Engine {
 
                     // Call negative function
                     expr => {
-                        let mut args = StaticVec::new_const();
+                        let mut args = FnArgsVec::new_const();
                         args.push(expr);
                         args.shrink_to_fit();
 
@@ -1973,7 +1973,7 @@ impl Engine {
 
                     // Call plus function
                     expr => {
-                        let mut args = StaticVec::new_const();
+                        let mut args = FnArgsVec::new_const();
                         args.push(expr);
                         args.shrink_to_fit();
 
@@ -1994,7 +1994,7 @@ impl Engine {
                 let token = token.clone();
                 let pos = eat_token(input, Token::Bang);
 
-                let mut args = StaticVec::new_const();
+                let mut args = FnArgsVec::new_const();
                 args.push(self.parse_unary(input, state, lib, settings.level_up()?)?);
                 args.shrink_to_fit();
 
@@ -2359,7 +2359,7 @@ impl Engine {
                 Some(op_token.clone())
             };
 
-            let mut args = StaticVec::new_const();
+            let mut args = FnArgsVec::new_const();
             args.push(root);
             args.push(rhs);
             args.shrink_to_fit();
@@ -2419,7 +2419,7 @@ impl Engine {
                     } else {
                         // Put a `!` call in front
                         let op = Token::Bang.literal_syntax();
-                        let mut args = StaticVec::new_const();
+                        let mut args = FnArgsVec::new_const();
                         args.push(fn_call);
 
                         let not_base = FnCallExpr {
@@ -3708,7 +3708,7 @@ impl Engine {
         }
 
         let num_externals = externals.len();
-        let mut args = StaticVec::with_capacity(externals.len() + 1);
+        let mut args = FnArgsVec::with_capacity(externals.len() + 1);
 
         args.push(fn_expr);
 

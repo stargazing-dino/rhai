@@ -5,8 +5,8 @@ use crate::engine::{KEYWORD_FN_PTR, OP_EXCLUSIVE_RANGE, OP_INCLUSIVE_RANGE};
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
 use crate::{
-    calc_fn_hash, Dynamic, FnPtr, Identifier, ImmutableString, Position, SmartString, StaticVec,
-    INT,
+    calc_fn_hash, Dynamic, FnArgsVec, FnPtr, Identifier, ImmutableString, Position, SmartString,
+    StaticVec, INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -201,7 +201,7 @@ pub struct FnCallExpr {
     /// Pre-calculated hashes.
     pub hashes: FnCallHashes,
     /// List of function call argument expressions.
-    pub args: StaticVec<Expr>,
+    pub args: FnArgsVec<Expr>,
     /// Does this function call capture the parent scope?
     pub capture_parent_scope: bool,
     /// Is this function call a native operator?
