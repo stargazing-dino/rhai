@@ -3,7 +3,8 @@
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::api::events::VarDefInfo;
 use crate::ast::{
-    ASTFlags, BinaryExpr, Expr, FlowControl, OpAssignment, Stmt, SwitchCasesCollection,
+    ASTFlags, BinaryExpr, ConditionalExpr, Expr, FlowControl, OpAssignment, Stmt,
+    SwitchCasesCollection,
 };
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::types::dynamic::{AccessMode, Union};
@@ -359,15 +360,13 @@ impl Engine {
                                 break;
                             }
                         }
-                    } else if value.is_int() && !ranges.is_empty() {
+                    } else if !ranges.is_empty() {
                         // Then check integer ranges
-                        let value = value.as_int().expect("`INT`");
+                        for r in ranges.iter().filter(|r| r.contains(&value)) {
+                            let ConditionalExpr { condition, expr } = &expressions[r.index()];
 
-                        for r in ranges.iter().filter(|r| r.contains(value)) {
-                            let block = &expressions[r.index()];
-
-                            let cond_result = match block.condition {
-                                Expr::BoolConstant(b, ..) => b,
+                            let cond_result = match condition {
+                                Expr::BoolConstant(b, ..) => *b,
                                 ref c => self
                                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), c)?
                                     .as_bool()
@@ -377,7 +376,7 @@ impl Engine {
                             };
 
                             if cond_result {
-                                result = Some(&block.expr);
+                                result = Some(expr);
                                 break;
                             }
                         }

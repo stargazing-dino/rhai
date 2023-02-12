@@ -19,7 +19,7 @@ use crate::types::StringsInterner;
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
     Identifier, ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position,
-    Scope, Shared, SmartString, StaticVec, AST, INT, PERR,
+    Scope, Shared, SmartString, StaticVec, AST, PERR,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -41,9 +41,6 @@ const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 
 /// The message: `TokenStream` never ends
 const NEVER_ENDS: &str = "`Token`";
-
-/// Unroll `switch` ranges no larger than this.
-const SMALL_SWITCH_RANGE: INT = 16;
 
 /// _(internals)_ A type that encapsulates the current state of the parser.
 /// Exported under the `internals` feature only.
@@ -1216,7 +1213,6 @@ impl Engine {
                     let stmt_block: StmtBlock = stmt.into();
                     (Expr::Stmt(stmt_block.into()), need_comma)
                 };
-            let has_condition = !matches!(condition, Expr::BoolConstant(true, ..));
 
             expressions.push((condition, action_expr).into());
             let index = expressions.len() - 1;
@@ -1240,23 +1236,9 @@ impl Engine {
 
                     if let Some(mut r) = range_value {
                         if !r.is_empty() {
-                            // Do not unroll ranges if there are previous non-unrolled ranges
-                            if !has_condition && ranges.is_empty() && r.len() <= SMALL_SWITCH_RANGE
-                            {
-                                // Unroll small range
-                                r.into_iter().for_each(|n| {
-                                    let hasher = &mut get_hasher();
-                                    Dynamic::from_int(n).hash(hasher);
-                                    cases
-                                        .entry(hasher.finish())
-                                        .and_modify(|cases| cases.push(index))
-                                        .or_insert_with(|| [index].into());
-                                });
-                            } else {
-                                // Other range
-                                r.set_index(index);
-                                ranges.push(r);
-                            }
+                            // Other range
+                            r.set_index(index);
+                            ranges.push(r);
                         }
                         continue;
                     }

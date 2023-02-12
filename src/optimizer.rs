@@ -563,16 +563,14 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             }
 
             // Then check ranges
-            if value.is_int() && !ranges.is_empty() {
-                let value = value.as_int().unwrap();
-
+            if !ranges.is_empty() {
                 // Only one range or all ranges without conditions
                 if ranges.len() == 1
                     || ranges
                         .iter()
                         .all(|r| expressions[r.index()].is_always_true())
                 {
-                    if let Some(r) = ranges.iter().find(|r| r.contains(value)) {
+                    if let Some(r) = ranges.iter().find(|r| r.contains(&value)) {
                         let range_block = &mut expressions[r.index()];
 
                         if range_block.is_always_true() {
@@ -619,7 +617,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
 
                     let old_ranges_len = ranges.len();
 
-                    ranges.retain(|r| r.contains(value));
+                    ranges.retain(|r| r.contains(&value));
 
                     if ranges.len() != old_ranges_len {
                         state.set_dirty();

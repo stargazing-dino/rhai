@@ -28,6 +28,7 @@ impl Hasher for StraightHasher {
         self.0
     }
     #[cold]
+    #[inline(never)]
     fn write(&mut self, _bytes: &[u8]) {
         panic!("StraightHasher can only hash u64 values");
     }

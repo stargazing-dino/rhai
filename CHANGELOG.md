@@ -17,6 +17,7 @@ Enhancements
 ------------
 
 * The functions `min` and `max` are added for numbers.
+* Range cases in `switch` statements now also match floating-point and decimal values. In order to support this, however, small numeric ranges cases are no longer unrolled.
 
 
 Version 1.12.0
