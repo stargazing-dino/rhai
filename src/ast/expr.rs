@@ -383,7 +383,7 @@ impl fmt::Debug for Expr {
 
                 #[cfg(not(feature = "no_module"))]
                 if !x.1.is_empty() {
-                    write!(f, "{}{}", x.1, Token::DoubleColon.literal_syntax())?;
+                    write!(f, "{}{}", x.1, crate::engine::NAMESPACE_SEPARATOR)?;
                     let pos = x.1.position();
                     if !pos.is_none() {
                         display_pos = pos;

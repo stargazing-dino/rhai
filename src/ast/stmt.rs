@@ -1,7 +1,7 @@
 //! Module defining script statements.
 
 use super::{ASTFlags, ASTNode, BinaryExpr, Expr, FnCallExpr, Ident};
-use crate::engine::KEYWORD_EVAL;
+use crate::engine::{KEYWORD_EVAL, OP_EQUALS};
 use crate::func::StraightHashMap;
 use crate::tokenizer::Token;
 use crate::types::Span;
@@ -29,8 +29,12 @@ pub struct OpAssignment {
     hash_op: u64,
     /// Op-assignment operator.
     op_assign: Token,
+    /// Syntax of op-assignment operator.
+    op_assign_syntax: &'static str,
     /// Underlying operator.
     op: Token,
+    /// Syntax of underlying operator.
+    op_syntax: &'static str,
     /// [Position] of the op-assignment operator.
     pos: Position,
 }
@@ -44,7 +48,9 @@ impl OpAssignment {
             hash_op_assign: 0,
             hash_op: 0,
             op_assign: Token::Equals,
+            op_assign_syntax: OP_EQUALS,
             op: Token::Equals,
+            op_syntax: OP_EQUALS,
             pos,
         }
     }
@@ -56,17 +62,28 @@ impl OpAssignment {
     }
     /// Get information if this [`OpAssignment`] is an op-assignment.
     ///
-    /// Returns `( hash_op_assign, hash_op, op_assign, op )`:
+    /// Returns `( hash_op_assign, hash_op, op_assign, op_assign_syntax, op, op_syntax )`:
     ///
     /// * `hash_op_assign`: Hash of the op-assignment call.
     /// * `hash_op`: Hash of the underlying operator call (for fallback).
     /// * `op_assign`: Op-assignment operator.
+    /// * `op_assign_syntax`: Syntax of op-assignment operator.
     /// * `op`: Underlying operator.
+    /// * `op_syntax`: Syntax of underlying operator.
     #[must_use]
     #[inline]
-    pub fn get_op_assignment_info(&self) -> Option<(u64, u64, &Token, &Token)> {
+    pub fn get_op_assignment_info(
+        &self,
+    ) -> Option<(u64, u64, &Token, &'static str, &Token, &'static str)> {
         if self.is_op_assignment() {
-            Some((self.hash_op_assign, self.hash_op, &self.op_assign, &self.op))
+            Some((
+                self.hash_op_assign,
+                self.hash_op,
+                &self.op_assign,
+                self.op_assign_syntax,
+                &self.op,
+                self.op_syntax,
+            ))
         } else {
             None
         }
@@ -99,11 +116,16 @@ impl OpAssignment {
             .get_base_op_from_assignment()
             .expect("op-assignment operator");
 
+        let op_assign_syntax = op_assign.literal_syntax();
+        let op_syntax = op.literal_syntax();
+
         Self {
-            hash_op_assign: calc_fn_hash(None, op_assign.literal_syntax(), 2),
-            hash_op: calc_fn_hash(None, op.literal_syntax(), 2),
+            hash_op_assign: calc_fn_hash(None, op_assign_syntax, 2),
+            hash_op: calc_fn_hash(None, op_syntax, 2),
             op_assign,
+            op_assign_syntax,
             op,
+            op_syntax,
             pos,
         }
     }
@@ -139,7 +161,9 @@ impl fmt::Debug for OpAssignment {
                 .field("hash_op_assign", &self.hash_op_assign)
                 .field("hash_op", &self.hash_op)
                 .field("op_assign", &self.op_assign)
+                .field("op_assign_syntax", &self.op_assign_syntax)
                 .field("op", &self.op)
+                .field("op_syntax", &self.op_syntax)
                 .field("pos", &self.pos)
                 .finish()
         } else {

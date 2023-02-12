@@ -1491,7 +1491,7 @@ impl Engine {
                 } else {
                     format!(
                         "{namespace}{}{}",
-                        crate::tokenizer::Token::DoubleColon.literal_syntax(),
+                        crate::engine::NAMESPACE_SEPARATOR,
                         self.gen_fn_call_signature(fn_name, args)
                     )
                 };

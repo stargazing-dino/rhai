@@ -127,21 +127,20 @@ impl Engine {
 
         let pos = op_info.position();
 
-        if let Some((hash1, hash2, op_assign, op)) = op_info.get_op_assignment_info() {
+        if let Some((hash_x, hash, op_x, op_x_str, op, op_str)) = op_info.get_op_assignment_info() {
             let mut lock_guard = target.write_lock::<Dynamic>().unwrap();
             let args = &mut [&mut *lock_guard, &mut new_val];
 
             if self.fast_operators() {
                 if let Some((func, need_context)) =
-                    get_builtin_op_assignment_fn(op_assign, args[0], args[1])
+                    get_builtin_op_assignment_fn(op_x, args[0], args[1])
                 {
                     // Built-in found
                     auto_restore! { let orig_level = global.level; global.level += 1 }
 
                     let context = if need_context {
-                        let op = op_assign.literal_syntax();
                         let source = global.source();
-                        Some((self, op, source, &*global, pos).into())
+                        Some((self, op_x_str, source, &*global, pos).into())
                     } else {
                         None
                     };
@@ -149,20 +148,17 @@ impl Engine {
                 }
             }
 
-            let token = Some(op_assign);
-            let op_assign = op_assign.literal_syntax();
+            let opx = Some(op_x);
 
-            match self.exec_native_fn_call(global, caches, op_assign, token, hash1, args, true, pos)
-            {
+            match self.exec_native_fn_call(global, caches, op_x_str, opx, hash_x, args, true, pos) {
                 Ok(_) => (),
-                Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
+                Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_x_str)) =>
                 {
                     // Expand to `var = var op rhs`
-                    let token = Some(op);
-                    let op = op.literal_syntax();
+                    let op = Some(op);
 
                     *args[0] = self
-                        .exec_native_fn_call(global, caches, op, token, hash2, args, true, pos)?
+                        .exec_native_fn_call(global, caches, op_str, op, hash, args, true, pos)?
                         .0;
                 }
                 Err(err) => return Err(err),

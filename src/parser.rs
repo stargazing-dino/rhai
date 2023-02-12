@@ -7,7 +7,7 @@ use crate::ast::{
     FnCallHashes, Ident, Namespace, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock,
     StmtBlockContainer, SwitchCasesCollection,
 };
-use crate::engine::{Precedence, KEYWORD_THIS, OP_CONTAINS};
+use crate::engine::{Precedence, KEYWORD_THIS, OP_CONTAINS, OP_NOT};
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::tokenizer::{
@@ -1299,6 +1299,10 @@ impl Engine {
             }
         }
 
+        expressions.shrink_to_fit();
+        cases.shrink_to_fit();
+        ranges.shrink_to_fit();
+
         let cases = SwitchCasesCollection {
             expressions,
             cases,
@@ -2418,14 +2422,13 @@ impl Engine {
                         fn_call
                     } else {
                         // Put a `!` call in front
-                        let op = Token::Bang.literal_syntax();
                         let mut args = FnArgsVec::new_const();
                         args.push(fn_call);
 
                         let not_base = FnCallExpr {
                             namespace: Namespace::NONE,
-                            name: state.get_interned_string(op),
-                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, op, 1)),
+                            name: state.get_interned_string(OP_NOT),
+                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, OP_NOT, 1)),
                             args,
                             op_token: Some(Token::Bang),
                             capture_parent_scope: false,

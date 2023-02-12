@@ -729,7 +729,7 @@ impl Engine {
             name: &str,
             module: SharedModule,
         ) {
-            let separator = crate::tokenizer::Token::DoubleColon.literal_syntax();
+            let separator = crate::engine::NAMESPACE_SEPARATOR;
 
             if name.contains(separator) {
                 let mut iter = name.splitn(2, separator);

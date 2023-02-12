@@ -74,7 +74,7 @@ impl Engine {
                     if let Some(module) = self.search_imports(global, ns) {
                         return module.get_qualified_var(*hash_var).map_or_else(
                             || {
-                                let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
+                                let sep = crate::engine::NAMESPACE_SEPARATOR;
 
                                 Err(ERR::ErrorVariableNotFound(
                                     format!("{ns}{sep}{var_name}"),
@@ -104,7 +104,7 @@ impl Engine {
                             }
                         }
 
-                        let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
+                        let sep = crate::engine::NAMESPACE_SEPARATOR;
 
                         return Err(ERR::ErrorVariableNotFound(
                             format!("{ns}{sep}{var_name}"),

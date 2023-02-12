@@ -2,7 +2,6 @@
 #![cfg(not(feature = "no_module"))]
 
 use crate::ast::Ident;
-use crate::tokenizer::Token;
 use crate::{Position, StaticVec};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -46,7 +45,7 @@ impl fmt::Debug for Namespace {
                 .iter()
                 .map(Ident::as_str)
                 .collect::<StaticVec<_>>()
-                .join(Token::DoubleColon.literal_syntax()),
+                .join(crate::engine::NAMESPACE_SEPARATOR),
         )
     }
 }
@@ -63,7 +62,7 @@ impl fmt::Display for Namespace {
                 .iter()
                 .map(Ident::as_str)
                 .collect::<StaticVec<_>>()
-                .join(Token::DoubleColon.literal_syntax()),
+                .join(crate::engine::NAMESPACE_SEPARATOR),
         )
     }
 }
