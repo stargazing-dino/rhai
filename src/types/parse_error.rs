@@ -105,7 +105,7 @@ pub enum ParseErrorType {
     DuplicatedSwitchCase,
     /// A variable name is duplicated. Wrapped value is the variable name.
     DuplicatedVariable(String),
-    /// An integer case of a `switch` statement is in an appropriate place.
+    /// A numeric case of a `switch` statement is in an appropriate place.
     WrongSwitchIntegerCase,
     /// The default case of a `switch` statement is in an appropriate place.
     WrongSwitchDefaultCase,
@@ -236,7 +236,7 @@ impl fmt::Display for ParseErrorType {
             Self::Reserved(s) if is_valid_identifier(s.as_str()) => write!(f, "'{s}' is a reserved keyword"),
             Self::Reserved(s) => write!(f, "'{s}' is a reserved symbol"),
             Self::UnexpectedEOF => f.write_str("Script is incomplete"),
-            Self::WrongSwitchIntegerCase => f.write_str("Integer switch case cannot follow a range case"),
+            Self::WrongSwitchIntegerCase => f.write_str("Numeric switch case cannot follow a range case"),
             Self::WrongSwitchDefaultCase => f.write_str("Default switch case must be the last"),
             Self::WrongSwitchCaseCondition => f.write_str("This switch case cannot have a condition"),
             Self::PropertyExpected => f.write_str("Expecting name of a property"),

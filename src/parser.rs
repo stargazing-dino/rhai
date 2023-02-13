@@ -14,7 +14,7 @@ use crate::tokenizer::{
     is_keyword_function, is_valid_function_name, is_valid_identifier, Token, TokenStream,
     TokenizerControl,
 };
-use crate::types::dynamic::AccessMode;
+use crate::types::dynamic::{AccessMode, Union};
 use crate::types::StringsInterner;
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
@@ -1243,8 +1243,19 @@ impl Engine {
                         continue;
                     }
 
-                    if value.is_int() && !ranges.is_empty() {
-                        return Err(PERR::WrongSwitchIntegerCase.into_err(expr.start_position()));
+                    if !ranges.is_empty() {
+                        let forbidden = match value {
+                            Dynamic(Union::Int(..)) => true,
+                            #[cfg(not(feature = "no_float"))]
+                            Dynamic(Union::Float(..)) => true,
+                            #[cfg(feature = "decimal")]
+                            Dynamic(Union::Decimal(..)) => true,
+                            _ => false,
+                        };
+
+                        if forbidden {
+                            return Err(PERR::WrongSwitchIntegerCase.into_err(expr.start_position()));
+                        }
                     }
 
                     let hasher = &mut get_hasher();
