@@ -385,10 +385,21 @@ impl Scope<'_> {
     /// ```
     #[inline(always)]
     pub fn pop(&mut self) -> &mut Self {
-        self.names.pop().expect("`Scope` must not be empty");
-        let _ = self.values.pop().expect("`Scope` must not be empty");
-        self.aliases.pop().expect("`Scope` must not be empty");
+        self.names.pop().expect("not empty");
+        let _ = self.values.pop().expect("not empty");
+        self.aliases.pop().expect("not empty");
         self
+    }
+    /// Remove the last entry from the [`Scope`] and return it.
+    #[inline(always)]
+    pub(crate) fn pop_entry(&mut self) -> Option<(Identifier, Dynamic, Vec<ImmutableString>)> {
+        self.values.pop().map(|value| {
+            (
+                self.names.pop().expect("not empty"),
+                value,
+                self.aliases.pop().expect("not empty"),
+            )
+        })
     }
     /// Truncate (rewind) the [`Scope`] to a previous size.
     ///

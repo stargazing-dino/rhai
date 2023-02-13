@@ -13,6 +13,12 @@ Bug fixes
 * `x += y` where `x` and `y` are `char` now works correctly.
 * Expressions such as `!inside` now parses correctly instead of as `!in` followed by `side`.
 
+Potentially breaking changes
+----------------------------
+
+* The trait method `ModuleResolver::resolve_raw` (which is a low-level API) now takes a `&mut Scope` parameter.  This is a breaking change because the signature is modified, but this trait method has a default and is rarely called/implemented in practice.
+* `Module::eval_ast_as_new_raw` (a low-level API) now takes a `&mut Scope` instead of the `Scope` parameter.  This is a breaking change because the `&mut` is now required.
+
 Enhancements
 ------------
 

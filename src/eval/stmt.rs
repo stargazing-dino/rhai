@@ -802,14 +802,16 @@ impl Engine {
 
                 let module = resolver
                     .as_ref()
-                    .and_then(|r| match r.resolve_raw(self, global, &path, path_pos) {
-                        Err(err) if matches!(*err, ERR::ErrorModuleNotFound(..)) => None,
-                        result => Some(result),
-                    })
+                    .and_then(
+                        |r| match r.resolve_raw(self, global, scope, &path, path_pos) {
+                            Err(err) if matches!(*err, ERR::ErrorModuleNotFound(..)) => None,
+                            result => Some(result),
+                        },
+                    )
                     .or_else(|| {
                         Some(
                             self.module_resolver
-                                .resolve_raw(self, global, &path, path_pos),
+                                .resolve_raw(self, global, scope, &path, path_pos),
                         )
                     })
                     .unwrap_or_else(|| {

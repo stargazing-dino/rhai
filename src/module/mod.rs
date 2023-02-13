@@ -2083,9 +2083,10 @@ impl Module {
         ast: &crate::AST,
         engine: &crate::Engine,
     ) -> RhaiResultOf<Self> {
+        let mut scope = scope;
         let global = &mut crate::eval::GlobalRuntimeState::new(engine);
 
-        Self::eval_ast_as_new_raw(engine, scope, global, ast)
+        Self::eval_ast_as_new_raw(engine, &mut scope, global, ast)
     }
     /// Create a new [`Module`] by evaluating an [`AST`][crate::AST].
     ///
@@ -2101,13 +2102,12 @@ impl Module {
     #[cfg(not(feature = "no_module"))]
     pub fn eval_ast_as_new_raw(
         engine: &crate::Engine,
-        scope: crate::Scope,
+        scope: &mut crate::Scope,
         global: &mut crate::eval::GlobalRuntimeState,
         ast: &crate::AST,
     ) -> RhaiResultOf<Self> {
-        let mut scope = scope;
-
         // Save global state
+        let orig_scope_len = scope.len();
         let orig_imports_len = global.num_imports();
         let orig_source = global.source.clone();
 
@@ -2120,7 +2120,7 @@ impl Module {
         // Run the script
         let caches = &mut crate::eval::Caches::new();
 
-        let result = engine.eval_ast_with_scope_raw(global, caches, &mut scope, ast);
+        let result = engine.eval_ast_with_scope_raw(global, caches, scope, ast);
 
         // Create new module
         let mut module = Module::new();
@@ -2162,7 +2162,9 @@ impl Module {
         });
 
         // Variables with an alias left in the scope become module variables
-        for (_name, mut value, mut aliases) in scope {
+        while scope.len() > orig_scope_len {
+            let (_name, mut value, mut aliases) = scope.pop_entry().expect("not empty");
+
             value.deep_scan(|v| {
                 if let Some(fn_ptr) = v.downcast_mut::<crate::FnPtr>() {
                     fn_ptr.set_encapsulated_environ(Some(environ.clone()));
