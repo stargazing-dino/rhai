@@ -10,9 +10,7 @@ fn test_unit() -> Result<(), Box<EvalAltResult>> {
 #[test]
 fn test_unit_eq() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
-    assert!(engine
-        .eval::<bool>("let x = (); let y = (); x == y")
-        .unwrap());
+    assert!(engine.eval::<bool>("let x = (); let y = (); x == y")?);
     Ok(())
 }
 

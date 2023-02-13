@@ -5,8 +5,8 @@ fn test_or_equals() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
 
     assert_eq!(engine.eval::<INT>("let x = 16; x |= 74; x")?, 90);
-    assert!(engine.eval::<bool>("let x = true; x |= false; x").unwrap());
-    assert!(engine.eval::<bool>("let x = false; x |= true; x").unwrap());
+    assert!(engine.eval::<bool>("let x = true; x |= false; x")?);
+    assert!(engine.eval::<bool>("let x = false; x |= true; x")?);
 
     Ok(())
 }
@@ -16,9 +16,9 @@ fn test_and_equals() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
 
     assert_eq!(engine.eval::<INT>("let x = 16; x &= 31; x")?, 16);
-    assert!(!engine.eval::<bool>("let x = true; x &= false; x").unwrap());
-    assert!(!engine.eval::<bool>("let x = false; x &= true; x").unwrap());
-    assert!(engine.eval::<bool>("let x = true; x &= true; x").unwrap());
+    assert!(!engine.eval::<bool>("let x = true; x &= false; x")?);
+    assert!(!engine.eval::<bool>("let x = false; x &= true; x")?);
+    assert!(engine.eval::<bool>("let x = true; x &= true; x")?);
 
     Ok(())
 }
