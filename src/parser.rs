@@ -1254,7 +1254,9 @@ impl Engine {
                         };
 
                         if forbidden {
-                            return Err(PERR::WrongSwitchIntegerCase.into_err(expr.start_position()));
+                            return Err(
+                                PERR::WrongSwitchIntegerCase.into_err(expr.start_position())
+                            );
                         }
                     }
 

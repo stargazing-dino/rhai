@@ -18,12 +18,14 @@ Potentially breaking changes
 
 * The trait method `ModuleResolver::resolve_raw` (which is a low-level API) now takes a `&mut Scope` parameter.  This is a breaking change because the signature is modified, but this trait method has a default and is rarely called/implemented in practice.
 * `Module::eval_ast_as_new_raw` (a low-level API) now takes a `&mut Scope` instead of the `Scope` parameter.  This is a breaking change because the `&mut` is now required.
+* `Engine::allow_loop_expressions` now correctly defaults to `true` (was erroneously `false` by default).
 
 Enhancements
 ------------
 
 * The functions `min` and `max` are added for numbers.
 * Range cases in `switch` statements now also match floating-point and decimal values. In order to support this, however, small numeric ranges cases are no longer unrolled.
+* Loading a module via `import` now gives the module access to the current scope, including variables and constants defined inside.
 
 
 Version 1.12.0

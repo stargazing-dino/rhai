@@ -41,6 +41,7 @@ impl LangOptions {
     pub fn new() -> Self {
         Self::IF_EXPR
             | Self::SWITCH_EXPR
+            | Self::LOOP_EXPR
             | Self::STMT_EXPR
             | Self::LOOPING
             | Self::SHADOWING
