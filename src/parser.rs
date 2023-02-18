@@ -1397,20 +1397,26 @@ impl Engine {
                     .into(),
             )),
             // Loops are allowed to act as expressions
-            Token::While | Token::Loop if settings.has_option(LangOptions::LOOP_EXPR) => {
+            Token::While | Token::Loop
+                if self.allow_looping() && settings.has_option(LangOptions::LOOP_EXPR) =>
+            {
                 Expr::Stmt(Box::new(
                     self.parse_while_loop(input, state, lib, settings.level_up()?)?
                         .into(),
                 ))
             }
-            Token::Do if settings.has_option(LangOptions::LOOP_EXPR) => Expr::Stmt(Box::new(
-                self.parse_do(input, state, lib, settings.level_up()?)?
-                    .into(),
-            )),
-            Token::For if settings.has_option(LangOptions::LOOP_EXPR) => Expr::Stmt(Box::new(
-                self.parse_for(input, state, lib, settings.level_up()?)?
-                    .into(),
-            )),
+            Token::Do if self.allow_looping() && settings.has_option(LangOptions::LOOP_EXPR) => {
+                Expr::Stmt(Box::new(
+                    self.parse_do(input, state, lib, settings.level_up()?)?
+                        .into(),
+                ))
+            }
+            Token::For if self.allow_looping() && settings.has_option(LangOptions::LOOP_EXPR) => {
+                Expr::Stmt(Box::new(
+                    self.parse_for(input, state, lib, settings.level_up()?)?
+                        .into(),
+                ))
+            }
             // Switch statement is allowed to act as expressions
             Token::Switch if settings.has_option(LangOptions::SWITCH_EXPR) => Expr::Stmt(Box::new(
                 self.parse_switch(input, state, lib, settings.level_up()?)?
