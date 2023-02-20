@@ -2,7 +2,8 @@ use rhai::plugin::*;
 use rhai::{Dynamic, Engine, EvalAltResult, Module, Scope, AST, INT};
 use rustyline::config::Builder;
 use rustyline::error::ReadlineError;
-use rustyline::{Cmd, Editor, Event, EventHandler, KeyCode, KeyEvent, Modifiers, Movement};
+use rustyline::history::{History, SearchDirection};
+use rustyline::{Cmd, DefaultEditor, Event, EventHandler, KeyCode, KeyEvent, Modifiers, Movement};
 
 use std::{env, fs::File, io::Read, path::Path, process::exit};
 
@@ -188,14 +189,14 @@ fn load_script_files(engine: &mut Engine) {
 }
 
 // Setup the Rustyline editor.
-fn setup_editor() -> Editor<()> {
+fn setup_editor() -> DefaultEditor {
     //env_logger::init();
     let config = Builder::new()
         .tab_stop(4)
         .indent_size(4)
         .bracketed_paste(true)
         .build();
-    let mut rl = Editor::<()>::with_config(config).unwrap();
+    let mut rl = DefaultEditor::with_config(config).unwrap();
 
     // Bind more keys
 
@@ -336,7 +337,10 @@ fn main() {
     'main_loop: loop {
         if let Some(replace) = replacement.take() {
             input = replace;
-            if rl.add_history_entry(input.clone()) {
+            if rl
+                .add_history_entry(input.clone())
+                .expect("Failed to add history entry")
+            {
                 history_offset += 1;
             }
             if input.contains('\n') {
@@ -366,7 +370,9 @@ fn main() {
                         if !cmd.is_empty()
                             && !cmd.starts_with('!')
                             && cmd.trim() != "history"
-                            && rl.add_history_entry(input.clone())
+                            && rl
+                                .add_history_entry(input.clone())
+                                .expect("Failed to add history entry")
                         {
                             history_offset += 1;
                         }
@@ -476,7 +482,7 @@ fn main() {
 
                 let json = engine
                     .gen_fn_metadata_with_ast_to_json(&main_ast, false)
-                    .unwrap();
+                    .expect("Unable to generate JSON");
                 let mut f = std::fs::File::create("metadata.json")
                     .expect("Unable to create `metadata.json`");
                 f.write_all(json.as_bytes()).expect("Unable to write data");
@@ -484,7 +490,7 @@ fn main() {
                 continue;
             }
             "!!" => {
-                match rl.history().last() {
+                match rl.history().iter().last() {
                     Some(line) => {
                         replacement = Some(line.clone());
                         replacement_index = history_offset + rl.history().len() - 1;
@@ -514,8 +520,12 @@ fn main() {
             _ if cmd.starts_with('!') => {
                 if let Ok(num) = cmd[1..].parse::<usize>() {
                     if num >= history_offset {
-                        if let Some(line) = rl.history().get(num - history_offset) {
-                            replacement = Some(line.clone());
+                        if let Some(line) = rl
+                            .history()
+                            .get(num - history_offset, SearchDirection::Forward)
+                            .expect("Failed to get history entry")
+                        {
+                            replacement = Some(line.entry.into());
                             replacement_index = num;
                             continue;
                         }
@@ -578,7 +588,8 @@ fn main() {
         main_ast.clear_statements();
     }
 
-    rl.save_history(HISTORY_FILE).unwrap();
+    rl.save_history(HISTORY_FILE)
+        .expect("Failed to save history");
 
     println!("Bye!");
 }
