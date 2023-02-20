@@ -3792,7 +3792,7 @@ impl Engine {
                     (.., pos) => {
                         return Err(PERR::MissingToken(
                             Token::Pipe.into(),
-                            "to close the parameters list of anonymous function".into(),
+                            "to close the parameters list of anonymous function or closure".into(),
                         )
                         .into_err(pos))
                     }

@@ -12,6 +12,7 @@ Bug fixes
 * Syntax such as `foo.bar::baz` no longer panics, but returns a proper parse error.
 * `x += y` where `x` and `y` are `char` now works correctly.
 * Expressions such as `!inside` now parses correctly instead of as `!in` followed by `side`.
+* Custom syntax starting with symbols now works correctly and no longer raises a parse error.
 
 Potentially breaking changes
 ----------------------------

@@ -2066,7 +2066,7 @@ pub const fn is_id_continue(x: char) -> bool {
     x.is_ascii_alphanumeric() || x == '_'
 }
 
-/// Is a piece of syntax a reserved keyword or symbol?
+/// Is a piece of syntax a reserved keyword or reserved symbol?
 #[must_use]
 pub fn is_reserved_keyword_or_symbol(syntax: &str) -> bool {
     match syntax {
