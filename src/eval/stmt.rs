@@ -139,12 +139,8 @@ impl Engine {
                     // Built-in found
                     auto_restore! { let orig_level = global.level; global.level += 1 }
 
-                    let context = if need_context {
-                        let source = global.source();
-                        Some((self, op_x_str, source, &*global, pos).into())
-                    } else {
-                        None
-                    };
+                    let context = need_context
+                        .then_some((self, op_x_str, global.source(), &*global, pos).into());
                     return func(context, args).map(|_| ());
                 }
             }

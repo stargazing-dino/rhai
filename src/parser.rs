@@ -215,11 +215,7 @@ impl<'e, 's> ParseState<'e, 's> {
             self.allow_capture = true;
         }
 
-        let index = if hit_barrier {
-            None
-        } else {
-            NonZeroUsize::new(index)
-        };
+        let index = (!hit_barrier).then(|| NonZeroUsize::new(index)).flatten();
 
         (index, is_func_name)
     }
@@ -2357,12 +2353,8 @@ impl Engine {
 
             let op = op_token.to_string();
             let hash = calc_fn_hash(None, &op, 2);
-            let is_valid_script_function = is_valid_function_name(&op);
-            let operator_token = if is_valid_script_function {
-                None
-            } else {
-                Some(op_token.clone())
-            };
+            let native_only = !is_valid_function_name(&op);
+            let operator_token = native_only.then_some(op_token.clone());
 
             let mut args = FnArgsVec::new_const();
             args.push(root);
@@ -2446,10 +2438,10 @@ impl Engine {
                         .and_then(|m| m.get(s.as_str()))
                         .map_or(false, Option::is_some) =>
                 {
-                    op_base.hashes = if is_valid_script_function {
-                        FnCallHashes::from_hash(calc_fn_hash(None, &s, 2))
-                    } else {
+                    op_base.hashes = if native_only {
                         FnCallHashes::from_native_only(calc_fn_hash(None, &s, 2))
+                    } else {
+                        FnCallHashes::from_hash(calc_fn_hash(None, &s, 2))
                     };
                     op_base.into_fn_call_expr(pos)
                 }
@@ -3085,8 +3077,7 @@ impl Engine {
         let (id, id_pos) = parse_var_name(input)?;
 
         let (alias, alias_pos) = if match_token(input, Token::As).0 {
-            let (name, pos) = parse_var_name(input)?;
-            (Some(name), pos)
+            parse_var_name(input).map(|(name, pos)| (Some(name), pos))?
         } else {
             (None, Position::NONE)
         };

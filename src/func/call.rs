@@ -398,11 +398,9 @@ impl Engine {
             let is_method = func.is_method();
             let src = source.as_ref().map(|s| s.as_str());
 
-            let context = if func.has_context() {
-                Some((self, name, src, &*global, pos).into())
-            } else {
-                None
-            };
+            let context = func
+                .has_context()
+                .then_some((self, name, src, &*global, pos).into());
 
             let mut _result = if let Some(f) = func.get_plugin_fn() {
                 if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
@@ -1460,11 +1458,9 @@ impl Engine {
 
             Some(f) if f.is_plugin_fn() => {
                 let f = f.get_plugin_fn().expect("plugin function");
-                let context = if f.has_context() {
-                    Some((self, fn_name, module.id(), &*global, pos).into())
-                } else {
-                    None
-                };
+                let context = f
+                    .has_context()
+                    .then_some((self, fn_name, module.id(), &*global, pos).into());
                 if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
                 } else {
@@ -1475,18 +1471,16 @@ impl Engine {
 
             Some(f) if f.is_native() => {
                 let func = f.get_native_fn().expect("native function");
-                let context = if f.has_context() {
-                    Some((self, fn_name, module.id(), &*global, pos).into())
-                } else {
-                    None
-                };
+                let context = f
+                    .has_context()
+                    .then_some((self, fn_name, module.id(), &*global, pos).into());
                 func(context, args).and_then(|r| self.check_data_size(r, pos))
             }
 
             Some(f) => unreachable!("unknown function type: {:?}", f),
 
-            None => {
-                let sig = if namespace.is_empty() {
+            None => Err(ERR::ErrorFunctionNotFound(
+                if namespace.is_empty() {
                     self.gen_fn_call_signature(fn_name, args)
                 } else {
                     format!(
@@ -1494,10 +1488,10 @@ impl Engine {
                         crate::engine::NAMESPACE_SEPARATOR,
                         self.gen_fn_call_signature(fn_name, args)
                     )
-                };
-
-                Err(ERR::ErrorFunctionNotFound(sig, pos).into())
-            }
+                },
+                pos,
+            )
+            .into()),
         }
     }
 
@@ -1605,11 +1599,8 @@ impl Engine {
                 // Built-in found
                 auto_restore! { let orig_level = global.level; global.level += 1 }
 
-                let context = if need_context {
-                    Some((self, name.as_str(), None, &*global, pos).into())
-                } else {
-                    None
-                };
+                let context =
+                    need_context.then_some((self, name.as_str(), None, &*global, pos).into());
                 return func(context, operands);
             }
 
