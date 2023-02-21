@@ -252,7 +252,10 @@ impl AST {
     #[inline(always)]
     #[must_use]
     pub(crate) fn statements(&self) -> &[Stmt] {
-        self.body.statements()
+        self.body
+            .as_deref()
+            .map(StmtBlock::statements)
+            .unwrap_or_default()
     }
     /// _(internals)_ Get the statements.
     /// Exported under the `internals` feature only.
