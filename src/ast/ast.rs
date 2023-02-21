@@ -23,7 +23,7 @@ pub struct AST {
     source: Option<ImmutableString>,
     /// [`AST`] documentation.
     #[cfg(feature = "metadata")]
-    doc: crate::SmartString,
+    doc: Option<crate::SmartString>,
     /// Global statements.
     body: StmtBlock,
     /// Script-defined functions.
@@ -98,7 +98,7 @@ impl AST {
         Self {
             source: None,
             #[cfg(feature = "metadata")]
-            doc: crate::SmartString::new_const(),
+            doc: None,
             body: StmtBlock::new(statements, Position::NONE, Position::NONE),
             #[cfg(not(feature = "no_function"))]
             lib: functions.into(),
@@ -148,7 +148,7 @@ impl AST {
         Self {
             source: None,
             #[cfg(feature = "metadata")]
-            doc: crate::SmartString::new_const(),
+            doc: None,
             body: StmtBlock::NONE,
             #[cfg(not(feature = "no_function"))]
             lib: crate::Module::new().into(),
@@ -202,14 +202,14 @@ impl AST {
     #[inline(always)]
     #[must_use]
     pub fn doc(&self) -> &str {
-        &self.doc
+        self.doc.as_ref().map(|s| s.as_str()).unwrap_or_default()
     }
     /// Clear the documentation.
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[inline(always)]
     pub fn clear_doc(&mut self) -> &mut Self {
-        self.doc.clear();
+        self.doc = None;
         self
     }
     /// Get a mutable reference to the documentation.
@@ -219,8 +219,8 @@ impl AST {
     #[inline(always)]
     #[must_use]
     #[allow(dead_code)]
-    pub(crate) fn doc_mut(&mut self) -> &mut crate::SmartString {
-        &mut self.doc
+    pub(crate) fn doc_mut(&mut self) -> Option<&mut crate::SmartString> {
+        self.doc.as_mut()
     }
     /// Set the documentation.
     ///
@@ -228,7 +228,13 @@ impl AST {
     #[cfg(feature = "metadata")]
     #[inline(always)]
     pub(crate) fn set_doc(&mut self, doc: impl Into<crate::SmartString>) {
-        self.doc = doc.into();
+        let doc = doc.into();
+
+        if doc.is_empty() {
+            self.doc = None;
+        } else {
+            self.doc = Some(doc);
+        }
     }
     /// Get the statements.
     #[cfg(not(feature = "internals"))]
@@ -598,11 +604,13 @@ impl AST {
         }
 
         #[cfg(feature = "metadata")]
-        if !other.doc.is_empty() {
-            if !_ast.doc.is_empty() {
-                _ast.doc.push('\n');
+        if let Some(ref other_doc) = other.doc {
+            if let Some(ref mut ast_doc) = _ast.doc {
+                ast_doc.push('\n');
+                ast_doc.push_str(other_doc);
+            } else {
+                _ast.doc = Some(other_doc.clone());
             }
-            _ast.doc.push_str(other.doc());
         }
 
         _ast
@@ -698,11 +706,13 @@ impl AST {
         }
 
         #[cfg(feature = "metadata")]
-        if !other.doc.is_empty() {
-            if !self.doc.is_empty() {
-                self.doc.push('\n');
+        if let Some(other_doc) = other.doc {
+            if let Some(ref mut self_doc) = self.doc {
+                self_doc.push('\n');
+                self_doc.push_str(&other_doc);
+            } else {
+                self.doc = Some(other_doc);
             }
-            self.doc.push_str(&other.doc);
         }
 
         self
