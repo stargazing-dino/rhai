@@ -1229,7 +1229,7 @@ fn get_next_token_inner(
     // Still inside a comment?
     if state.comment_level > 0 {
         let start_pos = *pos;
-        let mut comment = state.include_comments.then_some(String::new());
+        let mut comment = state.include_comments.then(|| String::new());
 
         state.comment_level =
             scan_block_comment(stream, state.comment_level, pos, comment.as_mut());

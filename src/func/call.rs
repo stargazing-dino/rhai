@@ -400,7 +400,7 @@ impl Engine {
 
             let context = func
                 .has_context()
-                .then_some((self, name, src, &*global, pos).into());
+                .then(|| (self, name, src, &*global, pos).into());
 
             let mut _result = if let Some(f) = func.get_plugin_fn() {
                 if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
@@ -1460,7 +1460,7 @@ impl Engine {
                 let f = f.get_plugin_fn().expect("plugin function");
                 let context = f
                     .has_context()
-                    .then_some((self, fn_name, module.id(), &*global, pos).into());
+                    .then(|| (self, fn_name, module.id(), &*global, pos).into());
                 if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
                 } else {
@@ -1473,7 +1473,7 @@ impl Engine {
                 let func = f.get_native_fn().expect("native function");
                 let context = f
                     .has_context()
-                    .then_some((self, fn_name, module.id(), &*global, pos).into());
+                    .then(|| (self, fn_name, module.id(), &*global, pos).into());
                 func(context, args).and_then(|r| self.check_data_size(r, pos))
             }
 
@@ -1600,7 +1600,7 @@ impl Engine {
                 auto_restore! { let orig_level = global.level; global.level += 1 }
 
                 let context =
-                    need_context.then_some((self, name.as_str(), None, &*global, pos).into());
+                    need_context.then(|| (self, name.as_str(), None, &*global, pos).into());
                 return func(context, operands);
             }
 

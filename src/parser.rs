@@ -2354,7 +2354,7 @@ impl Engine {
             let op = op_token.to_string();
             let hash = calc_fn_hash(None, &op, 2);
             let native_only = !is_valid_function_name(&op);
-            let operator_token = native_only.then_some(op_token.clone());
+            let operator_token = native_only.then(|| op_token.clone());
 
             let mut args = FnArgsVec::new_const();
             args.push(root);

@@ -140,7 +140,7 @@ impl Engine {
                     auto_restore! { let orig_level = global.level; global.level += 1 }
 
                     let context = need_context
-                        .then_some((self, op_x_str, global.source(), &*global, pos).into());
+                        .then(|| (self, op_x_str, global.source(), &*global, pos).into());
                     return func(context, args).map(|_| ());
                 }
             }
