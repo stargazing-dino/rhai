@@ -87,7 +87,7 @@ impl AST {
         Self {
             source: None,
             #[cfg(feature = "metadata")]
-            doc: crate::SmartString::new_const(),
+            doc: None,
             body: (!stmt.is_empty()).then(|| stmt.into()),
             #[cfg(not(feature = "no_function"))]
             lib: functions.into(),
