@@ -24,6 +24,7 @@ Potentially breaking changes
 Enhancements
 ------------
 
+* `Engine::new_raw` is now `const` and runs very fast, delaying all other initialization until first use.
 * The functions `min` and `max` are added for numbers.
 * Range cases in `switch` statements now also match floating-point and decimal values. In order to support this, however, small numeric ranges cases are no longer unrolled.
 * Loading a module via `import` now gives the module access to the current scope, including variables and constants defined inside.
