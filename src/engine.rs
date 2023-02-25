@@ -229,8 +229,8 @@ pub fn make_setter(id: &str) -> Identifier {
 }
 
 impl Engine {
-    /// An empty [`Engine`].
-    pub const EMPTY: Self = Self {
+    /// An empty raw [`Engine`].
+    pub const RAW: Self = Self {
         global_modules: StaticVec::new_const(),
 
         #[cfg(not(feature = "no_module"))]
@@ -310,12 +310,15 @@ impl Engine {
     }
 
     /// Create a new [`Engine`] with minimal built-in functions.
+    /// It returns a copy of [`Engine::RAW`].
+    ///
+    /// This is useful for creating a custom scripting engine with only the functions you need.
     ///
     /// Use [`register_global_module`][Engine::register_global_module] to add packages of functions.
     #[inline]
     #[must_use]
     pub const fn new_raw() -> Self {
-        Self::EMPTY
+        Self::RAW
     }
 
     /// Get an interned [string][ImmutableString].
