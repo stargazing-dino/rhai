@@ -4,6 +4,7 @@
 use crate::func::native::locked_write;
 use crate::parser::{ParseSettingFlags, ParseState};
 use crate::tokenizer::Token;
+use crate::types::StringsInterner;
 use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -115,7 +116,16 @@ impl Engine {
         );
 
         let ast = {
-            let interned_strings = &mut *locked_write(&self.interned_strings);
+            let mut interner;
+            let mut guard;
+            let interned_strings = if let Some(ref interner) = self.interned_strings {
+                guard = locked_write(interner);
+                &mut *guard
+            } else {
+                interner = StringsInterner::new();
+                &mut interner
+            };
+
             let state = &mut ParseState::new(None, interned_strings, tokenizer_control);
 
             self.parse_global_expr(

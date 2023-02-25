@@ -806,7 +806,7 @@ impl Engine {
                     )
                     .or_else(|| {
                         Some(
-                            self.module_resolver
+                            self.module_resolver()
                                 .resolve_raw(self, global, scope, &path, path_pos),
                         )
                     })

@@ -3,6 +3,7 @@
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::native::locked_write;
 use crate::parser::ParseState;
+use crate::types::StringsInterner;
 use crate::{Engine, RhaiResultOf, Scope, AST};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -59,7 +60,17 @@ impl Engine {
         let scripts = [script];
         let ast = {
             let (stream, tc) = self.lex_raw(&scripts, self.token_mapper.as_deref());
-            let interned_strings = &mut *locked_write(&self.interned_strings);
+
+            let mut interner;
+            let mut guard;
+            let interned_strings = if let Some(ref interner) = self.interned_strings {
+                guard = locked_write(interner);
+                &mut *guard
+            } else {
+                interner = StringsInterner::new();
+                &mut interner
+            };
+
             let state = &mut ParseState::new(Some(scope), interned_strings, tc);
             self.parse(stream.peekable(), state, self.optimization_level)?
         };

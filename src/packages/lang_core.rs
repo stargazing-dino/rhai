@@ -7,6 +7,7 @@ use crate::{Dynamic, RhaiResultOf, ERR, INT};
 use std::prelude::v1::*;
 
 #[cfg(not(feature = "no_float"))]
+#[cfg(not(feature = "no_std"))]
 use crate::FLOAT;
 
 def_package! {
