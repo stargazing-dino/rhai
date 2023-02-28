@@ -239,14 +239,7 @@ impl FileModuleResolver {
         if !self.cache_enabled {
             return false;
         }
-
-        let cache = locked_read(&self.cache);
-
-        if cache.is_empty() {
-            false
-        } else {
-            cache.contains_key(path.as_ref())
-        }
+        locked_read(&self.cache).contains_key(path.as_ref())
     }
     /// Empty the internal cache.
     #[inline]

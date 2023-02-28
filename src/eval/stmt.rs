@@ -304,12 +304,14 @@ impl Engine {
                     .as_bool()
                     .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, expr.position()))?;
 
-                if guard_val && !if_block.is_empty() {
-                    self.eval_stmt_block(global, caches, scope, this_ptr, if_block, true)
-                } else if !guard_val && !else_block.is_empty() {
-                    self.eval_stmt_block(global, caches, scope, this_ptr, else_block, true)
-                } else {
-                    Ok(Dynamic::UNIT)
+                match guard_val {
+                    true if !if_block.is_empty() => {
+                        self.eval_stmt_block(global, caches, scope, this_ptr, if_block, true)
+                    }
+                    false if !else_block.is_empty() => {
+                        self.eval_stmt_block(global, caches, scope, this_ptr, else_block, true)
+                    }
+                    _ => Ok(Dynamic::UNIT),
                 }
             }
 
@@ -512,12 +514,10 @@ impl Engine {
                 auto_restore! { scope => rewind; let orig_scope_len = scope.len(); }
 
                 // Add the loop variables
-                let counter_index = if counter.is_empty() {
-                    usize::MAX
-                } else {
+                let counter_index = (!counter.is_empty()).then(|| {
                     scope.push(counter.name.clone(), 0 as INT);
                     scope.len() - 1
-                };
+                });
 
                 scope.push(var_name.name.clone(), ());
                 let index = scope.len() - 1;
@@ -526,7 +526,7 @@ impl Engine {
 
                 for (x, iter_value) in iter_func(iter_obj).enumerate() {
                     // Increment counter
-                    if counter_index < usize::MAX {
+                    if let Some(counter_index) = counter_index {
                         // As the variable increments from 0, this should always work
                         // since any overflow will first be caught below.
                         let index_value = x as INT;

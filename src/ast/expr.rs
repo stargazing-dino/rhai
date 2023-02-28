@@ -248,11 +248,7 @@ impl FnCallExpr {
     #[inline]
     #[must_use]
     pub fn constant_args(&self) -> bool {
-        if self.args.is_empty() {
-            true
-        } else {
-            self.args.iter().all(Expr::is_constant)
-        }
+        self.args.is_empty() || self.args.iter().all(Expr::is_constant)
     }
 }
 

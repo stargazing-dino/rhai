@@ -63,8 +63,8 @@ impl Caches {
     #[inline]
     #[must_use]
     pub fn fn_resolution_cache_mut(&mut self) -> &mut FnResolutionCache {
+        // Push a new function resolution cache if the stack is empty
         if self.0.is_empty() {
-            // Push a new function resolution cache if the stack is empty
             self.push_fn_resolution_cache();
         }
         self.0.last_mut().unwrap()

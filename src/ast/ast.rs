@@ -189,11 +189,7 @@ impl AST {
             .as_mut()
             .map(|m| m.set_id(source.clone()));
 
-        if source.is_empty() {
-            self.source = None;
-        } else {
-            self.source = Some(source);
-        }
+        self.source = (!source.is_empty()).then(|| source);
 
         self
     }
@@ -240,12 +236,7 @@ impl AST {
     #[inline(always)]
     pub(crate) fn set_doc(&mut self, doc: impl Into<crate::SmartString>) {
         let doc = doc.into();
-
-        if doc.is_empty() {
-            self.doc = None;
-        } else {
-            self.doc = Some(doc.into());
-        }
+        self.doc = (!doc.is_empty()).then(|| doc.into());
     }
     /// Get the statements.
     #[cfg(not(feature = "internals"))]

@@ -25,7 +25,6 @@ use bitflags::bitflags;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
-    collections::BTreeMap,
     convert::TryFrom,
     fmt,
     hash::{Hash, Hasher},
@@ -979,7 +978,7 @@ impl Engine {
         settings.pos = eat_token(input, Token::MapStart);
 
         let mut map = StaticVec::<(Ident, Expr)>::new();
-        let mut template = BTreeMap::<Identifier, crate::Dynamic>::new();
+        let mut template = std::collections::BTreeMap::<Identifier, crate::Dynamic>::new();
 
         loop {
             const MISSING_RBRACE: &str = "to end this object map literal";

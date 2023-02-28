@@ -361,13 +361,7 @@ impl Module {
     #[inline(always)]
     pub fn set_id(&mut self, id: impl Into<ImmutableString>) -> &mut Self {
         let id = id.into();
-
-        if id.is_empty() {
-            self.id = None;
-        } else {
-            self.id = Some(id);
-        }
-
+        self.id = (!id.is_empty()).then(|| id);
         self
     }
 
@@ -2330,21 +2324,9 @@ impl Module {
             self.flags
                 .set(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS, has_global_functions);
 
-            self.all_variables = if variables.is_empty() {
-                None
-            } else {
-                Some(variables.into())
-            };
-            self.all_functions = if functions.is_empty() {
-                None
-            } else {
-                Some(functions.into())
-            };
-            self.all_type_iterators = if type_iterators.is_empty() {
-                None
-            } else {
-                Some(type_iterators.into())
-            };
+            self.all_variables = (!variables.is_empty()).then(|| variables.into());
+            self.all_functions = (!functions.is_empty()).then(|| functions.into());
+            self.all_type_iterators = (!type_iterators.is_empty()).then(|| type_iterators.into());
 
             self.flags |= ModuleFlags::INDEXED;
         }

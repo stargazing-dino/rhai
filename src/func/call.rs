@@ -816,7 +816,8 @@ impl Engine {
                 if call_args.is_empty() {
                     let typ = self.map_type_name(target.type_name());
                     return Err(self.make_type_mismatch_err::<FnPtr>(typ, fn_call_pos));
-                } else if !call_args[0].is_fnptr() {
+                }
+                if !call_args[0].is_fnptr() {
                     let typ = self.map_type_name(call_args[0].type_name());
                     return Err(self.make_type_mismatch_err::<FnPtr>(typ, first_arg_pos));
                 }
@@ -1257,9 +1258,7 @@ impl Engine {
         }
 
         // Call with blank scope
-        if total_args == 0 && curry.is_empty() {
-            // No arguments
-        } else {
+        if total_args > 0 || !curry.is_empty() {
             // If the first argument is a variable, and there is no curried arguments,
             // convert to method-call style in order to leverage potential &mut first argument and
             // avoid cloning the value
@@ -1330,9 +1329,7 @@ impl Engine {
         let args = &mut FnArgsVec::with_capacity(args_expr.len());
         let mut first_arg_value = None;
 
-        if args_expr.is_empty() {
-            // No arguments
-        } else {
+        if !args_expr.is_empty() {
             // See if the first argument is a variable (not namespace-qualified).
             // If so, convert to method-call style in order to leverage potential &mut first argument
             // and avoid cloning the value
