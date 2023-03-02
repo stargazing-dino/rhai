@@ -292,6 +292,11 @@ impl<M: Into<Module>> AddAssign<M> for Module {
     }
 }
 
+#[inline(always)]
+fn new_hash_map<T>(size: usize) -> StraightHashMap<T> {
+    StraightHashMap::with_capacity_and_hasher(size, Default::default())
+}
+
 impl Module {
     /// Create a new [`Module`].
     ///
@@ -685,6 +690,16 @@ impl Module {
 
         if self.is_indexed() {
             let hash_var = crate::calc_var_hash(Some(""), &ident);
+
+            // Catch hash collisions in testing environment only.
+            #[cfg(feature = "testing-environ")]
+            if let Some(_) = self.all_variables.as_ref().and_then(|f| f.get(&hash_var)) {
+                panic!(
+                    "Hash {} already exists when registering variable {}",
+                    hash_var, ident
+                );
+            }
+
             self.all_variables
                 .get_or_insert_with(Default::default)
                 .insert(hash_var, value.clone());
@@ -716,16 +731,11 @@ impl Module {
         let num_params = fn_def.params.len();
         let hash_script = crate::calc_fn_hash(None, &fn_def.name, num_params);
 
+        // Catch hash collisions in testing environment only.
         #[cfg(feature = "testing-environ")]
-        if let Some(f) = self
-            .functions
-            .get_or_insert_with(|| {
-                StraightHashMap::with_capacity_and_hasher(FN_MAP_SIZE, Default::default())
-            })
-            .get(&hash_script)
-        {
+        if let Some(f) = self.functions.as_ref().and_then(|f| f.get(&hash_script)) {
             panic!(
-                "PANIC ATTACK!!! Function hash {} already exists when registering function {:#?}:\n{:#?}",
+                "Hash {} already exists when registering function {:#?}:\n{:#?}",
                 hash_script, fn_def, f
             );
         }
@@ -734,9 +744,7 @@ impl Module {
         let params_info = fn_def.params.iter().map(Into::into).collect();
 
         self.functions
-            .get_or_insert_with(|| {
-                StraightHashMap::with_capacity_and_hasher(FN_MAP_SIZE, Default::default())
-            })
+            .get_or_insert_with(|| new_hash_map(FN_MAP_SIZE))
             .insert(
                 hash_script,
                 FuncInfo {
@@ -1062,16 +1070,11 @@ impl Module {
         let hash_script = calc_fn_hash(None, name, param_types.len());
         let hash_fn = calc_fn_hash_full(hash_script, param_types.iter().copied());
 
+        // Catch hash collisions in testing environment only.
         #[cfg(feature = "testing-environ")]
-        if let Some(f) = self
-            .functions
-            .get_or_insert_with(|| {
-                StraightHashMap::with_capacity_and_hasher(FN_MAP_SIZE, Default::default())
-            })
-            .get(&hash_script)
-        {
+        if let Some(f) = self.functions.as_ref().and_then(|f| f.get(&hash_script)) {
             panic!(
-                "PANIC ATTACK!!! Function hash {} already exists when registering function {}:\n{:#?}",
+                "Hash {} already exists when registering function {}:\n{:#?}",
                 hash_script, name, f
             );
         }
@@ -1083,9 +1086,7 @@ impl Module {
         }
 
         self.functions
-            .get_or_insert_with(|| {
-                StraightHashMap::with_capacity_and_hasher(FN_MAP_SIZE, Default::default())
-            })
+            .get_or_insert_with(|| new_hash_map(FN_MAP_SIZE))
             .insert(
                 hash_fn,
                 FuncInfo {
@@ -1805,9 +1806,9 @@ impl Module {
             let others_len = functions.len();
 
             for (&k, f) in functions.iter() {
-                let map = self.functions.get_or_insert_with(|| {
-                    StraightHashMap::with_capacity_and_hasher(others_len, Default::default())
-                });
+                let map = self
+                    .functions
+                    .get_or_insert_with(|| new_hash_map(FN_MAP_SIZE));
                 map.reserve(others_len);
                 map.entry(k).or_insert_with(|| f.clone());
             }
@@ -2283,6 +2284,16 @@ impl Module {
             if let Some(ref v) = module.variables {
                 for (var_name, value) in v.iter() {
                     let hash_var = crate::calc_var_hash(path.iter().copied(), var_name);
+
+                    // Catch hash collisions in testing environment only.
+                    #[cfg(feature = "testing-environ")]
+                    if let Some(_) = variables.get(&hash_var) {
+                        panic!(
+                            "Hash {} already exists when indexing variable {}",
+                            hash_var, var_name
+                        );
+                    }
+
                     variables.insert(hash_var, value.clone());
                 }
             }
@@ -2298,6 +2309,15 @@ impl Module {
             for (&hash, f) in module.functions.iter().flatten() {
                 match f.metadata.namespace {
                     FnNamespace::Global => {
+                        // Catch hash collisions in testing environment only.
+                        #[cfg(feature = "testing-environ")]
+                        if let Some(fx) = functions.get(&hash) {
+                            panic!(
+                                "Hash {} already exists when indexing function {:#?}:\n{:#?}",
+                                hash, f.func, fx
+                            );
+                        }
+
                         // Flatten all functions with global namespace
                         functions.insert(hash, f.func.clone());
                         contains_indexed_global_functions = true;
@@ -2315,6 +2335,16 @@ impl Module {
                         f.metadata.name.as_str(),
                         &f.metadata.param_types,
                     );
+
+                    // Catch hash collisions in testing environment only.
+                    #[cfg(feature = "testing-environ")]
+                    if let Some(fx) = functions.get(&hash_qualified_fn) {
+                        panic!(
+                            "Hash {} already exists when indexing function {:#?}:\n{:#?}",
+                            hash_qualified_fn, f.func, fx
+                        );
+                    }
+
                     functions.insert(hash_qualified_fn, f.func.clone());
                 } else if cfg!(not(feature = "no_function")) {
                     let hash_qualified_script = crate::calc_fn_hash(
@@ -2322,6 +2352,16 @@ impl Module {
                         &f.metadata.name,
                         f.metadata.num_params,
                     );
+
+                    // Catch hash collisions in testing environment only.
+                    #[cfg(feature = "testing-environ")]
+                    if let Some(fx) = functions.get(&hash_qualified_script) {
+                        panic!(
+                            "Hash {} already exists when indexing function {:#?}:\n{:#?}",
+                            hash_qualified_script, f.func, fx
+                        );
+                    }
+
                     functions.insert(hash_qualified_script, f.func.clone());
                 }
             }
@@ -2331,14 +2371,9 @@ impl Module {
 
         if !self.is_indexed() {
             let mut path = Vec::with_capacity(4);
-            let mut variables = StraightHashMap::with_capacity_and_hasher(
-                self.variables.as_deref().map_or(0, BTreeMap::len),
-                Default::default(),
-            );
-            let mut functions = StraightHashMap::with_capacity_and_hasher(
-                self.functions.as_ref().map_or(0, StraightHashMap::len),
-                Default::default(),
-            );
+            let mut variables = new_hash_map(self.variables.as_deref().map_or(0, BTreeMap::len));
+            let mut functions =
+                new_hash_map(self.functions.as_ref().map_or(0, StraightHashMap::len));
             let mut type_iterators = BTreeMap::new();
 
             path.push("");
