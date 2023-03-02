@@ -715,8 +715,24 @@ impl Module {
         // None + function name + number of arguments.
         let num_params = fn_def.params.len();
         let hash_script = crate::calc_fn_hash(None, &fn_def.name, num_params);
+
+        #[cfg(feature = "testing-environ")]
+        if let Some(f) = self
+            .functions
+            .get_or_insert_with(|| {
+                StraightHashMap::with_capacity_and_hasher(FN_MAP_SIZE, Default::default())
+            })
+            .get(&hash_script)
+        {
+            panic!(
+                "PANIC ATTACK!!! Function hash {} already exists when registering function {:#?}:\n{:#?}",
+                hash_script, fn_def, f
+            );
+        }
+
         #[cfg(feature = "metadata")]
         let params_info = fn_def.params.iter().map(Into::into).collect();
+
         self.functions
             .get_or_insert_with(|| {
                 StraightHashMap::with_capacity_and_hasher(FN_MAP_SIZE, Default::default())
@@ -1045,6 +1061,20 @@ impl Module {
         let name = name.as_ref();
         let hash_script = calc_fn_hash(None, name, param_types.len());
         let hash_fn = calc_fn_hash_full(hash_script, param_types.iter().copied());
+
+        #[cfg(feature = "testing-environ")]
+        if let Some(f) = self
+            .functions
+            .get_or_insert_with(|| {
+                StraightHashMap::with_capacity_and_hasher(FN_MAP_SIZE, Default::default())
+            })
+            .get(&hash_script)
+        {
+            panic!(
+                "PANIC ATTACK!!! Function hash {} already exists when registering function {}:\n{:#?}",
+                hash_script, name, f
+            );
+        }
 
         if is_dynamic {
             self.dynamic_functions_filter

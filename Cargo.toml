@@ -117,6 +117,11 @@ std = ["ahash/std", "num-traits/std", "smartstring/std"]
     ## Use [`stdweb`](https://crates.io/crates/stdweb) as JavaScript interface.
     stdweb = ["getrandom/js", "instant/stdweb"]
 
+#! ### Features used in testing environments only
+
+    ## Running under a testing environment.
+    testing-environ = []
+
 [[bin]]
 name = "rhai-repl"
 required-features = ["rustyline"]
