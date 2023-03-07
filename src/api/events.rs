@@ -363,7 +363,7 @@ impl Engine {
             + SendSync
             + 'static,
     ) -> &mut Self {
-        self.debugger_interface = Some(Box::new((Box::new(init), Box::new(callback))));
+        self.debugger_interface = Some((Box::new(init), Box::new(callback)));
         self
     }
 }

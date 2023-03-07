@@ -205,9 +205,13 @@ impl Engine {
         }
 
         // Report progress
-        self.progress
-            .as_ref()
-            .and_then(|p| p(global.num_operations))
-            .map_or(Ok(()), |token| Err(ERR::ErrorTerminated(token, pos).into()))
+        if let Some(ref progress) = self.progress {
+            match progress(global.num_operations) {
+                None => Ok(()),
+                Some(token) => Err(ERR::ErrorTerminated(token, pos).into()),
+            }
+        } else {
+            Ok(())
+        }
     }
 }

@@ -115,7 +115,7 @@ pub struct Engine {
     /// Custom syntax.
     #[cfg(not(feature = "no_custom_syntax"))]
     pub(crate) custom_syntax: Option<
-        Box<std::collections::BTreeMap<Identifier, crate::api::custom_syntax::CustomSyntax>>,
+        Box<std::collections::BTreeMap<Identifier, Box<crate::api::custom_syntax::CustomSyntax>>>,
     >,
     /// Callback closure for filtering variable definition.
     pub(crate) def_var_filter: Option<Box<OnDefVarCallback>>,
@@ -147,12 +147,10 @@ pub struct Engine {
 
     /// Callback closure for debugging.
     #[cfg(feature = "debugging")]
-    pub(crate) debugger_interface: Option<
-        Box<(
-            Box<crate::eval::OnDebuggingInit>,
-            Box<crate::eval::OnDebuggerCallback>,
-        )>,
-    >,
+    pub(crate) debugger_interface: Option<(
+        Box<crate::eval::OnDebuggingInit>,
+        Box<crate::eval::OnDebuggerCallback>,
+    )>,
 }
 
 impl fmt::Debug for Engine {

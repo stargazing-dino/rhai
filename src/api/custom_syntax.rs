@@ -402,7 +402,8 @@ impl Engine {
                     parse: Box::new(parse),
                     func: Box::new(func),
                     scope_may_be_changed,
-                },
+                }
+                .into(),
             );
         self
     }

@@ -464,7 +464,7 @@ impl Engine {
                             let t = self.map_type_name(type_name::<ImmutableString>()).into();
                             ERR::ErrorMismatchOutputType(t, typ.into(), pos)
                         })?;
-                        ((print)(&text).into(), false)
+                        (print(&text).into(), false)
                     } else {
                         (Dynamic::UNIT, false)
                     }
@@ -475,7 +475,7 @@ impl Engine {
                             let t = self.map_type_name(type_name::<ImmutableString>()).into();
                             ERR::ErrorMismatchOutputType(t, typ.into(), pos)
                         })?;
-                        ((debug)(&text, global.source(), pos).into(), false)
+                        (debug(&text, global.source(), pos).into(), false)
                     } else {
                         (Dynamic::UNIT, false)
                     }

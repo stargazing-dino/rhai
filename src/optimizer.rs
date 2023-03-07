@@ -1139,7 +1139,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                         .and_then(|(f, ctx)| {
                             let context = ctx.then(|| (state.engine, x.name.as_str(), None, &state.global, *pos).into());
                             let (first, second) = arg_values.split_first_mut().unwrap();
-                            (f)(context, &mut [ first, &mut second[0] ]).ok()
+                            f(context, &mut [ first, &mut second[0] ]).ok()
                         }) {
                             state.set_dirty();
                             *expr = Expr::from_dynamic(result, *pos);
