@@ -1661,6 +1661,51 @@ impl Engine {
                         _ => (),
                     }
                 }
+                #[cfg(not(feature = "no_float"))]
+                (Union::Float(f1, ..), Union::Float(f2, ..)) => match op_token.unwrap() {
+                    Token::EqualsTo => return Ok((**f1 == **f2).into()),
+                    Token::NotEqualsTo => return Ok((**f1 != **f2).into()),
+                    Token::GreaterThan => return Ok((**f1 > **f2).into()),
+                    Token::GreaterThanEqualsTo => return Ok((**f1 >= **f2).into()),
+                    Token::LessThan => return Ok((**f1 < **f2).into()),
+                    Token::LessThanEqualsTo => return Ok((**f1 <= **f2).into()),
+                    Token::Plus => return Ok((**f1 + **f2).into()),
+                    Token::Minus => return Ok((**f1 - **f2).into()),
+                    Token::Multiply => return Ok((**f1 * **f2).into()),
+                    Token::Divide => return Ok((**f1 / **f2).into()),
+                    Token::Modulo => return Ok((**f1 % **f2).into()),
+                    _ => (),
+                },
+                #[cfg(not(feature = "no_float"))]
+                (Union::Float(f1, ..), Union::Int(n2, ..)) => match op_token.unwrap() {
+                    Token::EqualsTo => return Ok((**f1 == (*n2 as crate::FLOAT)).into()),
+                    Token::NotEqualsTo => return Ok((**f1 != (*n2 as crate::FLOAT)).into()),
+                    Token::GreaterThan => return Ok((**f1 > (*n2 as crate::FLOAT)).into()),
+                    Token::GreaterThanEqualsTo => return Ok((**f1 >= (*n2 as crate::FLOAT)).into()),
+                    Token::LessThan => return Ok((**f1 < (*n2 as crate::FLOAT)).into()),
+                    Token::LessThanEqualsTo => return Ok((**f1 <= (*n2 as crate::FLOAT)).into()),
+                    Token::Plus => return Ok((**f1 + (*n2 as crate::FLOAT)).into()),
+                    Token::Minus => return Ok((**f1 - (*n2 as crate::FLOAT)).into()),
+                    Token::Multiply => return Ok((**f1 * (*n2 as crate::FLOAT)).into()),
+                    Token::Divide => return Ok((**f1 / (*n2 as crate::FLOAT)).into()),
+                    Token::Modulo => return Ok((**f1 % (*n2 as crate::FLOAT)).into()),
+                    _ => (),
+                },
+                #[cfg(not(feature = "no_float"))]
+                (Union::Int(n1, ..), Union::Float(f2, ..)) => match op_token.unwrap() {
+                    Token::EqualsTo => return Ok(((*n1 as crate::FLOAT) == **f2).into()),
+                    Token::NotEqualsTo => return Ok(((*n1 as crate::FLOAT) != **f2).into()),
+                    Token::GreaterThan => return Ok(((*n1 as crate::FLOAT) > **f2).into()),
+                    Token::GreaterThanEqualsTo => return Ok(((*n1 as crate::FLOAT) >= **f2).into()),
+                    Token::LessThan => return Ok(((*n1 as crate::FLOAT) < **f2).into()),
+                    Token::LessThanEqualsTo => return Ok(((*n1 as crate::FLOAT) <= **f2).into()),
+                    Token::Plus => return Ok(((*n1 as crate::FLOAT) + **f2).into()),
+                    Token::Minus => return Ok(((*n1 as crate::FLOAT) - **f2).into()),
+                    Token::Multiply => return Ok(((*n1 as crate::FLOAT) * **f2).into()),
+                    Token::Divide => return Ok(((*n1 as crate::FLOAT) / **f2).into()),
+                    Token::Modulo => return Ok(((*n1 as crate::FLOAT) % **f2).into()),
+                    _ => (),
+                },
                 (Union::Str(s1, ..), Union::Str(s2, ..)) => match op_token.unwrap() {
                     Token::EqualsTo => return Ok((s1 == s2).into()),
                     Token::NotEqualsTo => return Ok((s1 != s2).into()),
