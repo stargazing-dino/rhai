@@ -392,6 +392,7 @@ impl Scope<'_> {
     }
     /// Remove the last entry from the [`Scope`] and return it.
     #[inline(always)]
+    #[allow(dead_code)]
     pub(crate) fn pop_entry(&mut self) -> Option<(Identifier, Dynamic, Vec<ImmutableString>)> {
         self.values.pop().map(|value| {
             (

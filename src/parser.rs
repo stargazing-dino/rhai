@@ -1722,7 +1722,7 @@ impl Engine {
         lib: &mut FnLib,
         settings: ParseSettings,
         mut lhs: Expr,
-        options: ChainingFlags,
+        _options: ChainingFlags,
     ) -> ParseResult<Expr> {
         let mut settings = settings;
 
@@ -1783,7 +1783,7 @@ impl Engine {
                 // Disallowed module separator
                 #[cfg(not(feature = "no_module"))]
                 (_, token @ Token::DoubleColon)
-                    if options.contains(ChainingFlags::DISALLOW_NAMESPACES) =>
+                    if _options.contains(ChainingFlags::DISALLOW_NAMESPACES) =>
                 {
                     return Err(LexError::ImproperSymbol(
                         token.literal_syntax().into(),
