@@ -9,6 +9,7 @@ use crate::engine::{
 };
 use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token};
+use crate::types::dynamic::Union;
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString,
     OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
@@ -1595,6 +1596,77 @@ impl Engine {
                 .get_arg_value(global, caches, scope, this_ptr, &args[1])?
                 .0
                 .flatten();
+
+            match (&lhs.0, &rhs.0) {
+                (Union::Unit(..), Union::Unit(..)) => match op_token.unwrap() {
+                    Token::EqualsTo => return Ok(Dynamic::TRUE),
+                    Token::NotEqualsTo
+                    | Token::GreaterThan
+                    | Token::GreaterThanEqualsTo
+                    | Token::LessThan
+                    | Token::LessThanEqualsTo => return Ok(Dynamic::FALSE),
+                    _ => (),
+                },
+                (Union::Bool(b1, ..), Union::Bool(b2, ..)) => match op_token.unwrap() {
+                    Token::EqualsTo => return Ok((*b1 == *b2).into()),
+                    Token::NotEqualsTo => return Ok((*b1 != *b2).into()),
+                    Token::GreaterThan
+                    | Token::GreaterThanEqualsTo
+                    | Token::LessThan
+                    | Token::LessThanEqualsTo => return Ok(Dynamic::FALSE),
+                    Token::Pipe => return Ok((*b1 || *b2).into()),
+                    Token::Ampersand => return Ok((*b1 && *b2).into()),
+                    _ => (),
+                },
+                (Union::Int(n1, ..), Union::Int(n2, ..)) => {
+                    #[cfg(not(feature = "unchecked"))]
+                    #[allow(clippy::wildcard_imports)]
+                    use crate::packages::arithmetic::arith_basic::INT::functions::*;
+
+                    match op_token.unwrap() {
+                        Token::EqualsTo => return Ok((*n1 == *n2).into()),
+                        Token::NotEqualsTo => return Ok((*n1 != *n2).into()),
+                        Token::GreaterThan => return Ok((*n1 > *n2).into()),
+                        Token::GreaterThanEqualsTo => return Ok((*n1 >= *n2).into()),
+                        Token::LessThan => return Ok((*n1 < *n2).into()),
+                        Token::LessThanEqualsTo => return Ok((*n1 <= *n2).into()),
+
+                        #[cfg(not(feature = "unchecked"))]
+                        Token::Plus => return add(*n1, *n2).map(Into::into),
+                        #[cfg(not(feature = "unchecked"))]
+                        Token::Minus => return subtract(*n1, *n2).map(Into::into),
+                        #[cfg(not(feature = "unchecked"))]
+                        Token::Multiply => return multiply(*n1, *n2).map(Into::into),
+                        #[cfg(not(feature = "unchecked"))]
+                        Token::Divide => return divide(*n1, *n2).map(Into::into),
+                        #[cfg(not(feature = "unchecked"))]
+                        Token::Modulo => return modulo(*n1, *n2).map(Into::into),
+
+                        #[cfg(feature = "unchecked")]
+                        Token::Plus => return Ok((*n1 + *n2).into()),
+                        #[cfg(feature = "unchecked")]
+                        Token::Minus => return Ok((*n1 - *n2).into()),
+                        #[cfg(feature = "unchecked")]
+                        Token::Multiply => return Ok((*n1 * *n2).into()),
+                        #[cfg(feature = "unchecked")]
+                        Token::Divide => return Ok((*n1 / *n2).into()),
+                        #[cfg(feature = "unchecked")]
+                        Token::Modulo => return Ok((*n1 % *n2).into()),
+
+                        _ => (),
+                    }
+                }
+                (Union::Str(s1, ..), Union::Str(s2, ..)) => match op_token.unwrap() {
+                    Token::EqualsTo => return Ok((s1 == s2).into()),
+                    Token::NotEqualsTo => return Ok((s1 != s2).into()),
+                    Token::GreaterThan => return Ok((s1 > s2).into()),
+                    Token::GreaterThanEqualsTo => return Ok((s1 >= s2).into()),
+                    Token::LessThan => return Ok((s1 < s2).into()),
+                    Token::LessThanEqualsTo => return Ok((s1 <= s2).into()),
+                    _ => (),
+                },
+                _ => (),
+            }
 
             let operands = &mut [&mut lhs, &mut rhs];
 
