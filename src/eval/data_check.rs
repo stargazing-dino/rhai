@@ -8,90 +8,91 @@ use std::borrow::Borrow;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
+/// Recursively calculate the sizes of an array.
+///
+/// Sizes returned are `(` [`Array`][crate::Array], [`Map`][crate::Map] and [`String`] `)`.
+///
+/// # Panics
+///
+/// Panics if any interior data is shared (should never happen).
+#[cfg(not(feature = "no_index"))]
+#[inline]
+pub fn calc_array_sizes(array: &crate::Array) -> (usize, usize, usize) {
+    let (mut ax, mut mx, mut sx) = (0, 0, 0);
+
+    for value in array {
+        ax += 1;
+
+        match value.0 {
+            Union::Array(ref a, ..) => {
+                let (a, m, s) = calc_array_sizes(a);
+                ax += a;
+                mx += m;
+                sx += s;
+            }
+            Union::Blob(ref a, ..) => ax += 1 + a.len(),
+            #[cfg(not(feature = "no_object"))]
+            Union::Map(ref m, ..) => {
+                let (a, m, s) = calc_map_sizes(m);
+                ax += a;
+                mx += m;
+                sx += s;
+            }
+            Union::Str(ref s, ..) => sx += s.len(),
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(..) => {
+                unreachable!("shared values discovered within data")
+            }
+            _ => (),
+        }
+    }
+
+    (ax, mx, sx)
+}
+/// Recursively calculate the sizes of a map.
+///
+/// Sizes returned are `(` [`Array`][crate::Array], [`Map`][crate::Map] and [`String`] `)`.
+///
+/// # Panics
+///
+/// Panics if any interior data is shared (should never happen).
+#[cfg(not(feature = "no_object"))]
+#[inline]
+pub fn calc_map_sizes(map: &crate::Map) -> (usize, usize, usize) {
+    let (mut ax, mut mx, mut sx) = (0, 0, 0);
+
+    for value in map.values() {
+        mx += 1;
+
+        match value.0 {
+            #[cfg(not(feature = "no_index"))]
+            Union::Array(ref a, ..) => {
+                let (a, m, s) = calc_array_sizes(a);
+                ax += a;
+                mx += m;
+                sx += s;
+            }
+            #[cfg(not(feature = "no_index"))]
+            Union::Blob(ref a, ..) => ax += 1 + a.len(),
+            Union::Map(ref m, ..) => {
+                let (a, m, s) = calc_map_sizes(m);
+                ax += a;
+                mx += m;
+                sx += s;
+            }
+            Union::Str(ref s, ..) => sx += s.len(),
+            #[cfg(not(feature = "no_closure"))]
+            Union::Shared(..) => {
+                unreachable!("shared values discovered within data")
+            }
+            _ => (),
+        }
+    }
+
+    (ax, mx, sx)
+}
+
 impl Dynamic {
-    /// Recursively calculate the sizes of an array.
-    ///
-    /// Sizes returned are `(` [`Array`][crate::Array], [`Map`][crate::Map] and [`String`] `)`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if any interior data is shared (should never happen).
-    #[cfg(not(feature = "no_index"))]
-    #[inline]
-    pub(crate) fn calc_array_sizes(array: &crate::Array) -> (usize, usize, usize) {
-        let (mut ax, mut mx, mut sx) = (0, 0, 0);
-
-        for value in array {
-            ax += 1;
-
-            match value.0 {
-                Union::Array(ref a, ..) => {
-                    let (a, m, s) = Self::calc_array_sizes(a);
-                    ax += a;
-                    mx += m;
-                    sx += s;
-                }
-                Union::Blob(ref a, ..) => ax += 1 + a.len(),
-                #[cfg(not(feature = "no_object"))]
-                Union::Map(ref m, ..) => {
-                    let (a, m, s) = Self::calc_map_sizes(m);
-                    ax += a;
-                    mx += m;
-                    sx += s;
-                }
-                Union::Str(ref s, ..) => sx += s.len(),
-                #[cfg(not(feature = "no_closure"))]
-                Union::Shared(..) => {
-                    unreachable!("shared values discovered within data")
-                }
-                _ => (),
-            }
-        }
-
-        (ax, mx, sx)
-    }
-    /// Recursively calculate the sizes of a map.
-    ///
-    /// Sizes returned are `(` [`Array`][crate::Array], [`Map`][crate::Map] and [`String`] `)`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if any interior data is shared (should never happen).
-    #[cfg(not(feature = "no_object"))]
-    #[inline]
-    pub(crate) fn calc_map_sizes(map: &crate::Map) -> (usize, usize, usize) {
-        let (mut ax, mut mx, mut sx) = (0, 0, 0);
-
-        for value in map.values() {
-            mx += 1;
-
-            match value.0 {
-                #[cfg(not(feature = "no_index"))]
-                Union::Array(ref a, ..) => {
-                    let (a, m, s) = Self::calc_array_sizes(a);
-                    ax += a;
-                    mx += m;
-                    sx += s;
-                }
-                #[cfg(not(feature = "no_index"))]
-                Union::Blob(ref a, ..) => ax += 1 + a.len(),
-                Union::Map(ref m, ..) => {
-                    let (a, m, s) = Self::calc_map_sizes(m);
-                    ax += a;
-                    mx += m;
-                    sx += s;
-                }
-                Union::Str(ref s, ..) => sx += s.len(),
-                #[cfg(not(feature = "no_closure"))]
-                Union::Shared(..) => {
-                    unreachable!("shared values discovered within data")
-                }
-                _ => (),
-            }
-        }
-
-        (ax, mx, sx)
-    }
     /// Recursively calculate the sizes of a value.
     ///
     /// Sizes returned are `(` [`Array`][crate::Array], [`Map`][crate::Map] and [`String`] `)`.
@@ -103,11 +104,11 @@ impl Dynamic {
     pub(crate) fn calc_data_sizes(&self, _top: bool) -> (usize, usize, usize) {
         match self.0 {
             #[cfg(not(feature = "no_index"))]
-            Union::Array(ref arr, ..) => Self::calc_array_sizes(arr),
+            Union::Array(ref arr, ..) => calc_array_sizes(arr),
             #[cfg(not(feature = "no_index"))]
             Union::Blob(ref blob, ..) => (blob.len(), 0, 0),
             #[cfg(not(feature = "no_object"))]
-            Union::Map(ref map, ..) => Self::calc_map_sizes(map),
+            Union::Map(ref map, ..) => calc_map_sizes(map),
             Union::Str(ref s, ..) => (0, 0, s.len()),
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) if _top => self.read_lock::<Self>().unwrap().calc_data_sizes(true),

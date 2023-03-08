@@ -13,6 +13,7 @@ Bug fixes
 * `x += y` where `x` and `y` are `char` now works correctly.
 * Expressions such as `!inside` now parses correctly instead of as `!in` followed by `side`.
 * Custom syntax starting with symbols now works correctly and no longer raises a parse error.
+* Comparing different custom types now works correctly when the appropriate comparison operators are registered.
 
 Potentially breaking changes
 ----------------------------

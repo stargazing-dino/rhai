@@ -127,20 +127,6 @@ impl GlobalRuntimeState {
     pub fn get_shared_import(&self, index: usize) -> Option<crate::SharedModule> {
         self.modules.as_ref().and_then(|m| m.get(index).cloned())
     }
-    /// Get a mutable reference to the globally-imported [module][crate::Module] at a
-    /// particular index.
-    ///
-    /// Not available under `no_module`.
-    #[cfg(not(feature = "no_module"))]
-    #[allow(dead_code)]
-    #[inline]
-    #[must_use]
-    pub(crate) fn get_shared_import_mut(
-        &mut self,
-        index: usize,
-    ) -> Option<&mut crate::SharedModule> {
-        self.modules.as_deref_mut().and_then(|m| m.get_mut(index))
-    }
     /// Get the index of a globally-imported [module][crate::Module] by name.
     ///
     /// Not available under `no_module`.

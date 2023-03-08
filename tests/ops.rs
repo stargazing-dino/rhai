@@ -35,7 +35,11 @@ fn test_ops_other_number_types() -> Result<(), Box<EvalAltResult>> {
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("== (u16,")
     ));
 
-    assert!(!engine.eval_with_scope::<bool>(&mut scope, r#"x == "hello""#)?);
+    assert!(
+        matches!(*engine.eval_with_scope::<bool>(&mut scope, r#"x == "hello""#).expect_err("should error"),
+            EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("== (u16,")
+        )
+    );
 
     Ok(())
 }
@@ -60,6 +64,27 @@ fn test_ops_precedence() -> Result<(), Box<EvalAltResult>> {
         engine.eval::<INT>("let x = 0; if x == 10 || true { x = 1} x")?,
         1
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_ops_custom_types() -> Result<(), Box<EvalAltResult>> {
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct Test1;
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct Test2;
+
+    let mut engine = Engine::new();
+
+    engine
+        .register_type_with_name::<Test1>("Test1")
+        .register_type_with_name::<Test2>("Test2")
+        .register_fn("new_ts1", || Test1)
+        .register_fn("new_ts2", || Test2)
+        .register_fn("==", |x: Test1, y: Test2| true);
+
+    assert!(engine.eval::<bool>("let x = new_ts1(); let y = new_ts2(); x == y")?);
 
     Ok(())
 }
