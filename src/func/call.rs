@@ -1576,6 +1576,11 @@ impl Engine {
                 .0
                 .flatten();
 
+            match value.0 {
+                Union::Bool(b, ..) => return Ok((!b).into()),
+                _ => (),
+            }
+
             return value.as_bool().map(|r| (!r).into()).or_else(|_| {
                 let operand = &mut [&mut value];
                 self.exec_fn_call(
@@ -1597,6 +1602,8 @@ impl Engine {
                 .0
                 .flatten();
 
+            // For extremely simple primary data operations, do it directly
+            // to avoid the overhead of calling a function.
             match (&lhs.0, &rhs.0) {
                 (Union::Unit(..), Union::Unit(..)) => match op_token.unwrap() {
                     Token::EqualsTo => return Ok(Dynamic::TRUE),
@@ -1623,6 +1630,7 @@ impl Engine {
                     #[allow(clippy::wildcard_imports)]
                     use crate::packages::arithmetic::arith_basic::INT::functions::*;
 
+                    #[cfg(not(feature = "unchecked"))]
                     match op_token.unwrap() {
                         Token::EqualsTo => return Ok((*n1 == *n2).into()),
                         Token::NotEqualsTo => return Ok((*n1 != *n2).into()),
@@ -1630,29 +1638,26 @@ impl Engine {
                         Token::GreaterThanEqualsTo => return Ok((*n1 >= *n2).into()),
                         Token::LessThan => return Ok((*n1 < *n2).into()),
                         Token::LessThanEqualsTo => return Ok((*n1 <= *n2).into()),
-
-                        #[cfg(not(feature = "unchecked"))]
                         Token::Plus => return add(*n1, *n2).map(Into::into),
-                        #[cfg(not(feature = "unchecked"))]
                         Token::Minus => return subtract(*n1, *n2).map(Into::into),
-                        #[cfg(not(feature = "unchecked"))]
                         Token::Multiply => return multiply(*n1, *n2).map(Into::into),
-                        #[cfg(not(feature = "unchecked"))]
                         Token::Divide => return divide(*n1, *n2).map(Into::into),
-                        #[cfg(not(feature = "unchecked"))]
                         Token::Modulo => return modulo(*n1, *n2).map(Into::into),
-
-                        #[cfg(feature = "unchecked")]
+                        _ => (),
+                    }
+                    #[cfg(feature = "unchecked")]
+                    match op_token.unwrap() {
+                        Token::EqualsTo => return Ok((*n1 == *n2).into()),
+                        Token::NotEqualsTo => return Ok((*n1 != *n2).into()),
+                        Token::GreaterThan => return Ok((*n1 > *n2).into()),
+                        Token::GreaterThanEqualsTo => return Ok((*n1 >= *n2).into()),
+                        Token::LessThan => return Ok((*n1 < *n2).into()),
+                        Token::LessThanEqualsTo => return Ok((*n1 <= *n2).into()),
                         Token::Plus => return Ok((*n1 + *n2).into()),
-                        #[cfg(feature = "unchecked")]
                         Token::Minus => return Ok((*n1 - *n2).into()),
-                        #[cfg(feature = "unchecked")]
                         Token::Multiply => return Ok((*n1 * *n2).into()),
-                        #[cfg(feature = "unchecked")]
                         Token::Divide => return Ok((*n1 / *n2).into()),
-                        #[cfg(feature = "unchecked")]
                         Token::Modulo => return Ok((*n1 % *n2).into()),
-
                         _ => (),
                     }
                 }
