@@ -14,6 +14,7 @@ Bug fixes
 * Expressions such as `!inside` now parses correctly instead of as `!in` followed by `side`.
 * Custom syntax starting with symbols now works correctly and no longer raises a parse error.
 * Comparing different custom types now works correctly when the appropriate comparison operators are registered.
+* Op-assignments to bit flags or bit ranges now work correctly.
 
 Potentially breaking changes
 ----------------------------

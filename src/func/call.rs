@@ -1547,6 +1547,9 @@ impl Engine {
     /// # Main Entry-Point (`FnCallExpr`)
     ///
     /// Evaluate a function call expression.
+    ///
+    /// This method tries to short-circuit function resolution under Fast Operators mode if the
+    /// function call is an operator.
     pub(crate) fn eval_fn_call_expr(
         &self,
         global: &mut GlobalRuntimeState,
@@ -1570,28 +1573,29 @@ impl Engine {
         let op_token = op_token.as_ref();
 
         // Short-circuit native unary operator call if under Fast Operators mode
-        if op_token == Some(&Token::Bang) && self.fast_operators() && args.len() == 1 {
+        if self.fast_operators() && args.len() == 1 && op_token == Some(&Token::Bang) {
             let mut value = self
                 .get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), &args[0])?
                 .0
                 .flatten();
 
-            match value.0 {
-                Union::Bool(b, ..) => return Ok((!b).into()),
-                _ => (),
-            }
-
-            return value.as_bool().map(|r| (!r).into()).or_else(|_| {
-                let operand = &mut [&mut value];
-                self.exec_fn_call(
-                    global, caches, None, name, op_token, *hashes, operand, false, false, pos,
-                )
-                .map(|(v, ..)| v)
-            });
+            return match value.0 {
+                Union::Bool(b, ..) => Ok((!b).into()),
+                _ => {
+                    let operand = &mut [&mut value];
+                    self.exec_fn_call(
+                        global, caches, None, name, op_token, *hashes, operand, false, false, pos,
+                    )
+                    .map(|(v, ..)| v)
+                }
+            };
         }
 
         // Short-circuit native binary operator call if under Fast Operators mode
         if op_token.is_some() && self.fast_operators() && args.len() == 2 {
+            #[allow(clippy::wildcard_imports)]
+            use Token::*;
+
             let mut lhs = self
                 .get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), &args[0])?
                 .0
@@ -1606,23 +1610,19 @@ impl Engine {
             // to avoid the overhead of calling a function.
             match (&lhs.0, &rhs.0) {
                 (Union::Unit(..), Union::Unit(..)) => match op_token.unwrap() {
-                    Token::EqualsTo => return Ok(Dynamic::TRUE),
-                    Token::NotEqualsTo
-                    | Token::GreaterThan
-                    | Token::GreaterThanEqualsTo
-                    | Token::LessThan
-                    | Token::LessThanEqualsTo => return Ok(Dynamic::FALSE),
+                    EqualsTo => return Ok(Dynamic::TRUE),
+                    NotEqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan
+                    | LessThanEqualsTo => return Ok(Dynamic::FALSE),
                     _ => (),
                 },
                 (Union::Bool(b1, ..), Union::Bool(b2, ..)) => match op_token.unwrap() {
-                    Token::EqualsTo => return Ok((*b1 == *b2).into()),
-                    Token::NotEqualsTo => return Ok((*b1 != *b2).into()),
-                    Token::GreaterThan
-                    | Token::GreaterThanEqualsTo
-                    | Token::LessThan
-                    | Token::LessThanEqualsTo => return Ok(Dynamic::FALSE),
-                    Token::Pipe => return Ok((*b1 || *b2).into()),
-                    Token::Ampersand => return Ok((*b1 && *b2).into()),
+                    EqualsTo => return Ok((*b1 == *b2).into()),
+                    NotEqualsTo => return Ok((*b1 != *b2).into()),
+                    GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo => {
+                        return Ok(Dynamic::FALSE)
+                    }
+                    Pipe => return Ok((*b1 || *b2).into()),
+                    Ampersand => return Ok((*b1 && *b2).into()),
                     _ => (),
                 },
                 (Union::Int(n1, ..), Union::Int(n2, ..)) => {
@@ -1632,87 +1632,87 @@ impl Engine {
 
                     #[cfg(not(feature = "unchecked"))]
                     match op_token.unwrap() {
-                        Token::EqualsTo => return Ok((*n1 == *n2).into()),
-                        Token::NotEqualsTo => return Ok((*n1 != *n2).into()),
-                        Token::GreaterThan => return Ok((*n1 > *n2).into()),
-                        Token::GreaterThanEqualsTo => return Ok((*n1 >= *n2).into()),
-                        Token::LessThan => return Ok((*n1 < *n2).into()),
-                        Token::LessThanEqualsTo => return Ok((*n1 <= *n2).into()),
-                        Token::Plus => return add(*n1, *n2).map(Into::into),
-                        Token::Minus => return subtract(*n1, *n2).map(Into::into),
-                        Token::Multiply => return multiply(*n1, *n2).map(Into::into),
-                        Token::Divide => return divide(*n1, *n2).map(Into::into),
-                        Token::Modulo => return modulo(*n1, *n2).map(Into::into),
+                        EqualsTo => return Ok((*n1 == *n2).into()),
+                        NotEqualsTo => return Ok((*n1 != *n2).into()),
+                        GreaterThan => return Ok((*n1 > *n2).into()),
+                        GreaterThanEqualsTo => return Ok((*n1 >= *n2).into()),
+                        LessThan => return Ok((*n1 < *n2).into()),
+                        LessThanEqualsTo => return Ok((*n1 <= *n2).into()),
+                        Plus => return add(*n1, *n2).map(Into::into),
+                        Minus => return subtract(*n1, *n2).map(Into::into),
+                        Multiply => return multiply(*n1, *n2).map(Into::into),
+                        Divide => return divide(*n1, *n2).map(Into::into),
+                        Modulo => return modulo(*n1, *n2).map(Into::into),
                         _ => (),
                     }
                     #[cfg(feature = "unchecked")]
                     match op_token.unwrap() {
-                        Token::EqualsTo => return Ok((*n1 == *n2).into()),
-                        Token::NotEqualsTo => return Ok((*n1 != *n2).into()),
-                        Token::GreaterThan => return Ok((*n1 > *n2).into()),
-                        Token::GreaterThanEqualsTo => return Ok((*n1 >= *n2).into()),
-                        Token::LessThan => return Ok((*n1 < *n2).into()),
-                        Token::LessThanEqualsTo => return Ok((*n1 <= *n2).into()),
-                        Token::Plus => return Ok((*n1 + *n2).into()),
-                        Token::Minus => return Ok((*n1 - *n2).into()),
-                        Token::Multiply => return Ok((*n1 * *n2).into()),
-                        Token::Divide => return Ok((*n1 / *n2).into()),
-                        Token::Modulo => return Ok((*n1 % *n2).into()),
+                        EqualsTo => return Ok((*n1 == *n2).into()),
+                        NotEqualsTo => return Ok((*n1 != *n2).into()),
+                        GreaterThan => return Ok((*n1 > *n2).into()),
+                        GreaterThanEqualsTo => return Ok((*n1 >= *n2).into()),
+                        LessThan => return Ok((*n1 < *n2).into()),
+                        LessThanEqualsTo => return Ok((*n1 <= *n2).into()),
+                        Plus => return Ok((*n1 + *n2).into()),
+                        Minus => return Ok((*n1 - *n2).into()),
+                        Multiply => return Ok((*n1 * *n2).into()),
+                        Divide => return Ok((*n1 / *n2).into()),
+                        Modulo => return Ok((*n1 % *n2).into()),
                         _ => (),
                     }
                 }
                 #[cfg(not(feature = "no_float"))]
                 (Union::Float(f1, ..), Union::Float(f2, ..)) => match op_token.unwrap() {
-                    Token::EqualsTo => return Ok((**f1 == **f2).into()),
-                    Token::NotEqualsTo => return Ok((**f1 != **f2).into()),
-                    Token::GreaterThan => return Ok((**f1 > **f2).into()),
-                    Token::GreaterThanEqualsTo => return Ok((**f1 >= **f2).into()),
-                    Token::LessThan => return Ok((**f1 < **f2).into()),
-                    Token::LessThanEqualsTo => return Ok((**f1 <= **f2).into()),
-                    Token::Plus => return Ok((**f1 + **f2).into()),
-                    Token::Minus => return Ok((**f1 - **f2).into()),
-                    Token::Multiply => return Ok((**f1 * **f2).into()),
-                    Token::Divide => return Ok((**f1 / **f2).into()),
-                    Token::Modulo => return Ok((**f1 % **f2).into()),
+                    EqualsTo => return Ok((**f1 == **f2).into()),
+                    NotEqualsTo => return Ok((**f1 != **f2).into()),
+                    GreaterThan => return Ok((**f1 > **f2).into()),
+                    GreaterThanEqualsTo => return Ok((**f1 >= **f2).into()),
+                    LessThan => return Ok((**f1 < **f2).into()),
+                    LessThanEqualsTo => return Ok((**f1 <= **f2).into()),
+                    Plus => return Ok((**f1 + **f2).into()),
+                    Minus => return Ok((**f1 - **f2).into()),
+                    Multiply => return Ok((**f1 * **f2).into()),
+                    Divide => return Ok((**f1 / **f2).into()),
+                    Modulo => return Ok((**f1 % **f2).into()),
                     _ => (),
                 },
                 #[cfg(not(feature = "no_float"))]
                 (Union::Float(f1, ..), Union::Int(n2, ..)) => match op_token.unwrap() {
-                    Token::EqualsTo => return Ok((**f1 == (*n2 as crate::FLOAT)).into()),
-                    Token::NotEqualsTo => return Ok((**f1 != (*n2 as crate::FLOAT)).into()),
-                    Token::GreaterThan => return Ok((**f1 > (*n2 as crate::FLOAT)).into()),
-                    Token::GreaterThanEqualsTo => return Ok((**f1 >= (*n2 as crate::FLOAT)).into()),
-                    Token::LessThan => return Ok((**f1 < (*n2 as crate::FLOAT)).into()),
-                    Token::LessThanEqualsTo => return Ok((**f1 <= (*n2 as crate::FLOAT)).into()),
-                    Token::Plus => return Ok((**f1 + (*n2 as crate::FLOAT)).into()),
-                    Token::Minus => return Ok((**f1 - (*n2 as crate::FLOAT)).into()),
-                    Token::Multiply => return Ok((**f1 * (*n2 as crate::FLOAT)).into()),
-                    Token::Divide => return Ok((**f1 / (*n2 as crate::FLOAT)).into()),
-                    Token::Modulo => return Ok((**f1 % (*n2 as crate::FLOAT)).into()),
+                    EqualsTo => return Ok((**f1 == (*n2 as crate::FLOAT)).into()),
+                    NotEqualsTo => return Ok((**f1 != (*n2 as crate::FLOAT)).into()),
+                    GreaterThan => return Ok((**f1 > (*n2 as crate::FLOAT)).into()),
+                    GreaterThanEqualsTo => return Ok((**f1 >= (*n2 as crate::FLOAT)).into()),
+                    LessThan => return Ok((**f1 < (*n2 as crate::FLOAT)).into()),
+                    LessThanEqualsTo => return Ok((**f1 <= (*n2 as crate::FLOAT)).into()),
+                    Plus => return Ok((**f1 + (*n2 as crate::FLOAT)).into()),
+                    Minus => return Ok((**f1 - (*n2 as crate::FLOAT)).into()),
+                    Multiply => return Ok((**f1 * (*n2 as crate::FLOAT)).into()),
+                    Divide => return Ok((**f1 / (*n2 as crate::FLOAT)).into()),
+                    Modulo => return Ok((**f1 % (*n2 as crate::FLOAT)).into()),
                     _ => (),
                 },
                 #[cfg(not(feature = "no_float"))]
                 (Union::Int(n1, ..), Union::Float(f2, ..)) => match op_token.unwrap() {
-                    Token::EqualsTo => return Ok(((*n1 as crate::FLOAT) == **f2).into()),
-                    Token::NotEqualsTo => return Ok(((*n1 as crate::FLOAT) != **f2).into()),
-                    Token::GreaterThan => return Ok(((*n1 as crate::FLOAT) > **f2).into()),
-                    Token::GreaterThanEqualsTo => return Ok(((*n1 as crate::FLOAT) >= **f2).into()),
-                    Token::LessThan => return Ok(((*n1 as crate::FLOAT) < **f2).into()),
-                    Token::LessThanEqualsTo => return Ok(((*n1 as crate::FLOAT) <= **f2).into()),
-                    Token::Plus => return Ok(((*n1 as crate::FLOAT) + **f2).into()),
-                    Token::Minus => return Ok(((*n1 as crate::FLOAT) - **f2).into()),
-                    Token::Multiply => return Ok(((*n1 as crate::FLOAT) * **f2).into()),
-                    Token::Divide => return Ok(((*n1 as crate::FLOAT) / **f2).into()),
-                    Token::Modulo => return Ok(((*n1 as crate::FLOAT) % **f2).into()),
+                    EqualsTo => return Ok(((*n1 as crate::FLOAT) == **f2).into()),
+                    NotEqualsTo => return Ok(((*n1 as crate::FLOAT) != **f2).into()),
+                    GreaterThan => return Ok(((*n1 as crate::FLOAT) > **f2).into()),
+                    GreaterThanEqualsTo => return Ok(((*n1 as crate::FLOAT) >= **f2).into()),
+                    LessThan => return Ok(((*n1 as crate::FLOAT) < **f2).into()),
+                    LessThanEqualsTo => return Ok(((*n1 as crate::FLOAT) <= **f2).into()),
+                    Plus => return Ok(((*n1 as crate::FLOAT) + **f2).into()),
+                    Minus => return Ok(((*n1 as crate::FLOAT) - **f2).into()),
+                    Multiply => return Ok(((*n1 as crate::FLOAT) * **f2).into()),
+                    Divide => return Ok(((*n1 as crate::FLOAT) / **f2).into()),
+                    Modulo => return Ok(((*n1 as crate::FLOAT) % **f2).into()),
                     _ => (),
                 },
                 (Union::Str(s1, ..), Union::Str(s2, ..)) => match op_token.unwrap() {
-                    Token::EqualsTo => return Ok((s1 == s2).into()),
-                    Token::NotEqualsTo => return Ok((s1 != s2).into()),
-                    Token::GreaterThan => return Ok((s1 > s2).into()),
-                    Token::GreaterThanEqualsTo => return Ok((s1 >= s2).into()),
-                    Token::LessThan => return Ok((s1 < s2).into()),
-                    Token::LessThanEqualsTo => return Ok((s1 <= s2).into()),
+                    EqualsTo => return Ok((s1 == s2).into()),
+                    NotEqualsTo => return Ok((s1 != s2).into()),
+                    GreaterThan => return Ok((s1 > s2).into()),
+                    GreaterThanEqualsTo => return Ok((s1 >= s2).into()),
+                    LessThan => return Ok((s1 < s2).into()),
+                    LessThanEqualsTo => return Ok((s1 <= s2).into()),
                     _ => (),
                 },
                 _ => (),
@@ -1723,8 +1723,8 @@ impl Engine {
             if let Some((func, need_context)) =
                 get_builtin_binary_op_fn(op_token.as_ref().unwrap(), operands[0], operands[1])
             {
-                // Built-in found
-                auto_restore! { let orig_level = global.level; global.level += 1 }
+                // We may not need to bump the level because built-in's do not need it.
+                //auto_restore! { let orig_level = global.level; global.level += 1 }
 
                 let context =
                     need_context.then(|| (self, name.as_str(), None, &*global, pos).into());

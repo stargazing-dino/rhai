@@ -684,6 +684,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
             return match op {
                 AndAssign => impl_op!(bool = x && as_bool),
                 OrAssign => impl_op!(bool = x || as_bool),
+                XOrAssign => impl_op!(bool = x ^ as_bool),
                 _ => None,
             };
         }
