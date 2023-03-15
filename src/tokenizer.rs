@@ -1544,12 +1544,7 @@ fn get_next_token_inner(
         // Identifiers and strings that can have non-ASCII characters
         match (c, cc) {
             // letter or underscore ...
-            #[cfg(not(feature = "unicode-xid-ident"))]
-            ('a'..='z' | '_' | 'A'..='Z', ..) => {
-                return Some(parse_identifier_token(stream, state, pos, start_pos, c));
-            }
-            #[cfg(feature = "unicode-xid-ident")]
-            _ if unicode_xid::UnicodeXID::is_xid_start(c) || c == '_' => {
+            _ if is_id_first_alphabetic(c) || c == '_' => {
                 return Some(parse_identifier_token(stream, state, pos, start_pos, c));
             }
             // " - string literal
@@ -1625,7 +1620,7 @@ fn get_next_token_inner(
         }
 
         // Non-ASCII inputs are not valid here
-        if !c.is_ascii() || !cc.is_ascii() {
+        if !c.is_ascii() {
             return Some((
                 Token::LexError(LERR::UnexpectedInput(c.to_string()).into()),
                 start_pos,
@@ -1635,7 +1630,9 @@ fn get_next_token_inner(
         // Match ASCII byte values (faster?)
         let mut buf = [0_u8; 2];
         c.encode_utf8(&mut buf[0..1]);
-        cc.encode_utf8(&mut buf[1..]);
+        if cc.is_ascii() {
+            cc.encode_utf8(&mut buf[1..]);
+        }
 
         match (buf[0], buf[1]) {
             // \n
@@ -2295,35 +2292,23 @@ pub fn is_valid_function_name(name: &str) -> bool {
 }
 
 /// Is a character valid to start an identifier?
-#[cfg(feature = "unicode-xid-ident")]
 #[inline(always)]
 #[must_use]
 pub fn is_id_first_alphabetic(x: char) -> bool {
-    unicode_xid::UnicodeXID::is_xid_start(x)
+    #[cfg(feature = "unicode-xid-ident")]
+    return unicode_xid::UnicodeXID::is_xid_start(x);
+    #[cfg(not(feature = "unicode-xid-ident"))]
+    return x.is_ascii_alphabetic();
 }
 
 /// Is a character valid for an identifier?
-#[cfg(feature = "unicode-xid-ident")]
 #[inline(always)]
 #[must_use]
 pub fn is_id_continue(x: char) -> bool {
-    unicode_xid::UnicodeXID::is_xid_continue(x)
-}
-
-/// Is a character valid to start an identifier?
-#[cfg(not(feature = "unicode-xid-ident"))]
-#[inline(always)]
-#[must_use]
-pub const fn is_id_first_alphabetic(x: char) -> bool {
-    x.is_ascii_alphabetic()
-}
-
-/// Is a character valid for an identifier?
-#[cfg(not(feature = "unicode-xid-ident"))]
-#[inline(always)]
-#[must_use]
-pub const fn is_id_continue(x: char) -> bool {
-    x.is_ascii_alphanumeric() || x == '_'
+    #[cfg(feature = "unicode-xid-ident")]
+    return unicode_xid::UnicodeXID::is_xid_continue(x);
+    #[cfg(not(feature = "unicode-xid-ident"))]
+    return x.is_ascii_alphanumeric() || x == '_';
 }
 
 /// Is a piece of syntax a reserved keyword or reserved symbol?
