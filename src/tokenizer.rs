@@ -315,7 +315,7 @@ const MAX_KEYWORD_LEN: usize = 8;
 const MIN_KEYWORD_HASH_VALUE: usize = 1;
 const MAX_KEYWORD_HASH_VALUE: usize = 152;
 
-const KEYWORD_ASSOC_VALUES: [u8; 257] = [
+static KEYWORD_ASSOC_VALUES: [u8; 257] = [
     153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153,
     153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 115, 153, 100, 153, 110,
     105, 40, 80, 2, 20, 25, 125, 95, 15, 40, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 55,
@@ -331,7 +331,7 @@ const KEYWORD_ASSOC_VALUES: [u8; 257] = [
     153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153, 153,
     153,
 ];
-const KEYWORDS_LIST: [(&str, Token); 153] = [
+static KEYWORDS_LIST: [(&str, Token); 153] = [
     ("", Token::EOF),
     (">", Token::GreaterThan),
     (">=", Token::GreaterThanEqualsTo),
@@ -515,7 +515,7 @@ const MAX_RESERVED_LEN: usize = 10;
 const MIN_RESERVED_HASH_VALUE: usize = 1;
 const MAX_RESERVED_HASH_VALUE: usize = 112;
 
-const RESERVED_ASSOC_VALUES: [u8; 256] = [
+static RESERVED_ASSOC_VALUES: [u8; 256] = [
     113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
     113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 35, 113, 45, 25, 113,
     113, 113, 60, 55, 50, 50, 113, 15, 0, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
@@ -530,8 +530,7 @@ const RESERVED_ASSOC_VALUES: [u8; 256] = [
     113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
     113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
 ];
-
-const RESERVED_LIST: [(&str, bool); 113] = [
+static RESERVED_LIST: [(&str, bool); 113] = [
     ("", false),
     ("~", true),
     ("is", true),
@@ -2351,27 +2350,20 @@ pub const fn is_id_continue(x: char) -> bool {
 }
 
 /// Is a piece of syntax a reserved keyword or reserved symbol?
+#[inline]
 #[must_use]
 pub fn is_reserved_keyword_or_symbol(syntax: &str) -> bool {
     let utf8 = syntax.as_bytes();
     let len = utf8.len();
+    let rounds = len.min(3);
     let mut hash_val = len;
 
     if !(MIN_RESERVED_LEN..=MAX_RESERVED_LEN).contains(&len) {
         return false;
     }
 
-    match len {
-        1 => hash_val += RESERVED_ASSOC_VALUES[utf8[0] as usize] as usize,
-        2 => {
-            hash_val += RESERVED_ASSOC_VALUES[utf8[1] as usize] as usize;
-            hash_val += RESERVED_ASSOC_VALUES[utf8[0] as usize] as usize;
-        }
-        _ => {
-            hash_val += RESERVED_ASSOC_VALUES[utf8[2] as usize] as usize;
-            hash_val += RESERVED_ASSOC_VALUES[utf8[1] as usize] as usize;
-            hash_val += RESERVED_ASSOC_VALUES[utf8[0] as usize] as usize;
-        }
+    for x in 0..rounds {
+        hash_val += RESERVED_ASSOC_VALUES[utf8[rounds - 1 - x] as usize] as usize;
     }
 
     if !(MIN_RESERVED_HASH_VALUE..=MAX_RESERVED_HASH_VALUE).contains(&hash_val) {
