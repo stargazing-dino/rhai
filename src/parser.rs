@@ -11,7 +11,7 @@ use crate::engine::{Precedence, KEYWORD_THIS, OP_CONTAINS, OP_NOT};
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::tokenizer::{
-    is_keyword_function, is_valid_function_name, is_valid_identifier, Token, TokenStream,
+    is_reserved_keyword_or_symbol, is_valid_function_name, is_valid_identifier, Token, TokenStream,
     TokenizerControl,
 };
 use crate::types::dynamic::{AccessMode, Union};
@@ -1665,7 +1665,9 @@ impl Engine {
 
                 match input.peek().expect(NEVER_ENDS).0 {
                     // Function call is allowed to have reserved keyword
-                    Token::LeftParen | Token::Bang | Token::Unit if is_keyword_function(&s).0 => {
+                    Token::LeftParen | Token::Bang | Token::Unit
+                        if is_reserved_keyword_or_symbol(&s).1 =>
+                    {
                         Expr::Variable(
                             (None, ns, 0, state.get_interned_string(*s)).into(),
                             None,
@@ -1824,7 +1826,7 @@ impl Engine {
                             // Prevents capturing of the object properties as vars: xxx.<var>
                             state.allow_capture = false;
                         }
-                        (Token::Reserved(s), ..) if is_keyword_function(s).1 => (),
+                        (Token::Reserved(s), ..) if is_reserved_keyword_or_symbol(s).2 => (),
                         (Token::Reserved(s), pos) => {
                             return Err(PERR::Reserved(s.to_string()).into_err(*pos))
                         }

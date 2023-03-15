@@ -232,7 +232,7 @@ impl Engine {
             }
 
             let token = Token::lookup_symbol_from_syntax(s).or_else(|| {
-                if is_reserved_keyword_or_symbol(s) {
+                if is_reserved_keyword_or_symbol(s).0 {
                     Some(Token::Reserved(Box::new(s.into())))
                 } else {
                     None
@@ -296,7 +296,7 @@ impl Engine {
 
                 // Identifier or symbol in first position
                 _ if segments.is_empty()
-                    && (is_valid_identifier(s) || is_reserved_keyword_or_symbol(s)) =>
+                    && (is_valid_identifier(s) || is_reserved_keyword_or_symbol(s).0) =>
                 {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if self

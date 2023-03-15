@@ -54,7 +54,7 @@ impl Engine {
     #[inline(always)]
     #[must_use]
     pub fn module_resolver(&self) -> &dyn crate::ModuleResolver {
-        const DUMMY_RESOLVER: crate::module::resolvers::DummyModuleResolver =
+        static DUMMY_RESOLVER: crate::module::resolvers::DummyModuleResolver =
             crate::module::resolvers::DummyModuleResolver;
 
         self.module_resolver.as_deref().unwrap_or(&DUMMY_RESOLVER)

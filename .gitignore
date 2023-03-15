@@ -6,9 +6,9 @@ benches/results
 clippy.toml
 Rhai.toml
 **/*.bat
+**/*.exe
 doc/rhai-sync.json
 doc/rhai.json
-tools/
 .idea/
 .idea
 .idea/*
