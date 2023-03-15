@@ -30,6 +30,7 @@ Enhancements
 * The functions `min` and `max` are added for numbers.
 * Range cases in `switch` statements now also match floating-point and decimal values. In order to support this, however, small numeric ranges cases are no longer unrolled.
 * Loading a module via `import` now gives the module access to the current scope, including variables and constants defined inside.
+* Some very simple operator calls (e.g. integer add) are short-circuited to avoid the overhead of a function call, resulting in a small speed improvement.
 
 
 Version 1.12.0
