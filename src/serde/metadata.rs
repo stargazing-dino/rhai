@@ -34,6 +34,8 @@ struct FnMetadata<'a> {
     pub namespace: crate::FnNamespace,
     pub access: FnAccess,
     pub name: &'a str,
+    #[cfg(not(feature = "no_function"))]
+    pub is_anonymous: bool,
     #[serde(rename = "type")]
     pub typ: FnType,
     pub num_params: usize,
@@ -83,6 +85,8 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
             namespace: info.metadata.namespace,
             access: info.metadata.access,
             name: &info.metadata.name,
+            #[cfg(not(feature = "no_function"))]
+            is_anonymous: crate::parser::is_anonymous_fn(&info.metadata.name),
             typ,
             num_params: info.metadata.num_params,
             params: info

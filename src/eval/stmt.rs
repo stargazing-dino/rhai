@@ -54,7 +54,7 @@ impl Engine {
             global.scope_level += 1;
         }
 
-        auto_restore!(global if restore_orig_state => move |g| {
+        auto_restore! { global if restore_orig_state => move |g| {
             g.scope_level -= 1;
 
             #[cfg(not(feature = "no_module"))]
@@ -63,7 +63,7 @@ impl Engine {
             // The impact of new local variables goes away at the end of a block
             // because any new variables introduced will go out of scope
             g.always_search_scope = orig_always_search_scope;
-        });
+        }}
 
         // Pop new function resolution caches at end of block
         auto_restore! {
@@ -271,7 +271,7 @@ impl Engine {
         let reset =
             self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), stmt)?;
         #[cfg(feature = "debugging")]
-        auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
+        auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
         self.track_operation(global, stmt.position())?;
 
