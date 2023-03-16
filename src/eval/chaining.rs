@@ -504,9 +504,7 @@ impl Engine {
                     global, caches, scope, this_ptr, expr, rhs, idx_values,
                 )?;
 
-                if !_arg_values.is_empty() {
-                    idx_values.extend(_arg_values);
-                }
+                idx_values.extend(_arg_values);
             }
 
             #[cfg(not(feature = "no_object"))]

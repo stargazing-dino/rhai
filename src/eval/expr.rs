@@ -20,7 +20,7 @@ impl Engine {
         global: &GlobalRuntimeState,
         namespace: &crate::ast::Namespace,
     ) -> Option<crate::SharedModule> {
-        assert!(!namespace.is_empty());
+        debug_assert!(!namespace.is_empty());
 
         let root = namespace.root();
 
@@ -74,7 +74,7 @@ impl Engine {
                     if let Some(module) = self.search_imports(global, ns) {
                         return module.get_qualified_var(*hash_var).map_or_else(
                             || {
-                                let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
+                                let sep = crate::engine::NAMESPACE_SEPARATOR;
 
                                 Err(ERR::ErrorVariableNotFound(
                                     format!("{ns}{sep}{var_name}"),
@@ -104,7 +104,7 @@ impl Engine {
                             }
                         }
 
-                        let sep = crate::tokenizer::Token::DoubleColon.literal_syntax();
+                        let sep = crate::engine::NAMESPACE_SEPARATOR;
 
                         return Err(ERR::ErrorVariableNotFound(
                             format!("{ns}{sep}{var_name}"),
@@ -239,29 +239,22 @@ impl Engine {
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
 
+        #[cfg(feature = "debugging")]
+        let reset =
+            self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
+        #[cfg(feature = "debugging")]
+        auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
+
+        self.track_operation(global, expr.position())?;
+
         // Function calls should account for a relatively larger portion of expressions because
         // binary operators are also function calls.
         if let Expr::FnCall(x, pos) = expr {
-            #[cfg(feature = "debugging")]
-            let reset =
-                self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
-            #[cfg(feature = "debugging")]
-            auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
-
-            self.track_operation(global, expr.position())?;
-
             return self.eval_fn_call_expr(global, caches, scope, this_ptr, x, *pos);
         }
 
         // Then variable access.
-        // We shouldn't do this for too many variants because, soon or later, the added comparisons
-        // will cost more than the mis-predicted `match` branch.
         if let Expr::Variable(x, index, var_pos) = expr {
-            #[cfg(feature = "debugging")]
-            self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
-
-            self.track_operation(global, expr.position())?;
-
             return if index.is_none() && x.0.is_none() && x.3 == KEYWORD_THIS {
                 this_ptr
                     .ok_or_else(|| ERR::ErrorUnboundThis(*var_pos).into())
@@ -272,24 +265,26 @@ impl Engine {
             };
         }
 
-        #[cfg(feature = "debugging")]
-        let reset =
-            self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
-        #[cfg(feature = "debugging")]
-        auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
+        // Then integer constants.
+        if let Expr::IntegerConstant(x, ..) = expr {
+            return Ok((*x).into());
+        }
 
-        self.track_operation(global, expr.position())?;
+        // Stop merging branches here!
+        // We shouldn't lift out too many variants because, soon or later, the added comparisons
+        // will cost more than the mis-predicted `match` branch.
+        Self::black_box();
 
         match expr {
             // Constants
-            Expr::DynamicConstant(x, ..) => Ok(x.as_ref().clone()),
-            Expr::IntegerConstant(x, ..) => Ok((*x).into()),
+            Expr::IntegerConstant(..) => unreachable!(),
+            Expr::StringConstant(x, ..) => Ok(x.clone().into()),
+            Expr::BoolConstant(x, ..) => Ok((*x).into()),
             #[cfg(not(feature = "no_float"))]
             Expr::FloatConstant(x, ..) => Ok((*x).into()),
-            Expr::StringConstant(x, ..) => Ok(x.clone().into()),
             Expr::CharConstant(x, ..) => Ok((*x).into()),
-            Expr::BoolConstant(x, ..) => Ok((*x).into()),
             Expr::Unit(..) => Ok(Dynamic::UNIT),
+            Expr::DynamicConstant(x, ..) => Ok(x.as_ref().clone()),
 
             // `... ${...} ...`
             Expr::InterpolatedString(x, _) => {
@@ -434,8 +429,13 @@ impl Engine {
                     .and_then(|r| self.check_data_size(r, expr.start_position()))
             }
 
-            Expr::Stmt(x) if x.is_empty() => Ok(Dynamic::UNIT),
-            Expr::Stmt(x) => self.eval_stmt_block(global, caches, scope, this_ptr, x, true),
+            Expr::Stmt(x) => {
+                if x.is_empty() {
+                    Ok(Dynamic::UNIT)
+                } else {
+                    self.eval_stmt_block(global, caches, scope, this_ptr, x, true)
+                }
+            }
 
             #[cfg(not(feature = "no_index"))]
             Expr::Index(..) => {

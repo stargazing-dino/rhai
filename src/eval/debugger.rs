@@ -510,7 +510,7 @@ impl Engine {
             let src = global.source_raw().cloned();
             let src = src.as_ref().map(|s| s.as_str());
             let context = EvalContext::new(self, global, caches, scope, this_ptr);
-            let (.., ref on_debugger) = **x;
+            let (.., ref on_debugger) = *x;
 
             let command = on_debugger(context, event, node, src, node.position());
 

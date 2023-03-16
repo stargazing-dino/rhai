@@ -21,7 +21,7 @@ fn test_comments() -> Result<(), Box<EvalAltResult>> {
         42
     );
 
-    engine.run("/* Hello world */").unwrap();
+    engine.run("/* Hello world */")?;
 
     Ok(())
 }

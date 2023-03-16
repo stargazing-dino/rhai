@@ -11,6 +11,12 @@ mod target;
 pub use cache::{Caches, FnResolutionCache, FnResolutionCacheEntry};
 #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
 pub use chaining::ChainType;
+#[cfg(not(feature = "unchecked"))]
+#[cfg(not(feature = "no_index"))]
+pub use data_check::calc_array_sizes;
+#[cfg(not(feature = "unchecked"))]
+#[cfg(not(feature = "no_object"))]
+pub use data_check::calc_map_sizes;
 #[cfg(feature = "debugging")]
 pub use debugger::{
     BreakPoint, CallStackFrame, Debugger, DebuggerCommand, DebuggerEvent, DebuggerStatus,

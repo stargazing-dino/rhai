@@ -73,11 +73,7 @@ impl StaticModuleResolver {
     #[inline(always)]
     #[must_use]
     pub fn contains_path(&self, path: &str) -> bool {
-        if self.0.is_empty() {
-            false
-        } else {
-            self.0.contains_key(path)
-        }
+        self.0.contains_key(path)
     }
     /// Get an iterator of all the [modules][Module].
     #[inline]
@@ -123,9 +119,7 @@ impl StaticModuleResolver {
     /// Existing modules of the same path name are overwritten.
     #[inline]
     pub fn merge(&mut self, other: Self) -> &mut Self {
-        if !other.is_empty() {
-            self.0.extend(other.0.into_iter());
-        }
+        self.0.extend(other.0.into_iter());
         self
     }
 }

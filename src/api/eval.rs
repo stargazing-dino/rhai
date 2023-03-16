@@ -4,6 +4,7 @@ use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::native::locked_write;
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
+use crate::types::StringsInterner;
 use crate::{
     Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
 };
@@ -119,7 +120,15 @@ impl Engine {
     ) -> RhaiResultOf<T> {
         let scripts = [script];
         let ast = {
-            let interned_strings = &mut *locked_write(&self.interned_strings);
+            let mut interner;
+            let mut guard;
+            let interned_strings = if let Some(ref interner) = self.interned_strings {
+                guard = locked_write(interner);
+                &mut *guard
+            } else {
+                interner = StringsInterner::new();
+                &mut interner
+            };
 
             let (stream, tc) = self.lex_raw(&scripts, self.token_mapper.as_deref());
 

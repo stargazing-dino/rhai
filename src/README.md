@@ -28,4 +28,5 @@ Sub-Directories
 | `func`        | Support for function calls                            |
 | `eval`        | Evaluation engine                                     |
 | `serde`       | Support for [`serde`](https://crates.io/crates/serde) |
+| `tools`       | External tools needed for building                    |
 | `bin`         | Pre-built CLI binaries (e.g. `rhai-run`, `rhai-repl`) |

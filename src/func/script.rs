@@ -86,7 +86,7 @@ impl Engine {
         let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
 
         #[cfg(not(feature = "no_module"))]
-        let orig_constants = if let Some(environ) = _environ {
+        let orig_constants = _environ.map(|environ| {
             let EncapsulatedEnviron {
                 lib,
                 imports,
@@ -100,10 +100,8 @@ impl Engine {
 
             global.lib.push(lib.clone());
 
-            Some(mem::replace(&mut global.constants, constants.clone()))
-        } else {
-            None
-        };
+            mem::replace(&mut global.constants, constants.clone())
+        });
 
         #[cfg(feature = "debugging")]
         if self.is_debugger_registered() {

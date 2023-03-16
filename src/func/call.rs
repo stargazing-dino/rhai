@@ -9,6 +9,7 @@ use crate::engine::{
 };
 use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token};
+use crate::types::dynamic::Union;
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString,
     OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, Shared, ERR,
@@ -363,7 +364,7 @@ impl Engine {
         );
 
         if let Some(FnResolutionCacheEntry { func, source }) = func {
-            assert!(func.is_native());
+            debug_assert!(func.is_native());
 
             // Push a new call stack frame
             #[cfg(feature = "debugging")]
@@ -398,11 +399,9 @@ impl Engine {
             let is_method = func.is_method();
             let src = source.as_ref().map(|s| s.as_str());
 
-            let context = if func.has_context() {
-                Some((self, name, src, &*global, pos).into())
-            } else {
-                None
-            };
+            let context = func
+                .has_context()
+                .then(|| (self, name, src, &*global, pos).into());
 
             let mut _result = if let Some(f) = func.get_plugin_fn() {
                 if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
@@ -461,18 +460,26 @@ impl Engine {
             // See if the function match print/debug (which requires special processing)
             return Ok(match name {
                 KEYWORD_PRINT => {
-                    let text = result.into_immutable_string().map_err(|typ| {
-                        let t = self.map_type_name(type_name::<ImmutableString>()).into();
-                        ERR::ErrorMismatchOutputType(t, typ.into(), pos)
-                    })?;
-                    ((*self.print)(&text).into(), false)
+                    if let Some(ref print) = self.print {
+                        let text = result.into_immutable_string().map_err(|typ| {
+                            let t = self.map_type_name(type_name::<ImmutableString>()).into();
+                            ERR::ErrorMismatchOutputType(t, typ.into(), pos)
+                        })?;
+                        (print(&text).into(), false)
+                    } else {
+                        (Dynamic::UNIT, false)
+                    }
                 }
                 KEYWORD_DEBUG => {
-                    let text = result.into_immutable_string().map_err(|typ| {
-                        let t = self.map_type_name(type_name::<ImmutableString>()).into();
-                        ERR::ErrorMismatchOutputType(t, typ.into(), pos)
-                    })?;
-                    ((*self.debug)(&text, global.source(), pos).into(), false)
+                    if let Some(ref debug) = self.debug {
+                        let text = result.into_immutable_string().map_err(|typ| {
+                            let t = self.map_type_name(type_name::<ImmutableString>()).into();
+                            ERR::ErrorMismatchOutputType(t, typ.into(), pos)
+                        })?;
+                        (debug(&text, global.source(), pos).into(), false)
+                    } else {
+                        (Dynamic::UNIT, false)
+                    }
                 }
                 _ => (result, is_method),
             });
@@ -633,7 +640,7 @@ impl Engine {
                 .cloned()
             {
                 // Script function call
-                assert!(func.is_script());
+                debug_assert!(func.is_script());
 
                 let f = func.get_script_fn_def().expect("script-defined function");
                 let environ = func.get_encapsulated_environ();
@@ -810,7 +817,8 @@ impl Engine {
                 if call_args.is_empty() {
                     let typ = self.map_type_name(target.type_name());
                     return Err(self.make_type_mismatch_err::<FnPtr>(typ, fn_call_pos));
-                } else if !call_args[0].is_fnptr() {
+                }
+                if !call_args[0].is_fnptr() {
                     let typ = self.map_type_name(call_args[0].type_name());
                     return Err(self.make_type_mismatch_err::<FnPtr>(typ, first_arg_pos));
                 }
@@ -1251,9 +1259,7 @@ impl Engine {
         }
 
         // Call with blank scope
-        if total_args == 0 && curry.is_empty() {
-            // No arguments
-        } else {
+        if total_args > 0 || !curry.is_empty() {
             // If the first argument is a variable, and there is no curried arguments,
             // convert to method-call style in order to leverage potential &mut first argument and
             // avoid cloning the value
@@ -1324,9 +1330,7 @@ impl Engine {
         let args = &mut FnArgsVec::with_capacity(args_expr.len());
         let mut first_arg_value = None;
 
-        if args_expr.is_empty() {
-            // No arguments
-        } else {
+        if !args_expr.is_empty() {
             // See if the first argument is a variable (not namespace-qualified).
             // If so, convert to method-call style in order to leverage potential &mut first argument
             // and avoid cloning the value
@@ -1460,11 +1464,9 @@ impl Engine {
 
             Some(f) if f.is_plugin_fn() => {
                 let f = f.get_plugin_fn().expect("plugin function");
-                let context = if f.has_context() {
-                    Some((self, fn_name, module.id(), &*global, pos).into())
-                } else {
-                    None
-                };
+                let context = f
+                    .has_context()
+                    .then(|| (self, fn_name, module.id(), &*global, pos).into());
                 if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
                 } else {
@@ -1475,29 +1477,27 @@ impl Engine {
 
             Some(f) if f.is_native() => {
                 let func = f.get_native_fn().expect("native function");
-                let context = if f.has_context() {
-                    Some((self, fn_name, module.id(), &*global, pos).into())
-                } else {
-                    None
-                };
+                let context = f
+                    .has_context()
+                    .then(|| (self, fn_name, module.id(), &*global, pos).into());
                 func(context, args).and_then(|r| self.check_data_size(r, pos))
             }
 
             Some(f) => unreachable!("unknown function type: {:?}", f),
 
-            None => {
-                let sig = if namespace.is_empty() {
+            None => Err(ERR::ErrorFunctionNotFound(
+                if namespace.is_empty() {
                     self.gen_fn_call_signature(fn_name, args)
                 } else {
                     format!(
                         "{namespace}{}{}",
-                        crate::tokenizer::Token::DoubleColon.literal_syntax(),
+                        crate::engine::NAMESPACE_SEPARATOR,
                         self.gen_fn_call_signature(fn_name, args)
                     )
-                };
-
-                Err(ERR::ErrorFunctionNotFound(sig, pos).into())
-            }
+                },
+                pos,
+            )
+            .into()),
         }
     }
 
@@ -1547,6 +1547,9 @@ impl Engine {
     /// # Main Entry-Point (`FnCallExpr`)
     ///
     /// Evaluate a function call expression.
+    ///
+    /// This method tries to short-circuit function resolution under Fast Operators mode if the
+    /// function call is an operator.
     pub(crate) fn eval_fn_call_expr(
         &self,
         global: &mut GlobalRuntimeState,
@@ -1570,23 +1573,29 @@ impl Engine {
         let op_token = op_token.as_ref();
 
         // Short-circuit native unary operator call if under Fast Operators mode
-        if op_token == Some(&Token::Bang) && self.fast_operators() && args.len() == 1 {
+        if self.fast_operators() && args.len() == 1 && op_token == Some(&Token::Bang) {
             let mut value = self
                 .get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), &args[0])?
                 .0
                 .flatten();
 
-            return value.as_bool().map(|r| (!r).into()).or_else(|_| {
-                let operand = &mut [&mut value];
-                self.exec_fn_call(
-                    global, caches, None, name, op_token, *hashes, operand, false, false, pos,
-                )
-                .map(|(v, ..)| v)
-            });
+            return match value.0 {
+                Union::Bool(b, ..) => Ok((!b).into()),
+                _ => {
+                    let operand = &mut [&mut value];
+                    self.exec_fn_call(
+                        global, caches, None, name, op_token, *hashes, operand, false, false, pos,
+                    )
+                    .map(|(v, ..)| v)
+                }
+            };
         }
 
         // Short-circuit native binary operator call if under Fast Operators mode
         if op_token.is_some() && self.fast_operators() && args.len() == 2 {
+            #[allow(clippy::wildcard_imports)]
+            use Token::*;
+
             let mut lhs = self
                 .get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), &args[0])?
                 .0
@@ -1597,19 +1606,128 @@ impl Engine {
                 .0
                 .flatten();
 
+            // For extremely simple primary data operations, do it directly
+            // to avoid the overhead of calling a function.
+            match (&lhs.0, &rhs.0) {
+                (Union::Unit(..), Union::Unit(..)) => match op_token.unwrap() {
+                    EqualsTo => return Ok(Dynamic::TRUE),
+                    NotEqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan
+                    | LessThanEqualsTo => return Ok(Dynamic::FALSE),
+                    _ => (),
+                },
+                (Union::Bool(b1, ..), Union::Bool(b2, ..)) => match op_token.unwrap() {
+                    EqualsTo => return Ok((*b1 == *b2).into()),
+                    NotEqualsTo => return Ok((*b1 != *b2).into()),
+                    GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo => {
+                        return Ok(Dynamic::FALSE)
+                    }
+                    Pipe => return Ok((*b1 || *b2).into()),
+                    Ampersand => return Ok((*b1 && *b2).into()),
+                    _ => (),
+                },
+                (Union::Int(n1, ..), Union::Int(n2, ..)) => {
+                    #[cfg(not(feature = "unchecked"))]
+                    #[allow(clippy::wildcard_imports)]
+                    use crate::packages::arithmetic::arith_basic::INT::functions::*;
+
+                    #[cfg(not(feature = "unchecked"))]
+                    match op_token.unwrap() {
+                        EqualsTo => return Ok((*n1 == *n2).into()),
+                        NotEqualsTo => return Ok((*n1 != *n2).into()),
+                        GreaterThan => return Ok((*n1 > *n2).into()),
+                        GreaterThanEqualsTo => return Ok((*n1 >= *n2).into()),
+                        LessThan => return Ok((*n1 < *n2).into()),
+                        LessThanEqualsTo => return Ok((*n1 <= *n2).into()),
+                        Plus => return add(*n1, *n2).map(Into::into),
+                        Minus => return subtract(*n1, *n2).map(Into::into),
+                        Multiply => return multiply(*n1, *n2).map(Into::into),
+                        Divide => return divide(*n1, *n2).map(Into::into),
+                        Modulo => return modulo(*n1, *n2).map(Into::into),
+                        _ => (),
+                    }
+                    #[cfg(feature = "unchecked")]
+                    match op_token.unwrap() {
+                        EqualsTo => return Ok((*n1 == *n2).into()),
+                        NotEqualsTo => return Ok((*n1 != *n2).into()),
+                        GreaterThan => return Ok((*n1 > *n2).into()),
+                        GreaterThanEqualsTo => return Ok((*n1 >= *n2).into()),
+                        LessThan => return Ok((*n1 < *n2).into()),
+                        LessThanEqualsTo => return Ok((*n1 <= *n2).into()),
+                        Plus => return Ok((*n1 + *n2).into()),
+                        Minus => return Ok((*n1 - *n2).into()),
+                        Multiply => return Ok((*n1 * *n2).into()),
+                        Divide => return Ok((*n1 / *n2).into()),
+                        Modulo => return Ok((*n1 % *n2).into()),
+                        _ => (),
+                    }
+                }
+                #[cfg(not(feature = "no_float"))]
+                (Union::Float(f1, ..), Union::Float(f2, ..)) => match op_token.unwrap() {
+                    EqualsTo => return Ok((**f1 == **f2).into()),
+                    NotEqualsTo => return Ok((**f1 != **f2).into()),
+                    GreaterThan => return Ok((**f1 > **f2).into()),
+                    GreaterThanEqualsTo => return Ok((**f1 >= **f2).into()),
+                    LessThan => return Ok((**f1 < **f2).into()),
+                    LessThanEqualsTo => return Ok((**f1 <= **f2).into()),
+                    Plus => return Ok((**f1 + **f2).into()),
+                    Minus => return Ok((**f1 - **f2).into()),
+                    Multiply => return Ok((**f1 * **f2).into()),
+                    Divide => return Ok((**f1 / **f2).into()),
+                    Modulo => return Ok((**f1 % **f2).into()),
+                    _ => (),
+                },
+                #[cfg(not(feature = "no_float"))]
+                (Union::Float(f1, ..), Union::Int(n2, ..)) => match op_token.unwrap() {
+                    EqualsTo => return Ok((**f1 == (*n2 as crate::FLOAT)).into()),
+                    NotEqualsTo => return Ok((**f1 != (*n2 as crate::FLOAT)).into()),
+                    GreaterThan => return Ok((**f1 > (*n2 as crate::FLOAT)).into()),
+                    GreaterThanEqualsTo => return Ok((**f1 >= (*n2 as crate::FLOAT)).into()),
+                    LessThan => return Ok((**f1 < (*n2 as crate::FLOAT)).into()),
+                    LessThanEqualsTo => return Ok((**f1 <= (*n2 as crate::FLOAT)).into()),
+                    Plus => return Ok((**f1 + (*n2 as crate::FLOAT)).into()),
+                    Minus => return Ok((**f1 - (*n2 as crate::FLOAT)).into()),
+                    Multiply => return Ok((**f1 * (*n2 as crate::FLOAT)).into()),
+                    Divide => return Ok((**f1 / (*n2 as crate::FLOAT)).into()),
+                    Modulo => return Ok((**f1 % (*n2 as crate::FLOAT)).into()),
+                    _ => (),
+                },
+                #[cfg(not(feature = "no_float"))]
+                (Union::Int(n1, ..), Union::Float(f2, ..)) => match op_token.unwrap() {
+                    EqualsTo => return Ok(((*n1 as crate::FLOAT) == **f2).into()),
+                    NotEqualsTo => return Ok(((*n1 as crate::FLOAT) != **f2).into()),
+                    GreaterThan => return Ok(((*n1 as crate::FLOAT) > **f2).into()),
+                    GreaterThanEqualsTo => return Ok(((*n1 as crate::FLOAT) >= **f2).into()),
+                    LessThan => return Ok(((*n1 as crate::FLOAT) < **f2).into()),
+                    LessThanEqualsTo => return Ok(((*n1 as crate::FLOAT) <= **f2).into()),
+                    Plus => return Ok(((*n1 as crate::FLOAT) + **f2).into()),
+                    Minus => return Ok(((*n1 as crate::FLOAT) - **f2).into()),
+                    Multiply => return Ok(((*n1 as crate::FLOAT) * **f2).into()),
+                    Divide => return Ok(((*n1 as crate::FLOAT) / **f2).into()),
+                    Modulo => return Ok(((*n1 as crate::FLOAT) % **f2).into()),
+                    _ => (),
+                },
+                (Union::Str(s1, ..), Union::Str(s2, ..)) => match op_token.unwrap() {
+                    EqualsTo => return Ok((s1 == s2).into()),
+                    NotEqualsTo => return Ok((s1 != s2).into()),
+                    GreaterThan => return Ok((s1 > s2).into()),
+                    GreaterThanEqualsTo => return Ok((s1 >= s2).into()),
+                    LessThan => return Ok((s1 < s2).into()),
+                    LessThanEqualsTo => return Ok((s1 <= s2).into()),
+                    _ => (),
+                },
+                _ => (),
+            }
+
             let operands = &mut [&mut lhs, &mut rhs];
 
             if let Some((func, need_context)) =
                 get_builtin_binary_op_fn(op_token.as_ref().unwrap(), operands[0], operands[1])
             {
-                // Built-in found
-                auto_restore! { let orig_level = global.level; global.level += 1 }
+                // We may not need to bump the level because built-in's do not need it.
+                //auto_restore! { let orig_level = global.level; global.level += 1 }
 
-                let context = if need_context {
-                    Some((self, name.as_str(), None, &*global, pos).into())
-                } else {
-                    None
-                };
+                let context =
+                    need_context.then(|| (self, name.as_str(), None, &*global, pos).into());
                 return func(context, operands);
             }
 

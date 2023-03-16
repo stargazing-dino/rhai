@@ -3,9 +3,11 @@
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::api::events::VarDefInfo;
 use crate::ast::{
-    ASTFlags, BinaryExpr, Expr, FlowControl, OpAssignment, Stmt, SwitchCasesCollection,
+    ASTFlags, BinaryExpr, ConditionalExpr, Expr, FlowControl, OpAssignment, Stmt,
+    SwitchCasesCollection,
 };
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
+use crate::tokenizer::Token;
 use crate::types::dynamic::{AccessMode, Union};
 use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, ERR, INT};
 use std::hash::{Hash, Hasher};
@@ -127,48 +129,119 @@ impl Engine {
 
         let pos = op_info.position();
 
-        if let Some((hash1, hash2, op_assign, op)) = op_info.get_op_assignment_info() {
+        if let Some((hash_x, hash, op_x, op_x_str, op, op_str)) = op_info.get_op_assignment_info() {
             let mut lock_guard = target.write_lock::<Dynamic>().unwrap();
-            let args = &mut [&mut *lock_guard, &mut new_val];
+            let mut done = false;
 
+            // Short-circuit built-in op-assignments if under Fast Operators mode
             if self.fast_operators() {
-                if let Some((func, need_context)) =
-                    get_builtin_op_assignment_fn(op_assign, args[0], args[1])
-                {
-                    // Built-in found
-                    auto_restore! { let orig_level = global.level; global.level += 1 }
+                #[allow(clippy::wildcard_imports)]
+                use Token::*;
 
-                    let context = if need_context {
-                        let op = op_assign.literal_syntax();
-                        let source = global.source();
-                        Some((self, op, source, &*global, pos).into())
-                    } else {
-                        None
-                    };
-                    return func(context, args).map(|_| ());
+                done = true;
+
+                // For extremely simple primary data operations, do it directly
+                // to avoid the overhead of calling a function.
+                match (&mut lock_guard.0, &mut new_val.0) {
+                    (Union::Bool(b1, ..), Union::Bool(b2, ..)) => match op_x {
+                        AndAssign => *b1 = *b1 && *b2,
+                        OrAssign => *b1 = *b1 || *b2,
+                        XOrAssign => *b1 = *b1 ^ *b2,
+                        _ => done = false,
+                    },
+                    (Union::Int(n1, ..), Union::Int(n2, ..)) => {
+                        #[cfg(not(feature = "unchecked"))]
+                        #[allow(clippy::wildcard_imports)]
+                        use crate::packages::arithmetic::arith_basic::INT::functions::*;
+
+                        #[cfg(not(feature = "unchecked"))]
+                        match op_x {
+                            PlusAssign => {
+                                *n1 = add(*n1, *n2).map_err(|err| err.fill_position(pos))?
+                            }
+                            MinusAssign => {
+                                *n1 = subtract(*n1, *n2).map_err(|err| err.fill_position(pos))?
+                            }
+                            MultiplyAssign => {
+                                *n1 = multiply(*n1, *n2).map_err(|err| err.fill_position(pos))?
+                            }
+                            DivideAssign => {
+                                *n1 = divide(*n1, *n2).map_err(|err| err.fill_position(pos))?
+                            }
+                            ModuloAssign => {
+                                *n1 = modulo(*n1, *n2).map_err(|err| err.fill_position(pos))?
+                            }
+                            _ => done = false,
+                        }
+                        #[cfg(feature = "unchecked")]
+                        match op_x {
+                            PlusAssign => *n1 += *n2,
+                            MinusAssign => *n1 -= *n2,
+                            MultiplyAssign => *n1 *= *n2,
+                            DivideAssign => *n1 /= *n2,
+                            ModuloAssign => *n1 %= *n2,
+                            _ => done = false,
+                        }
+                    }
+                    #[cfg(not(feature = "no_float"))]
+                    (Union::Float(f1, ..), Union::Float(f2, ..)) => match op_x {
+                        PlusAssign => **f1 += **f2,
+                        MinusAssign => **f1 -= **f2,
+                        MultiplyAssign => **f1 *= **f2,
+                        DivideAssign => **f1 /= **f2,
+                        ModuloAssign => **f1 %= **f2,
+                        _ => done = false,
+                    },
+                    #[cfg(not(feature = "no_float"))]
+                    (Union::Float(f1, ..), Union::Int(n2, ..)) => match op_x {
+                        PlusAssign => **f1 += *n2 as crate::FLOAT,
+                        MinusAssign => **f1 -= *n2 as crate::FLOAT,
+                        MultiplyAssign => **f1 *= *n2 as crate::FLOAT,
+                        DivideAssign => **f1 /= *n2 as crate::FLOAT,
+                        ModuloAssign => **f1 %= *n2 as crate::FLOAT,
+                        _ => done = false,
+                    },
+                    _ => done = false,
+                }
+
+                if !done {
+                    if let Some((func, need_context)) =
+                        get_builtin_op_assignment_fn(op_x, &*lock_guard, &new_val)
+                    {
+                        // We may not need to bump the level because built-in's do not need it.
+                        //auto_restore! { let orig_level = global.level; global.level += 1 }
+
+                        let args = &mut [&mut *lock_guard, &mut new_val];
+                        let context = need_context
+                            .then(|| (self, op_x_str, global.source(), &*global, pos).into());
+                        let _ = func(context, args).map_err(|err| err.fill_position(pos))?;
+                        done = true;
+                    }
                 }
             }
 
-            let token = Some(op_assign);
-            let op_assign = op_assign.literal_syntax();
+            if !done {
+                let opx = Some(op_x);
+                let args = &mut [&mut *lock_guard, &mut new_val];
 
-            match self.exec_native_fn_call(global, caches, op_assign, token, hash1, args, true, pos)
-            {
-                Ok(_) => (),
-                Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_assign)) =>
+                match self
+                    .exec_native_fn_call(global, caches, op_x_str, opx, hash_x, args, true, pos)
                 {
-                    // Expand to `var = var op rhs`
-                    let token = Some(op);
-                    let op = op.literal_syntax();
+                    Ok(_) => (),
+                    Err(err) if matches!(*err, ERR::ErrorFunctionNotFound(ref f, ..) if f.starts_with(op_x_str)) =>
+                    {
+                        // Expand to `var = var op rhs`
+                        let op = Some(op);
 
-                    *args[0] = self
-                        .exec_native_fn_call(global, caches, op, token, hash2, args, true, pos)?
-                        .0;
+                        *args[0] = self
+                            .exec_native_fn_call(global, caches, op_str, op, hash, args, true, pos)?
+                            .0;
+                    }
+                    Err(err) => return Err(err),
                 }
-                Err(err) => return Err(err),
-            }
 
-            self.check_data_size(&*args[0], root.position())?;
+                self.check_data_size(&*args[0], root.position())?;
+            }
         } else {
             // Normal assignment
             match target {
@@ -200,23 +273,19 @@ impl Engine {
         #[cfg(feature = "debugging")]
         auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
 
+        self.track_operation(global, stmt.position())?;
+
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
 
         // Function calls should account for a relatively larger portion of statements.
         if let Stmt::FnCall(x, pos) = stmt {
-            self.track_operation(global, stmt.position())?;
-
             return self.eval_fn_call_expr(global, caches, scope, this_ptr, x, *pos);
         }
 
         // Then assignments.
-        // We shouldn't do this for too many variants because, soon or later, the added comparisons
-        // will cost more than the mis-predicted `match` branch.
         if let Stmt::Assignment(x, ..) = stmt {
             let (op_info, BinaryExpr { lhs, rhs }) = &**x;
-
-            self.track_operation(global, stmt.position())?;
 
             if let Expr::Variable(x, ..) = lhs {
                 let rhs_val = self
@@ -281,7 +350,97 @@ impl Engine {
             }
         }
 
-        self.track_operation(global, stmt.position())?;
+        // Then variable definitions.
+        if let Stmt::Var(x, options, pos) = stmt {
+            if !self.allow_shadowing() && scope.contains(&x.0) {
+                return Err(ERR::ErrorVariableExists(x.0.to_string(), *pos).into());
+            }
+
+            // Let/const statement
+            let (var_name, expr, index) = &**x;
+
+            let access = if options.contains(ASTFlags::CONSTANT) {
+                AccessMode::ReadOnly
+            } else {
+                AccessMode::ReadWrite
+            };
+            let export = options.contains(ASTFlags::EXPORTED);
+
+            // Check variable definition filter
+            if let Some(ref filter) = self.def_var_filter {
+                let will_shadow = scope.contains(var_name);
+                let is_const = access == AccessMode::ReadOnly;
+                let info = VarDefInfo {
+                    name: var_name,
+                    is_const,
+                    nesting_level: global.scope_level,
+                    will_shadow,
+                };
+                let orig_scope_len = scope.len();
+                let context =
+                    EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());
+                let filter_result = filter(true, info, context);
+
+                if orig_scope_len != scope.len() {
+                    // The scope is changed, always search from now on
+                    global.always_search_scope = true;
+                }
+
+                if !filter_result? {
+                    return Err(ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into());
+                }
+            }
+
+            // Evaluate initial value
+            let mut value = self
+                .eval_expr(global, caches, scope, this_ptr, expr)?
+                .flatten()
+                .intern_string(self);
+
+            let _alias = if !rewind_scope {
+                // Put global constants into global module
+                #[cfg(not(feature = "no_function"))]
+                #[cfg(not(feature = "no_module"))]
+                if global.scope_level == 0
+                    && access == AccessMode::ReadOnly
+                    && global.lib.iter().any(|m| !m.is_empty())
+                {
+                    crate::func::locked_write(global.constants.get_or_insert_with(|| {
+                        crate::Shared::new(crate::Locked::new(std::collections::BTreeMap::new()))
+                    }))
+                    .insert(var_name.name.clone(), value.clone());
+                }
+
+                if export {
+                    Some(var_name)
+                } else {
+                    None
+                }
+            } else if export {
+                unreachable!("exported variable not on global level");
+            } else {
+                None
+            };
+
+            if let Some(index) = index {
+                value.set_access_mode(access);
+                *scope.get_mut_by_index(scope.len() - index.get()) = value;
+            } else {
+                scope.push_entry(var_name.name.clone(), access, value);
+            }
+
+            #[cfg(not(feature = "no_module"))]
+            if let Some(alias) = _alias {
+                scope.add_alias_by_index(scope.len() - 1, alias.as_str().into());
+            }
+
+            return Ok(Dynamic::UNIT);
+        }
+
+        // Stop merging branches here!
+        // We shouldn't lift out too many variants because, soon or later, the added comparisons
+        // will cost more than the mis-predicted `match` branch.
+        Self::black_box();
 
         match stmt {
             // No-op
@@ -293,9 +452,12 @@ impl Engine {
                 .map(Dynamic::flatten),
 
             // Block scope
-            Stmt::Block(statements, ..) if statements.is_empty() => Ok(Dynamic::UNIT),
             Stmt::Block(statements, ..) => {
-                self.eval_stmt_block(global, caches, scope, this_ptr, statements, true)
+                if statements.is_empty() {
+                    Ok(Dynamic::UNIT)
+                } else {
+                    self.eval_stmt_block(global, caches, scope, this_ptr, statements, true)
+                }
             }
 
             // If statement
@@ -311,12 +473,14 @@ impl Engine {
                     .as_bool()
                     .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, expr.position()))?;
 
-                if guard_val && !if_block.is_empty() {
-                    self.eval_stmt_block(global, caches, scope, this_ptr, if_block, true)
-                } else if !guard_val && !else_block.is_empty() {
-                    self.eval_stmt_block(global, caches, scope, this_ptr, else_block, true)
-                } else {
-                    Ok(Dynamic::UNIT)
+                match guard_val {
+                    true if !if_block.is_empty() => {
+                        self.eval_stmt_block(global, caches, scope, this_ptr, if_block, true)
+                    }
+                    false if !else_block.is_empty() => {
+                        self.eval_stmt_block(global, caches, scope, this_ptr, else_block, true)
+                    }
+                    _ => Ok(Dynamic::UNIT),
                 }
             }
 
@@ -343,7 +507,7 @@ impl Engine {
 
                     // First check hashes
                     if let Some(case_blocks_list) = cases.get(&hash) {
-                        assert!(!case_blocks_list.is_empty());
+                        debug_assert!(!case_blocks_list.is_empty());
 
                         for &index in case_blocks_list {
                             let block = &expressions[index];
@@ -363,15 +527,13 @@ impl Engine {
                                 break;
                             }
                         }
-                    } else if value.is_int() && !ranges.is_empty() {
+                    } else if !ranges.is_empty() {
                         // Then check integer ranges
-                        let value = value.as_int().expect("`INT`");
+                        for r in ranges.iter().filter(|r| r.contains(&value)) {
+                            let ConditionalExpr { condition, expr } = &expressions[r.index()];
 
-                        for r in ranges.iter().filter(|r| r.contains(value)) {
-                            let block = &expressions[r.index()];
-
-                            let cond_result = match block.condition {
-                                Expr::BoolConstant(b, ..) => b,
+                            let cond_result = match condition {
+                                Expr::BoolConstant(b, ..) => *b,
                                 ref c => self
                                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), c)?
                                     .as_bool()
@@ -381,7 +543,7 @@ impl Engine {
                             };
 
                             if cond_result {
-                                result = Some(&block.expr);
+                                result = Some(expr);
                                 break;
                             }
                         }
@@ -521,12 +683,10 @@ impl Engine {
                 auto_restore! { scope => rewind; let orig_scope_len = scope.len(); }
 
                 // Add the loop variables
-                let counter_index = if counter.is_empty() {
-                    usize::MAX
-                } else {
+                let counter_index = (!counter.is_empty()).then(|| {
                     scope.push(counter.name.clone(), 0 as INT);
                     scope.len() - 1
-                };
+                });
 
                 scope.push(var_name.name.clone(), ());
                 let index = scope.len() - 1;
@@ -535,7 +695,7 @@ impl Engine {
 
                 for (x, iter_value) in iter_func(iter_obj).enumerate() {
                     // Increment counter
-                    if counter_index < usize::MAX {
+                    if let Some(counter_index) = counter_index {
                         // As the variable increments from 0, this should always work
                         // since any overflow will first be caught below.
                         let index_value = x as INT;
@@ -695,94 +855,6 @@ impl Engine {
             // Empty return
             Stmt::Return(None, .., pos) => Err(ERR::Return(Dynamic::UNIT, *pos).into()),
 
-            // Let/const statement - shadowing disallowed
-            Stmt::Var(x, .., pos) if !self.allow_shadowing() && scope.contains(&x.0) => {
-                Err(ERR::ErrorVariableExists(x.0.to_string(), *pos).into())
-            }
-            // Let/const statement
-            Stmt::Var(x, options, pos) => {
-                let (var_name, expr, index) = &**x;
-
-                let access = if options.contains(ASTFlags::CONSTANT) {
-                    AccessMode::ReadOnly
-                } else {
-                    AccessMode::ReadWrite
-                };
-                let export = options.contains(ASTFlags::EXPORTED);
-
-                // Check variable definition filter
-                if let Some(ref filter) = self.def_var_filter {
-                    let will_shadow = scope.contains(var_name);
-                    let is_const = access == AccessMode::ReadOnly;
-                    let info = VarDefInfo {
-                        name: var_name,
-                        is_const,
-                        nesting_level: global.scope_level,
-                        will_shadow,
-                    };
-                    let orig_scope_len = scope.len();
-                    let context =
-                        EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());
-                    let filter_result = filter(true, info, context);
-
-                    if orig_scope_len != scope.len() {
-                        // The scope is changed, always search from now on
-                        global.always_search_scope = true;
-                    }
-
-                    if !filter_result? {
-                        return Err(ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into());
-                    }
-                }
-
-                // Evaluate initial value
-                let mut value = self
-                    .eval_expr(global, caches, scope, this_ptr, expr)?
-                    .flatten()
-                    .intern_string(self);
-
-                let _alias = if !rewind_scope {
-                    // Put global constants into global module
-                    #[cfg(not(feature = "no_function"))]
-                    #[cfg(not(feature = "no_module"))]
-                    if global.scope_level == 0
-                        && access == AccessMode::ReadOnly
-                        && global.lib.iter().any(|m| !m.is_empty())
-                    {
-                        crate::func::locked_write(global.constants.get_or_insert_with(|| {
-                            crate::Shared::new(
-                                crate::Locked::new(std::collections::BTreeMap::new()),
-                            )
-                        }))
-                        .insert(var_name.name.clone(), value.clone());
-                    }
-
-                    if export {
-                        Some(var_name)
-                    } else {
-                        None
-                    }
-                } else if export {
-                    unreachable!("exported variable not on global level");
-                } else {
-                    None
-                };
-
-                if let Some(index) = index {
-                    value.set_access_mode(access);
-                    *scope.get_mut_by_index(scope.len() - index.get()) = value;
-                } else {
-                    scope.push_entry(var_name.name.clone(), access, value);
-                }
-
-                #[cfg(not(feature = "no_module"))]
-                if let Some(alias) = _alias {
-                    scope.add_alias_by_index(scope.len() - 1, alias.as_str().into());
-                }
-
-                Ok(Dynamic::UNIT)
-            }
-
             // Import statement
             #[cfg(not(feature = "no_module"))]
             Stmt::Import(x, _pos) => {
@@ -807,14 +879,16 @@ impl Engine {
 
                 let module = resolver
                     .as_ref()
-                    .and_then(|r| match r.resolve_raw(self, global, &path, path_pos) {
-                        Err(err) if matches!(*err, ERR::ErrorModuleNotFound(..)) => None,
-                        result => Some(result),
-                    })
+                    .and_then(
+                        |r| match r.resolve_raw(self, global, scope, &path, path_pos) {
+                            Err(err) if matches!(*err, ERR::ErrorModuleNotFound(..)) => None,
+                            result => Some(result),
+                        },
+                    )
                     .or_else(|| {
                         Some(
-                            self.module_resolver
-                                .resolve_raw(self, global, &path, path_pos),
+                            self.module_resolver()
+                                .resolve_raw(self, global, scope, &path, path_pos),
                         )
                     })
                     .unwrap_or_else(|| {

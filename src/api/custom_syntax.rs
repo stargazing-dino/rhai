@@ -232,7 +232,7 @@ impl Engine {
             }
 
             let token = Token::lookup_symbol_from_syntax(s).or_else(|| {
-                if is_reserved_keyword_or_symbol(s) {
+                if is_reserved_keyword_or_symbol(s).0 {
                     Some(Token::Reserved(Box::new(s.into())))
                 } else {
                     None
@@ -255,7 +255,8 @@ impl Engine {
                 // Markers not in first position
                 #[cfg(not(feature = "no_float"))]
                 CUSTOM_SYNTAX_MARKER_FLOAT if !segments.is_empty() => s.into(),
-                // Standard or reserved keyword/symbol not in first position
+
+                // Keyword/symbol not in first position
                 _ if !segments.is_empty() && token.is_some() => {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if (self
@@ -274,6 +275,7 @@ impl Engine {
                     }
                     s.into()
                 }
+
                 // Standard keyword in first position but not disabled
                 _ if segments.is_empty()
                     && token.as_ref().map_or(false, Token::is_standard_keyword)
@@ -291,8 +293,11 @@ impl Engine {
                     )
                     .into_err(Position::NONE));
                 }
-                // Identifier in first position
-                _ if segments.is_empty() && is_valid_identifier(s) => {
+
+                // Identifier or symbol in first position
+                _ if segments.is_empty()
+                    && (is_valid_identifier(s) || is_reserved_keyword_or_symbol(s).0) =>
+                {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if self
                         .disabled_symbols
@@ -310,6 +315,7 @@ impl Engine {
                     }
                     s.into()
                 }
+
                 // Anything else is an error
                 _ => {
                     return Err(LexError::ImproperSymbol(
@@ -326,23 +332,20 @@ impl Engine {
             segments.push(seg);
         }
 
-        // If the syntax has no symbols, just ignore the registration
+        // If the syntax has nothing, just ignore the registration
         if segments.is_empty() {
             return Ok(self);
         }
 
-        // The first keyword is the discriminator
+        // The first keyword/symbol is the discriminator
         let key = segments[0].clone();
 
         self.register_custom_syntax_with_state_raw(
             key,
             // Construct the parsing function
-            move |stream, _, _| {
-                if stream.len() >= segments.len() {
-                    Ok(None)
-                } else {
-                    Ok(Some(segments[stream.len()].clone()))
-                }
+            move |stream, _, _| match stream.len() {
+                len if len >= segments.len() => Ok(None),
+                len => Ok(Some(segments[len].clone())),
             },
             scope_may_be_changed,
             move |context, expressions, _| func(context, expressions),
@@ -399,7 +402,8 @@ impl Engine {
                     parse: Box::new(parse),
                     func: Box::new(func),
                     scope_may_be_changed,
-                },
+                }
+                .into(),
             );
         self
     }

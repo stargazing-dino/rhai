@@ -7,6 +7,7 @@ use crate::{Dynamic, RhaiResultOf, ERR, INT};
 use std::prelude::v1::*;
 
 #[cfg(not(feature = "no_float"))]
+#[cfg(not(feature = "no_std"))]
 use crate::FLOAT;
 
 def_package! {
@@ -287,7 +288,8 @@ fn collect_fn_metadata(
 
     #[cfg(not(feature = "no_module"))]
     {
-        use crate::{tokenizer::Token::DoubleColon, Shared, SmartString};
+        use crate::engine::NAMESPACE_SEPARATOR;
+        use crate::{Shared, SmartString};
 
         // Recursively scan modules for script-defined functions.
         fn scan_module(
@@ -305,7 +307,7 @@ fn collect_fn_metadata(
                 use std::fmt::Write;
 
                 let mut ns = SmartString::new_const();
-                write!(&mut ns, "{namespace}{}{name}", DoubleColon.literal_syntax()).unwrap();
+                write!(&mut ns, "{namespace}{}{name}", NAMESPACE_SEPARATOR).unwrap();
                 scan_module(engine, list, &ns, m, filter);
             }
         }

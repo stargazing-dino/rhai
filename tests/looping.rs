@@ -20,7 +20,7 @@ fn test_loop() -> Result<(), Box<EvalAltResult>> {
 					}
 				}
 
-				return x;
+				x
 		    "
         )?,
         21
@@ -50,6 +50,46 @@ fn test_loop() -> Result<(), Box<EvalAltResult>> {
             .err_type(),
         ParseErrorType::LoopBreak
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_loop_expression() -> Result<(), Box<EvalAltResult>> {
+    let mut engine = Engine::new();
+
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+				let x = 0;
+
+				let value = while x < 10 {
+                    if x % 5 == 0 { break 42; }
+                    x += 1;
+				};
+
+				value
+		    "
+        )?,
+        42
+    );
+
+    engine.set_allow_loop_expressions(false);
+
+    assert!(engine
+        .eval::<INT>(
+            "
+				let x = 0;
+
+				let value = while x < 10 {
+                    if x % 5 == 0 { break 42; }
+                    x += 1;
+				};
+
+				value
+		    "
+        )
+        .is_err());
 
     Ok(())
 }

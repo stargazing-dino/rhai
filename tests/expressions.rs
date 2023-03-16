@@ -50,8 +50,8 @@ fn test_expressions() -> Result<(), Box<EvalAltResult>> {
             "
                 switch x {
                     0 => 1,
-                    1..10 => 123,
                     10 => 42,
+                    1..10 => 123,
                 }
             "
         )?,
@@ -63,11 +63,11 @@ fn test_expressions() -> Result<(), Box<EvalAltResult>> {
             "
                 switch x {
                     0 => 1,
+                    10 => 42,
                     1..10 => {
                         let y = 123;
                         y
                     }
-                    10 => 42,
                 }
             "
         )

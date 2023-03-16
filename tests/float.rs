@@ -9,9 +9,7 @@ fn test_float() -> Result<(), Box<EvalAltResult>> {
 
     assert!(engine.eval::<bool>("let x = 0.0; let y = 1.0; x < y")?);
     assert!(!engine.eval::<bool>("let x = 0.0; let y = 1.0; x > y")?);
-    assert!(!engine
-        .eval::<bool>("let x = 0.; let y = 1.; x > y")
-        .unwrap());
+    assert!(!engine.eval::<bool>("let x = 0.; let y = 1.; x > y")?);
     assert!((engine.eval::<FLOAT>("let x = 9.9999; x")? - 9.9999 as FLOAT).abs() < EPSILON);
 
     Ok(())

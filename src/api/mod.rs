@@ -54,7 +54,10 @@ impl Engine {
     #[inline(always)]
     #[must_use]
     pub fn module_resolver(&self) -> &dyn crate::ModuleResolver {
-        &*self.module_resolver
+        static DUMMY_RESOLVER: crate::module::resolvers::DummyModuleResolver =
+            crate::module::resolvers::DummyModuleResolver;
+
+        self.module_resolver.as_deref().unwrap_or(&DUMMY_RESOLVER)
     }
 
     /// Set the module resolution service used by the [`Engine`].
@@ -66,7 +69,7 @@ impl Engine {
         &mut self,
         resolver: impl crate::ModuleResolver + 'static,
     ) -> &mut Self {
-        self.module_resolver = Box::new(resolver);
+        self.module_resolver = Some(Box::new(resolver));
         self
     }
 

@@ -39,7 +39,10 @@ fn test_mismatched_op_custom_type() -> Result<(), Box<EvalAltResult>> {
         ").expect_err("should error"),
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f == "== (TestStruct, TestStruct)"));
 
-    assert!(!engine.eval::<bool>("new_ts() == 42")?);
+    assert!(
+        matches!(*engine.eval::<bool>("new_ts() == 42").expect_err("should error"),
+        EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("== (TestStruct, "))
+    );
 
     assert!(matches!(
         *engine.eval::<INT>("60 + new_ts()").expect_err("should error"),

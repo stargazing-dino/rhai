@@ -538,7 +538,7 @@ impl TryFrom<ImmutableString> for FnPtr {
                 #[cfg(not(feature = "no_function"))]
                 fn_def: None,
             })
-        } else if is_reserved_keyword_or_symbol(&value)
+        } else if is_reserved_keyword_or_symbol(&value).0
             || Token::lookup_symbol_from_syntax(&value).is_some()
         {
             Err(

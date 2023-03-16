@@ -5,7 +5,9 @@ use crate::ast::{
     ASTFlags, Expr, FlowControl, OpAssignment, Stmt, StmtBlock, StmtBlockContainer,
     SwitchCasesCollection,
 };
-use crate::engine::{KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_PRINT, KEYWORD_TYPE_OF};
+use crate::engine::{
+    KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_PRINT, KEYWORD_TYPE_OF, OP_NOT,
+};
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::builtin::get_builtin_binary_op_fn;
 use crate::func::hashing::get_hasher;
@@ -24,9 +26,6 @@ use std::{
     hash::{Hash, Hasher},
     mem,
 };
-
-/// Standard not operator.
-const OP_NOT: &str = Token::Bang.literal_syntax();
 
 /// Level of optimization performed.
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
@@ -564,16 +563,14 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             }
 
             // Then check ranges
-            if value.is_int() && !ranges.is_empty() {
-                let value = value.as_int().unwrap();
-
+            if !ranges.is_empty() {
                 // Only one range or all ranges without conditions
                 if ranges.len() == 1
                     || ranges
                         .iter()
                         .all(|r| expressions[r.index()].is_always_true())
                 {
-                    if let Some(r) = ranges.iter().find(|r| r.contains(value)) {
+                    if let Some(r) = ranges.iter().find(|r| r.contains(&value)) {
                         let range_block = &mut expressions[r.index()];
 
                         if range_block.is_always_true() {
@@ -620,7 +617,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
 
                     let old_ranges_len = ranges.len();
 
-                    ranges.retain(|r| r.contains(value));
+                    ranges.retain(|r| r.contains(&value));
 
                     if ranges.len() != old_ranges_len {
                         state.set_dirty();
@@ -1140,13 +1137,9 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 _ if x.args.len() == 2 && x.op_token.is_some() && (state.engine.fast_operators() || !state.engine.has_native_fn_override(x.hashes.native(), &arg_types)) => {
                     if let Some(result) = get_builtin_binary_op_fn(x.op_token.as_ref().unwrap(), &arg_values[0], &arg_values[1])
                         .and_then(|(f, ctx)| {
-                            let context = if ctx {
-                                Some((state.engine, x.name.as_str(), None, &state.global, *pos).into())
-                            } else {
-                                None
-                            };
+                            let context = ctx.then(|| (state.engine, x.name.as_str(), None, &state.global, *pos).into());
                             let (first, second) = arg_values.split_first_mut().unwrap();
-                            (f)(context, &mut [ first, &mut second[0] ]).ok()
+                            f(context, &mut [ first, &mut second[0] ]).ok()
                         }) {
                             state.set_dirty();
                             *expr = Expr::from_dynamic(result, *pos);

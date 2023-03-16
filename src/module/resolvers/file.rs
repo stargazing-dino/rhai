@@ -239,14 +239,7 @@ impl FileModuleResolver {
         if !self.cache_enabled {
             return false;
         }
-
-        let cache = locked_read(&self.cache);
-
-        if cache.is_empty() {
-            false
-        } else {
-            cache.contains_key(path.as_ref())
-        }
+        locked_read(&self.cache).contains_key(path.as_ref())
     }
     /// Empty the internal cache.
     #[inline]
@@ -290,15 +283,15 @@ impl FileModuleResolver {
     fn impl_resolve(
         &self,
         engine: &Engine,
-        global: Option<&mut GlobalRuntimeState>,
+        global: &mut GlobalRuntimeState,
+        scope: &mut Scope,
         source: Option<&str>,
         path: &str,
         pos: Position,
     ) -> Result<SharedModule, Box<crate::EvalAltResult>> {
         // Load relative paths from source if there is no base path specified
         let source_path = global
-            .as_ref()
-            .and_then(|g| g.source())
+            .source()
             .or(source)
             .and_then(|p| Path::new(p).parent());
 
@@ -321,14 +314,9 @@ impl FileModuleResolver {
 
         ast.set_source(path);
 
-        let scope = Scope::new();
-
-        let m: Shared<_> = match global {
-            Some(global) => Module::eval_ast_as_new_raw(engine, scope, global, &ast),
-            None => Module::eval_ast_as_new(scope, &ast, engine),
-        }
-        .map_err(|err| Box::new(ERR::ErrorInModule(path.to_string(), err, pos)))?
-        .into();
+        let m: Shared<_> = Module::eval_ast_as_new_raw(engine, scope, global, &ast)
+            .map_err(|err| Box::new(ERR::ErrorInModule(path.to_string(), err, pos)))?
+            .into();
 
         if self.is_cache_enabled() {
             locked_write(&self.cache).insert(file_path, m.clone());
@@ -343,10 +331,11 @@ impl ModuleResolver for FileModuleResolver {
         &self,
         engine: &Engine,
         global: &mut GlobalRuntimeState,
+        scope: &mut Scope,
         path: &str,
         pos: Position,
     ) -> RhaiResultOf<SharedModule> {
-        self.impl_resolve(engine, Some(global), None, path, pos)
+        self.impl_resolve(engine, global, scope, None, path, pos)
     }
 
     #[inline(always)]
@@ -357,7 +346,9 @@ impl ModuleResolver for FileModuleResolver {
         path: &str,
         pos: Position,
     ) -> RhaiResultOf<SharedModule> {
-        self.impl_resolve(engine, None, source, path, pos)
+        let global = &mut GlobalRuntimeState::new(engine);
+        let scope = &mut Scope::new();
+        self.impl_resolve(engine, global, scope, source, path, pos)
     }
 
     /// Resolve an `AST` based on a path string.

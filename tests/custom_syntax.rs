@@ -252,6 +252,62 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
 }
 
 #[test]
+fn test_custom_syntax_matrix() -> Result<(), Box<EvalAltResult>> {
+    let mut engine = Engine::new();
+
+    engine.disable_symbol("|");
+
+    engine.register_custom_syntax(
+        [
+            "@", //
+            "|", "$expr$", "$expr$", "$expr$", "|", //
+            "|", "$expr$", "$expr$", "$expr$", "|", //
+            "|", "$expr$", "$expr$", "$expr$", "|",
+        ],
+        false,
+        |context, inputs| {
+            let mut values = [[0; 3]; 3];
+
+            for y in 0..3 {
+                for x in 0..3 {
+                    let offset = y * 3 + x;
+
+                    match context.eval_expression_tree(&inputs[offset])?.as_int() {
+                        Ok(v) => values[y][x] = v,
+                        Err(typ) => {
+                            return Err(Box::new(EvalAltResult::ErrorMismatchDataType(
+                                "integer".to_string(),
+                                typ.to_string(),
+                                inputs[offset].position(),
+                            )))
+                        }
+                    }
+                }
+            }
+
+            Ok(Dynamic::from(values))
+        },
+    )?;
+
+    let r = engine.eval::<[[INT; 3]; 3]>(
+        "
+            let a = 42;
+            let b = 123;
+            let c = 1;
+            let d = 99;
+
+            @|  a   b   0  |
+             | -b   a   0  |
+             |  0   0  c*d |
+        ",
+    )?;
+
+    assert_eq!(r, [[42, 123, 0], [-123, 42, 0], [0, 0, 99]]);
+
+    Ok(())
+}
+
+#[test]
 fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
 

@@ -5,13 +5,11 @@ use crate::func::native::{
     locked_write, OnDebugCallback, OnDefVarCallback, OnParseTokenCallback, OnPrintCallback,
     OnVarCallback,
 };
-use crate::module::ModuleFlags;
 use crate::packages::{Package, StandardPackage};
 use crate::tokenizer::Token;
 use crate::types::StringsInterner;
 use crate::{
-    Dynamic, Identifier, ImmutableString, Locked, Module, OptimizationLevel, SharedModule,
-    StaticVec,
+    Dynamic, Identifier, ImmutableString, Locked, OptimizationLevel, SharedModule, StaticVec,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -57,11 +55,18 @@ pub const OP_EQUALS: &str = Token::EqualsTo.literal_syntax();
 /// The `in` operator is implemented as a call to this function.
 pub const OP_CONTAINS: &str = "contains";
 
+/// Standard not operator.
+pub const OP_NOT: &str = Token::Bang.literal_syntax();
+
 /// Standard exclusive range operator.
 pub const OP_EXCLUSIVE_RANGE: &str = Token::ExclusiveRange.literal_syntax();
 
 /// Standard inclusive range operator.
 pub const OP_INCLUSIVE_RANGE: &str = Token::InclusiveRange.literal_syntax();
+
+/// Separator for namespaces.
+#[cfg(not(feature = "no_module"))]
+pub const NAMESPACE_SEPARATOR: &str = Token::DoubleColon.literal_syntax();
 
 /// Rhai main scripting engine.
 ///
@@ -96,10 +101,10 @@ pub struct Engine {
 
     /// A module resolution service.
     #[cfg(not(feature = "no_module"))]
-    pub(crate) module_resolver: Box<dyn crate::ModuleResolver>,
+    pub(crate) module_resolver: Option<Box<dyn crate::ModuleResolver>>,
 
     /// Strings interner.
-    pub(crate) interned_strings: Locked<StringsInterner>,
+    pub(crate) interned_strings: Option<Box<Locked<StringsInterner>>>,
 
     /// A set of symbols to disable.
     pub(crate) disabled_symbols: Option<Box<BTreeSet<Identifier>>>,
@@ -110,7 +115,7 @@ pub struct Engine {
     /// Custom syntax.
     #[cfg(not(feature = "no_custom_syntax"))]
     pub(crate) custom_syntax: Option<
-        Box<std::collections::BTreeMap<Identifier, crate::api::custom_syntax::CustomSyntax>>,
+        Box<std::collections::BTreeMap<Identifier, Box<crate::api::custom_syntax::CustomSyntax>>>,
     >,
     /// Callback closure for filtering variable definition.
     pub(crate) def_var_filter: Option<Box<OnDefVarCallback>>,
@@ -120,9 +125,9 @@ pub struct Engine {
     pub(crate) token_mapper: Option<Box<OnParseTokenCallback>>,
 
     /// Callback closure for implementing the `print` command.
-    pub(crate) print: Box<OnPrintCallback>,
+    pub(crate) print: Option<Box<OnPrintCallback>>,
     /// Callback closure for implementing the `debug` command.
-    pub(crate) debug: Box<OnDebugCallback>,
+    pub(crate) debug: Option<Box<OnDebugCallback>>,
     /// Callback closure for progress reporting.
     #[cfg(not(feature = "unchecked"))]
     pub(crate) progress: Option<Box<crate::func::native::OnProgressCallback>>,
@@ -142,12 +147,10 @@ pub struct Engine {
 
     /// Callback closure for debugging.
     #[cfg(feature = "debugging")]
-    pub(crate) debugger_interface: Option<
-        Box<(
-            Box<crate::eval::OnDebuggingInit>,
-            Box<crate::eval::OnDebuggerCallback>,
-        )>,
-    >,
+    pub(crate) debugger_interface: Option<(
+        Box<crate::eval::OnDebuggingInit>,
+        Box<crate::eval::OnDebuggerCallback>,
+    )>,
 }
 
 impl fmt::Debug for Engine {
@@ -224,6 +227,49 @@ pub fn make_setter(id: &str) -> Identifier {
 }
 
 impl Engine {
+    /// An empty raw [`Engine`].
+    pub const RAW: Self = Self {
+        global_modules: StaticVec::new_const(),
+
+        #[cfg(not(feature = "no_module"))]
+        global_sub_modules: None,
+
+        #[cfg(not(feature = "no_module"))]
+        module_resolver: None,
+
+        interned_strings: None,
+        disabled_symbols: None,
+        #[cfg(not(feature = "no_custom_syntax"))]
+        custom_keywords: None,
+        #[cfg(not(feature = "no_custom_syntax"))]
+        custom_syntax: None,
+
+        def_var_filter: None,
+        resolve_var: None,
+        token_mapper: None,
+
+        print: None,
+        debug: None,
+
+        #[cfg(not(feature = "unchecked"))]
+        progress: None,
+
+        options: LangOptions::new(),
+
+        def_tag: Dynamic::UNIT,
+
+        #[cfg(not(feature = "no_optimize"))]
+        optimization_level: OptimizationLevel::Simple,
+        #[cfg(feature = "no_optimize")]
+        optimization_level: (),
+
+        #[cfg(not(feature = "unchecked"))]
+        limits: crate::api::limits::Limits::new(),
+
+        #[cfg(feature = "debugging")]
+        debugger_interface: None,
+    };
+
     /// Create a new [`Engine`].
     #[inline]
     #[must_use]
@@ -235,22 +281,25 @@ impl Engine {
         #[cfg(not(feature = "no_std"))]
         #[cfg(not(target_family = "wasm"))]
         {
-            engine.module_resolver = Box::new(crate::module::resolvers::FileModuleResolver::new());
+            engine.module_resolver =
+                Some(Box::new(crate::module::resolvers::FileModuleResolver::new()));
         }
+
+        engine.interned_strings = Some(Locked::new(StringsInterner::new()).into());
 
         // default print/debug implementations
         #[cfg(not(feature = "no_std"))]
         #[cfg(not(target_family = "wasm"))]
         {
-            engine.print = Box::new(|s| println!("{s}"));
-            engine.debug = Box::new(|s, source, pos| match (source, pos) {
+            engine.print = Some(Box::new(|s| println!("{s}")));
+            engine.debug = Some(Box::new(|s, source, pos| match (source, pos) {
                 (Some(source), crate::Position::NONE) => println!("{source} | {s}"),
                 #[cfg(not(feature = "no_position"))]
                 (Some(source), pos) => println!("{source} @ {pos:?} | {s}"),
                 (None, crate::Position::NONE) => println!("{s}"),
                 #[cfg(not(feature = "no_position"))]
                 (None, pos) => println!("{pos:?} | {s}"),
-            });
+            }));
         }
 
         engine.register_global_module(StandardPackage::new().as_shared_module());
@@ -259,59 +308,15 @@ impl Engine {
     }
 
     /// Create a new [`Engine`] with minimal built-in functions.
+    /// It returns a copy of [`Engine::RAW`].
+    ///
+    /// This is useful for creating a custom scripting engine with only the functions you need.
     ///
     /// Use [`register_global_module`][Engine::register_global_module] to add packages of functions.
     #[inline]
     #[must_use]
-    pub fn new_raw() -> Self {
-        let mut engine = Self {
-            global_modules: StaticVec::new_const(),
-
-            #[cfg(not(feature = "no_module"))]
-            global_sub_modules: None,
-
-            #[cfg(not(feature = "no_module"))]
-            module_resolver: Box::new(crate::module::resolvers::DummyModuleResolver::new()),
-
-            interned_strings: StringsInterner::new().into(),
-            disabled_symbols: None,
-            #[cfg(not(feature = "no_custom_syntax"))]
-            custom_keywords: None,
-            #[cfg(not(feature = "no_custom_syntax"))]
-            custom_syntax: None,
-
-            def_var_filter: None,
-            resolve_var: None,
-            token_mapper: None,
-
-            print: Box::new(|_| {}),
-            debug: Box::new(|_, _, _| {}),
-
-            #[cfg(not(feature = "unchecked"))]
-            progress: None,
-
-            options: LangOptions::new(),
-
-            def_tag: Dynamic::UNIT,
-
-            #[cfg(not(feature = "no_optimize"))]
-            optimization_level: OptimizationLevel::Simple,
-            #[cfg(feature = "no_optimize")]
-            optimization_level: (),
-
-            #[cfg(not(feature = "unchecked"))]
-            limits: crate::api::limits::Limits::new(),
-
-            #[cfg(feature = "debugging")]
-            debugger_interface: None,
-        };
-
-        // Add the global namespace module
-        let mut global_namespace = Module::new();
-        global_namespace.flags |= ModuleFlags::INTERNAL;
-        engine.global_modules.push(global_namespace.into());
-
-        engine
+    pub const fn new_raw() -> Self {
+        Self::RAW
     }
 
     /// Get an interned [string][ImmutableString].
@@ -322,7 +327,11 @@ impl Engine {
         &self,
         string: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        locked_write(&self.interned_strings).get(string)
+        if let Some(ref interner) = self.interned_strings {
+            locked_write(interner).get(string)
+        } else {
+            string.into()
+        }
     }
 
     /// _(internals)_ Get an interned [string][ImmutableString].
@@ -331,13 +340,17 @@ impl Engine {
     /// [`Engine`] keeps a cache of [`ImmutableString`] instances and tries to avoid new allocations
     /// when an existing instance is found.
     #[cfg(feature = "internals")]
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn get_interned_string(
         &self,
         string: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        locked_write(&self.interned_strings).get(string)
+        if let Some(ref interner) = self.interned_strings {
+            locked_write(interner).get(string)
+        } else {
+            string.into()
+        }
     }
 
     /// Get an empty [`ImmutableString`] which refers to a shared instance.
@@ -353,5 +366,18 @@ impl Engine {
     #[must_use]
     pub(crate) const fn is_debugger_registered(&self) -> bool {
         self.debugger_interface.is_some()
+    }
+
+    /// Imitation of std::hints::black_box which requires nightly.
+    #[cfg(not(target_family = "wasm"))]
+    #[inline(never)]
+    pub(crate) fn black_box() -> usize {
+        unsafe { core::ptr::read_volatile(&0_usize as *const usize) }
+    }
+    /// Imitation of std::hints::black_box which requires nightly.
+    #[cfg(target_family = "wasm")]
+    #[inline(always)]
+    pub(crate) fn black_box() -> usize {
+        0
     }
 }

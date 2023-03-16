@@ -27,48 +27,6 @@ use rust_decimal::Decimal;
 /// The `unchecked` feature is not active.
 const CHECKED_BUILD: bool = cfg!(not(feature = "unchecked"));
 
-/// Is the type a numeric type?
-#[inline]
-#[must_use]
-fn is_numeric(type_id: TypeId) -> bool {
-    if type_id == TypeId::of::<INT>() {
-        return true;
-    }
-
-    #[cfg(not(feature = "only_i64"))]
-    #[cfg(not(feature = "only_i32"))]
-    if type_id == TypeId::of::<u8>()
-        || type_id == TypeId::of::<u16>()
-        || type_id == TypeId::of::<u32>()
-        || type_id == TypeId::of::<u64>()
-        || type_id == TypeId::of::<i8>()
-        || type_id == TypeId::of::<i16>()
-        || type_id == TypeId::of::<i32>()
-        || type_id == TypeId::of::<i64>()
-    {
-        return true;
-    }
-
-    #[cfg(not(feature = "only_i64"))]
-    #[cfg(not(feature = "only_i32"))]
-    #[cfg(not(target_family = "wasm"))]
-    if type_id == TypeId::of::<u128>() || type_id == TypeId::of::<i128>() {
-        return true;
-    }
-
-    #[cfg(not(feature = "no_float"))]
-    if type_id == TypeId::of::<f32>() || type_id == TypeId::of::<f64>() {
-        return true;
-    }
-
-    #[cfg(feature = "decimal")]
-    if type_id == TypeId::of::<rust_decimal::Decimal>() {
-        return true;
-    }
-
-    false
-}
-
 /// A function that returns `true`.
 #[inline(always)]
 #[allow(clippy::unnecessary_wraps)]
@@ -584,22 +542,7 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
 
     // One of the operands is a custom type, so it is never built-in
     if x.is_variant() || y.is_variant() {
-        return if is_numeric(type1) && is_numeric(type2) {
-            // Disallow comparisons between different numeric types
-            None
-        } else if type1 != type2 {
-            // If the types are not the same, default to not compare
-            match op {
-                NotEqualsTo => Some((const_true_fn, false)),
-                EqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo => {
-                    Some((const_false_fn, false))
-                }
-                _ => None,
-            }
-        } else {
-            // Disallow comparisons between the same type
-            None
-        };
+        return None;
     }
 
     // Default comparison operators for different types
@@ -741,6 +684,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
             return match op {
                 AndAssign => impl_op!(bool = x && as_bool),
                 OrAssign => impl_op!(bool = x || as_bool),
+                XOrAssign => impl_op!(bool = x ^ as_bool),
                 _ => None,
             };
         }

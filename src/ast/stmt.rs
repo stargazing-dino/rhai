@@ -1,17 +1,18 @@
 //! Module defining script statements.
 
 use super::{ASTFlags, ASTNode, BinaryExpr, Expr, FnCallExpr, Ident};
-use crate::engine::KEYWORD_EVAL;
+use crate::engine::{KEYWORD_EVAL, OP_EQUALS};
+use crate::func::StraightHashMap;
 use crate::tokenizer::Token;
+use crate::types::dynamic::Union;
 use crate::types::Span;
-use crate::{calc_fn_hash, Position, StaticVec, INT};
+use crate::{calc_fn_hash, Dynamic, Position, StaticVec, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
     borrow::Borrow,
-    collections::BTreeMap,
     fmt,
-    hash::Hash,
+    hash::{Hash, Hasher},
     mem,
     num::NonZeroUsize,
     ops::{Deref, DerefMut, Range, RangeInclusive},
@@ -29,8 +30,12 @@ pub struct OpAssignment {
     hash_op: u64,
     /// Op-assignment operator.
     op_assign: Token,
+    /// Syntax of op-assignment operator.
+    op_assign_syntax: &'static str,
     /// Underlying operator.
     op: Token,
+    /// Syntax of underlying operator.
+    op_syntax: &'static str,
     /// [Position] of the op-assignment operator.
     pos: Position,
 }
@@ -44,7 +49,9 @@ impl OpAssignment {
             hash_op_assign: 0,
             hash_op: 0,
             op_assign: Token::Equals,
+            op_assign_syntax: OP_EQUALS,
             op: Token::Equals,
+            op_syntax: OP_EQUALS,
             pos,
         }
     }
@@ -56,17 +63,28 @@ impl OpAssignment {
     }
     /// Get information if this [`OpAssignment`] is an op-assignment.
     ///
-    /// Returns `( hash_op_assign, hash_op, op_assign, op )`:
+    /// Returns `( hash_op_assign, hash_op, op_assign, op_assign_syntax, op, op_syntax )`:
     ///
     /// * `hash_op_assign`: Hash of the op-assignment call.
     /// * `hash_op`: Hash of the underlying operator call (for fallback).
     /// * `op_assign`: Op-assignment operator.
+    /// * `op_assign_syntax`: Syntax of op-assignment operator.
     /// * `op`: Underlying operator.
+    /// * `op_syntax`: Syntax of underlying operator.
     #[must_use]
     #[inline]
-    pub fn get_op_assignment_info(&self) -> Option<(u64, u64, &Token, &Token)> {
+    pub fn get_op_assignment_info(
+        &self,
+    ) -> Option<(u64, u64, &Token, &'static str, &Token, &'static str)> {
         if self.is_op_assignment() {
-            Some((self.hash_op_assign, self.hash_op, &self.op_assign, &self.op))
+            Some((
+                self.hash_op_assign,
+                self.hash_op,
+                &self.op_assign,
+                self.op_assign_syntax,
+                &self.op,
+                self.op_syntax,
+            ))
         } else {
             None
         }
@@ -99,11 +117,16 @@ impl OpAssignment {
             .get_base_op_from_assignment()
             .expect("op-assignment operator");
 
+        let op_assign_syntax = op_assign.literal_syntax();
+        let op_syntax = op.literal_syntax();
+
         Self {
-            hash_op_assign: calc_fn_hash(None, op_assign.literal_syntax(), 2),
-            hash_op: calc_fn_hash(None, op.literal_syntax(), 2),
+            hash_op_assign: calc_fn_hash(None, op_assign_syntax, 2),
+            hash_op: calc_fn_hash(None, op_syntax, 2),
             op_assign,
+            op_assign_syntax,
             op,
+            op_syntax,
             pos,
         }
     }
@@ -139,7 +162,9 @@ impl fmt::Debug for OpAssignment {
                 .field("hash_op_assign", &self.hash_op_assign)
                 .field("hash_op", &self.hash_op)
                 .field("op_assign", &self.op_assign)
+                .field("op_assign_syntax", &self.op_assign_syntax)
                 .field("op", &self.op)
+                .field("op_syntax", &self.op_syntax)
                 .field("pos", &self.pos)
                 .finish()
         } else {
@@ -233,7 +258,7 @@ impl IntoIterator for RangeCase {
     type Item = INT;
     type IntoIter = Box<dyn Iterator<Item = Self::Item>>;
 
-    #[inline(always)]
+    #[inline]
     #[must_use]
     fn into_iter(self) -> Self::IntoIter {
         match self {
@@ -245,7 +270,7 @@ impl IntoIterator for RangeCase {
 
 impl RangeCase {
     /// Returns `true` if the range contains no items.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
         match self {
@@ -254,7 +279,7 @@ impl RangeCase {
         }
     }
     /// Size of the range.
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn len(&self) -> INT {
         match self {
@@ -264,13 +289,54 @@ impl RangeCase {
             Self::InclusiveInt(r, ..) => *r.end() - *r.start() + 1,
         }
     }
-    /// Is the specified number within this range?
-    #[inline(always)]
+    /// Is the specified value within this range?
+    #[inline]
     #[must_use]
-    pub fn contains(&self, n: INT) -> bool {
+    pub fn contains(&self, value: &Dynamic) -> bool {
+        match value {
+            Dynamic(Union::Int(v, ..)) => self.contains_int(*v),
+            #[cfg(not(feature = "no_float"))]
+            Dynamic(Union::Float(v, ..)) => self.contains_float(**v),
+            #[cfg(feature = "decimal")]
+            Dynamic(Union::Decimal(v, ..)) => self.contains_decimal(**v),
+            _ => false,
+        }
+    }
+    /// Is the specified number within this range?
+    #[inline]
+    #[must_use]
+    pub fn contains_int(&self, n: INT) -> bool {
         match self {
             Self::ExclusiveInt(r, ..) => r.contains(&n),
             Self::InclusiveInt(r, ..) => r.contains(&n),
+        }
+    }
+    /// Is the specified floating-point number within this range?
+    #[cfg(not(feature = "no_float"))]
+    #[inline]
+    #[must_use]
+    pub fn contains_float(&self, n: crate::FLOAT) -> bool {
+        use crate::FLOAT;
+
+        match self {
+            Self::ExclusiveInt(r, ..) => ((r.start as FLOAT)..(r.end as FLOAT)).contains(&n),
+            Self::InclusiveInt(r, ..) => ((*r.start() as FLOAT)..=(*r.end() as FLOAT)).contains(&n),
+        }
+    }
+    /// Is the specified decimal number within this range?
+    #[cfg(feature = "decimal")]
+    #[inline]
+    #[must_use]
+    pub fn contains_decimal(&self, n: rust_decimal::Decimal) -> bool {
+        use rust_decimal::Decimal;
+
+        match self {
+            Self::ExclusiveInt(r, ..) => {
+                (Into::<Decimal>::into(r.start)..Into::<Decimal>::into(r.end)).contains(&n)
+            }
+            Self::InclusiveInt(r, ..) => {
+                (Into::<Decimal>::into(*r.start())..=Into::<Decimal>::into(*r.end())).contains(&n)
+            }
         }
     }
     /// Is the specified range inclusive?
@@ -303,16 +369,29 @@ pub type CaseBlocksList = smallvec::SmallVec<[usize; 1]>;
 
 /// _(internals)_ A type containing all cases for a `switch` statement.
 /// Exported under the `internals` feature only.
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone)]
 pub struct SwitchCasesCollection {
     /// List of [`ConditionalExpr`]'s.
     pub expressions: StaticVec<ConditionalExpr>,
     /// Dictionary mapping value hashes to [`ConditionalExpr`]'s.
-    pub cases: BTreeMap<u64, CaseBlocksList>,
+    pub cases: StraightHashMap<CaseBlocksList>,
     /// List of range cases.
     pub ranges: StaticVec<RangeCase>,
     /// Statements block for the default case (there can be no condition for the default case).
     pub def_case: Option<usize>,
+}
+
+impl Hash for SwitchCasesCollection {
+    #[inline(always)]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.expressions.hash(state);
+
+        self.cases.len().hash(state);
+        self.cases.iter().for_each(|kv| kv.hash(state));
+
+        self.ranges.hash(state);
+        self.def_case.hash(state);
+    }
 }
 
 /// Number of items to keep inline for [`StmtBlockContainer`].

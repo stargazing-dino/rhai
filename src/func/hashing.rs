@@ -27,7 +27,8 @@ impl Hasher for StraightHasher {
     fn finish(&self) -> u64 {
         self.0
     }
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     fn write(&mut self, _bytes: &[u8]) {
         panic!("StraightHasher can only hash u64 values");
     }
@@ -85,7 +86,7 @@ pub fn calc_var_hash<'a>(namespace: impl IntoIterator<Item = &'a str>, var_name:
         }
         count += 1;
     });
-    count.hash(s);
+    s.write_usize(count);
     var_name.hash(s);
 
     s.finish()
@@ -119,9 +120,9 @@ pub fn calc_fn_hash<'a>(
         }
         count += 1;
     });
-    count.hash(s);
+    s.write_usize(count);
     fn_name.hash(s);
-    num.hash(s);
+    s.write_usize(num);
 
     s.finish()
 }
@@ -133,13 +134,12 @@ pub fn calc_fn_hash<'a>(
 #[must_use]
 pub fn calc_fn_hash_full(base: u64, params: impl IntoIterator<Item = TypeId>) -> u64 {
     let s = &mut get_hasher();
-    base.hash(s);
     let mut count = 0;
     params.into_iter().for_each(|t| {
         t.hash(s);
         count += 1;
     });
-    count.hash(s);
+    s.write_usize(count);
 
-    s.finish()
+    s.finish() ^ base
 }

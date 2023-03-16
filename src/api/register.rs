@@ -1,6 +1,7 @@
 //! Module that defines the public function/module registration API of [`Engine`].
 
 use crate::func::{FnCallArgs, RegisterNativeFunction, SendSync};
+use crate::module::ModuleFlags;
 use crate::types::dynamic::Variant;
 use crate::{
     Engine, FnAccess, FnNamespace, Identifier, Module, NativeCallContext, RhaiResultOf, Shared,
@@ -14,20 +15,18 @@ use std::prelude::v1::*;
 use crate::func::register::Mut;
 
 impl Engine {
-    /// Get the global namespace module (which is the fist module in `global_modules`).
-    #[inline(always)]
-    #[allow(dead_code)]
-    #[must_use]
-    pub(crate) fn global_namespace(&self) -> &Module {
-        self.global_modules.first().unwrap()
-    }
     /// Get a mutable reference to the global namespace module
     /// (which is the first module in `global_modules`).
     #[inline(always)]
     #[must_use]
-    pub(crate) fn global_namespace_mut(&mut self) -> &mut Module {
-        let module = self.global_modules.first_mut().unwrap();
-        Shared::get_mut(module).expect("not shared")
+    fn global_namespace_mut(&mut self) -> &mut Module {
+        if self.global_modules.is_empty() {
+            let mut global_namespace = Module::new();
+            global_namespace.flags |= ModuleFlags::INTERNAL;
+            self.global_modules.push(global_namespace.into());
+        }
+
+        Shared::get_mut(self.global_modules.first_mut().unwrap()).expect("not shared")
     }
     /// Register a custom function with the [`Engine`].
     ///
@@ -677,6 +676,9 @@ impl Engine {
     /// modules are searched in reverse order.
     #[inline(always)]
     pub fn register_global_module(&mut self, module: SharedModule) -> &mut Self {
+        // Make sure the global namespace is created.
+        let _ = self.global_namespace_mut();
+
         // Insert the module into the front.
         // The first module is always the global namespace.
         self.global_modules.insert(1, module);
@@ -729,7 +731,7 @@ impl Engine {
             name: &str,
             module: SharedModule,
         ) {
-            let separator = crate::tokenizer::Token::DoubleColon.literal_syntax();
+            let separator = crate::engine::NAMESPACE_SEPARATOR;
 
             if name.contains(separator) {
                 let mut iter = name.splitn(2, separator);
@@ -779,7 +781,9 @@ impl Engine {
     pub fn gen_fn_signatures(&self, include_packages: bool) -> Vec<String> {
         let mut signatures = Vec::with_capacity(64);
 
-        signatures.extend(self.global_namespace().gen_fn_signatures());
+        if let Some(global_namespace) = self.global_modules.first() {
+            signatures.extend(global_namespace.gen_fn_signatures());
+        }
 
         #[cfg(not(feature = "no_module"))]
         for (name, m) in self.global_sub_modules.as_deref().into_iter().flatten() {

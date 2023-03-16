@@ -10,9 +10,7 @@ fn test_switch() -> Result<(), Box<EvalAltResult>> {
         engine.eval::<char>("switch 2 { 1 => (), 2 => 'a', 42 => true }")?,
         'a'
     );
-    engine
-        .run("switch 3 { 1 => (), 2 => 'a', 42 => true }")
-        .unwrap();
+    engine.run("switch 3 { 1 => (), 2 => 'a', 42 => true }")?;
     assert_eq!(
         engine.eval::<INT>("switch 3 { 1 => (), 2 => 'a', 42 => true, _ => 123 }")?,
         123
@@ -31,15 +29,13 @@ fn test_switch() -> Result<(), Box<EvalAltResult>> {
         )?,
         'a'
     );
-    assert!(engine
-        .eval_with_scope::<bool>(&mut scope, "switch x { 1 => (), 2 => 'a', 42 => true }")
-        .unwrap());
-    assert!(engine
-        .eval_with_scope::<bool>(&mut scope, "switch x { 1 => (), 2 => 'a', _ => true }")
-        .unwrap());
-    let _: () = engine
-        .eval_with_scope::<()>(&mut scope, "switch x { 1 => 123, 2 => 'a' }")
-        .unwrap();
+    assert!(
+        engine.eval_with_scope::<bool>(&mut scope, "switch x { 1 => (), 2 => 'a', 42 => true }")?
+    );
+    assert!(
+        engine.eval_with_scope::<bool>(&mut scope, "switch x { 1 => (), 2 => 'a', _ => true }")?
+    );
+    let _: () = engine.eval_with_scope::<()>(&mut scope, "switch x { 1 => 123, 2 => 'a' }")?;
 
     assert_eq!(
         engine.eval_with_scope::<INT>(
@@ -273,6 +269,13 @@ fn test_switch_ranges() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine.compile(
             "switch x { 10..20 => (), 20..=42 => 'a', 25..45 => 'z', 42 => 'x', 30..100 => true }"
+        ).expect_err("should error").err_type(),
+        ParseErrorType::WrongSwitchIntegerCase
+    ));
+    #[cfg(not(feature = "no_float"))]
+    assert!(matches!(
+        engine.compile(
+            "switch x { 10..20 => (), 20..=42 => 'a', 25..45 => 'z', 42.0 => 'x', 30..100 => true }"
         ).expect_err("should error").err_type(),
         ParseErrorType::WrongSwitchIntegerCase
     ));

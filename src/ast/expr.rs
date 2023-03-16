@@ -185,7 +185,7 @@ impl FnCallHashes {
     #[inline(always)]
     #[must_use]
     pub fn script(&self) -> u64 {
-        assert!(self.script.is_some());
+        debug_assert!(self.script.is_some());
         self.script.unwrap()
     }
 }
@@ -248,11 +248,7 @@ impl FnCallExpr {
     #[inline]
     #[must_use]
     pub fn constant_args(&self) -> bool {
-        if self.args.is_empty() {
-            true
-        } else {
-            self.args.iter().all(Expr::is_constant)
-        }
+        self.args.is_empty() || self.args.iter().all(Expr::is_constant)
     }
 }
 
@@ -383,7 +379,7 @@ impl fmt::Debug for Expr {
 
                 #[cfg(not(feature = "no_module"))]
                 if !x.1.is_empty() {
-                    write!(f, "{}{}", x.1, Token::DoubleColon.literal_syntax())?;
+                    write!(f, "{}{}", x.1, crate::engine::NAMESPACE_SEPARATOR)?;
                     let pos = x.1.position();
                     if !pos.is_none() {
                         display_pos = pos;

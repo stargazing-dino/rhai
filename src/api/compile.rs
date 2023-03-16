@@ -2,6 +2,7 @@
 
 use crate::func::native::locked_write;
 use crate::parser::{ParseResult, ParseState};
+use crate::types::StringsInterner;
 use crate::{Engine, OptimizationLevel, Scope, AST};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -126,7 +127,7 @@ impl Engine {
                 let path = path.clone();
 
                 match self
-                    .module_resolver
+                    .module_resolver()
                     .resolve_ast(self, None, &path, crate::Position::NONE)
                 {
                     Some(Ok(module_ast)) => collect_imports(&module_ast, &resolver, &mut imports),
@@ -135,7 +136,7 @@ impl Engine {
                 }
 
                 let module =
-                    self.module_resolver
+                    self.module_resolver()
                         .resolve(self, None, &path, crate::Position::NONE)?;
 
                 let module = shared_take_or_clone(module);
@@ -223,7 +224,17 @@ impl Engine {
         optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
         let (stream, tc) = self.lex_raw(scripts.as_ref(), self.token_mapper.as_deref());
-        let interned_strings = &mut *locked_write(&self.interned_strings);
+
+        let mut interner;
+        let mut guard;
+        let interned_strings = if let Some(ref interner) = self.interned_strings {
+            guard = locked_write(interner);
+            &mut *guard
+        } else {
+            interner = StringsInterner::new();
+            &mut interner
+        };
+
         let state = &mut ParseState::new(scope, interned_strings, tc);
         let mut _ast = self.parse(stream.peekable(), state, optimization_level)?;
         #[cfg(feature = "metadata")]
@@ -294,7 +305,17 @@ impl Engine {
     ) -> ParseResult<AST> {
         let scripts = [script];
         let (stream, t) = self.lex_raw(&scripts, self.token_mapper.as_deref());
-        let interned_strings = &mut *locked_write(&self.interned_strings);
+
+        let mut interner;
+        let mut guard;
+        let interned_strings = if let Some(ref interner) = self.interned_strings {
+            guard = locked_write(interner);
+            &mut *guard
+        } else {
+            interner = StringsInterner::new();
+            &mut interner
+        };
+
         let state = &mut ParseState::new(Some(scope), interned_strings, t);
         self.parse_global_expr(stream.peekable(), state, |_| {}, self.optimization_level)
     }

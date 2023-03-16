@@ -7,25 +7,24 @@ use crate::ast::{
     FnCallHashes, Ident, Namespace, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock,
     StmtBlockContainer, SwitchCasesCollection,
 };
-use crate::engine::{Precedence, KEYWORD_THIS, OP_CONTAINS};
+use crate::engine::{Precedence, KEYWORD_THIS, OP_CONTAINS, OP_NOT};
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::tokenizer::{
-    is_keyword_function, is_valid_function_name, is_valid_identifier, Token, TokenStream,
+    is_reserved_keyword_or_symbol, is_valid_function_name, is_valid_identifier, Token, TokenStream,
     TokenizerControl,
 };
-use crate::types::dynamic::AccessMode;
+use crate::types::dynamic::{AccessMode, Union};
 use crate::types::StringsInterner;
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
     Identifier, ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position,
-    Scope, Shared, SmartString, StaticVec, AST, INT, PERR,
+    Scope, Shared, SmartString, StaticVec, AST, PERR,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
-    collections::BTreeMap,
     convert::TryFrom,
     fmt,
     hash::{Hash, Hasher},
@@ -41,9 +40,6 @@ const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 
 /// The message: `TokenStream` never ends
 const NEVER_ENDS: &str = "`Token`";
-
-/// Unroll `switch` ranges no larger than this.
-const SMALL_SWITCH_RANGE: INT = 16;
 
 /// _(internals)_ A type that encapsulates the current state of the parser.
 /// Exported under the `internals` feature only.
@@ -218,11 +214,7 @@ impl<'e, 's> ParseState<'e, 's> {
             self.allow_capture = true;
         }
 
-        let index = if hit_barrier {
-            None
-        } else {
-            NonZeroUsize::new(index)
-        };
+        let index = (!hit_barrier).then(|| NonZeroUsize::new(index)).flatten();
 
         (index, is_func_name)
     }
@@ -986,7 +978,7 @@ impl Engine {
         settings.pos = eat_token(input, Token::MapStart);
 
         let mut map = StaticVec::<(Ident, Expr)>::new();
-        let mut template = BTreeMap::<Identifier, crate::Dynamic>::new();
+        let mut template = std::collections::BTreeMap::<Identifier, crate::Dynamic>::new();
 
         loop {
             const MISSING_RBRACE: &str = "to end this object map literal";
@@ -1121,7 +1113,7 @@ impl Engine {
         }
 
         let mut expressions = StaticVec::<ConditionalExpr>::new();
-        let mut cases = BTreeMap::<u64, CaseBlocksList>::new();
+        let mut cases = StraightHashMap::<CaseBlocksList>::default();
         let mut ranges = StaticVec::<RangeCase>::new();
         let mut def_case = None;
         let mut def_case_pos = Position::NONE;
@@ -1216,7 +1208,6 @@ impl Engine {
                     let stmt_block: StmtBlock = stmt.into();
                     (Expr::Stmt(stmt_block.into()), need_comma)
                 };
-            let has_condition = !matches!(condition, Expr::BoolConstant(true, ..));
 
             expressions.push((condition, action_expr).into());
             let index = expressions.len() - 1;
@@ -1240,29 +1231,28 @@ impl Engine {
 
                     if let Some(mut r) = range_value {
                         if !r.is_empty() {
-                            // Do not unroll ranges if there are previous non-unrolled ranges
-                            if !has_condition && ranges.is_empty() && r.len() <= SMALL_SWITCH_RANGE
-                            {
-                                // Unroll small range
-                                r.into_iter().for_each(|n| {
-                                    let hasher = &mut get_hasher();
-                                    Dynamic::from_int(n).hash(hasher);
-                                    cases
-                                        .entry(hasher.finish())
-                                        .and_modify(|cases| cases.push(index))
-                                        .or_insert_with(|| [index].into());
-                                });
-                            } else {
-                                // Other range
-                                r.set_index(index);
-                                ranges.push(r);
-                            }
+                            // Other range
+                            r.set_index(index);
+                            ranges.push(r);
                         }
                         continue;
                     }
 
-                    if value.is_int() && !ranges.is_empty() {
-                        return Err(PERR::WrongSwitchIntegerCase.into_err(expr.start_position()));
+                    if !ranges.is_empty() {
+                        let forbidden = match value {
+                            Dynamic(Union::Int(..)) => true,
+                            #[cfg(not(feature = "no_float"))]
+                            Dynamic(Union::Float(..)) => true,
+                            #[cfg(feature = "decimal")]
+                            Dynamic(Union::Decimal(..)) => true,
+                            _ => false,
+                        };
+
+                        if forbidden {
+                            return Err(
+                                PERR::WrongSwitchIntegerCase.into_err(expr.start_position())
+                            );
+                        }
                     }
 
                     let hasher = &mut get_hasher();
@@ -1298,6 +1288,10 @@ impl Engine {
                 _ => (),
             }
         }
+
+        expressions.shrink_to_fit();
+        cases.shrink_to_fit();
+        ranges.shrink_to_fit();
 
         let cases = SwitchCasesCollection {
             expressions,
@@ -1398,20 +1392,26 @@ impl Engine {
                     .into(),
             )),
             // Loops are allowed to act as expressions
-            Token::While | Token::Loop if settings.has_option(LangOptions::LOOP_EXPR) => {
+            Token::While | Token::Loop
+                if self.allow_looping() && settings.has_option(LangOptions::LOOP_EXPR) =>
+            {
                 Expr::Stmt(Box::new(
                     self.parse_while_loop(input, state, lib, settings.level_up()?)?
                         .into(),
                 ))
             }
-            Token::Do if settings.has_option(LangOptions::LOOP_EXPR) => Expr::Stmt(Box::new(
-                self.parse_do(input, state, lib, settings.level_up()?)?
-                    .into(),
-            )),
-            Token::For if settings.has_option(LangOptions::LOOP_EXPR) => Expr::Stmt(Box::new(
-                self.parse_for(input, state, lib, settings.level_up()?)?
-                    .into(),
-            )),
+            Token::Do if self.allow_looping() && settings.has_option(LangOptions::LOOP_EXPR) => {
+                Expr::Stmt(Box::new(
+                    self.parse_do(input, state, lib, settings.level_up()?)?
+                        .into(),
+                ))
+            }
+            Token::For if self.allow_looping() && settings.has_option(LangOptions::LOOP_EXPR) => {
+                Expr::Stmt(Box::new(
+                    self.parse_for(input, state, lib, settings.level_up()?)?
+                        .into(),
+                ))
+            }
             // Switch statement is allowed to act as expressions
             Token::Switch if settings.has_option(LangOptions::SWITCH_EXPR) => Expr::Stmt(Box::new(
                 self.parse_switch(input, state, lib, settings.level_up()?)?
@@ -1665,7 +1665,9 @@ impl Engine {
 
                 match input.peek().expect(NEVER_ENDS).0 {
                     // Function call is allowed to have reserved keyword
-                    Token::LeftParen | Token::Bang | Token::Unit if is_keyword_function(&s).0 => {
+                    Token::LeftParen | Token::Bang | Token::Unit
+                        if is_reserved_keyword_or_symbol(&s).1 =>
+                    {
                         Expr::Variable(
                             (None, ns, 0, state.get_interned_string(*s)).into(),
                             None,
@@ -1722,7 +1724,7 @@ impl Engine {
         lib: &mut FnLib,
         settings: ParseSettings,
         mut lhs: Expr,
-        options: ChainingFlags,
+        _options: ChainingFlags,
     ) -> ParseResult<Expr> {
         let mut settings = settings;
 
@@ -1783,7 +1785,7 @@ impl Engine {
                 // Disallowed module separator
                 #[cfg(not(feature = "no_module"))]
                 (_, token @ Token::DoubleColon)
-                    if options.contains(ChainingFlags::DISALLOW_NAMESPACES) =>
+                    if _options.contains(ChainingFlags::DISALLOW_NAMESPACES) =>
                 {
                     return Err(LexError::ImproperSymbol(
                         token.literal_syntax().into(),
@@ -1824,7 +1826,7 @@ impl Engine {
                             // Prevents capturing of the object properties as vars: xxx.<var>
                             state.allow_capture = false;
                         }
-                        (Token::Reserved(s), ..) if is_keyword_function(s).1 => (),
+                        (Token::Reserved(s), ..) if is_reserved_keyword_or_symbol(s).2 => (),
                         (Token::Reserved(s), pos) => {
                             return Err(PERR::Reserved(s.to_string()).into_err(*pos))
                         }
@@ -2352,12 +2354,7 @@ impl Engine {
 
             let op = op_token.to_string();
             let hash = calc_fn_hash(None, &op, 2);
-            let is_valid_script_function = is_valid_function_name(&op);
-            let operator_token = if is_valid_script_function {
-                None
-            } else {
-                Some(op_token.clone())
-            };
+            let native_only = !is_valid_function_name(&op);
 
             let mut args = FnArgsVec::new_const();
             args.push(root);
@@ -2369,7 +2366,7 @@ impl Engine {
                 name: state.get_interned_string(&op),
                 hashes: FnCallHashes::from_native_only(hash),
                 args,
-                op_token: operator_token,
+                op_token: native_only.then(|| op_token.clone()),
                 capture_parent_scope: false,
             };
 
@@ -2418,14 +2415,13 @@ impl Engine {
                         fn_call
                     } else {
                         // Put a `!` call in front
-                        let op = Token::Bang.literal_syntax();
                         let mut args = FnArgsVec::new_const();
                         args.push(fn_call);
 
                         let not_base = FnCallExpr {
                             namespace: Namespace::NONE,
-                            name: state.get_interned_string(op),
-                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, op, 1)),
+                            name: state.get_interned_string(OP_NOT),
+                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, OP_NOT, 1)),
                             args,
                             op_token: Some(Token::Bang),
                             capture_parent_scope: false,
@@ -2442,10 +2438,10 @@ impl Engine {
                         .and_then(|m| m.get(s.as_str()))
                         .map_or(false, Option::is_some) =>
                 {
-                    op_base.hashes = if is_valid_script_function {
-                        FnCallHashes::from_hash(calc_fn_hash(None, &s, 2))
-                    } else {
+                    op_base.hashes = if native_only {
                         FnCallHashes::from_native_only(calc_fn_hash(None, &s, 2))
+                    } else {
+                        FnCallHashes::from_hash(calc_fn_hash(None, &s, 2))
                     };
                     op_base.into_fn_call_expr(pos)
                 }
@@ -3081,8 +3077,7 @@ impl Engine {
         let (id, id_pos) = parse_var_name(input)?;
 
         let (alias, alias_pos) = if match_token(input, Token::As).0 {
-            let (name, pos) = parse_var_name(input)?;
-            (Some(name), pos)
+            parse_var_name(input).map(|(name, pos)| (Some(name), pos))?
         } else {
             (None, Position::NONE)
         };
@@ -3788,7 +3783,7 @@ impl Engine {
                     (.., pos) => {
                         return Err(PERR::MissingToken(
                             Token::Pipe.into(),
-                            "to close the parameters list of anonymous function".into(),
+                            "to close the parameters list of anonymous function or closure".into(),
                         )
                         .into_err(pos))
                     }

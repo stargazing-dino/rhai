@@ -34,7 +34,7 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"], 
 unicode-xid = { version = "0.2", default-features = false, optional = true }
 rust_decimal = { version = "1.16", default-features = false, features = ["maths"], optional = true }
 getrandom = { version = "0.2", optional = true }
-rustyline = { version = "10", optional = true }
+rustyline = { version = "11", optional = true }
 document-features = { version = "0.2", optional = true }
 
 [dev-dependencies]
@@ -117,6 +117,11 @@ std = ["ahash/std", "num-traits/std", "smartstring/std"]
     ## Use [`stdweb`](https://crates.io/crates/stdweb) as JavaScript interface.
     stdweb = ["getrandom/js", "instant/stdweb"]
 
+#! ### Features used in testing environments only
+
+    ## Running under a testing environment.
+    testing-environ = []
+
 [[bin]]
 name = "rhai-repl"
 required-features = ["rustyline"]
@@ -151,4 +156,4 @@ features = ["document-features", "metadata", "serde", "internals", "decimal", "d
 [patch.crates-io]
 # Notice that a custom modified version of `rustyline` is used which supports bracketed paste on Windows.
 # This can be moved to the official version when bracketed paste is added.
-rustyline = { git = "https://github.com/schungx/rustyline", branch = "v10" }
+rustyline = { git = "https://github.com/schungx/rustyline", branch = "v11" }

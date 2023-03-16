@@ -369,9 +369,9 @@ fn test_closures_external() -> Result<(), Box<EvalAltResult>> {
 
     let fn_ptr = engine.eval_ast::<FnPtr>(&ast)?;
 
-    let f = move |x: INT| -> String { fn_ptr.call(&engine, &ast, (x,)).unwrap() };
+    let f = move |x: INT| fn_ptr.call::<String>(&engine, &ast, (x,));
 
-    assert_eq!(f(42), "hello42");
+    assert_eq!(f(42)?, "hello42");
 
     Ok(())
 }
@@ -383,20 +383,20 @@ fn test_closures_callback() -> Result<(), Box<EvalAltResult>> {
     type SingleNode = Rc<dyn Node>;
 
     trait Node {
-        fn run(&self, x: INT) -> INT;
+        fn run(&self, x: INT) -> Result<INT, Box<EvalAltResult>>;
     }
 
     struct PhaserNode {
-        func: Box<dyn Fn(INT) -> INT>,
+        func: Box<dyn Fn(INT) -> Result<INT, Box<EvalAltResult>>>,
     }
 
     impl Node for PhaserNode {
-        fn run(&self, x: INT) -> INT {
+        fn run(&self, x: INT) -> Result<INT, Box<EvalAltResult>> {
             (self.func)(x)
         }
     }
 
-    fn phaser(callback: impl Fn(INT) -> INT + 'static) -> impl Node {
+    fn phaser(callback: impl Fn(INT) -> Result<INT, Box<EvalAltResult>> + 'static) -> impl Node {
         PhaserNode {
             func: Box::new(callback),
         }
@@ -419,7 +419,7 @@ fn test_closures_callback() -> Result<(), Box<EvalAltResult>> {
         let engine = engine2.clone();
         let ast = ast2.clone();
 
-        let callback = Box::new(move |x: INT| fp.call(&engine.borrow(), &ast, (x,)).unwrap());
+        let callback = Box::new(move |x: INT| fp.call(&engine.borrow(), &ast, (x,)));
 
         Rc::new(phaser(callback)) as SingleNode
     });
@@ -428,7 +428,7 @@ fn test_closures_callback() -> Result<(), Box<EvalAltResult>> {
 
     let cb = shared_engine.borrow().eval_ast::<SingleNode>(&ast)?;
 
-    assert_eq!(cb.run(21), 42);
+    assert_eq!(cb.run(21)?, 42);
 
     Ok(())
 }

@@ -38,23 +38,26 @@ impl LangOptions {
     /// Create a new [`LangOptions`] with default values.
     #[inline(always)]
     #[must_use]
-    pub fn new() -> Self {
-        Self::IF_EXPR
-            | Self::SWITCH_EXPR
-            | Self::STMT_EXPR
-            | Self::LOOPING
-            | Self::SHADOWING
-            | Self::FAST_OPS
-            | {
-                #[cfg(not(feature = "no_function"))]
-                {
-                    Self::ANON_FN
-                }
-                #[cfg(feature = "no_function")]
-                {
-                    Self::empty()
-                }
-            }
+    pub const fn new() -> Self {
+        Self::from_bits_truncate(
+            Self::IF_EXPR.bits()
+                | Self::SWITCH_EXPR.bits()
+                | Self::LOOP_EXPR.bits()
+                | Self::STMT_EXPR.bits()
+                | Self::LOOPING.bits()
+                | Self::SHADOWING.bits()
+                | Self::FAST_OPS.bits()
+                | {
+                    #[cfg(not(feature = "no_function"))]
+                    {
+                        Self::ANON_FN.bits()
+                    }
+                    #[cfg(feature = "no_function")]
+                    {
+                        Self::empty().bits()
+                    }
+                },
+        )
     }
 }
 

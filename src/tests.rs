@@ -13,6 +13,7 @@ fn check_struct_sizes() {
         feature = "only_i32",
         any(feature = "no_float", feature = "f32_float")
     ));
+    const WORD_SIZE: usize = size_of::<usize>();
 
     assert_eq!(size_of::<Dynamic>(), if PACKED { 8 } else { 16 });
     assert_eq!(size_of::<Option<Dynamic>>(), if PACKED { 8 } else { 16 });
@@ -20,10 +21,7 @@ fn check_struct_sizes() {
         size_of::<Position>(),
         if cfg!(feature = "no_position") { 0 } else { 4 }
     );
-    assert_eq!(
-        size_of::<tokenizer::Token>(),
-        if IS_32_BIT { 8 } else { 16 }
-    );
+    assert_eq!(size_of::<tokenizer::Token>(), 2 * WORD_SIZE);
     assert_eq!(size_of::<ast::Expr>(), if PACKED { 12 } else { 16 });
     assert_eq!(size_of::<Option<ast::Expr>>(), if PACKED { 12 } else { 16 });
     assert_eq!(size_of::<ast::Stmt>(), if IS_32_BIT { 12 } else { 16 });
@@ -34,40 +32,41 @@ fn check_struct_sizes() {
 
     #[cfg(feature = "internals")]
     {
-        assert_eq!(
-            size_of::<CallableFunction>(),
-            if IS_32_BIT { 12 } else { 24 }
-        );
-        assert_eq!(
-            size_of::<module::FuncInfo>(),
-            if IS_32_BIT { 16 } else { 32 }
-        );
+        assert_eq!(size_of::<CallableFunction>(), 3 * WORD_SIZE);
+        assert_eq!(size_of::<module::FuncInfo>(), 4 * WORD_SIZE);
     }
 
-    #[cfg(target_pointer_width = "64")]
-    {
-        assert_eq!(size_of::<Scope>(), 536);
-        assert_eq!(
-            size_of::<FnPtr>(),
-            if cfg!(feature = "no_function") {
-                72
-            } else {
-                80
-            }
-        );
-        assert_eq!(size_of::<LexError>(), 56);
-        assert_eq!(
-            size_of::<ParseError>(),
-            if cfg!(feature = "no_position") { 8 } else { 16 }
-        );
-        assert_eq!(size_of::<EvalAltResult>(), 64);
-        assert_eq!(
-            size_of::<NativeCallContext>(),
-            if cfg!(feature = "no_position") {
-                48
-            } else {
-                56
-            }
-        );
+    // The following only on 64-bit platforms
+
+    if !cfg!(target_pointer_width = "64") {
+        return;
     }
+
+    assert_eq!(size_of::<Scope>(), 536);
+    assert_eq!(
+        size_of::<FnPtr>(),
+        80 - if cfg!(feature = "no_function") {
+            WORD_SIZE
+        } else {
+            0
+        }
+    );
+    assert_eq!(size_of::<LexError>(), 56);
+    assert_eq!(
+        size_of::<ParseError>(),
+        16 - if cfg!(feature = "no_position") {
+            WORD_SIZE
+        } else {
+            0
+        }
+    );
+    assert_eq!(size_of::<EvalAltResult>(), 64);
+    assert_eq!(
+        size_of::<NativeCallContext>(),
+        56 - if cfg!(feature = "no_position") {
+            WORD_SIZE
+        } else {
+            0
+        }
+    );
 }

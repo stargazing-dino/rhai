@@ -5,6 +5,7 @@ use crate::engine::OP_EQUALS;
 use crate::eval::{calc_index, calc_offset_len};
 use crate::module::ModuleFlags;
 use crate::plugin::*;
+
 use crate::{
     def_package, Array, Dynamic, ExclusiveRange, FnPtr, InclusiveRange, NativeCallContext,
     Position, RhaiResultOf, StaticVec, ERR, INT, MAX_USIZE_INT,
@@ -237,7 +238,7 @@ pub mod array_functions {
         #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_array_size() > 0 {
             let pad = len - array.len();
-            let (a, m, s) = Dynamic::calc_array_sizes(array);
+            let (a, m, s) = crate::eval::calc_array_sizes(array);
             let (ax, mx, sx) = item.calc_data_sizes(true);
 
             _ctx.engine()
