@@ -367,4 +367,10 @@ impl Engine {
     pub(crate) const fn is_debugger_registered(&self) -> bool {
         self.debugger_interface.is_some()
     }
+
+    /// Imitation of std::hints::black_box which requires nightly.
+    #[inline(never)]
+    pub(crate) fn black_box() -> usize {
+        unsafe { core::ptr::read_volatile(&0_usize as *const usize) }
+    }
 }

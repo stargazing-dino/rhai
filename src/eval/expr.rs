@@ -239,17 +239,17 @@ impl Engine {
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
 
+        #[cfg(feature = "debugging")]
+        let reset =
+            self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
+        #[cfg(feature = "debugging")]
+        auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
+
+        self.track_operation(global, expr.position())?;
+
         // Function calls should account for a relatively larger portion of expressions because
         // binary operators are also function calls.
         if let Expr::FnCall(x, pos) = expr {
-            #[cfg(feature = "debugging")]
-            let reset =
-                self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
-            #[cfg(feature = "debugging")]
-            auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
-
-            self.track_operation(global, expr.position())?;
-
             return self.eval_fn_call_expr(global, caches, scope, this_ptr, x, *pos);
         }
 
@@ -257,11 +257,6 @@ impl Engine {
         // We shouldn't do this for too many variants because, soon or later, the added comparisons
         // will cost more than the mis-predicted `match` branch.
         if let Expr::Variable(x, index, var_pos) = expr {
-            #[cfg(feature = "debugging")]
-            self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
-
-            self.track_operation(global, expr.position())?;
-
             return if index.is_none() && x.0.is_none() && x.3 == KEYWORD_THIS {
                 this_ptr
                     .ok_or_else(|| ERR::ErrorUnboundThis(*var_pos).into())
@@ -272,25 +267,41 @@ impl Engine {
             };
         }
 
-        #[cfg(feature = "debugging")]
-        let reset =
-            self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
-        #[cfg(feature = "debugging")]
-        auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
+        // Stop merging branches here!
+        Self::black_box();
 
-        self.track_operation(global, expr.position())?;
+        // Constants
+        if let Expr::IntegerConstant(x, ..) = expr {
+            return Ok((*x).into());
+        }
+        if let Expr::StringConstant(x, ..) = expr {
+            return Ok(x.clone().into());
+        }
+        if let Expr::BoolConstant(x, ..) = expr {
+            return Ok((*x).into());
+        }
+
+        // Stop merging branches here!
+        Self::black_box();
+
+        #[cfg(not(feature = "no_float"))]
+        if let Expr::FloatConstant(x, ..) = expr {
+            return Ok((*x).into());
+        }
+        if let Expr::CharConstant(x, ..) = expr {
+            return Ok((*x).into());
+        }
+        if let Expr::Unit(..) = expr {
+            return Ok(Dynamic::UNIT);
+        }
+        if let Expr::DynamicConstant(x, ..) = expr {
+            return Ok(x.as_ref().clone());
+        }
+
+        // Stop merging branches here!
+        Self::black_box();
 
         match expr {
-            // Constants
-            Expr::DynamicConstant(x, ..) => Ok(x.as_ref().clone()),
-            Expr::IntegerConstant(x, ..) => Ok((*x).into()),
-            #[cfg(not(feature = "no_float"))]
-            Expr::FloatConstant(x, ..) => Ok((*x).into()),
-            Expr::StringConstant(x, ..) => Ok(x.clone().into()),
-            Expr::CharConstant(x, ..) => Ok((*x).into()),
-            Expr::BoolConstant(x, ..) => Ok((*x).into()),
-            Expr::Unit(..) => Ok(Dynamic::UNIT),
-
             // `... ${...} ...`
             Expr::InterpolatedString(x, _) => {
                 let mut concat = SmartString::new_const();

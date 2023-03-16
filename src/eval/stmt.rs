@@ -273,13 +273,14 @@ impl Engine {
         #[cfg(feature = "debugging")]
         auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
 
+        self.track_operation(global, stmt.position())?;
+
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
+        // Hopefully the compiler won't undo all this work!
 
         // Function calls should account for a relatively larger portion of statements.
         if let Stmt::FnCall(x, pos) = stmt {
-            self.track_operation(global, stmt.position())?;
-
             return self.eval_fn_call_expr(global, caches, scope, this_ptr, x, *pos);
         }
 
@@ -288,8 +289,6 @@ impl Engine {
         // will cost more than the mis-predicted `match` branch.
         if let Stmt::Assignment(x, ..) = stmt {
             let (op_info, BinaryExpr { lhs, rhs }) = &**x;
-
-            self.track_operation(global, stmt.position())?;
 
             if let Expr::Variable(x, ..) = lhs {
                 let rhs_val = self
@@ -354,47 +353,146 @@ impl Engine {
             }
         }
 
-        self.track_operation(global, stmt.position())?;
+        // Stop merging branches here!
+        Self::black_box();
 
-        match stmt {
-            // No-op
-            Stmt::Noop(..) => Ok(Dynamic::UNIT),
-
-            // Expression as statement
-            Stmt::Expr(expr) => self
-                .eval_expr(global, caches, scope, this_ptr, expr)
-                .map(Dynamic::flatten),
-
-            // Block scope
-            Stmt::Block(statements, ..) if statements.is_empty() => Ok(Dynamic::UNIT),
-            Stmt::Block(statements, ..) => {
+        // Block scope
+        if let Stmt::Block(statements, ..) = stmt {
+            return if statements.is_empty() {
+                Ok(Dynamic::UNIT)
+            } else {
                 self.eval_stmt_block(global, caches, scope, this_ptr, statements, true)
+            };
+        }
+
+        if let Stmt::Var(x, options, pos) = stmt {
+            if !self.allow_shadowing() && scope.contains(&x.0) {
+                return Err(ERR::ErrorVariableExists(x.0.to_string(), *pos).into());
             }
+            // Let/const statement
+            let (var_name, expr, index) = &**x;
 
-            // If statement
-            Stmt::If(x, ..) => {
-                let FlowControl {
-                    expr,
-                    body: if_block,
-                    branch: else_block,
-                } = &**x;
+            let access = if options.contains(ASTFlags::CONSTANT) {
+                AccessMode::ReadOnly
+            } else {
+                AccessMode::ReadWrite
+            };
+            let export = options.contains(ASTFlags::EXPORTED);
 
-                let guard_val = self
-                    .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
-                    .as_bool()
-                    .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, expr.position()))?;
+            // Check variable definition filter
+            if let Some(ref filter) = self.def_var_filter {
+                let will_shadow = scope.contains(var_name);
+                let is_const = access == AccessMode::ReadOnly;
+                let info = VarDefInfo {
+                    name: var_name,
+                    is_const,
+                    nesting_level: global.scope_level,
+                    will_shadow,
+                };
+                let orig_scope_len = scope.len();
+                let context =
+                    EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());
+                let filter_result = filter(true, info, context);
 
-                match guard_val {
-                    true if !if_block.is_empty() => {
-                        self.eval_stmt_block(global, caches, scope, this_ptr, if_block, true)
-                    }
-                    false if !else_block.is_empty() => {
-                        self.eval_stmt_block(global, caches, scope, this_ptr, else_block, true)
-                    }
-                    _ => Ok(Dynamic::UNIT),
+                if orig_scope_len != scope.len() {
+                    // The scope is changed, always search from now on
+                    global.always_search_scope = true;
+                }
+
+                if !filter_result? {
+                    return Err(ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into());
                 }
             }
 
+            // Evaluate initial value
+            let mut value = self
+                .eval_expr(global, caches, scope, this_ptr, expr)?
+                .flatten()
+                .intern_string(self);
+
+            let _alias = if !rewind_scope {
+                // Put global constants into global module
+                #[cfg(not(feature = "no_function"))]
+                #[cfg(not(feature = "no_module"))]
+                if global.scope_level == 0
+                    && access == AccessMode::ReadOnly
+                    && global.lib.iter().any(|m| !m.is_empty())
+                {
+                    crate::func::locked_write(global.constants.get_or_insert_with(|| {
+                        crate::Shared::new(crate::Locked::new(std::collections::BTreeMap::new()))
+                    }))
+                    .insert(var_name.name.clone(), value.clone());
+                }
+
+                if export {
+                    Some(var_name)
+                } else {
+                    None
+                }
+            } else if export {
+                unreachable!("exported variable not on global level");
+            } else {
+                None
+            };
+
+            if let Some(index) = index {
+                value.set_access_mode(access);
+                *scope.get_mut_by_index(scope.len() - index.get()) = value;
+            } else {
+                scope.push_entry(var_name.name.clone(), access, value);
+            }
+
+            #[cfg(not(feature = "no_module"))]
+            if let Some(alias) = _alias {
+                scope.add_alias_by_index(scope.len() - 1, alias.as_str().into());
+            }
+
+            return Ok(Dynamic::UNIT);
+        }
+
+        // Stop merging branches here!
+        Self::black_box();
+
+        // If statement
+        if let Stmt::If(x, ..) = stmt {
+            let FlowControl {
+                expr,
+                body: if_block,
+                branch: else_block,
+            } = &**x;
+
+            let guard_val = self
+                .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
+                .as_bool()
+                .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, expr.position()))?;
+
+            return match guard_val {
+                true if !if_block.is_empty() => {
+                    self.eval_stmt_block(global, caches, scope, this_ptr, if_block, true)
+                }
+                false if !else_block.is_empty() => {
+                    self.eval_stmt_block(global, caches, scope, this_ptr, else_block, true)
+                }
+                _ => Ok(Dynamic::UNIT),
+            };
+        }
+
+        // Expression as statement
+        if let Stmt::Expr(expr) = stmt {
+            return self
+                .eval_expr(global, caches, scope, this_ptr, expr)
+                .map(Dynamic::flatten);
+        }
+
+        // No-op
+        if let Stmt::Noop(..) = stmt {
+            return Ok(Dynamic::UNIT);
+        }
+
+        // Stop merging branches here!
+        Self::black_box();
+
+        match stmt {
             // Switch statement
             Stmt::Switch(x, ..) => {
                 let (
@@ -765,94 +863,6 @@ impl Engine {
 
             // Empty return
             Stmt::Return(None, .., pos) => Err(ERR::Return(Dynamic::UNIT, *pos).into()),
-
-            // Let/const statement - shadowing disallowed
-            Stmt::Var(x, .., pos) if !self.allow_shadowing() && scope.contains(&x.0) => {
-                Err(ERR::ErrorVariableExists(x.0.to_string(), *pos).into())
-            }
-            // Let/const statement
-            Stmt::Var(x, options, pos) => {
-                let (var_name, expr, index) = &**x;
-
-                let access = if options.contains(ASTFlags::CONSTANT) {
-                    AccessMode::ReadOnly
-                } else {
-                    AccessMode::ReadWrite
-                };
-                let export = options.contains(ASTFlags::EXPORTED);
-
-                // Check variable definition filter
-                if let Some(ref filter) = self.def_var_filter {
-                    let will_shadow = scope.contains(var_name);
-                    let is_const = access == AccessMode::ReadOnly;
-                    let info = VarDefInfo {
-                        name: var_name,
-                        is_const,
-                        nesting_level: global.scope_level,
-                        will_shadow,
-                    };
-                    let orig_scope_len = scope.len();
-                    let context =
-                        EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());
-                    let filter_result = filter(true, info, context);
-
-                    if orig_scope_len != scope.len() {
-                        // The scope is changed, always search from now on
-                        global.always_search_scope = true;
-                    }
-
-                    if !filter_result? {
-                        return Err(ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into());
-                    }
-                }
-
-                // Evaluate initial value
-                let mut value = self
-                    .eval_expr(global, caches, scope, this_ptr, expr)?
-                    .flatten()
-                    .intern_string(self);
-
-                let _alias = if !rewind_scope {
-                    // Put global constants into global module
-                    #[cfg(not(feature = "no_function"))]
-                    #[cfg(not(feature = "no_module"))]
-                    if global.scope_level == 0
-                        && access == AccessMode::ReadOnly
-                        && global.lib.iter().any(|m| !m.is_empty())
-                    {
-                        crate::func::locked_write(global.constants.get_or_insert_with(|| {
-                            crate::Shared::new(
-                                crate::Locked::new(std::collections::BTreeMap::new()),
-                            )
-                        }))
-                        .insert(var_name.name.clone(), value.clone());
-                    }
-
-                    if export {
-                        Some(var_name)
-                    } else {
-                        None
-                    }
-                } else if export {
-                    unreachable!("exported variable not on global level");
-                } else {
-                    None
-                };
-
-                if let Some(index) = index {
-                    value.set_access_mode(access);
-                    *scope.get_mut_by_index(scope.len() - index.get()) = value;
-                } else {
-                    scope.push_entry(var_name.name.clone(), access, value);
-                }
-
-                #[cfg(not(feature = "no_module"))]
-                if let Some(alias) = _alias {
-                    scope.add_alias_by_index(scope.len() - 1, alias.as_str().into());
-                }
-
-                Ok(Dynamic::UNIT)
-            }
 
             // Import statement
             #[cfg(not(feature = "no_module"))]
