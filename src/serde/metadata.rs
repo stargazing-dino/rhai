@@ -3,6 +3,7 @@
 
 use crate::api::formatting::format_type;
 use crate::module::{calc_native_fn_hash, FuncInfo, ModuleFlags};
+use crate::parser::is_anonymous_fn;
 use crate::{calc_fn_hash, Engine, FnAccess, SmartString, StaticVec, AST};
 use serde::Serialize;
 #[cfg(feature = "no_std")]
@@ -34,6 +35,7 @@ struct FnMetadata<'a> {
     pub namespace: crate::FnNamespace,
     pub access: FnAccess,
     pub name: &'a str,
+    pub is_anonymous: bool,
     #[serde(rename = "type")]
     pub typ: FnType,
     pub num_params: usize,
@@ -83,6 +85,7 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
             namespace: info.metadata.namespace,
             access: info.metadata.access,
             name: &info.metadata.name,
+            is_anonymous: is_anonymous_fn(&info.metadata.name),
             typ,
             num_params: info.metadata.num_params,
             params: info
