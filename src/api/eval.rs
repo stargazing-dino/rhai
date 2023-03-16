@@ -242,7 +242,7 @@ impl Engine {
             ast.resolver().cloned(),
         );
 
-        auto_restore!(global => move |g| {
+        auto_restore! { global => move |g| {
             #[cfg(not(feature = "no_module"))]
             {
                 g.embedded_module_resolver = orig_embedded_module_resolver;
@@ -252,7 +252,7 @@ impl Engine {
             g.lib.truncate(orig_lib_len);
 
             g.source = orig_source;
-        });
+        }}
 
         let r = self.eval_global_statements(global, caches, scope, ast.statements())?;
 

@@ -688,7 +688,7 @@ impl Engine {
                         let reset =
                             self.run_debugger_with_reset(global, caches, scope, this_ptr, rhs)?;
                         #[cfg(feature = "debugging")]
-                        auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
+                        auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
                         let crate::ast::FnCallExpr {
                             name, hashes, args, ..
@@ -857,7 +857,7 @@ impl Engine {
                                 let reset = self
                                     .run_debugger_with_reset(global, caches, scope, _tp, _node)?;
                                 #[cfg(feature = "debugging")]
-                                auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
+                                auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
                                 let crate::ast::FnCallExpr {
                                     name, hashes, args, ..
@@ -977,7 +977,7 @@ impl Engine {
                                         global, caches, scope, _tp, _node,
                                     )?;
                                     #[cfg(feature = "debugging")]
-                                    auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
+                                    auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
                                     let crate::ast::FnCallExpr {
                                         name, hashes, args, ..

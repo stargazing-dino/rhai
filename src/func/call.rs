@@ -658,7 +658,7 @@ impl Engine {
                 };
 
                 let orig_source = mem::replace(&mut global.source, source.clone());
-                auto_restore!(global => move |g| g.source = orig_source);
+                auto_restore! { global => move |g| g.source = orig_source }
 
                 return if _is_method_call {
                     // Method call of script function - map first argument to `this`
@@ -686,7 +686,7 @@ impl Engine {
                         backup.change_first_arg_to_copy(_args);
                     }
 
-                    auto_restore!(args = (_args) if swap => move |a| backup.restore_first_arg(a));
+                    auto_restore! { args = (_args) if swap => move |a| backup.restore_first_arg(a) }
 
                     self.call_script_fn(global, caches, scope, None, environ, f, args, true, pos)
                 }
@@ -730,7 +730,7 @@ impl Engine {
             })
         });
         #[cfg(feature = "debugging")]
-        auto_restore!(global if Some(reset) => move |g| g.debugger_mut().reset_status(reset));
+        auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
         self.eval_expr(global, caches, scope, this_ptr, arg_expr)
             .map(|r| (r, arg_expr.start_position()))
@@ -1457,7 +1457,7 @@ impl Engine {
                 let scope = &mut Scope::new();
 
                 let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
-                auto_restore!(global => move |g| g.source = orig_source);
+                auto_restore! { global => move |g| g.source = orig_source }
 
                 self.call_script_fn(global, caches, scope, None, environ, f, args, true, pos)
             }
