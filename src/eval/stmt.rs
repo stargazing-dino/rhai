@@ -277,7 +277,6 @@ impl Engine {
 
         // Coded this way for better branch prediction.
         // Popular branches are lifted out of the `match` statement into their own branches.
-        // Hopefully the compiler won't undo all this work!
 
         // Function calls should account for a relatively larger portion of statements.
         if let Stmt::FnCall(x, pos) = stmt {
@@ -285,8 +284,6 @@ impl Engine {
         }
 
         // Then assignments.
-        // We shouldn't do this for too many variants because, soon or later, the added comparisons
-        // will cost more than the mis-predicted `match` branch.
         if let Stmt::Assignment(x, ..) = stmt {
             let (op_info, BinaryExpr { lhs, rhs }) = &**x;
 
@@ -353,22 +350,12 @@ impl Engine {
             }
         }
 
-        // Stop merging branches here!
-        Self::black_box();
-
-        // Block scope
-        if let Stmt::Block(statements, ..) = stmt {
-            return if statements.is_empty() {
-                Ok(Dynamic::UNIT)
-            } else {
-                self.eval_stmt_block(global, caches, scope, this_ptr, statements, true)
-            };
-        }
-
+        // Then variable definitions.
         if let Stmt::Var(x, options, pos) = stmt {
             if !self.allow_shadowing() && scope.contains(&x.0) {
                 return Err(ERR::ErrorVariableExists(x.0.to_string(), *pos).into());
             }
+
             // Let/const statement
             let (var_name, expr, index) = &**x;
 
@@ -451,48 +438,52 @@ impl Engine {
         }
 
         // Stop merging branches here!
-        Self::black_box();
-
-        // If statement
-        if let Stmt::If(x, ..) = stmt {
-            let FlowControl {
-                expr,
-                body: if_block,
-                branch: else_block,
-            } = &**x;
-
-            let guard_val = self
-                .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
-                .as_bool()
-                .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, expr.position()))?;
-
-            return match guard_val {
-                true if !if_block.is_empty() => {
-                    self.eval_stmt_block(global, caches, scope, this_ptr, if_block, true)
-                }
-                false if !else_block.is_empty() => {
-                    self.eval_stmt_block(global, caches, scope, this_ptr, else_block, true)
-                }
-                _ => Ok(Dynamic::UNIT),
-            };
-        }
-
-        // Expression as statement
-        if let Stmt::Expr(expr) = stmt {
-            return self
-                .eval_expr(global, caches, scope, this_ptr, expr)
-                .map(Dynamic::flatten);
-        }
-
-        // No-op
-        if let Stmt::Noop(..) = stmt {
-            return Ok(Dynamic::UNIT);
-        }
-
-        // Stop merging branches here!
+        // We shouldn't lift out too many variants because, soon or later, the added comparisons
+        // will cost more than the mis-predicted `match` branch.
         Self::black_box();
 
         match stmt {
+            // No-op
+            Stmt::Noop(..) => Ok(Dynamic::UNIT),
+
+            // Expression as statement
+            Stmt::Expr(expr) => self
+                .eval_expr(global, caches, scope, this_ptr, expr)
+                .map(Dynamic::flatten),
+
+            // Block scope
+            Stmt::Block(statements, ..) => {
+                if statements.is_empty() {
+                    Ok(Dynamic::UNIT)
+                } else {
+                    self.eval_stmt_block(global, caches, scope, this_ptr, statements, true)
+                }
+            }
+
+            // If statement
+            Stmt::If(x, ..) => {
+                let FlowControl {
+                    expr,
+                    body: if_block,
+                    branch: else_block,
+                } = &**x;
+
+                let guard_val = self
+                    .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
+                    .as_bool()
+                    .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, expr.position()))?;
+
+                match guard_val {
+                    true if !if_block.is_empty() => {
+                        self.eval_stmt_block(global, caches, scope, this_ptr, if_block, true)
+                    }
+                    false if !else_block.is_empty() => {
+                        self.eval_stmt_block(global, caches, scope, this_ptr, else_block, true)
+                    }
+                    _ => Ok(Dynamic::UNIT),
+                }
+            }
+
             // Switch statement
             Stmt::Switch(x, ..) => {
                 let (

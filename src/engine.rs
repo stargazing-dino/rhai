@@ -369,8 +369,15 @@ impl Engine {
     }
 
     /// Imitation of std::hints::black_box which requires nightly.
+    #[cfg(not(target_family = "wasm"))]
     #[inline(never)]
     pub(crate) fn black_box() -> usize {
         unsafe { core::ptr::read_volatile(&0_usize as *const usize) }
+    }
+    /// Imitation of std::hints::black_box which requires nightly.
+    #[cfg(target_family = "wasm")]
+    #[inline(always)]
+    pub(crate) fn black_box() -> usize {
+        0
     }
 }

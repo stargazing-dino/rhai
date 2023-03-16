@@ -254,8 +254,6 @@ impl Engine {
         }
 
         // Then variable access.
-        // We shouldn't do this for too many variants because, soon or later, the added comparisons
-        // will cost more than the mis-predicted `match` branch.
         if let Expr::Variable(x, index, var_pos) = expr {
             return if index.is_none() && x.0.is_none() && x.3 == KEYWORD_THIS {
                 this_ptr
@@ -267,41 +265,27 @@ impl Engine {
             };
         }
 
-        // Stop merging branches here!
-        Self::black_box();
-
-        // Constants
+        // Then integer constants.
         if let Expr::IntegerConstant(x, ..) = expr {
             return Ok((*x).into());
         }
-        if let Expr::StringConstant(x, ..) = expr {
-            return Ok(x.clone().into());
-        }
-        if let Expr::BoolConstant(x, ..) = expr {
-            return Ok((*x).into());
-        }
 
         // Stop merging branches here!
-        Self::black_box();
-
-        #[cfg(not(feature = "no_float"))]
-        if let Expr::FloatConstant(x, ..) = expr {
-            return Ok((*x).into());
-        }
-        if let Expr::CharConstant(x, ..) = expr {
-            return Ok((*x).into());
-        }
-        if let Expr::Unit(..) = expr {
-            return Ok(Dynamic::UNIT);
-        }
-        if let Expr::DynamicConstant(x, ..) = expr {
-            return Ok(x.as_ref().clone());
-        }
-
-        // Stop merging branches here!
+        // We shouldn't lift out too many variants because, soon or later, the added comparisons
+        // will cost more than the mis-predicted `match` branch.
         Self::black_box();
 
         match expr {
+            // Constants
+            Expr::IntegerConstant(..) => unreachable!(),
+            Expr::StringConstant(x, ..) => Ok(x.clone().into()),
+            Expr::BoolConstant(x, ..) => Ok((*x).into()),
+            #[cfg(not(feature = "no_float"))]
+            Expr::FloatConstant(x, ..) => Ok((*x).into()),
+            Expr::CharConstant(x, ..) => Ok((*x).into()),
+            Expr::Unit(..) => Ok(Dynamic::UNIT),
+            Expr::DynamicConstant(x, ..) => Ok(x.as_ref().clone()),
+
             // `... ${...} ...`
             Expr::InterpolatedString(x, _) => {
                 let mut concat = SmartString::new_const();
@@ -445,8 +429,13 @@ impl Engine {
                     .and_then(|r| self.check_data_size(r, expr.start_position()))
             }
 
-            Expr::Stmt(x) if x.is_empty() => Ok(Dynamic::UNIT),
-            Expr::Stmt(x) => self.eval_stmt_block(global, caches, scope, this_ptr, x, true),
+            Expr::Stmt(x) => {
+                if x.is_empty() {
+                    Ok(Dynamic::UNIT)
+                } else {
+                    self.eval_stmt_block(global, caches, scope, this_ptr, x, true)
+                }
+            }
 
             #[cfg(not(feature = "no_index"))]
             Expr::Index(..) => {
