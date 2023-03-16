@@ -191,6 +191,7 @@ impl Engine {
     }
 
     /// Check if the number of operations stay within limit.
+    #[inline(always)]
     pub(crate) fn track_operation(
         &self,
         global: &mut GlobalRuntimeState,
@@ -199,20 +200,16 @@ impl Engine {
         global.num_operations += 1;
 
         // Guard against too many operations
-        let max = self.max_operations();
-
-        if max > 0 && global.num_operations > max {
-            return Err(ERR::ErrorTooManyOperations(pos).into());
-        }
-
-        // Report progress
-        if let Some(ref progress) = self.progress {
-            match progress(global.num_operations) {
-                None => Ok(()),
-                Some(token) => Err(ERR::ErrorTerminated(token, pos).into()),
-            }
+        if self.max_operations() > 0 && global.num_operations > self.max_operations() {
+            Err(ERR::ErrorTooManyOperations(pos).into())
         } else {
-            Ok(())
+            self.progress
+                .as_ref()
+                .and_then(|progress| {
+                    progress(global.num_operations)
+                        .map(|token| Err(ERR::ErrorTerminated(token, pos).into()))
+                })
+                .unwrap_or(Ok(()))
         }
     }
 }
