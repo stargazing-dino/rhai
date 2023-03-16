@@ -871,6 +871,8 @@ impl Token {
     #[inline]
     #[must_use]
     pub fn lookup_symbol_from_syntax(syntax: &str) -> Option<Self> {
+        // This implementation is based upon a pre-calculated table generated
+        // by GNU gperf on the list of keywords.
         let utf8 = syntax.as_bytes();
         let len = utf8.len();
         let mut hash_val = len;
@@ -891,7 +893,11 @@ impl Token {
 
         match KEYWORDS_LIST[hash_val] {
             (_, Token::EOF) => None,
-            (s, ref t) if s == syntax => Some(t.clone()),
+            // Fail early to avoid calling memcmp()
+            // Since we are already working with bytes, mind as well check the first one
+            (s, ref t) if s.len() == len && s.as_bytes()[0] == utf8[0] && s == syntax => {
+                Some(t.clone())
+            }
             _ => None,
         }
     }
@@ -1543,103 +1549,11 @@ fn get_next_token_inner(
 
         // Identifiers and strings that can have non-ASCII characters
         match (c, cc) {
-            // letter or underscore ...
-            _ if is_id_first_alphabetic(c) || c == '_' => {
-                return Some(parse_identifier_token(stream, state, pos, start_pos, c));
-            }
-            // " - string literal
-            ('"', ..) => {
-                return parse_string_literal(stream, state, pos, c, false, true, false)
-                    .map_or_else(
-                        |(err, err_pos)| Some((Token::LexError(err.into()), err_pos)),
-                        |(result, ..)| Some((Token::StringConstant(result.into()), start_pos)),
-                    );
-            }
-            // ` - string literal
-            ('`', ..) => {
-                // Start from the next line if at the end of line
-                match stream.peek_next() {
-                    // `\r - start from next line
-                    Some('\r') => {
-                        eat_next_and_advance(stream, pos);
-                        // `\r\n
-                        if stream.peek_next() == Some('\n') {
-                            eat_next_and_advance(stream, pos);
-                        }
-                        pos.new_line();
-                    }
-                    // `\n - start from next line
-                    Some('\n') => {
-                        eat_next_and_advance(stream, pos);
-                        pos.new_line();
-                    }
-                    _ => (),
-                }
-
-                return parse_string_literal(stream, state, pos, c, true, false, true).map_or_else(
-                    |(err, err_pos)| Some((Token::LexError(err.into()), err_pos)),
-                    |(result, interpolated, ..)| {
-                        if interpolated {
-                            Some((Token::InterpolatedString(result.into()), start_pos))
-                        } else {
-                            Some((Token::StringConstant(result.into()), start_pos))
-                        }
-                    },
-                );
-            }
-
-            // ' - character literal
-            ('\'', '\'') => {
-                return Some((
-                    Token::LexError(LERR::MalformedChar(String::new()).into()),
-                    start_pos,
-                ))
-            }
-            ('\'', ..) => {
-                return Some(
-                    parse_string_literal(stream, state, pos, c, false, false, false).map_or_else(
-                        |(err, err_pos)| (Token::LexError(err.into()), err_pos),
-                        |(result, ..)| {
-                            let mut chars = result.chars();
-                            let first = chars.next().unwrap();
-
-                            if chars.next().is_some() {
-                                (
-                                    Token::LexError(LERR::MalformedChar(result.to_string()).into()),
-                                    start_pos,
-                                )
-                            } else {
-                                (Token::CharConstant(first), start_pos)
-                            }
-                        },
-                    ),
-                )
-            }
-
-            _ => (),
-        }
-
-        // Non-ASCII inputs are not valid here
-        if !c.is_ascii() {
-            return Some((
-                Token::LexError(LERR::UnexpectedInput(c.to_string()).into()),
-                start_pos,
-            ));
-        }
-
-        // Match ASCII byte values (faster?)
-        let mut buf = [0_u8; 2];
-        c.encode_utf8(&mut buf[0..1]);
-        if cc.is_ascii() {
-            cc.encode_utf8(&mut buf[1..]);
-        }
-
-        match (buf[0], buf[1]) {
             // \n
-            (b'\n', ..) => pos.new_line(),
+            ('\n', ..) => pos.new_line(),
 
             // digit ...
-            (b'0'..=b'9', ..) => {
+            ('0'..='9', ..) => {
                 let mut result = SmartString::new_const();
                 let mut radix_base: Option<u32> = None;
                 let mut valid: fn(char) -> bool = is_numeric_digit;
@@ -1798,38 +1712,107 @@ fn get_next_token_inner(
                 return Some((token, num_pos));
             }
 
+            // " - string literal
+            ('"', ..) => {
+                return parse_string_literal(stream, state, pos, c, false, true, false)
+                    .map_or_else(
+                        |(err, err_pos)| Some((Token::LexError(err.into()), err_pos)),
+                        |(result, ..)| Some((Token::StringConstant(result.into()), start_pos)),
+                    );
+            }
+            // ` - string literal
+            ('`', ..) => {
+                // Start from the next line if at the end of line
+                match stream.peek_next() {
+                    // `\r - start from next line
+                    Some('\r') => {
+                        eat_next_and_advance(stream, pos);
+                        // `\r\n
+                        if stream.peek_next() == Some('\n') {
+                            eat_next_and_advance(stream, pos);
+                        }
+                        pos.new_line();
+                    }
+                    // `\n - start from next line
+                    Some('\n') => {
+                        eat_next_and_advance(stream, pos);
+                        pos.new_line();
+                    }
+                    _ => (),
+                }
+
+                return parse_string_literal(stream, state, pos, c, true, false, true).map_or_else(
+                    |(err, err_pos)| Some((Token::LexError(err.into()), err_pos)),
+                    |(result, interpolated, ..)| {
+                        if interpolated {
+                            Some((Token::InterpolatedString(result.into()), start_pos))
+                        } else {
+                            Some((Token::StringConstant(result.into()), start_pos))
+                        }
+                    },
+                );
+            }
+
+            // ' - character literal
+            ('\'', '\'') => {
+                return Some((
+                    Token::LexError(LERR::MalformedChar(String::new()).into()),
+                    start_pos,
+                ))
+            }
+            ('\'', ..) => {
+                return Some(
+                    parse_string_literal(stream, state, pos, c, false, false, false).map_or_else(
+                        |(err, err_pos)| (Token::LexError(err.into()), err_pos),
+                        |(result, ..)| {
+                            let mut chars = result.chars();
+                            let first = chars.next().unwrap();
+
+                            if chars.next().is_some() {
+                                (
+                                    Token::LexError(LERR::MalformedChar(result.to_string()).into()),
+                                    start_pos,
+                                )
+                            } else {
+                                (Token::CharConstant(first), start_pos)
+                            }
+                        },
+                    ),
+                )
+            }
+
             // Braces
-            (b'{', ..) => return Some((Token::LeftBrace, start_pos)),
-            (b'}', ..) => return Some((Token::RightBrace, start_pos)),
+            ('{', ..) => return Some((Token::LeftBrace, start_pos)),
+            ('}', ..) => return Some((Token::RightBrace, start_pos)),
 
             // Unit
-            (b'(', b')') => {
+            ('(', ')') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Unit, start_pos));
             }
 
             // Parentheses
-            (b'(', b'*') => {
+            ('(', '*') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Reserved(Box::new("(*".into())), start_pos));
             }
-            (b'(', ..) => return Some((Token::LeftParen, start_pos)),
-            (b')', ..) => return Some((Token::RightParen, start_pos)),
+            ('(', ..) => return Some((Token::LeftParen, start_pos)),
+            (')', ..) => return Some((Token::RightParen, start_pos)),
 
             // Indexing
-            (b'[', ..) => return Some((Token::LeftBracket, start_pos)),
-            (b']', ..) => return Some((Token::RightBracket, start_pos)),
+            ('[', ..) => return Some((Token::LeftBracket, start_pos)),
+            (']', ..) => return Some((Token::RightBracket, start_pos)),
 
             // Map literal
             #[cfg(not(feature = "no_object"))]
-            (b'#', b'{') => {
+            ('#', '{') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::MapStart, start_pos));
             }
             // Shebang
-            (b'#', b'!') => return Some((Token::Reserved(Box::new("#!".into())), start_pos)),
+            ('#', '!') => return Some((Token::Reserved(Box::new("#!".into())), start_pos)),
 
-            (b'#', b' ') => {
+            ('#', ' ') => {
                 eat_next_and_advance(stream, pos);
                 let token = if stream.peek_next() == Some('{') {
                     eat_next_and_advance(stream, pos);
@@ -1840,50 +1823,50 @@ fn get_next_token_inner(
                 return Some((Token::Reserved(Box::new(token.into())), start_pos));
             }
 
-            (b'#', ..) => return Some((Token::Reserved(Box::new("#".into())), start_pos)),
+            ('#', ..) => return Some((Token::Reserved(Box::new("#".into())), start_pos)),
 
             // Operators
-            (b'+', b'=') => {
+            ('+', '=') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::PlusAssign, start_pos));
             }
-            (b'+', b'+') => {
+            ('+', '+') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Reserved(Box::new("++".into())), start_pos));
             }
-            (b'+', ..) if !state.next_token_cannot_be_unary => {
+            ('+', ..) if !state.next_token_cannot_be_unary => {
                 return Some((Token::UnaryPlus, start_pos))
             }
-            (b'+', ..) => return Some((Token::Plus, start_pos)),
+            ('+', ..) => return Some((Token::Plus, start_pos)),
 
-            (b'-', b'0'..=b'9') if !state.next_token_cannot_be_unary => negated = Some(start_pos),
-            (b'-', b'0'..=b'9') => return Some((Token::Minus, start_pos)),
-            (b'-', b'=') => {
+            ('-', '0'..='9') if !state.next_token_cannot_be_unary => negated = Some(start_pos),
+            ('-', '0'..='9') => return Some((Token::Minus, start_pos)),
+            ('-', '=') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::MinusAssign, start_pos));
             }
-            (b'-', b'>') => {
+            ('-', '>') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Reserved(Box::new("->".into())), start_pos));
             }
-            (b'-', b'-') => {
+            ('-', '-') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Reserved(Box::new("--".into())), start_pos));
             }
-            (b'-', ..) if !state.next_token_cannot_be_unary => {
+            ('-', ..) if !state.next_token_cannot_be_unary => {
                 return Some((Token::UnaryMinus, start_pos))
             }
-            (b'-', ..) => return Some((Token::Minus, start_pos)),
+            ('-', ..) => return Some((Token::Minus, start_pos)),
 
-            (b'*', b')') => {
+            ('*', ')') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Reserved(Box::new("*)".into())), start_pos));
             }
-            (b'*', b'=') => {
+            ('*', '=') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::MultiplyAssign, start_pos));
             }
-            (b'*', b'*') => {
+            ('*', '*') => {
                 eat_next_and_advance(stream, pos);
 
                 return Some((
@@ -1896,10 +1879,10 @@ fn get_next_token_inner(
                     start_pos,
                 ));
             }
-            (b'*', ..) => return Some((Token::Multiply, start_pos)),
+            ('*', ..) => return Some((Token::Multiply, start_pos)),
 
             // Comments
-            (b'/', b'/') => {
+            ('/', '/') => {
                 eat_next_and_advance(stream, pos);
 
                 let mut comment: Option<String> = match stream.peek_next() {
@@ -1956,7 +1939,7 @@ fn get_next_token_inner(
                     }
                 }
             }
-            (b'/', b'*') => {
+            ('/', '*') => {
                 state.comment_level = 1;
                 eat_next_and_advance(stream, pos);
 
@@ -1984,16 +1967,16 @@ fn get_next_token_inner(
                 }
             }
 
-            (b'/', b'=') => {
+            ('/', '=') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::DivideAssign, start_pos));
             }
-            (b'/', ..) => return Some((Token::Divide, start_pos)),
+            ('/', ..) => return Some((Token::Divide, start_pos)),
 
-            (b';', ..) => return Some((Token::SemiColon, start_pos)),
-            (b',', ..) => return Some((Token::Comma, start_pos)),
+            (';', ..) => return Some((Token::SemiColon, start_pos)),
+            (',', ..) => return Some((Token::Comma, start_pos)),
 
-            (b'.', b'.') => {
+            ('.', '.') => {
                 eat_next_and_advance(stream, pos);
                 return Some((
                     match stream.peek_next() {
@@ -2010,9 +1993,9 @@ fn get_next_token_inner(
                     start_pos,
                 ));
             }
-            (b'.', ..) => return Some((Token::Period, start_pos)),
+            ('.', ..) => return Some((Token::Period, start_pos)),
 
-            (b'=', b'=') => {
+            ('=', '=') => {
                 eat_next_and_advance(stream, pos);
 
                 if stream.peek_next() == Some('=') {
@@ -2022,14 +2005,14 @@ fn get_next_token_inner(
 
                 return Some((Token::EqualsTo, start_pos));
             }
-            (b'=', b'>') => {
+            ('=', '>') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::DoubleArrow, start_pos));
             }
-            (b'=', ..) => return Some((Token::Equals, start_pos)),
+            ('=', ..) => return Some((Token::Equals, start_pos)),
 
             #[cfg(not(feature = "no_module"))]
-            (b':', b':') => {
+            (':', ':') => {
                 eat_next_and_advance(stream, pos);
 
                 if stream.peek_next() == Some('<') {
@@ -2039,25 +2022,25 @@ fn get_next_token_inner(
 
                 return Some((Token::DoubleColon, start_pos));
             }
-            (b':', b'=') => {
+            (':', '=') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Reserved(Box::new(":=".into())), start_pos));
             }
-            (b':', b';') => {
+            (':', ';') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Reserved(Box::new(":;".into())), start_pos));
             }
-            (b':', ..) => return Some((Token::Colon, start_pos)),
+            (':', ..) => return Some((Token::Colon, start_pos)),
 
-            (b'<', b'=') => {
+            ('<', '=') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::LessThanEqualsTo, start_pos));
             }
-            (b'<', b'-') => {
+            ('<', '-') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Reserved(Box::new("<-".into())), start_pos));
             }
-            (b'<', b'<') => {
+            ('<', '<') => {
                 eat_next_and_advance(stream, pos);
 
                 return Some((
@@ -2070,17 +2053,17 @@ fn get_next_token_inner(
                     start_pos,
                 ));
             }
-            (b'<', b'|') => {
+            ('<', '|') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Reserved(Box::new("<|".into())), start_pos));
             }
-            (b'<', ..) => return Some((Token::LessThan, start_pos)),
+            ('<', ..) => return Some((Token::LessThan, start_pos)),
 
-            (b'>', b'=') => {
+            ('>', '=') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::GreaterThanEqualsTo, start_pos));
             }
-            (b'>', b'>') => {
+            ('>', '>') => {
                 eat_next_and_advance(stream, pos);
 
                 return Some((
@@ -2093,9 +2076,9 @@ fn get_next_token_inner(
                     start_pos,
                 ));
             }
-            (b'>', ..) => return Some((Token::GreaterThan, start_pos)),
+            ('>', ..) => return Some((Token::GreaterThan, start_pos)),
 
-            (b'!', b'i') => {
+            ('!', 'i') => {
                 stream.get_next().unwrap();
                 if stream.peek_next() == Some('n') {
                     stream.get_next().unwrap();
@@ -2116,7 +2099,7 @@ fn get_next_token_inner(
                 stream.unget('i');
                 return Some((Token::Bang, start_pos));
             }
-            (b'!', b'=') => {
+            ('!', '=') => {
                 eat_next_and_advance(stream, pos);
 
                 if stream.peek_next() == Some('=') {
@@ -2126,55 +2109,55 @@ fn get_next_token_inner(
 
                 return Some((Token::NotEqualsTo, start_pos));
             }
-            (b'!', b'.') => {
+            ('!', '.') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Reserved(Box::new("!.".into())), start_pos));
             }
-            (b'!', ..) => return Some((Token::Bang, start_pos)),
+            ('!', ..) => return Some((Token::Bang, start_pos)),
 
-            (b'|', b'|') => {
+            ('|', '|') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Or, start_pos));
             }
-            (b'|', b'=') => {
+            ('|', '=') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::OrAssign, start_pos));
             }
-            (b'|', b'>') => {
+            ('|', '>') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::Reserved(Box::new("|>".into())), start_pos));
             }
-            (b'|', ..) => return Some((Token::Pipe, start_pos)),
+            ('|', ..) => return Some((Token::Pipe, start_pos)),
 
-            (b'&', b'&') => {
+            ('&', '&') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::And, start_pos));
             }
-            (b'&', b'=') => {
+            ('&', '=') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::AndAssign, start_pos));
             }
-            (b'&', ..) => return Some((Token::Ampersand, start_pos)),
+            ('&', ..) => return Some((Token::Ampersand, start_pos)),
 
-            (b'^', b'=') => {
+            ('^', '=') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::XOrAssign, start_pos));
             }
-            (b'^', ..) => return Some((Token::XOr, start_pos)),
+            ('^', ..) => return Some((Token::XOr, start_pos)),
 
-            (b'~', ..) => return Some((Token::Reserved(Box::new("~".into())), start_pos)),
+            ('~', ..) => return Some((Token::Reserved(Box::new("~".into())), start_pos)),
 
-            (b'%', b'=') => {
+            ('%', '=') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::ModuloAssign, start_pos));
             }
-            (b'%', ..) => return Some((Token::Modulo, start_pos)),
+            ('%', ..) => return Some((Token::Modulo, start_pos)),
 
-            (b'@', ..) => return Some((Token::Reserved(Box::new("@".into())), start_pos)),
+            ('@', ..) => return Some((Token::Reserved(Box::new("@".into())), start_pos)),
 
-            (b'$', ..) => return Some((Token::Reserved(Box::new("$".into())), start_pos)),
+            ('$', ..) => return Some((Token::Reserved(Box::new("$".into())), start_pos)),
 
-            (b'?', b'.') => {
+            ('?', '.') => {
                 eat_next_and_advance(stream, pos);
                 return Some((
                     #[cfg(not(feature = "no_object"))]
@@ -2184,11 +2167,11 @@ fn get_next_token_inner(
                     start_pos,
                 ));
             }
-            (b'?', b'?') => {
+            ('?', '?') => {
                 eat_next_and_advance(stream, pos);
                 return Some((Token::DoubleQuestion, start_pos));
             }
-            (b'?', b'[') => {
+            ('?', '[') => {
                 eat_next_and_advance(stream, pos);
                 return Some((
                     #[cfg(not(feature = "no_index"))]
@@ -2198,7 +2181,12 @@ fn get_next_token_inner(
                     start_pos,
                 ));
             }
-            (b'?', ..) => return Some((Token::Reserved(Box::new("?".into())), start_pos)),
+            ('?', ..) => return Some((Token::Reserved(Box::new("?".into())), start_pos)),
+
+            // letter or underscore ...
+            _ if is_id_first_alphabetic(c) || c == '_' => {
+                return Some(parse_identifier_token(stream, state, pos, start_pos, c));
+            }
 
             _ if c.is_whitespace() => (),
 
@@ -2323,6 +2311,8 @@ pub fn is_id_continue(x: char) -> bool {
 #[inline]
 #[must_use]
 pub fn is_reserved_keyword_or_symbol(syntax: &str) -> (bool, bool, bool) {
+    // This implementation is based upon a pre-calculated table generated
+    // by GNU gperf on the list of keywords.
     let utf8 = syntax.as_bytes();
     let len = utf8.len();
     let rounds = len.min(3);
@@ -2342,7 +2332,13 @@ pub fn is_reserved_keyword_or_symbol(syntax: &str) -> (bool, bool, bool) {
 
     match RESERVED_LIST[hash_val] {
         ("", ..) => (false, false, false),
-        (s, true, a, b) => (s == syntax, a, b),
+        (s, true, a, b) => (
+            // Fail early to avoid calling memcmp()
+            // Since we are already working with bytes, mind as well check the first one
+            s.len() == len && s.as_bytes()[0] == utf8[0] && s == syntax,
+            a,
+            b,
+        ),
         _ => (false, false, false),
     }
 }
