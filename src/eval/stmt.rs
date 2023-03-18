@@ -946,6 +946,7 @@ impl Engine {
                 Ok(Dynamic::UNIT)
             }
 
+            #[allow(unreachable_patterns)]
             _ => unreachable!("statement cannot be evaluated: {:?}", stmt),
         }
     }

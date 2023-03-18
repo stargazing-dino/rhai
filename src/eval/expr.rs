@@ -431,6 +431,7 @@ impl Engine {
             #[cfg(not(feature = "no_object"))]
             Expr::Dot(..) => self.eval_dot_index_chain(global, caches, scope, this_ptr, expr, None),
 
+            #[allow(unreachable_patterns)]
             _ => unreachable!("expression cannot be evaluated: {:?}", expr),
         }
     }

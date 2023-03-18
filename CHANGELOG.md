@@ -1,6 +1,12 @@
 Rhai Release Notes
 ==================
 
+Version 1.14.0
+==============
+
+The code hacks that attempt to optimize branch prediction performance are removed because benchmarks do not show any material speed improvements.
+
+
 Version 1.13.0
 ==============
 
