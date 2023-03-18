@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - perf
 
 jobs:
   benchmark:

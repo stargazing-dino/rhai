@@ -275,173 +275,6 @@ impl Engine {
 
         self.track_operation(global, stmt.position())?;
 
-        // Coded this way for better branch prediction.
-        // Popular branches are lifted out of the `match` statement into their own branches.
-
-        // Function calls should account for a relatively larger portion of statements.
-        if let Stmt::FnCall(x, pos) = stmt {
-            return self.eval_fn_call_expr(global, caches, scope, this_ptr, x, *pos);
-        }
-
-        // Then assignments.
-        if let Stmt::Assignment(x, ..) = stmt {
-            let (op_info, BinaryExpr { lhs, rhs }) = &**x;
-
-            if let Expr::Variable(x, ..) = lhs {
-                let rhs_val = self
-                    .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), rhs)?
-                    .flatten();
-
-                let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
-
-                let is_temp_result = !target.is_ref();
-                let var_name = x.3.as_str();
-
-                #[cfg(not(feature = "no_closure"))]
-                // Also handle case where target is a `Dynamic` shared value
-                // (returned by a variable resolver, for example)
-                let is_temp_result = is_temp_result && !target.is_shared();
-
-                // Cannot assign to temp result from expression
-                if is_temp_result {
-                    return Err(ERR::ErrorAssignmentToConstant(
-                        var_name.to_string(),
-                        lhs.position(),
-                    )
-                    .into());
-                }
-
-                self.track_operation(global, lhs.position())?;
-
-                self.eval_op_assignment(global, caches, op_info, lhs, &mut target, rhs_val)?;
-
-                return Ok(Dynamic::UNIT);
-            }
-
-            #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-            {
-                let rhs_val = self
-                    .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), rhs)?
-                    .flatten()
-                    .intern_string(self);
-
-                let _new_val = Some((rhs_val, op_info));
-
-                // Must be either `var[index] op= val` or `var.prop op= val`.
-                // The return value of any op-assignment (should be `()`) is thrown away and not used.
-                let _ =
-                    match lhs {
-                        // name op= rhs (handled above)
-                        Expr::Variable(..) => {
-                            unreachable!("Expr::Variable case is already handled")
-                        }
-                        // idx_lhs[idx_expr] op= rhs
-                        #[cfg(not(feature = "no_index"))]
-                        Expr::Index(..) => self
-                            .eval_dot_index_chain(global, caches, scope, this_ptr, lhs, _new_val),
-                        // dot_lhs.dot_rhs op= rhs
-                        #[cfg(not(feature = "no_object"))]
-                        Expr::Dot(..) => self
-                            .eval_dot_index_chain(global, caches, scope, this_ptr, lhs, _new_val),
-                        _ => unreachable!("cannot assign to expression: {:?}", lhs),
-                    }?;
-
-                return Ok(Dynamic::UNIT);
-            }
-        }
-
-        // Then variable definitions.
-        if let Stmt::Var(x, options, pos) = stmt {
-            if !self.allow_shadowing() && scope.contains(&x.0) {
-                return Err(ERR::ErrorVariableExists(x.0.to_string(), *pos).into());
-            }
-
-            // Let/const statement
-            let (var_name, expr, index) = &**x;
-
-            let access = if options.contains(ASTFlags::CONSTANT) {
-                AccessMode::ReadOnly
-            } else {
-                AccessMode::ReadWrite
-            };
-            let export = options.contains(ASTFlags::EXPORTED);
-
-            // Check variable definition filter
-            if let Some(ref filter) = self.def_var_filter {
-                let will_shadow = scope.contains(var_name);
-                let is_const = access == AccessMode::ReadOnly;
-                let info = VarDefInfo {
-                    name: var_name,
-                    is_const,
-                    nesting_level: global.scope_level,
-                    will_shadow,
-                };
-                let orig_scope_len = scope.len();
-                let context =
-                    EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());
-                let filter_result = filter(true, info, context);
-
-                if orig_scope_len != scope.len() {
-                    // The scope is changed, always search from now on
-                    global.always_search_scope = true;
-                }
-
-                if !filter_result? {
-                    return Err(ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into());
-                }
-            }
-
-            // Evaluate initial value
-            let mut value = self
-                .eval_expr(global, caches, scope, this_ptr, expr)?
-                .flatten()
-                .intern_string(self);
-
-            let _alias = if !rewind_scope {
-                // Put global constants into global module
-                #[cfg(not(feature = "no_function"))]
-                #[cfg(not(feature = "no_module"))]
-                if global.scope_level == 0
-                    && access == AccessMode::ReadOnly
-                    && global.lib.iter().any(|m| !m.is_empty())
-                {
-                    crate::func::locked_write(global.constants.get_or_insert_with(|| {
-                        crate::Shared::new(crate::Locked::new(std::collections::BTreeMap::new()))
-                    }))
-                    .insert(var_name.name.clone(), value.clone());
-                }
-
-                if export {
-                    Some(var_name)
-                } else {
-                    None
-                }
-            } else if export {
-                unreachable!("exported variable not on global level");
-            } else {
-                None
-            };
-
-            if let Some(index) = index {
-                value.set_access_mode(access);
-                *scope.get_mut_by_index(scope.len() - index.get()) = value;
-            } else {
-                scope.push_entry(var_name.name.clone(), access, value);
-            }
-
-            #[cfg(not(feature = "no_module"))]
-            if let Some(alias) = _alias {
-                scope.add_alias_by_index(scope.len() - 1, alias.as_str().into());
-            }
-
-            return Ok(Dynamic::UNIT);
-        }
-
-        // Stop merging branches here!
-        // We shouldn't lift out too many variants because, soon or later, the added comparisons
-        // will cost more than the mis-predicted `match` branch.
-        Self::black_box();
-
         match stmt {
             // No-op
             Stmt::Noop(..) => Ok(Dynamic::UNIT),
@@ -458,6 +291,166 @@ impl Engine {
                 } else {
                     self.eval_stmt_block(global, caches, scope, this_ptr, statements, true)
                 }
+            }
+
+            // Function call
+            Stmt::FnCall(x, pos) => {
+                self.eval_fn_call_expr(global, caches, scope, this_ptr, x, *pos)
+            }
+
+            // Assignment
+            Stmt::Assignment(x, ..) => {
+                let (op_info, BinaryExpr { lhs, rhs }) = &**x;
+
+                if let Expr::Variable(x, ..) = lhs {
+                    let rhs_val = self
+                        .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), rhs)?
+                        .flatten();
+
+                    let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
+
+                    let is_temp_result = !target.is_ref();
+                    let var_name = x.3.as_str();
+
+                    #[cfg(not(feature = "no_closure"))]
+                    // Also handle case where target is a `Dynamic` shared value
+                    // (returned by a variable resolver, for example)
+                    let is_temp_result = is_temp_result && !target.is_shared();
+
+                    // Cannot assign to temp result from expression
+                    if is_temp_result {
+                        return Err(ERR::ErrorAssignmentToConstant(
+                            var_name.to_string(),
+                            lhs.position(),
+                        )
+                        .into());
+                    }
+
+                    self.track_operation(global, lhs.position())?;
+
+                    self.eval_op_assignment(global, caches, op_info, lhs, &mut target, rhs_val)?;
+                } else {
+                    #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+                    {
+                        let rhs_val = self
+                            .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), rhs)?
+                            .flatten()
+                            .intern_string(self);
+
+                        let _new_val = Some((rhs_val, op_info));
+
+                        // Must be either `var[index] op= val` or `var.prop op= val`.
+                        // The return value of any op-assignment (should be `()`) is thrown away and not used.
+                        let _ = match lhs {
+                            // name op= rhs (handled above)
+                            Expr::Variable(..) => {
+                                unreachable!("Expr::Variable case is already handled")
+                            }
+                            // idx_lhs[idx_expr] op= rhs
+                            #[cfg(not(feature = "no_index"))]
+                            Expr::Index(..) => self.eval_dot_index_chain(
+                                global, caches, scope, this_ptr, lhs, _new_val,
+                            ),
+                            // dot_lhs.dot_rhs op= rhs
+                            #[cfg(not(feature = "no_object"))]
+                            Expr::Dot(..) => self.eval_dot_index_chain(
+                                global, caches, scope, this_ptr, lhs, _new_val,
+                            ),
+                            _ => unreachable!("cannot assign to expression: {:?}", lhs),
+                        }?;
+                    }
+                }
+
+                Ok(Dynamic::UNIT)
+            }
+
+            // Variable definition
+            Stmt::Var(x, options, pos) => {
+                if !self.allow_shadowing() && scope.contains(&x.0) {
+                    return Err(ERR::ErrorVariableExists(x.0.to_string(), *pos).into());
+                }
+
+                // Let/const statement
+                let (var_name, expr, index) = &**x;
+
+                let access = if options.contains(ASTFlags::CONSTANT) {
+                    AccessMode::ReadOnly
+                } else {
+                    AccessMode::ReadWrite
+                };
+                let export = options.contains(ASTFlags::EXPORTED);
+
+                // Check variable definition filter
+                if let Some(ref filter) = self.def_var_filter {
+                    let will_shadow = scope.contains(var_name);
+                    let is_const = access == AccessMode::ReadOnly;
+                    let info = VarDefInfo {
+                        name: var_name,
+                        is_const,
+                        nesting_level: global.scope_level,
+                        will_shadow,
+                    };
+                    let orig_scope_len = scope.len();
+                    let context =
+                        EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());
+                    let filter_result = filter(true, info, context);
+
+                    if orig_scope_len != scope.len() {
+                        // The scope is changed, always search from now on
+                        global.always_search_scope = true;
+                    }
+
+                    if !filter_result? {
+                        return Err(ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into());
+                    }
+                }
+
+                // Evaluate initial value
+                let mut value = self
+                    .eval_expr(global, caches, scope, this_ptr, expr)?
+                    .flatten()
+                    .intern_string(self);
+
+                let _alias = if !rewind_scope {
+                    // Put global constants into global module
+                    #[cfg(not(feature = "no_function"))]
+                    #[cfg(not(feature = "no_module"))]
+                    if global.scope_level == 0
+                        && access == AccessMode::ReadOnly
+                        && global.lib.iter().any(|m| !m.is_empty())
+                    {
+                        crate::func::locked_write(global.constants.get_or_insert_with(|| {
+                            crate::Shared::new(
+                                crate::Locked::new(std::collections::BTreeMap::new()),
+                            )
+                        }))
+                        .insert(var_name.name.clone(), value.clone());
+                    }
+
+                    if export {
+                        Some(var_name)
+                    } else {
+                        None
+                    }
+                } else if export {
+                    unreachable!("exported variable not on global level");
+                } else {
+                    None
+                };
+
+                if let Some(index) = index {
+                    value.set_access_mode(access);
+                    *scope.get_mut_by_index(scope.len() - index.get()) = value;
+                } else {
+                    scope.push_entry(var_name.name.clone(), access, value);
+                }
+
+                #[cfg(not(feature = "no_module"))]
+                if let Some(alias) = _alias {
+                    scope.add_alias_by_index(scope.len() - 1, alias.as_str().into());
+                }
+
+                Ok(Dynamic::UNIT)
             }
 
             // If statement
