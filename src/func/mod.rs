@@ -21,6 +21,9 @@ pub use call::FnCallArgs;
 pub use callable_function::{CallableFunction, EncapsulatedEnviron};
 #[cfg(not(feature = "no_function"))]
 pub use func::Func;
+#[cfg(not(feature = "no_object"))]
+#[cfg(not(feature = "no_function"))]
+pub use hashing::calc_typed_method_hash;
 pub use hashing::{calc_fn_hash, calc_fn_hash_full, calc_var_hash, get_hasher, StraightHashMap};
 #[cfg(feature = "internals")]
 #[allow(deprecated)]

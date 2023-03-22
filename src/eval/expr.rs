@@ -247,37 +247,9 @@ impl Engine {
 
         self.track_operation(global, expr.position())?;
 
-        // Function calls should account for a relatively larger portion of expressions because
-        // binary operators are also function calls.
-        if let Expr::FnCall(x, pos) = expr {
-            return self.eval_fn_call_expr(global, caches, scope, this_ptr, x, *pos);
-        }
-
-        // Then variable access.
-        if let Expr::Variable(x, index, var_pos) = expr {
-            return if index.is_none() && x.0.is_none() && x.3 == KEYWORD_THIS {
-                this_ptr
-                    .ok_or_else(|| ERR::ErrorUnboundThis(*var_pos).into())
-                    .cloned()
-            } else {
-                self.search_namespace(global, caches, scope, this_ptr, expr)
-                    .map(Target::take_or_clone)
-            };
-        }
-
-        // Then integer constants.
-        if let Expr::IntegerConstant(x, ..) = expr {
-            return Ok((*x).into());
-        }
-
-        // Stop merging branches here!
-        // We shouldn't lift out too many variants because, soon or later, the added comparisons
-        // will cost more than the mis-predicted `match` branch.
-        Self::black_box();
-
         match expr {
             // Constants
-            Expr::IntegerConstant(..) => unreachable!(),
+            Expr::IntegerConstant(x, ..) => Ok((*x).into()),
             Expr::StringConstant(x, ..) => Ok(x.clone().into()),
             Expr::BoolConstant(x, ..) => Ok((*x).into()),
             #[cfg(not(feature = "no_float"))]
@@ -286,7 +258,21 @@ impl Engine {
             Expr::Unit(..) => Ok(Dynamic::UNIT),
             Expr::DynamicConstant(x, ..) => Ok(x.as_ref().clone()),
 
-            // `... ${...} ...`
+            Expr::FnCall(x, pos) => {
+                self.eval_fn_call_expr(global, caches, scope, this_ptr, x, *pos)
+            }
+
+            Expr::Variable(x, index, var_pos) => {
+                if index.is_none() && x.0.is_none() && x.3 == KEYWORD_THIS {
+                    this_ptr
+                        .ok_or_else(|| ERR::ErrorUnboundThis(*var_pos).into())
+                        .cloned()
+                } else {
+                    self.search_namespace(global, caches, scope, this_ptr, expr)
+                        .map(Target::take_or_clone)
+                }
+            }
+
             Expr::InterpolatedString(x, _) => {
                 let mut concat = SmartString::new_const();
 
@@ -445,6 +431,7 @@ impl Engine {
             #[cfg(not(feature = "no_object"))]
             Expr::Dot(..) => self.eval_dot_index_chain(global, caches, scope, this_ptr, expr, None),
 
+            #[allow(unreachable_patterns)]
             _ => unreachable!("expression cannot be evaluated: {:?}", expr),
         }
     }

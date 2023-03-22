@@ -620,7 +620,7 @@ impl Expr {
             Self::Index(_, options, _) | Self::Dot(_, options, _) => *options,
 
             #[cfg(not(feature = "no_float"))]
-            Self::FloatConstant(..) => ASTFlags::NONE,
+            Self::FloatConstant(..) => ASTFlags::empty(),
 
             Self::DynamicConstant(..)
             | Self::BoolConstant(..)
@@ -638,10 +638,10 @@ impl Expr {
             | Self::MethodCall(..)
             | Self::InterpolatedString(..)
             | Self::Property(..)
-            | Self::Stmt(..) => ASTFlags::NONE,
+            | Self::Stmt(..) => ASTFlags::empty(),
 
             #[cfg(not(feature = "no_custom_syntax"))]
-            Self::Custom(..) => ASTFlags::NONE,
+            Self::Custom(..) => ASTFlags::empty(),
         }
     }
     /// Get the [position][Position] of the expression.

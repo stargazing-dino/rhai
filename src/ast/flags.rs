@@ -41,8 +41,6 @@ bitflags! {
     /// _(internals)_ Bit-flags containing [`AST`][crate::AST] node configuration options.
     /// Exported under the `internals` feature only.
     pub struct ASTFlags: u8 {
-        /// No options for the [`AST`][crate::AST] node.
-        const NONE = 0b_0000_0000;
         /// The [`AST`][crate::AST] node is read-only.
         const CONSTANT = 0b_0000_0001;
         /// The [`AST`][crate::AST] node is exposed to the outside (i.e. public).

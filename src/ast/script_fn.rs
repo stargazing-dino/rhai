@@ -17,6 +17,10 @@ pub struct ScriptFnDef {
     pub name: ImmutableString,
     /// Function access mode.
     pub access: FnAccess,
+    #[cfg(not(feature = "no_object"))]
+    /// Type of `this` pointer, if any.
+    /// Not available under `no_object`.
+    pub this_type: Option<ImmutableString>,
     /// Names of function parameters.
     pub params: FnArgsVec<ImmutableString>,
     /// _(metadata)_ Function doc-comments (if any).
@@ -39,13 +43,23 @@ pub struct ScriptFnDef {
 
 impl fmt::Display for ScriptFnDef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[cfg(not(feature = "no_object"))]
+        let this_type = self
+            .this_type
+            .as_ref()
+            .map_or(String::new(), |s| format!("{:?}.", s));
+
+        #[cfg(feature = "no_object")]
+        let this_type = "";
+
         write!(
             f,
-            "{}{}({})",
+            "{}{}{}({})",
             match self.access {
                 FnAccess::Public => "",
                 FnAccess::Private => "private ",
             },
+            this_type,
             self.name,
             self.params
                 .iter()
@@ -70,6 +84,10 @@ pub struct ScriptFnMetadata<'a> {
     pub params: Vec<&'a str>,
     /// Function access mode.
     pub access: FnAccess,
+    #[cfg(not(feature = "no_object"))]
+    /// Type of `this` pointer, if any.
+    /// Not available under `no_object`.
+    pub this_type: Option<&'a str>,
     /// _(metadata)_ Function doc-comments (if any).
     /// Exported under the `metadata` feature only.
     ///
@@ -90,13 +108,23 @@ pub struct ScriptFnMetadata<'a> {
 
 impl fmt::Display for ScriptFnMetadata<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[cfg(not(feature = "no_object"))]
+        let this_type = self
+            .this_type
+            .as_ref()
+            .map_or(String::new(), |s| format!("{:?}.", s));
+
+        #[cfg(feature = "no_object")]
+        let this_type = "";
+
         write!(
             f,
-            "{}{}({})",
+            "{}{}{}({})",
             match self.access {
                 FnAccess::Public => "",
                 FnAccess::Private => "private ",
             },
+            this_type,
             self.name,
             self.params
                 .iter()
@@ -114,6 +142,8 @@ impl<'a> From<&'a ScriptFnDef> for ScriptFnMetadata<'a> {
             name: &value.name,
             params: value.params.iter().map(|s| s.as_str()).collect(),
             access: value.access,
+            #[cfg(not(feature = "no_object"))]
+            this_type: value.this_type.as_ref().map(|s| s.as_str()),
             #[cfg(feature = "metadata")]
             comments: value.comments.iter().map(<_>::as_ref).collect(),
         }

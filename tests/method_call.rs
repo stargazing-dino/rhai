@@ -75,3 +75,67 @@ fn test_method_call_with_full_optimization() -> Result<(), Box<EvalAltResult>> {
 
     Ok(())
 }
+
+#[cfg(not(feature = "no_function"))]
+#[test]
+fn test_method_call_typed() -> Result<(), Box<EvalAltResult>> {
+    let mut engine = Engine::new();
+
+    engine
+        .register_type_with_name::<TestStruct>("Test-Struct#ABC")
+        .register_fn("update", TestStruct::update)
+        .register_fn("new_ts", TestStruct::new);
+
+    assert_eq!(
+        engine.eval::<TestStruct>(
+            r#"
+                fn "Test-Struct#ABC".foo(x) {
+                    this.update(x);
+                }
+                fn foo(x) {
+                    this += x;
+                }
+                
+                let z = 1000;
+                z.foo(1);
+
+                let x = new_ts();
+                x.foo(z);
+
+                x
+            "#
+        )?,
+        TestStruct { x: 1002 }
+    );
+
+    assert!(matches!(
+        *engine
+            .run(
+                r#"
+                    fn "Test-Struct#ABC".foo(x) {
+                        this.update(x);
+                    }
+                    foo(1000);
+                "#
+            )
+            .expect_err("should error"),
+        EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("foo")
+    ));
+
+    assert!(matches!(
+        *engine
+            .run(
+                r#"
+                    fn "Test-Struct#ABC".foo(x) {
+                        this.update(x);
+                    }
+                    let x = 42;
+                    x.foo(1000);
+                "#
+            )
+            .expect_err("should error"),
+        EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("foo")
+    ));
+
+    Ok(())
+}

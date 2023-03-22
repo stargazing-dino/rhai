@@ -227,6 +227,9 @@ pub use api::{eval::eval, events::VarDefInfo, run::run};
 pub use ast::{FnAccess, AST};
 pub use engine::{Engine, OP_CONTAINS, OP_EQUALS};
 pub use eval::EvalContext;
+#[cfg(not(feature = "no_function"))]
+#[cfg(not(feature = "no_object"))]
+use func::calc_typed_method_hash;
 use func::{calc_fn_hash, calc_fn_hash_full, calc_var_hash};
 pub use func::{plugin, FuncArgs, NativeCallContext, RegisterNativeFunction};
 pub use module::{FnNamespace, Module};

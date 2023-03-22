@@ -22,7 +22,7 @@ impl Engine {
     /// Function call arguments may be _consumed_ when the function requires them to be passed by value.
     /// All function arguments not in the first position are always passed by value and thus consumed.
     ///
-    /// **DO NOT** reuse the argument values unless for the first `&mut` argument - all others are silently replaced by `()`!
+    /// **DO NOT** reuse the argument values except for the first `&mut` argument - all others are silently replaced by `()`!
     pub(crate) fn call_script_fn(
         &self,
         global: &mut GlobalRuntimeState,

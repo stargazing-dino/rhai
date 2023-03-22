@@ -251,12 +251,22 @@ impl GlobalRuntimeState {
     pub fn get_qualified_fn(
         &self,
         hash: u64,
+        global_namespace_only: bool,
     ) -> Option<(&crate::func::CallableFunction, Option<&ImmutableString>)> {
-        self.modules.as_ref().and_then(|m| {
-            m.iter()
-                .rev()
-                .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id_raw())))
-        })
+        if global_namespace_only {
+            self.modules.as_ref().and_then(|m| {
+                m.iter()
+                    .rev()
+                    .filter(|m| m.contains_indexed_global_functions())
+                    .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id_raw())))
+            })
+        } else {
+            self.modules.as_ref().and_then(|m| {
+                m.iter()
+                    .rev()
+                    .find_map(|m| m.get_qualified_fn(hash).map(|f| (f, m.id_raw())))
+            })
+        }
     }
     /// Does the specified [`TypeId`][std::any::TypeId] iterator exist in the stack of
     /// globally-imported [modules][crate::Module]?

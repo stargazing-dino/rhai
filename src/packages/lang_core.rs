@@ -208,6 +208,10 @@ fn collect_fn_metadata(
             "is_anonymous".into(),
             func.name.starts_with(FN_ANONYMOUS).into(),
         );
+        #[cfg(not(feature = "no_object"))]
+        if let Some(ref this_type) = func.this_type {
+            map.insert("this_type".into(), this_type.into());
+        }
         map.insert(
             "params".into(),
             func.params

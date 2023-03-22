@@ -73,6 +73,9 @@ pub struct FuncInfoMetadata {
     pub access: FnAccess,
     /// Function name.
     pub name: Identifier,
+    #[cfg(not(feature = "no_object"))]
+    /// Type of `this` pointer, if any.
+    pub this_type: Option<ImmutableString>,
     /// Number of parameters.
     pub num_params: usize,
     /// Parameter types (if applicable).
@@ -728,8 +731,16 @@ impl Module {
         let fn_def = fn_def.into();
 
         // None + function name + number of arguments.
+        let namespace = FnNamespace::Internal;
         let num_params = fn_def.params.len();
         let hash_script = crate::calc_fn_hash(None, &fn_def.name, num_params);
+        #[cfg(not(feature = "no_object"))]
+        let (hash_script, namespace) = if let Some(ref this_type) = fn_def.this_type {
+            let hash = crate::calc_typed_method_hash(hash_script, this_type);
+            (hash, FnNamespace::Global)
+        } else {
+            (hash_script, namespace)
+        };
 
         // Catch hash collisions in testing environment only.
         #[cfg(feature = "testing-environ")]
@@ -750,8 +761,10 @@ impl Module {
                 FuncInfo {
                     metadata: FuncInfoMetadata {
                         name: fn_def.name.as_str().into(),
-                        namespace: FnNamespace::Internal,
+                        namespace,
                         access: fn_def.access,
+                        #[cfg(not(feature = "no_object"))]
+                        this_type: fn_def.this_type.clone(),
                         num_params,
                         param_types: FnArgsVec::new_const(),
                         #[cfg(feature = "metadata")]
@@ -765,8 +778,10 @@ impl Module {
                     func: fn_def.into(),
                 },
             );
+
         self.flags
             .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
+
         hash_script
     }
 
@@ -1009,7 +1024,7 @@ impl Module {
         type_id
     }
 
-    /// Set a Rust function into the [`Module`], returning a [`u64`] hash key.
+    /// Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
     ///
     /// If there is an existing Rust function of the same hash, it is replaced.
     ///
@@ -1067,22 +1082,22 @@ impl Module {
         };
 
         let name = name.as_ref();
-        let hash_script = calc_fn_hash(None, name, param_types.len());
-        let hash_fn = calc_fn_hash_full(hash_script, param_types.iter().copied());
+        let hash_base = calc_fn_hash(None, name, param_types.len());
+        let hash_fn = calc_fn_hash_full(hash_base, param_types.iter().copied());
 
         // Catch hash collisions in testing environment only.
         #[cfg(feature = "testing-environ")]
-        if let Some(f) = self.functions.as_ref().and_then(|f| f.get(&hash_script)) {
+        if let Some(f) = self.functions.as_ref().and_then(|f| f.get(&hash_base)) {
             panic!(
                 "Hash {} already exists when registering function {}:\n{:#?}",
-                hash_script, name, f
+                hash_base, name, f
             );
         }
 
         if is_dynamic {
             self.dynamic_functions_filter
                 .get_or_insert_with(Default::default)
-                .mark(hash_script);
+                .mark(hash_base);
         }
 
         self.functions
@@ -1095,6 +1110,8 @@ impl Module {
                         name: name.into(),
                         namespace,
                         access,
+                        #[cfg(not(feature = "no_object"))]
+                        this_type: None,
                         num_params: param_types.len(),
                         param_types,
                         #[cfg(feature = "metadata")]
@@ -1114,7 +1131,7 @@ impl Module {
         hash_fn
     }
 
-    /// _(metadata)_ Set a Rust function into the [`Module`], returning a [`u64`] hash key.
+    /// _(metadata)_ Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
     /// Exported under the `metadata` feature only.
     ///
     /// If there is an existing Rust function of the same hash, it is replaced.
@@ -1167,13 +1184,7 @@ impl Module {
         hash
     }
 
-    /// Set a Rust function taking a reference to the scripting [`Engine`][crate::Engine],
-    /// the current set of functions, plus a list of mutable [`Dynamic`] references
-    /// into the [`Module`], returning a [`u64`] hash key.
-    ///
-    /// Use this to register a built-in function which must reference settings on the scripting
-    /// [`Engine`][crate::Engine] (e.g. to prevent growing an array beyond the allowed maximum size),
-    /// or to call a script-defined function in the current evaluation context.
+    /// Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
     ///
     /// If there is a similar existing Rust function, it is replaced.
     ///
@@ -1259,7 +1270,7 @@ impl Module {
         )
     }
 
-    /// Set a Rust function into the [`Module`], returning a [`u64`] hash key.
+    /// Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
     ///
     /// If there is a similar existing Rust function, it is replaced.
     ///
@@ -1618,7 +1629,7 @@ impl Module {
         )
     }
 
-    /// Look up a Rust function by hash.
+    /// Look up a native Rust function by hash.
     ///
     /// The [`u64`] hash is returned by the [`set_native_fn`][Module::set_native_fn] call.
     #[inline]
@@ -2298,14 +2309,14 @@ impl Module {
                 }
             }
 
-            // Index type iterators
+            // Index all type iterators
             if let Some(ref t) = module.type_iterators {
                 for (&type_id, func) in t.iter() {
                     type_iterators.insert(type_id, func.clone());
                 }
             }
 
-            // Index all Rust functions
+            // Index all functions
             for (&hash, f) in module.functions.iter().flatten() {
                 match f.metadata.namespace {
                     FnNamespace::Global => {
@@ -2346,23 +2357,33 @@ impl Module {
                     }
 
                     functions.insert(hash_qualified_fn, f.func.clone());
-                } else if cfg!(not(feature = "no_function")) {
-                    let hash_qualified_script = crate::calc_fn_hash(
-                        path.iter().copied(),
-                        &f.metadata.name,
-                        f.metadata.num_params,
-                    );
-
-                    // Catch hash collisions in testing environment only.
-                    #[cfg(feature = "testing-environ")]
-                    if let Some(fx) = functions.get(&hash_qualified_script) {
-                        panic!(
-                            "Hash {} already exists when indexing function {:#?}:\n{:#?}",
-                            hash_qualified_script, f.func, fx
+                } else {
+                    #[cfg(not(feature = "no_function"))]
+                    {
+                        let hash_qualified_script = crate::calc_fn_hash(
+                            path.iter().copied(),
+                            &f.metadata.name,
+                            f.metadata.num_params,
                         );
-                    }
+                        #[cfg(not(feature = "no_object"))]
+                        let hash_qualified_script =
+                            if let Some(ref this_type) = f.metadata.this_type {
+                                crate::calc_typed_method_hash(hash_qualified_script, this_type)
+                            } else {
+                                hash_qualified_script
+                            };
 
-                    functions.insert(hash_qualified_script, f.func.clone());
+                        // Catch hash collisions in testing environment only.
+                        #[cfg(feature = "testing-environ")]
+                        if let Some(fx) = functions.get(&hash_qualified_script) {
+                            panic!(
+                                "Hash {} already exists when indexing function {:#?}:\n{:#?}",
+                                hash_qualified_script, f.func, fx
+                            );
+                        }
+
+                        functions.insert(hash_qualified_script, f.func.clone());
+                    }
                 }
             }
 
