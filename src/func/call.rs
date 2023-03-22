@@ -631,6 +631,7 @@ impl Engine {
             let hash = hashes.script();
             let local_entry = &mut None;
 
+            #[cfg(not(feature = "no_object"))]
             let resolved = if _is_method_call && !args.is_empty() {
                 let typed_hash =
                     crate::calc_typed_method_hash(hash, self.map_type_name(args[0].type_name()));
@@ -638,6 +639,8 @@ impl Engine {
             } else {
                 None
             };
+            #[cfg(feature = "no_object")]
+            let resolved = None;
 
             let resolved = if resolved.is_none() {
                 self.resolve_fn(global, caches, local_entry, None, hash, None, false)

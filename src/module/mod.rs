@@ -2357,28 +2357,33 @@ impl Module {
                     }
 
                     functions.insert(hash_qualified_fn, f.func.clone());
-                } else if cfg!(not(feature = "no_function")) {
-                    let mut _hash_qualified_script = crate::calc_fn_hash(
-                        path.iter().copied(),
-                        &f.metadata.name,
-                        f.metadata.num_params,
-                    );
-                    #[cfg(not(feature = "no_object"))]
-                    if let Some(ref this_type) = f.metadata.this_type {
-                        _hash_qualified_script =
-                            crate::calc_typed_method_hash(_hash_qualified_script, this_type);
-                    }
-
-                    // Catch hash collisions in testing environment only.
-                    #[cfg(feature = "testing-environ")]
-                    if let Some(fx) = functions.get(&_hash_qualified_script) {
-                        panic!(
-                            "Hash {} already exists when indexing function {:#?}:\n{:#?}",
-                            _hash_qualified_script, f.func, fx
+                } else {
+                    #[cfg(not(feature = "no_function"))]
+                    {
+                        let hash_qualified_script = crate::calc_fn_hash(
+                            path.iter().copied(),
+                            &f.metadata.name,
+                            f.metadata.num_params,
                         );
-                    }
+                        #[cfg(not(feature = "no_object"))]
+                        let hash_qualified_script =
+                            if let Some(ref this_type) = f.metadata.this_type {
+                                crate::calc_typed_method_hash(hash_qualified_script, this_type)
+                            } else {
+                                hash_qualified_script
+                            };
 
-                    functions.insert(_hash_qualified_script, f.func.clone());
+                        // Catch hash collisions in testing environment only.
+                        #[cfg(feature = "testing-environ")]
+                        if let Some(fx) = functions.get(&hash_qualified_script) {
+                            panic!(
+                                "Hash {} already exists when indexing function {:#?}:\n{:#?}",
+                                hash_qualified_script, f.func, fx
+                            );
+                        }
+
+                        functions.insert(hash_qualified_script, f.func.clone());
+                    }
                 }
             }
 
