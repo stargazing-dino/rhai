@@ -864,7 +864,7 @@ impl Engine {
                         let settings = settings.level_up()?;
                         // Recursively parse the indexing chain, right-binding each
                         let options = match token {
-                            Token::LeftBracket => ASTFlags::NONE,
+                            Token::LeftBracket => ASTFlags::empty(),
                             Token::QuestionBracket => ASTFlags::NEGATED,
                             _ => unreachable!("`[` or `?[`"),
                         };
@@ -1810,7 +1810,7 @@ impl Engine {
                 #[cfg(not(feature = "no_index"))]
                 (expr, token @ (Token::LeftBracket | Token::QuestionBracket)) => {
                     let opt = match token {
-                        Token::LeftBracket => ASTFlags::NONE,
+                        Token::LeftBracket => ASTFlags::empty(),
                         Token::QuestionBracket => ASTFlags::NEGATED,
                         _ => unreachable!("`[` or `?[`"),
                     };
@@ -1834,7 +1834,7 @@ impl Engine {
                     }
 
                     let op_flags = match op {
-                        Token::Period => ASTFlags::NONE,
+                        Token::Period => ASTFlags::empty(),
                         Token::Elvis => ASTFlags::NEGATED,
                         _ => unreachable!("`.` or `?.`"),
                     };
@@ -1842,7 +1842,7 @@ impl Engine {
                     let rhs =
                         self.parse_primary(input, state, lib, settings.level_up()?, options)?;
 
-                    Self::make_dot_expr(state, expr, rhs, ASTFlags::NONE, op_flags, tail_pos)?
+                    Self::make_dot_expr(state, expr, rhs, ASTFlags::empty(), op_flags, tail_pos)?
                 }
                 // Unknown postfix operator
                 (expr, token) => {
@@ -2141,7 +2141,7 @@ impl Engine {
             {
                 let options = options | parent_options;
                 x.rhs = Self::make_dot_expr(state, x.rhs, rhs, options, op_flags, op_pos)?;
-                Ok(Expr::Index(x, ASTFlags::NONE, pos))
+                Ok(Expr::Index(x, ASTFlags::empty(), pos))
             }
             // lhs.module::id - syntax error
             #[cfg(not(feature = "no_module"))]
@@ -2770,7 +2770,7 @@ impl Engine {
         let body = self.parse_block(input, state, lib, settings)?.into();
 
         let negated = match input.next().expect(NEVER_ENDS) {
-            (Token::While, ..) => ASTFlags::NONE,
+            (Token::While, ..) => ASTFlags::empty(),
             (Token::Until, ..) => ASTFlags::NEGATED,
             (.., pos) => {
                 return Err(
@@ -2966,7 +2966,7 @@ impl Engine {
         let export = if is_export {
             ASTFlags::EXPORTED
         } else {
-            ASTFlags::NONE
+            ASTFlags::empty()
         };
 
         let (existing, hit_barrier) = state.find_var(&name);
@@ -3433,7 +3433,7 @@ impl Engine {
                 if self.allow_looping() && settings.has_flag(ParseSettingFlags::BREAKABLE) =>
             {
                 let pos = eat_token(input, Token::Continue);
-                Ok(Stmt::BreakLoop(None, ASTFlags::NONE, pos))
+                Ok(Stmt::BreakLoop(None, ASTFlags::empty(), pos))
             }
             Token::Break
                 if self.allow_looping() && settings.has_flag(ParseSettingFlags::BREAKABLE) =>
@@ -3465,7 +3465,7 @@ impl Engine {
                     .next()
                     .map(|(token, pos)| {
                         let flags = match token {
-                            Token::Return => ASTFlags::NONE,
+                            Token::Return => ASTFlags::empty(),
                             Token::Throw => ASTFlags::BREAK,
                             token => unreachable!(
                                 "Token::Return or Token::Throw expected but gets {:?}",

@@ -779,13 +779,13 @@ impl Stmt {
             | Self::While(..)
             | Self::For(..)
             | Self::TryCatch(..)
-            | Self::Assignment(..) => ASTFlags::NONE,
+            | Self::Assignment(..) => ASTFlags::empty(),
 
             #[cfg(not(feature = "no_module"))]
-            Self::Import(..) | Self::Export(..) => ASTFlags::NONE,
+            Self::Import(..) | Self::Export(..) => ASTFlags::empty(),
 
             #[cfg(not(feature = "no_closure"))]
-            Self::Share(..) => ASTFlags::NONE,
+            Self::Share(..) => ASTFlags::empty(),
         }
     }
     /// Get the [position][Position] of this statement.
