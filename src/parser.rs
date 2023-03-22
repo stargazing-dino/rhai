@@ -3612,31 +3612,39 @@ impl Engine {
 
         // Parse type for `this` pointer
         #[cfg(not(feature = "no_object"))]
-        let ((token, pos), this_type) = match token {
-            Token::StringConstant(s) if input.peek().expect(NEVER_ENDS).0 == Token::Period => {
-                eat_token(input, Token::Period);
-                let s = match s.as_str() {
-                    "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
-                    #[cfg(not(feature = "no_float"))]
-                    "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
-                    _ => state.get_interned_string(*s),
-                };
-                (input.next().expect(NEVER_ENDS), Some(s))
+        let ((token, pos), this_type) = {
+            let (next_token, next_pos) = input.peek().expect(NEVER_ENDS);
+
+            match token {
+                Token::StringConstant(s) if next_token == &Token::Period => {
+                    eat_token(input, Token::Period);
+                    let s = match s.as_str() {
+                        "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
+                        #[cfg(not(feature = "no_float"))]
+                        "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
+                        _ => state.get_interned_string(*s),
+                    };
+                    (input.next().expect(NEVER_ENDS), Some(s))
+                }
+                Token::StringConstant(..) => {
+                    return Err(PERR::MissingToken(
+                        Token::Period.into(),
+                        "after the type name for 'this'".into(),
+                    )
+                    .into_err(*next_pos))
+                }
+                Token::Identifier(s) if next_token == &Token::Period => {
+                    eat_token(input, Token::Period);
+                    let s = match s.as_str() {
+                        "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
+                        #[cfg(not(feature = "no_float"))]
+                        "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
+                        _ => state.get_interned_string(*s),
+                    };
+                    (input.next().expect(NEVER_ENDS), Some(s))
+                }
+                _ => ((token, pos), None),
             }
-            Token::StringConstant(..) => {
-                return Err(PERR::MissingSymbol(".".to_string()).into_err(pos))
-            }
-            Token::Identifier(s) if input.peek().expect(NEVER_ENDS).0 == Token::Period => {
-                eat_token(input, Token::Period);
-                let s = match s.as_str() {
-                    "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
-                    #[cfg(not(feature = "no_float"))]
-                    "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
-                    _ => state.get_interned_string(*s),
-                };
-                (input.next().expect(NEVER_ENDS), Some(s))
-            }
-            _ => ((token, pos), None),
         };
 
         let name = match token.into_function_name_for_override() {
