@@ -1348,8 +1348,9 @@ impl Engine {
                         name: fn_def.name.clone(),
                         access: fn_def.access,
                         body: crate::ast::StmtBlock::NONE,
+                        #[cfg(not(feature = "no_object"))]
+                        this_type: fn_def.this_type.clone(),
                         params: fn_def.params.clone(),
-                        #[cfg(not(feature = "no_function"))]
                         #[cfg(feature = "metadata")]
                         comments: Box::default(),
                     })

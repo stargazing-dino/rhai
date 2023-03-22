@@ -3392,9 +3392,14 @@ impl Engine {
                             comments,
                         )?;
 
-                        // Restore parse state
-
                         let hash = calc_fn_hash(None, &f.name, f.params.len());
+
+                        #[cfg(not(feature = "no_object"))]
+                        let hash = if let Some(ref this_type) = f.this_type {
+                            crate::calc_typed_method_hash(hash, this_type)
+                        } else {
+                            hash
+                        };
 
                         if !lib.is_empty() && lib.contains_key(&hash) {
                             return Err(PERR::FnDuplicatedDefinition(
@@ -3605,6 +3610,35 @@ impl Engine {
 
         let (token, pos) = input.next().expect(NEVER_ENDS);
 
+        // Parse type for `this` pointer
+        #[cfg(not(feature = "no_object"))]
+        let ((token, pos), this_type) = match token {
+            Token::StringConstant(s) if input.peek().expect(NEVER_ENDS).0 == Token::Period => {
+                eat_token(input, Token::Period);
+                let s = match s.as_str() {
+                    "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
+                    #[cfg(not(feature = "no_float"))]
+                    "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
+                    _ => state.get_interned_string(*s),
+                };
+                (input.next().expect(NEVER_ENDS), Some(s))
+            }
+            Token::StringConstant(..) => {
+                return Err(PERR::MissingSymbol(".".to_string()).into_err(pos))
+            }
+            Token::Identifier(s) if input.peek().expect(NEVER_ENDS).0 == Token::Period => {
+                eat_token(input, Token::Period);
+                let s = match s.as_str() {
+                    "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
+                    #[cfg(not(feature = "no_float"))]
+                    "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
+                    _ => state.get_interned_string(*s),
+                };
+                (input.next().expect(NEVER_ENDS), Some(s))
+            }
+            _ => ((token, pos), None),
+        };
+
         let name = match token.into_function_name_for_override() {
             Ok(r) => r,
             Err(Token::Reserved(s)) => return Err(PERR::Reserved(s.to_string()).into_err(pos)),
@@ -3679,6 +3713,8 @@ impl Engine {
         Ok(ScriptFnDef {
             name: state.get_interned_string(name),
             access,
+            #[cfg(not(feature = "no_object"))]
+            this_type,
             params,
             body,
             #[cfg(feature = "metadata")]
@@ -3839,6 +3875,8 @@ impl Engine {
         let script = Shared::new(ScriptFnDef {
             name: fn_name.clone(),
             access: crate::FnAccess::Public,
+            #[cfg(not(feature = "no_object"))]
+            this_type: None,
             params,
             body: body.into(),
             #[cfg(not(feature = "no_function"))]

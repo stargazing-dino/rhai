@@ -6,6 +6,11 @@ Version 1.14.0
 
 The code hacks that attempt to optimize branch prediction performance are removed because benchmarks do not show any material speed improvements.
 
+New features
+------------
+
+* It is now possible to require a specific _type_ to the `this` pointer for a particular script-defined function so that it is called only when the `this` pointer contains the specified type.
+
 
 Version 1.13.0
 ==============

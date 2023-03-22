@@ -38,6 +38,9 @@ struct FnMetadata<'a> {
     pub is_anonymous: bool,
     #[serde(rename = "type")]
     pub typ: FnType,
+    #[cfg(not(feature = "no_object"))]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub this_type: Option<&'a str>,
     pub num_params: usize,
     #[serde(default, skip_serializing_if = "StaticVec::is_empty")]
     pub params: StaticVec<FnParam<'a>>,
@@ -88,6 +91,8 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
             #[cfg(not(feature = "no_function"))]
             is_anonymous: crate::parser::is_anonymous_fn(&info.metadata.name),
             typ,
+            #[cfg(not(feature = "no_object"))]
+            this_type: info.metadata.this_type.as_ref().map(|s| s.as_str()),
             num_params: info.metadata.num_params,
             params: info
                 .metadata

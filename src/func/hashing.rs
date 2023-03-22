@@ -76,6 +76,9 @@ pub fn get_hasher() -> ahash::AHasher {
 #[must_use]
 pub fn calc_var_hash<'a>(namespace: impl IntoIterator<Item = &'a str>, var_name: &str) -> u64 {
     let s = &mut get_hasher();
+
+    s.write_u8(b'V'); // hash a discriminant
+
     let mut count = 0;
 
     // We always skip the first module
@@ -111,6 +114,9 @@ pub fn calc_fn_hash<'a>(
     num: usize,
 ) -> u64 {
     let s = &mut get_hasher();
+
+    s.write_u8(b'F'); // hash a discriminant
+
     let mut count = 0;
 
     namespace.into_iter().for_each(|m| {
@@ -134,12 +140,29 @@ pub fn calc_fn_hash<'a>(
 #[must_use]
 pub fn calc_fn_hash_full(base: u64, params: impl IntoIterator<Item = TypeId>) -> u64 {
     let s = &mut get_hasher();
+
+    s.write_u8(b'A'); // hash a discriminant
+
     let mut count = 0;
     params.into_iter().for_each(|t| {
         t.hash(s);
         count += 1;
     });
     s.write_usize(count);
+
+    s.finish() ^ base
+}
+
+/// Calculate a [`u64`] hash key from a base [`u64`] hash key and the type of the `this` pointer.
+#[cfg(not(feature = "no_object"))]
+#[cfg(not(feature = "no_function"))]
+#[inline]
+#[must_use]
+pub fn calc_typed_method_hash(base: u64, this_type: &str) -> u64 {
+    let s = &mut get_hasher();
+
+    s.write_u8(b'T'); // hash a discriminant
+    this_type.hash(s);
 
     s.finish() ^ base
 }
