@@ -488,7 +488,7 @@ impl Engine {
             // index getter function not found?
             #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
             crate::engine::FN_IDX_GET => {
-                assert!(args.len() == 2);
+                debug_assert_eq!(args.len(), 2);
 
                 let t0 = self.map_type_name(args[0].type_name());
                 let t1 = self.map_type_name(args[1].type_name());
@@ -499,7 +499,7 @@ impl Engine {
             // index setter function not found?
             #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
             crate::engine::FN_IDX_SET => {
-                assert!(args.len() == 3);
+                debug_assert_eq!(args.len(), 3);
 
                 let t0 = self.map_type_name(args[0].type_name());
                 let t1 = self.map_type_name(args[1].type_name());
@@ -511,7 +511,7 @@ impl Engine {
             // Getter function not found?
             #[cfg(not(feature = "no_object"))]
             _ if name.starts_with(crate::engine::FN_GET) => {
-                assert!(args.len() == 1);
+                debug_assert_eq!(args.len(), 1);
 
                 let prop = &name[crate::engine::FN_GET.len()..];
                 let t0 = self.map_type_name(args[0].type_name());
@@ -528,7 +528,7 @@ impl Engine {
             // Setter function not found?
             #[cfg(not(feature = "no_object"))]
             _ if name.starts_with(crate::engine::FN_SET) => {
-                assert!(args.len() == 2);
+                debug_assert_eq!(args.len(), 2);
 
                 let prop = &name[crate::engine::FN_SET.len()..];
                 let t0 = self.map_type_name(args[0].type_name());
@@ -1365,9 +1365,10 @@ impl Engine {
 
                 // Get target reference to first argument
                 let first_arg = &args_expr[0];
-                let target = self.search_scope_only(global, caches, scope, this_ptr, first_arg)?;
 
                 self.track_operation(global, first_arg.position())?;
+
+                let target = self.search_scope_only(global, caches, scope, this_ptr, first_arg)?;
 
                 #[cfg(not(feature = "no_closure"))]
                 let target_is_shared = target.is_shared();
@@ -1432,8 +1433,6 @@ impl Engine {
                         }
                     }),
                 );
-
-                self.track_operation(global, pos)?;
 
                 if let Some(f) = module.get_qualified_fn(hash_qualified_fn) {
                     func = Some(f);

@@ -267,13 +267,13 @@ impl Engine {
         stmt: &Stmt,
         rewind_scope: bool,
     ) -> RhaiResult {
+        self.track_operation(global, stmt.position())?;
+
         #[cfg(feature = "debugging")]
         let reset =
             self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), stmt)?;
         #[cfg(feature = "debugging")]
         auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
-
-        self.track_operation(global, stmt.position())?;
 
         match stmt {
             // No-op
@@ -307,6 +307,8 @@ impl Engine {
                         .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), rhs)?
                         .flatten();
 
+                    self.track_operation(global, lhs.position())?;
+
                     let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
 
                     let is_temp_result = !target.is_ref();
@@ -325,8 +327,6 @@ impl Engine {
                         )
                         .into());
                     }
-
-                    self.track_operation(global, lhs.position())?;
 
                     self.eval_op_assignment(global, caches, op_info, lhs, &mut target, rhs_val)?;
                 } else {
@@ -715,8 +715,6 @@ impl Engine {
                     *scope.get_mut_by_index(index).write_lock().unwrap() = value;
 
                     // Run block
-                    self.track_operation(global, body.position())?;
-
                     if body.is_empty() {
                         continue;
                     }

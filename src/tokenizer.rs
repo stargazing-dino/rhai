@@ -1219,12 +1219,12 @@ pub fn parse_string_literal(
                 ch
             }
             None if verbatim => {
-                assert_eq!(escape, "", "verbatim strings should not have any escapes");
+                debug_assert_eq!(escape, "", "verbatim strings should not have any escapes");
                 pos.advance();
                 break;
             }
             None if allow_line_continuation && !escape.is_empty() => {
-                assert_eq!(escape, "\\", "unexpected escape {escape} at end of line");
+                debug_assert_eq!(escape, "\\", "unexpected escape {} at end of line", escape);
                 pos.advance();
                 break;
             }
@@ -1343,14 +1343,14 @@ pub fn parse_string_literal(
 
             // Verbatim
             '\n' if verbatim => {
-                assert_eq!(escape, "", "verbatim strings should not have any escapes");
+                debug_assert_eq!(escape, "", "verbatim strings should not have any escapes");
                 pos.new_line();
                 result.push(next_char);
             }
 
             // Line continuation
             '\n' if allow_line_continuation && !escape.is_empty() => {
-                assert_eq!(escape, "\\", "unexpected escape {escape} at end of line");
+                debug_assert_eq!(escape, "\\", "unexpected escape {} at end of line", escape);
                 escape.clear();
                 pos.new_line();
 

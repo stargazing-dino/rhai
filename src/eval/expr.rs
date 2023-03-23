@@ -236,16 +236,13 @@ impl Engine {
         mut this_ptr: Option<&mut Dynamic>,
         expr: &Expr,
     ) -> RhaiResult {
-        // Coded this way for better branch prediction.
-        // Popular branches are lifted out of the `match` statement into their own branches.
+        self.track_operation(global, expr.position())?;
 
         #[cfg(feature = "debugging")]
         let reset =
             self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
         #[cfg(feature = "debugging")]
         auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
-
-        self.track_operation(global, expr.position())?;
 
         match expr {
             // Constants

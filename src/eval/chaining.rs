@@ -397,9 +397,10 @@ impl Engine {
         match lhs {
             // id.??? or id[???]
             Expr::Variable(.., var_pos) => {
+                self.track_operation(global, *var_pos)?;
+
                 #[cfg(feature = "debugging")]
                 self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), lhs)?;
-                self.track_operation(global, *var_pos)?;
 
                 let target = &mut self.search_namespace(global, caches, scope, this_ptr, lhs)?;
 

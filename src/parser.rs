@@ -3929,7 +3929,7 @@ impl Engine {
         let expr = self.parse_expr(&mut input, state, &mut functions, settings)?;
 
         #[cfg(feature = "no_function")]
-        assert!(functions.is_empty());
+        debug_assert!(functions.is_empty());
 
         match input.peek().expect(NEVER_ENDS) {
             (Token::EOF, ..) => (),
