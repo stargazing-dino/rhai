@@ -1262,7 +1262,7 @@ impl Engine {
         #[cfg(not(feature = "no_module"))]
         if self
             .global_sub_modules
-            .as_deref()
+            .as_ref()
             .into_iter()
             .flatten()
             .any(|(_, m)| m.contains_qualified_fn(hash))

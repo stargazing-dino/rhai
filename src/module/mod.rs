@@ -195,22 +195,22 @@ pub struct Module {
     /// Custom types.
     custom_types: Option<Box<CustomTypesCollection>>,
     /// Sub-modules.
-    modules: Option<Box<BTreeMap<Identifier, SharedModule>>>,
+    modules: Option<BTreeMap<Identifier, SharedModule>>,
     /// [`Module`] variables.
-    variables: Option<Box<BTreeMap<Identifier, Dynamic>>>,
+    variables: Option<BTreeMap<Identifier, Dynamic>>,
     /// Flattened collection of all [`Module`] variables, including those in sub-modules.
-    all_variables: Option<Box<StraightHashMap<Dynamic>>>,
+    all_variables: Option<StraightHashMap<Dynamic>>,
     /// Functions (both native Rust and scripted).
     functions: Option<StraightHashMap<FuncInfo>>,
     /// Flattened collection of all functions, native Rust and scripted.
     /// including those in sub-modules.
-    all_functions: Option<Box<StraightHashMap<CallableFunction>>>,
+    all_functions: Option<StraightHashMap<CallableFunction>>,
     /// Bloom filter on native Rust functions (in scripted hash format) that contain [`Dynamic`] parameters.
     dynamic_functions_filter: Option<Box<BloomFilterU64>>,
     /// Iterator functions, keyed by the type producing the iterator.
-    type_iterators: Option<Box<BTreeMap<TypeId, Shared<IteratorFn>>>>,
+    type_iterators: Option<BTreeMap<TypeId, Shared<IteratorFn>>>,
     /// Flattened collection of iterator functions, including those in sub-modules.
-    all_type_iterators: Option<Box<BTreeMap<TypeId, Shared<IteratorFn>>>>,
+    all_type_iterators: Option<BTreeMap<TypeId, Shared<IteratorFn>>>,
     /// Flags.
     pub(crate) flags: ModuleFlags,
 }
@@ -234,7 +234,7 @@ impl fmt::Debug for Module {
                 "modules",
                 &self
                     .modules
-                    .as_deref()
+                    .as_ref()
                     .into_iter()
                     .flat_map(BTreeMap::keys)
                     .map(SmartString::as_str)
@@ -561,23 +561,23 @@ impl Module {
                 .functions
                 .as_ref()
                 .map_or(true, StraightHashMap::is_empty)
-            && self.variables.as_deref().map_or(true, BTreeMap::is_empty)
-            && self.modules.as_deref().map_or(true, BTreeMap::is_empty)
+            && self.variables.as_ref().map_or(true, BTreeMap::is_empty)
+            && self.modules.as_ref().map_or(true, BTreeMap::is_empty)
             && self
                 .type_iterators
-                .as_deref()
+                .as_ref()
                 .map_or(true, BTreeMap::is_empty)
             && self
                 .all_functions
-                .as_deref()
+                .as_ref()
                 .map_or(true, StraightHashMap::is_empty)
             && self
                 .all_variables
-                .as_deref()
+                .as_ref()
                 .map_or(true, StraightHashMap::is_empty)
             && self
                 .all_type_iterators
-                .as_deref()
+                .as_ref()
                 .map_or(true, BTreeMap::is_empty)
     }
 
@@ -1979,9 +1979,9 @@ impl Module {
     #[must_use]
     pub fn count(&self) -> (usize, usize, usize) {
         (
-            self.variables.as_deref().map_or(0, BTreeMap::len),
+            self.variables.as_ref().map_or(0, BTreeMap::len),
             self.functions.as_ref().map_or(0, StraightHashMap::len),
-            self.type_iterators.as_deref().map_or(0, BTreeMap::len),
+            self.type_iterators.as_ref().map_or(0, BTreeMap::len),
         )
     }
 
@@ -1989,7 +1989,7 @@ impl Module {
     #[inline]
     pub fn iter_sub_modules(&self) -> impl Iterator<Item = (&str, &SharedModule)> {
         self.modules
-            .as_deref()
+            .as_ref()
             .into_iter()
             .flatten()
             .map(|(k, m)| (k.as_str(), m))
@@ -1999,7 +1999,7 @@ impl Module {
     #[inline]
     pub fn iter_var(&self) -> impl Iterator<Item = (&str, &Dynamic)> {
         self.variables
-            .as_deref()
+            .as_ref()
             .into_iter()
             .flatten()
             .map(|(k, v)| (k.as_str(), v))
@@ -2392,7 +2392,7 @@ impl Module {
 
         if !self.is_indexed() {
             let mut path = Vec::with_capacity(4);
-            let mut variables = new_hash_map(self.variables.as_deref().map_or(0, BTreeMap::len));
+            let mut variables = new_hash_map(self.variables.as_ref().map_or(0, BTreeMap::len));
             let mut functions =
                 new_hash_map(self.functions.as_ref().map_or(0, StraightHashMap::len));
             let mut type_iterators = BTreeMap::new();

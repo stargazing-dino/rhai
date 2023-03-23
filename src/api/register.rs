@@ -786,7 +786,7 @@ impl Engine {
         }
 
         #[cfg(not(feature = "no_module"))]
-        for (name, m) in self.global_sub_modules.as_deref().into_iter().flatten() {
+        for (name, m) in self.global_sub_modules.as_ref().into_iter().flatten() {
             signatures.extend(m.gen_fn_signatures().map(|f| format!("{name}::{f}")));
         }
 

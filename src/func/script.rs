@@ -219,7 +219,7 @@ impl Engine {
             // Then check imported modules
             global.contains_qualified_fn(hash_script)
             // Then check sub-modules
-            || self.global_sub_modules.as_deref().map_or(false, |m| {
+            || self.global_sub_modules.as_ref().map_or(false, |m| {
                 m.values().any(|m| m.contains_qualified_fn(hash_script))
             });
 

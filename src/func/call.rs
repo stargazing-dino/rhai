@@ -206,7 +206,7 @@ impl Engine {
                         .or_else(|| _global.get_qualified_fn(hash, true))
                         .or_else(|| {
                             self.global_sub_modules
-                                .as_deref()
+                                .as_ref()
                                 .into_iter()
                                 .flatten()
                                 .filter(|(_, m)| m.contains_indexed_global_functions())
@@ -248,7 +248,7 @@ impl Engine {
                         #[cfg(not(feature = "no_module"))]
                         let is_dynamic = is_dynamic
                             || _global.may_contain_dynamic_fn(hash_base)
-                            || self.global_sub_modules.as_deref().map_or(false, |m| {
+                            || self.global_sub_modules.as_ref().map_or(false, |m| {
                                 m.values().any(|m| m.may_contain_dynamic_fn(hash_base))
                             });
 

@@ -2450,7 +2450,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             Some((Token::Reserved(s), pos)) => (match
                 (s.as_str(),
                     #[cfg(not(feature = "no_custom_syntax"))]
-                    self.engine.custom_keywords.as_deref().map_or(false, |m| m.contains_key(&*s)),
+                    self.engine.custom_keywords.as_ref().map_or(false, |m| m.contains_key(&*s)),
                     #[cfg(feature = "no_custom_syntax")]
                     false
                 )
@@ -2487,7 +2487,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 #[cfg(feature = "no_custom_syntax")]
                 (.., true) => unreachable!("no custom operators"),
                 // Reserved keyword that is not custom and disabled.
-                (token, false) if self.engine.disabled_symbols.as_deref().map_or(false,|m| m.contains(token)) => {
+                (token, false) if self.engine.disabled_symbols.as_ref().map_or(false,|m| m.contains(token)) => {
                     let msg = format!("reserved {} '{token}' is disabled", if is_valid_identifier(token) { "keyword"} else {"symbol"});
                     Token::LexError(LERR::ImproperSymbol(s.to_string(), msg).into())
                 },
@@ -2496,13 +2496,13 @@ impl<'a> Iterator for TokenIterator<'a> {
             }, pos),
             // Custom keyword
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((Token::Identifier(s), pos)) if self.engine.custom_keywords.as_deref().map_or(false,|m| m.contains_key(&*s)) => {
+            Some((Token::Identifier(s), pos)) if self.engine.custom_keywords.as_ref().map_or(false,|m| m.contains_key(&*s)) => {
                 (Token::Custom(s), pos)
             }
             // Custom keyword/symbol - must be disabled
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((token, pos)) if token.is_literal() && self.engine.custom_keywords.as_deref().map_or(false,|m| m.contains_key(token.literal_syntax())) => {
-                if self.engine.disabled_symbols.as_deref().map_or(false,|m| m.contains(token.literal_syntax())) {
+            Some((token, pos)) if token.is_literal() && self.engine.custom_keywords.as_ref().map_or(false,|m| m.contains_key(token.literal_syntax())) => {
+                if self.engine.disabled_symbols.as_ref().map_or(false,|m| m.contains(token.literal_syntax())) {
                     // Disabled standard keyword/symbol
                     (Token::Custom(Box::new(token.literal_syntax().into())), pos)
                 } else {
@@ -2511,7 +2511,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                 }
             }
             // Disabled symbol
-            Some((token, pos)) if token.is_literal() && self.engine.disabled_symbols.as_deref().map_or(false,|m| m.contains(token.literal_syntax())) => {
+            Some((token, pos)) if token.is_literal() && self.engine.disabled_symbols.as_ref().map_or(false,|m| m.contains(token.literal_syntax())) => {
                 (Token::Reserved(Box::new(token.literal_syntax().into())), pos)
             }
             // Normal symbol

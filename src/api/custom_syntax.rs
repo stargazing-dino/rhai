@@ -261,12 +261,12 @@ impl Engine {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if (self
                         .disabled_symbols
-                        .as_deref()
+                        .as_ref()
                         .map_or(false, |m| m.contains(s))
                         || token.as_ref().map_or(false, Token::is_reserved))
                         && !self
                             .custom_keywords
-                            .as_deref()
+                            .as_ref()
                             .map_or(false, |m| m.contains_key(s))
                     {
                         self.custom_keywords
@@ -281,7 +281,7 @@ impl Engine {
                     && token.as_ref().map_or(false, Token::is_standard_keyword)
                     && !self
                         .disabled_symbols
-                        .as_deref()
+                        .as_ref()
                         .map_or(false, |m| m.contains(s)) =>
                 {
                     return Err(LexError::ImproperSymbol(
@@ -301,12 +301,12 @@ impl Engine {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if self
                         .disabled_symbols
-                        .as_deref()
+                        .as_ref()
                         .map_or(false, |m| m.contains(s))
                         || (token.as_ref().map_or(false, Token::is_reserved)
                             && !self
                                 .custom_keywords
-                                .as_deref()
+                                .as_ref()
                                 .map_or(false, |m| m.contains_key(s)))
                     {
                         self.custom_keywords

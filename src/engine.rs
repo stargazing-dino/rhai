@@ -96,8 +96,7 @@ pub struct Engine {
     pub(crate) global_modules: StaticVec<SharedModule>,
     /// A collection of all sub-modules directly loaded into the Engine.
     #[cfg(not(feature = "no_module"))]
-    pub(crate) global_sub_modules:
-        Option<Box<std::collections::BTreeMap<Identifier, SharedModule>>>,
+    pub(crate) global_sub_modules: Option<std::collections::BTreeMap<Identifier, SharedModule>>,
 
     /// A module resolution service.
     #[cfg(not(feature = "no_module"))]
@@ -107,15 +106,14 @@ pub struct Engine {
     pub(crate) interned_strings: Option<Box<Locked<StringsInterner>>>,
 
     /// A set of symbols to disable.
-    pub(crate) disabled_symbols: Option<Box<BTreeSet<Identifier>>>,
+    pub(crate) disabled_symbols: Option<BTreeSet<Identifier>>,
     /// A map containing custom keywords and precedence to recognize.
     #[cfg(not(feature = "no_custom_syntax"))]
-    pub(crate) custom_keywords:
-        Option<Box<std::collections::BTreeMap<Identifier, Option<Precedence>>>>,
+    pub(crate) custom_keywords: Option<std::collections::BTreeMap<Identifier, Option<Precedence>>>,
     /// Custom syntax.
     #[cfg(not(feature = "no_custom_syntax"))]
     pub(crate) custom_syntax: Option<
-        Box<std::collections::BTreeMap<Identifier, Box<crate::api::custom_syntax::CustomSyntax>>>,
+        std::collections::BTreeMap<Identifier, Box<crate::api::custom_syntax::CustomSyntax>>,
     >,
     /// Callback closure for filtering variable definition.
     pub(crate) def_var_filter: Option<Box<OnDefVarCallback>>,

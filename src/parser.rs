@@ -601,7 +601,7 @@ impl Engine {
                             .any(|m| m.as_str() == root)
                         && !self
                             .global_sub_modules
-                            .as_deref()
+                            .as_ref()
                             .map_or(false, |m| m.contains_key(root))
                     {
                         return Err(
@@ -676,7 +676,7 @@ impl Engine {
                                 .any(|m| m.as_str() == root)
                             && !self
                                 .global_sub_modules
-                                .as_deref()
+                                .as_ref()
                                 .map_or(false, |m| m.contains_key(root))
                         {
                             return Err(
@@ -1577,12 +1577,12 @@ impl Engine {
             Token::Custom(key) | Token::Reserved(key) | Token::Identifier(key)
                 if self
                     .custom_syntax
-                    .as_deref()
+                    .as_ref()
                     .map_or(false, |m| m.contains_key(&**key)) =>
             {
                 let (key, syntax) = self
                     .custom_syntax
-                    .as_deref()
+                    .as_ref()
                     .and_then(|m| m.get_key_value(&**key))
                     .unwrap();
                 let (.., pos) = input.next().expect(NEVER_ENDS);
@@ -1888,7 +1888,7 @@ impl Engine {
                             .any(|m| m.as_str() == root)
                         && !self
                             .global_sub_modules
-                            .as_deref()
+                            .as_ref()
                             .map_or(false, |m| m.contains_key(root))
                     {
                         return Err(
@@ -2303,7 +2303,7 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .as_deref()
+                    .as_ref()
                     .and_then(|m| m.get(&**c))
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*current_pos))?,
@@ -2329,7 +2329,7 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .as_deref()
+                    .as_ref()
                     .and_then(|m| m.get(&**c))
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*next_pos))?,
@@ -2434,7 +2434,7 @@ impl Engine {
                 Token::Custom(s)
                     if self
                         .custom_keywords
-                        .as_deref()
+                        .as_ref()
                         .and_then(|m| m.get(s.as_str()))
                         .map_or(false, Option::is_some) =>
                 {
