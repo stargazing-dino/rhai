@@ -686,51 +686,53 @@ impl Engine {
 
                 let mut result = Dynamic::UNIT;
 
-                for (x, iter_value) in iter_func(iter_obj).enumerate() {
-                    // Increment counter
-                    if let Some(counter_index) = counter_index {
-                        // As the variable increments from 0, this should always work
-                        // since any overflow will first be caught below.
-                        let index_value = x as INT;
+                if body.is_empty() {
+                    for _ in iter_func(iter_obj) {
+                        self.track_operation(global, body.position())?;
+                    }
+                } else {
+                    for (x, iter_value) in iter_func(iter_obj).enumerate() {
+                        // Increment counter
+                        if let Some(counter_index) = counter_index {
+                            // As the variable increments from 0, this should always work
+                            // since any overflow will first be caught below.
+                            let index_value = x as INT;
 
-                        #[cfg(not(feature = "unchecked"))]
-                        #[allow(clippy::absurd_extreme_comparisons)]
-                        if index_value > crate::MAX_USIZE_INT {
-                            return Err(ERR::ErrorArithmetic(
-                                format!("for-loop counter overflow: {x}"),
-                                counter.pos,
-                            )
-                            .into());
+                            #[cfg(not(feature = "unchecked"))]
+                            #[allow(clippy::absurd_extreme_comparisons)]
+                            if index_value > crate::MAX_USIZE_INT {
+                                return Err(ERR::ErrorArithmetic(
+                                    format!("for-loop counter overflow: {x}"),
+                                    counter.pos,
+                                )
+                                .into());
+                            }
+
+                            *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
+                                Dynamic::from_int(index_value);
                         }
 
-                        *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
-                            Dynamic::from_int(index_value);
-                    }
+                        // Set loop value
+                        let value = iter_value
+                            .map_err(|err| err.fill_position(expr.position()))?
+                            .flatten();
 
-                    // Set loop value
-                    let value = iter_value
-                        .map_err(|err| err.fill_position(expr.position()))?
-                        .flatten();
+                        *scope.get_mut_by_index(index).write_lock().unwrap() = value;
 
-                    *scope.get_mut_by_index(index).write_lock().unwrap() = value;
+                        // Run block
+                        let this_ptr = this_ptr.as_deref_mut();
 
-                    // Run block
-                    if body.is_empty() {
-                        continue;
-                    }
-
-                    let this_ptr = this_ptr.as_deref_mut();
-
-                    match self.eval_stmt_block(global, caches, scope, this_ptr, body, true) {
-                        Ok(_) => (),
-                        Err(err) => match *err {
-                            ERR::LoopBreak(false, ..) => (),
-                            ERR::LoopBreak(true, value, ..) => {
-                                result = value;
-                                break;
-                            }
-                            _ => return Err(err),
-                        },
+                        match self.eval_stmt_block(global, caches, scope, this_ptr, body, true) {
+                            Ok(_) => (),
+                            Err(err) => match *err {
+                                ERR::LoopBreak(false, ..) => (),
+                                ERR::LoopBreak(true, value, ..) => {
+                                    result = value;
+                                    break;
+                                }
+                                _ => return Err(err),
+                            },
+                        }
                     }
                 }
 
