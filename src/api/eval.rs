@@ -242,7 +242,7 @@ impl Engine {
             ast.resolver().cloned(),
         );
 
-        auto_restore! { global => move |g| {
+        defer! { global => move |g| {
             #[cfg(not(feature = "no_module"))]
             {
                 g.embedded_module_resolver = orig_embedded_module_resolver;

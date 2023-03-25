@@ -577,7 +577,7 @@ impl Engine {
         #[cfg(not(feature = "no_closure"))]
         ensure_no_data_race(fn_name, args, is_ref_mut)?;
 
-        auto_restore! { let orig_level = global.level; global.level += 1 }
+        defer! { let orig_level = global.level; global.level += 1 }
 
         // These may be redirected from method style calls.
         if hashes.is_native_only() {
@@ -668,7 +668,7 @@ impl Engine {
                 };
 
                 let orig_source = mem::replace(&mut global.source, source.clone());
-                auto_restore! { global => move |g| g.source = orig_source }
+                defer! { global => move |g| g.source = orig_source }
 
                 return if _is_method_call {
                     // Method call of script function - map first argument to `this`
@@ -696,7 +696,7 @@ impl Engine {
                         backup.change_first_arg_to_copy(args);
                     }
 
-                    auto_restore! { args = (args) if swap => move |a| backup.restore_first_arg(a) }
+                    defer! { args = (args) if swap => move |a| backup.restore_first_arg(a) }
 
                     self.call_script_fn(global, caches, scope, None, environ, f, args, true, pos)
                 }
@@ -740,7 +740,7 @@ impl Engine {
             })
         });
         #[cfg(feature = "debugging")]
-        auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
+        defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
         self.eval_expr(global, caches, scope, this_ptr, arg_expr)
             .map(|r| (r, arg_expr.start_position()))
@@ -1451,7 +1451,7 @@ impl Engine {
             }
         }
 
-        auto_restore! { let orig_level = global.level; global.level += 1 }
+        defer! { let orig_level = global.level; global.level += 1 }
 
         match func {
             #[cfg(not(feature = "no_function"))]
@@ -1462,7 +1462,7 @@ impl Engine {
                 let scope = &mut Scope::new();
 
                 let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
-                auto_restore! { global => move |g| g.source = orig_source }
+                defer! { global => move |g| g.source = orig_source }
 
                 self.call_script_fn(global, caches, scope, None, environ, f, args, true, pos)
             }
@@ -1729,7 +1729,7 @@ impl Engine {
                 get_builtin_binary_op_fn(op_token.as_ref().unwrap(), operands[0], operands[1])
             {
                 // We may not need to bump the level because built-in's do not need it.
-                //auto_restore! { let orig_level = global.level; global.level += 1 }
+                //defer! { let orig_level = global.level; global.level += 1 }
 
                 let context =
                     need_context.then(|| (self, name.as_str(), None, &*global, pos).into());

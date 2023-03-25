@@ -67,7 +67,7 @@ impl Engine {
         idx: &mut Dynamic,
         pos: Position,
     ) -> RhaiResultOf<Dynamic> {
-        auto_restore! { let orig_level = global.level; global.level += 1 }
+        defer! { let orig_level = global.level; global.level += 1 }
 
         let hash = hash_idx().0;
         let args = &mut [target, idx];
@@ -88,7 +88,7 @@ impl Engine {
         is_ref_mut: bool,
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
-        auto_restore! { let orig_level = global.level; global.level += 1 }
+        defer! { let orig_level = global.level; global.level += 1 }
 
         let hash = hash_idx().1;
         let args = &mut [target, idx, new_val];
@@ -689,14 +689,14 @@ impl Engine {
                         let reset =
                             self.run_debugger_with_reset(global, caches, scope, this_ptr, rhs)?;
                         #[cfg(feature = "debugging")]
-                        auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
+                        defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
                         let crate::ast::FnCallExpr {
                             name, hashes, args, ..
                         } = &**x;
 
                         // Truncate the index values upon exit
-                        auto_restore! { idx_values => truncate; let offset = idx_values.len() - args.len(); }
+                        defer! { idx_values => truncate; let offset = idx_values.len() - args.len(); }
 
                         let call_args = &mut idx_values[offset..];
                         let arg1_pos = args.get(0).map_or(Position::NONE, Expr::position);
@@ -858,14 +858,14 @@ impl Engine {
                                 let reset = self
                                     .run_debugger_with_reset(global, caches, scope, _tp, _node)?;
                                 #[cfg(feature = "debugging")]
-                                auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
+                                defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
                                 let crate::ast::FnCallExpr {
                                     name, hashes, args, ..
                                 } = &**x;
 
                                 // Truncate the index values upon exit
-                                auto_restore! { idx_values => truncate; let offset = idx_values.len() - args.len(); }
+                                defer! { idx_values => truncate; let offset = idx_values.len() - args.len(); }
 
                                 let call_args = &mut idx_values[offset..];
                                 let arg1_pos = args.get(0).map_or(Position::NONE, Expr::position);
@@ -978,14 +978,14 @@ impl Engine {
                                         global, caches, scope, _tp, _node,
                                     )?;
                                     #[cfg(feature = "debugging")]
-                                    auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
+                                    defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
                                     let crate::ast::FnCallExpr {
                                         name, hashes, args, ..
                                     } = &**f;
 
                                     // Truncate the index values upon exit
-                                    auto_restore! { idx_values => truncate; let offset = idx_values.len() - args.len(); }
+                                    defer! { idx_values => truncate; let offset = idx_values.len() - args.len(); }
 
                                     let call_args = &mut idx_values[offset..];
                                     let pos1 = args.get(0).map_or(Position::NONE, Expr::position);

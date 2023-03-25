@@ -233,7 +233,7 @@ impl Engine {
         let rewind_scope = options.rewind_scope;
 
         let result = if options.eval_ast && !statements.is_empty() {
-            auto_restore! {
+            defer! {
                 scope if rewind_scope => rewind;
                 let orig_scope_len = scope.len();
             }

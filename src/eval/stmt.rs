@@ -43,7 +43,7 @@ impl Engine {
         }
 
         // Restore scope at end of block if necessary
-        auto_restore! { scope if restore_orig_state => rewind; let orig_scope_len = scope.len(); }
+        defer! { scope if restore_orig_state => rewind; let orig_scope_len = scope.len(); }
 
         // Restore global state at end of block if necessary
         let orig_always_search_scope = global.always_search_scope;
@@ -54,7 +54,7 @@ impl Engine {
             global.scope_level += 1;
         }
 
-        auto_restore! { global if restore_orig_state => move |g| {
+        defer! { global if restore_orig_state => move |g| {
             g.scope_level -= 1;
 
             #[cfg(not(feature = "no_module"))]
@@ -66,7 +66,7 @@ impl Engine {
         }}
 
         // Pop new function resolution caches at end of block
-        auto_restore! {
+        defer! {
             caches => rewind_fn_resolution_caches;
             let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
         }
@@ -209,7 +209,7 @@ impl Engine {
                         get_builtin_op_assignment_fn(op_x, &*lock_guard, &new_val)
                     {
                         // We may not need to bump the level because built-in's do not need it.
-                        //auto_restore! { let orig_level = global.level; global.level += 1 }
+                        //defer! { let orig_level = global.level; global.level += 1 }
 
                         let args = &mut [&mut *lock_guard, &mut new_val];
                         let context = need_context
@@ -273,7 +273,7 @@ impl Engine {
         let reset =
             self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), stmt)?;
         #[cfg(feature = "debugging")]
-        auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
+        defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
         match stmt {
             // No-op
@@ -673,7 +673,7 @@ impl Engine {
                 let iter_func = iter_func.ok_or_else(|| ERR::ErrorFor(expr.start_position()))?;
 
                 // Restore scope at end of statement
-                auto_restore! { scope => rewind; let orig_scope_len = scope.len(); }
+                defer! { scope => rewind; let orig_scope_len = scope.len(); }
 
                 // Add the loop variables
                 let counter_index = (!counter.is_empty()).then(|| {
@@ -808,7 +808,7 @@ impl Engine {
                         };
 
                         // Restore scope at end of block
-                        auto_restore! { scope if !catch_var.is_unit() => rewind; let orig_scope_len = scope.len(); }
+                        defer! { scope if !catch_var.is_unit() => rewind; let orig_scope_len = scope.len(); }
 
                         if let Expr::Variable(x, ..) = catch_var {
                             scope.push(x.3.clone(), err_value);

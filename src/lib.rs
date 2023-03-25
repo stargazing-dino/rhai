@@ -102,7 +102,7 @@ use std::prelude::v1::*;
 #[macro_use]
 mod reify;
 #[macro_use]
-mod restore;
+mod defer;
 
 mod api;
 mod ast;
@@ -225,6 +225,7 @@ pub use api::custom_syntax::Expression;
 pub use api::files::{eval_file, run_file};
 pub use api::{eval::eval, events::VarDefInfo, run::run};
 pub use ast::{FnAccess, AST};
+use defer::Deferred;
 pub use engine::{Engine, OP_CONTAINS, OP_EQUALS};
 pub use eval::EvalContext;
 #[cfg(not(feature = "no_function"))]
@@ -233,7 +234,6 @@ use func::calc_typed_method_hash;
 use func::{calc_fn_hash, calc_fn_hash_full, calc_var_hash};
 pub use func::{plugin, FuncArgs, NativeCallContext, RegisterNativeFunction};
 pub use module::{FnNamespace, Module};
-use restore::RestoreOnDrop;
 pub use rhai_codegen::*;
 #[cfg(not(feature = "no_time"))]
 pub use types::Instant;
