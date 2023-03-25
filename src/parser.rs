@@ -908,7 +908,7 @@ impl Engine {
         let mut settings = settings;
         settings.pos = eat_token(input, Token::LeftBracket);
 
-        let mut array = StaticVec::new_const();
+        let mut array = FnArgsVec::new_const();
 
         loop {
             const MISSING_RBRACKET: &str = "to end this array literal";
@@ -1501,7 +1501,7 @@ impl Engine {
 
             // Interpolated string
             Token::InterpolatedString(..) => {
-                let mut segments = StaticVec::<Expr>::new();
+                let mut segments = FnArgsVec::new_const();
                 let settings = settings.level_up()?;
 
                 match input.next().expect(NEVER_ENDS) {

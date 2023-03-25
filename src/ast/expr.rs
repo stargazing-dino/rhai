@@ -276,9 +276,9 @@ pub enum Expr {
     /// [String][ImmutableString] constant.
     StringConstant(ImmutableString, Position),
     /// An interpolated [string][ImmutableString].
-    InterpolatedString(Box<StaticVec<Expr>>, Position),
+    InterpolatedString(Box<FnArgsVec<Expr>>, Position),
     /// [ expr, ... ]
-    Array(Box<StaticVec<Expr>>, Position),
+    Array(Box<FnArgsVec<Expr>>, Position),
     /// #{ name:expr, ... }
     Map(
         Box<(StaticVec<(Ident, Expr)>, BTreeMap<Identifier, Dynamic>)>,
