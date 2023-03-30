@@ -573,57 +573,46 @@ impl Engine {
         _is_method_call: bool,
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
+        // These may be redirected from method style calls.
+        if hashes.is_native_only() {
+            let error = match fn_name {
+                // Handle type_of()
+                KEYWORD_TYPE_OF => {
+                    if args.len() == 1 {
+                        let typ = self.get_interned_string(self.map_type_name(args[0].type_name()));
+                        return Ok((typ.into(), false));
+                    }
+                    true
+                }
+
+                #[cfg(not(feature = "no_closure"))]
+                crate::engine::KEYWORD_IS_SHARED => {
+                    if args.len() == 1 {
+                        return Ok((args[0].is_shared().into(), false));
+                    }
+                    true
+                }
+
+                #[cfg(not(feature = "no_function"))]
+                crate::engine::KEYWORD_IS_DEF_FN => true,
+
+                KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR | KEYWORD_FN_PTR_CALL
+                | KEYWORD_FN_PTR_CURRY => true,
+
+                _ => false,
+            };
+
+            if error {
+                let sig = self.gen_fn_call_signature(fn_name, args);
+                return Err(ERR::ErrorFunctionNotFound(sig, pos).into());
+            }
+        }
+
         // Check for data race.
         #[cfg(not(feature = "no_closure"))]
         ensure_no_data_race(fn_name, args, is_ref_mut)?;
 
         defer! { let orig_level = global.level; global.level += 1 }
-
-        // These may be redirected from method style calls.
-        if hashes.is_native_only() {
-            match fn_name {
-                // Handle type_of()
-                KEYWORD_TYPE_OF if args.len() == 1 => {
-                    let typ = self.get_interned_string(self.map_type_name(args[0].type_name()));
-                    return Ok((typ.into(), false));
-                }
-
-                // Handle is_def_fn()
-                #[cfg(not(feature = "no_function"))]
-                crate::engine::KEYWORD_IS_DEF_FN
-                    if args.len() == 2 && args[0].is_fnptr() && args[1].is_int() =>
-                {
-                    let fn_name = args[0].read_lock::<ImmutableString>().expect("`FnPtr`");
-                    let num_params = args[1].as_int().expect("`INT`");
-
-                    return Ok((
-                        if (0..=crate::MAX_USIZE_INT).contains(&num_params) {
-                            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-                            let hash_script =
-                                calc_fn_hash(None, fn_name.as_str(), num_params as usize);
-                            self.has_script_fn(global, caches, hash_script)
-                        } else {
-                            false
-                        }
-                        .into(),
-                        false,
-                    ));
-                }
-
-                // Handle is_shared()
-                #[cfg(not(feature = "no_closure"))]
-                crate::engine::KEYWORD_IS_SHARED => {
-                    unreachable!("{} called as method", fn_name)
-                }
-
-                KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR | KEYWORD_FN_PTR_CALL
-                | KEYWORD_FN_PTR_CURRY => {
-                    unreachable!("{} called as method", fn_name)
-                }
-
-                _ => (),
-            }
-        }
 
         // Script-defined function call?
         #[cfg(not(feature = "no_function"))]

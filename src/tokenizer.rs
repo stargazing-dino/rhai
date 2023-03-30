@@ -514,127 +514,122 @@ static KEYWORDS_LIST: [(&str, Token); 153] = [
 const MIN_RESERVED_LEN: usize = 1;
 const MAX_RESERVED_LEN: usize = 10;
 const MIN_RESERVED_HASH_VALUE: usize = 1;
-const MAX_RESERVED_HASH_VALUE: usize = 112;
+const MAX_RESERVED_HASH_VALUE: usize = 149;
 
 static RESERVED_ASSOC_VALUES: [u8; 256] = [
-    113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
-    113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 35, 113, 45, 25, 113,
-    113, 113, 60, 55, 50, 50, 113, 15, 0, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
-    10, 85, 45, 5, 55, 50, 5, 113, 113, 113, 113, 113, 85, 113, 113, 113, 113, 113, 113, 113, 113,
-    113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 35, 113, 113, 113, 55, 113, 10, 40,
-    5, 0, 5, 35, 10, 5, 0, 113, 113, 20, 25, 5, 45, 0, 113, 0, 0, 0, 15, 30, 20, 25, 20, 113, 113,
-    20, 113, 0, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
-    113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
-    113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
-    113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
-    113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
-    113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
-    113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113, 113,
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 10, 150, 5, 35, 150, 150,
+    150, 45, 35, 30, 30, 150, 20, 15, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 35,
+    30, 15, 5, 25, 0, 25, 150, 150, 150, 150, 150, 65, 150, 150, 150, 150, 150, 150, 150, 150, 150,
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 40, 150, 150, 150, 150, 150, 0, 150, 0,
+    0, 0, 15, 45, 10, 15, 150, 150, 35, 25, 10, 50, 0, 150, 5, 0, 15, 0, 5, 25, 45, 15, 150, 150,
+    25, 150, 20, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,
+    150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150,
 ];
-static RESERVED_LIST: [(&str, bool, bool, bool); 113] = [
+static RESERVED_LIST: [(&str, bool, bool, bool); 150] = [
     ("", false, false, false),
-    ("~", true, false, false),
-    ("is", true, false, false),
-    ("...", true, false, false),
-    ("", false, false, false),
-    ("print", true, true, false),
-    ("@", true, false, false),
-    ("private", cfg!(feature = "no_function"), false, false),
-    ("", false, false, false),
-    ("this", true, false, false),
-    ("", false, false, false),
-    ("thread", true, false, false),
+    ("?", true, false, false),
     ("as", cfg!(feature = "no_module"), false, false),
-    ("", false, false, false),
-    ("", false, false, false),
-    ("spawn", true, false, false),
-    ("static", true, false, false),
-    (":=", true, false, false),
-    ("===", true, false, false),
-    ("case", true, false, false),
-    ("super", true, false, false),
-    ("shared", true, false, false),
-    ("package", true, false, false),
     ("use", true, false, false),
-    ("with", true, false, false),
-    ("curry", true, true, true),
-    ("$", true, false, false),
-    ("type_of", true, true, true),
-    ("nil", true, false, false),
-    ("sync", true, false, false),
-    ("yield", true, false, false),
-    ("import", cfg!(feature = "no_module"), false, false),
-    ("--", true, false, false),
-    ("new", true, false, false),
-    ("exit", true, false, false),
+    ("case", true, false, false),
     ("async", true, false, false),
-    ("export", cfg!(feature = "no_module"), false, false),
-    ("!.", true, false, false),
+    ("public", true, false, false),
+    ("package", true, false, false),
     ("", false, false, false),
-    ("call", true, true, true),
-    ("match", true, false, false),
     ("", false, false, false),
-    ("fn", cfg!(feature = "no_function"), false, false),
-    ("var", true, false, false),
-    ("null", true, false, false),
-    ("await", true, false, false),
+    ("super", true, false, false),
     ("#", true, false, false),
+    ("private", cfg!(feature = "no_function"), false, false),
+    ("var", true, false, false),
+    ("protected", true, false, false),
+    ("spawn", true, false, false),
+    ("shared", true, false, false),
+    ("is", true, false, false),
+    ("===", true, false, false),
+    ("sync", true, false, false),
+    ("curry", true, true, true),
+    ("static", true, false, false),
     ("default", true, false, false),
     ("!==", true, false, false),
-    ("eval", true, true, false),
-    ("debug", true, true, false),
-    ("?", true, false, false),
+    ("is_shared", cfg!(not(feature = "no_closure")), true, true),
+    ("print", true, true, false),
+    ("", false, false, false),
+    ("#!", true, false, false),
+    ("", false, false, false),
+    ("this", true, false, false),
+    ("is_def_var", true, true, false),
+    ("thread", true, false, false),
     ("?.", cfg!(feature = "no_object"), false, false),
     ("", false, false, false),
-    ("protected", true, false, false),
+    ("is_def_fn", cfg!(not(feature = "no_function")), true, false),
+    ("yield", true, false, false),
+    ("", false, false, false),
+    ("fn", cfg!(feature = "no_function"), false, false),
+    ("new", true, false, false),
+    ("call", true, true, true),
+    ("match", true, false, false),
+    ("~", true, false, false),
+    ("!.", true, false, false),
+    ("", false, false, false),
+    ("eval", true, true, false),
+    ("await", true, false, false),
+    ("", false, false, false),
+    (":=", true, false, false),
+    ("...", true, false, false),
+    ("null", true, false, false),
+    ("debug", true, true, false),
+    ("@", true, false, false),
+    ("type_of", true, true, true),
+    ("", false, false, false),
+    ("with", true, false, false),
     ("", false, false, false),
     ("", false, false, false),
-    ("go", true, false, false),
-    ("", false, false, false),
-    ("goto", true, false, false),
-    ("", false, false, false),
-    ("public", true, false, false),
     ("<-", true, false, false),
     ("", false, false, false),
-    ("is_def_fn", cfg!(not(feature = "no_function")), true, false),
-    ("is_def_var", true, true, false),
+    ("void", true, false, false),
     ("", false, false, false),
+    ("import", cfg!(feature = "no_module"), false, false),
+    ("--", true, false, false),
+    ("nil", true, false, false),
+    ("exit", true, false, false),
+    ("", false, false, false),
+    ("export", cfg!(feature = "no_module"), false, false),
     ("<|", true, false, false),
-    ("::<", true, false, false),
     ("", false, false, false),
     ("", false, false, false),
     ("", false, false, false),
+    ("$", true, false, false),
     ("->", true, false, false),
     ("", false, false, false),
     ("", false, false, false),
     ("", false, false, false),
-    ("module", true, false, false),
+    ("", false, false, false),
     ("|>", true, false, false),
     ("", false, false, false),
-    ("void", true, false, false),
     ("", false, false, false),
     ("", false, false, false),
-    ("#!", true, false, false),
-    ("", false, false, false),
-    ("", false, false, false),
-    ("", false, false, false),
-    ("", false, false, false),
+    ("module", true, false, false),
     ("?[", cfg!(feature = "no_index"), false, false),
     ("", false, false, false),
     ("", false, false, false),
     ("", false, false, false),
     ("", false, false, false),
     ("Fn", true, true, false),
+    ("::<", true, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("++", true, false, false),
     ("", false, false, false),
     ("", false, false, false),
     ("", false, false, false),
     ("", false, false, false),
     (":;", true, false, false),
-    ("", false, false, false),
-    ("", false, false, false),
-    ("", false, false, false),
-    ("", false, false, false),
-    ("++", true, false, false),
     ("", false, false, false),
     ("", false, false, false),
     ("", false, false, false),
@@ -645,6 +640,48 @@ static RESERVED_LIST: [(&str, bool, bool, bool); 113] = [
     ("", false, false, false),
     ("", false, false, false),
     ("(*", true, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("", false, false, false),
+    ("go", true, false, false),
+    ("", false, false, false),
+    ("goto", true, false, false),
 ];
 
 impl Token {
@@ -875,11 +912,12 @@ impl Token {
         // by GNU `gperf` on the list of keywords.
         let utf8 = syntax.as_bytes();
         let len = utf8.len();
-        let mut hash_val = len;
 
         if !(MIN_KEYWORD_LEN..=MAX_KEYWORD_LEN).contains(&len) {
             return None;
         }
+
+        let mut hash_val = len;
 
         match len {
             1 => (),
@@ -2306,8 +2344,10 @@ pub fn is_id_continue(x: char) -> bool {
 /// The first `bool` indicates whether it is a reserved keyword or symbol.
 ///
 /// The second `bool` indicates whether the keyword can be called normally as a function.
+/// `false` if it is not a reserved keyword.
 ///
 /// The third `bool` indicates whether the keyword can be called in method-call style.
+/// `false` if it is not a reserved keyword or it cannot be called as a function.
 #[inline]
 #[must_use]
 pub fn is_reserved_keyword_or_symbol(syntax: &str) -> (bool, bool, bool) {
@@ -2315,16 +2355,19 @@ pub fn is_reserved_keyword_or_symbol(syntax: &str) -> (bool, bool, bool) {
     // by GNU `gperf` on the list of keywords.
     let utf8 = syntax.as_bytes();
     let len = utf8.len();
-    let rounds = len.min(3);
-    let mut hash_val = len;
 
     if !(MIN_RESERVED_LEN..=MAX_RESERVED_LEN).contains(&len) {
         return (false, false, false);
     }
 
-    for x in 0..rounds {
-        hash_val += RESERVED_ASSOC_VALUES[utf8[rounds - 1 - x] as usize] as usize;
+    let mut hash_val = len;
+
+    match len {
+        1 => (),
+        _ => hash_val += RESERVED_ASSOC_VALUES[(utf8[1] as usize)] as usize,
     }
+    hash_val += RESERVED_ASSOC_VALUES[utf8[0] as usize] as usize;
+    hash_val += RESERVED_ASSOC_VALUES[utf8[len - 1] as usize] as usize;
 
     if !(MIN_RESERVED_HASH_VALUE..=MAX_RESERVED_HASH_VALUE).contains(&hash_val) {
         return (false, false, false);
@@ -2332,13 +2375,12 @@ pub fn is_reserved_keyword_or_symbol(syntax: &str) -> (bool, bool, bool) {
 
     match RESERVED_LIST[hash_val] {
         ("", ..) => (false, false, false),
-        (s, true, a, b) => (
+        (s, true, a, b) => {
             // Fail early to avoid calling memcmp().
             // Since we are already working with bytes, mind as well check the first one.
-            s.len() == len && s.as_bytes()[0] == utf8[0] && s == syntax,
-            a,
-            b,
-        ),
+            let is_reserved = s.len() == len && s.as_bytes()[0] == utf8[0] && s == syntax;
+            (is_reserved, is_reserved && a, is_reserved && a && b)
+        }
         _ => (false, false, false),
     }
 }

@@ -6,6 +6,11 @@ Version 1.14.0
 
 The code hacks that attempt to optimize branch prediction performance are removed because benchmarks do not show any material speed improvements.
 
+Buf fixes
+----------
+
+* `is_shared` is a reserved keyword and is now handled properly (e.g. it cannot be the target of a function pointer).
+
 New features
 ------------
 

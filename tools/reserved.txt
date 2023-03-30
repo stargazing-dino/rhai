@@ -91,3 +91,4 @@ struct reserved;
 "this",         true, false, false
 "is_def_var",   true, true, false
 "is_def_fn",    cfg!(not(feature = "no_function")), true, false
+"is_shared",    cfg!(not(feature = "no_closure")), true, true
