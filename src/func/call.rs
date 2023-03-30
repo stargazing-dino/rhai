@@ -1,9 +1,6 @@
 //! Implement function-calling mechanism for [`Engine`].
 
-use super::{
-    calc_typed_method_hash, get_builtin_binary_op_fn, get_builtin_op_assignment_fn,
-    CallableFunction,
-};
+use super::{get_builtin_binary_op_fn, get_builtin_op_assignment_fn, CallableFunction};
 use crate::api::default_limits::MAX_DYNAMIC_PARAMETERS;
 use crate::ast::{Expr, FnCallExpr, FnCallHashes};
 use crate::engine::{
@@ -1204,7 +1201,7 @@ impl Engine {
 
                 return Ok(if num_params >= 0 {
                     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-                    let hash_script = calc_typed_method_hash(
+                    let hash_script = crate::calc_typed_method_hash(
                         calc_fn_hash(None, &fn_name, num_params as usize),
                         &this_type,
                     );

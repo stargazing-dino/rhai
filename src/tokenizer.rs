@@ -2364,7 +2364,7 @@ pub fn is_reserved_keyword_or_symbol(syntax: &str) -> (bool, bool, bool) {
 
     match len {
         1 => (),
-        _ => hash_val += RESERVED_ASSOC_VALUES[(utf8[1] as usize)] as usize,
+        _ => hash_val += RESERVED_ASSOC_VALUES[utf8[1] as usize] as usize,
     }
     hash_val += RESERVED_ASSOC_VALUES[utf8[0] as usize] as usize;
     hash_val += RESERVED_ASSOC_VALUES[utf8[len - 1] as usize] as usize;
