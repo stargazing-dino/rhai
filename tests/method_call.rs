@@ -108,6 +108,15 @@ fn test_method_call_typed() -> Result<(), Box<EvalAltResult>> {
         TestStruct { x: 1002 }
     );
 
+    assert!(engine.eval::<bool>(
+        r#"
+            fn "Test-Struct#ABC".foo(x) {
+                this.update(x);
+            }
+            is_def_fn("Test-Struct#ABC", "foo", 1)
+        "#
+    )?);
+
     assert!(matches!(
         *engine
             .run(

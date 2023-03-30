@@ -1,6 +1,9 @@
 //! Implement function-calling mechanism for [`Engine`].
 
-use super::{get_builtin_binary_op_fn, get_builtin_op_assignment_fn, CallableFunction};
+use super::{
+    calc_typed_method_hash, get_builtin_binary_op_fn, get_builtin_op_assignment_fn,
+    CallableFunction,
+};
 use crate::api::default_limits::MAX_DYNAMIC_PARAMETERS;
 use crate::ast::{Expr, FnCallExpr, FnCallHashes};
 use crate::engine::{
@@ -1099,7 +1102,7 @@ impl Engine {
                     FnCallHashes::from_hash(calc_fn_hash(None, name, args_len))
                 };
             }
-            // Handle Fn()
+            // Handle Fn(fn_name)
             KEYWORD_FN_PTR if total_args == 1 => {
                 let arg = first_arg.unwrap();
                 let (arg_value, arg_pos) =
@@ -1114,7 +1117,7 @@ impl Engine {
                     .map_err(|err| err.fill_position(arg_pos));
             }
 
-            // Handle curry()
+            // Handle curry(x, ...)
             KEYWORD_FN_PTR_CURRY if total_args > 1 => {
                 let first = first_arg.unwrap();
                 let (arg_value, arg_pos) =
@@ -1137,7 +1140,7 @@ impl Engine {
                 return Ok(fn_ptr.into());
             }
 
-            // Handle is_shared()
+            // Handle is_shared(var)
             #[cfg(not(feature = "no_closure"))]
             crate::engine::KEYWORD_IS_SHARED if total_args == 1 => {
                 let arg = first_arg.unwrap();
@@ -1146,7 +1149,7 @@ impl Engine {
                 return Ok(arg_value.is_shared().into());
             }
 
-            // Handle is_def_fn()
+            // Handle is_def_fn(fn_name, arity)
             #[cfg(not(feature = "no_function"))]
             crate::engine::KEYWORD_IS_DEF_FN if total_args == 2 => {
                 let first = first_arg.unwrap();
@@ -1164,17 +1167,54 @@ impl Engine {
                     .as_int()
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
 
-                return Ok(if (0..=crate::MAX_USIZE_INT).contains(&num_params) {
+                return Ok(if num_params >= 0 {
                     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                     let hash_script = calc_fn_hash(None, &fn_name, num_params as usize);
-                    self.has_script_fn(global, caches, hash_script)
+                    self.has_script_fn(global, caches, hash_script).into()
                 } else {
-                    false
-                }
-                .into());
+                    Dynamic::FALSE
+                });
             }
 
-            // Handle is_def_var()
+            // Handle is_def_fn(this_type, fn_name, arity)
+            #[cfg(not(feature = "no_function"))]
+            #[cfg(not(feature = "no_object"))]
+            crate::engine::KEYWORD_IS_DEF_FN if total_args == 3 => {
+                let first = first_arg.unwrap();
+                let (arg_value, arg_pos) =
+                    self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), first)?;
+
+                let this_type = arg_value
+                    .into_immutable_string()
+                    .map_err(|typ| self.make_type_mismatch_err::<ImmutableString>(typ, arg_pos))?;
+
+                let (arg_value, arg_pos) =
+                    self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), &a_expr[0])?;
+
+                let fn_name = arg_value
+                    .into_immutable_string()
+                    .map_err(|typ| self.make_type_mismatch_err::<ImmutableString>(typ, arg_pos))?;
+
+                let (arg_value, arg_pos) =
+                    self.get_arg_value(global, caches, scope, this_ptr, &a_expr[1])?;
+
+                let num_params = arg_value
+                    .as_int()
+                    .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
+
+                return Ok(if num_params >= 0 {
+                    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+                    let hash_script = calc_typed_method_hash(
+                        calc_fn_hash(None, &fn_name, num_params as usize),
+                        &this_type,
+                    );
+                    self.has_script_fn(global, caches, hash_script).into()
+                } else {
+                    Dynamic::FALSE
+                });
+            }
+
+            // Handle is_def_var(fn_name)
             KEYWORD_IS_DEF_VAR if total_args == 1 => {
                 let arg = first_arg.unwrap();
                 let (arg_value, arg_pos) =
@@ -1185,7 +1225,7 @@ impl Engine {
                 return Ok(scope.contains(&var_name).into());
             }
 
-            // Handle eval()
+            // Handle eval(script)
             KEYWORD_EVAL if total_args == 1 => {
                 // eval - only in function call style
                 let orig_scope_len = scope.len();
