@@ -261,7 +261,7 @@ impl<'e, 's> ParseState<'e, 's> {
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
         self.interned_strings.get_with_mapper(
-            crate::engine::FN_GET,
+            b'g',
             |s| crate::engine::make_getter(s.as_ref()).into(),
             text,
         )
@@ -276,7 +276,7 @@ impl<'e, 's> ParseState<'e, 's> {
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
         self.interned_strings.get_with_mapper(
-            crate::engine::FN_SET,
+            b's',
             |s| crate::engine::make_setter(s.as_ref()).into(),
             text,
         )

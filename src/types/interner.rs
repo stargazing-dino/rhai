@@ -62,7 +62,7 @@ impl StringsInterner {
     #[inline(always)]
     #[must_use]
     pub fn get<S: AsRef<str> + Into<ImmutableString>>(&mut self, text: S) -> ImmutableString {
-        self.get_with_mapper("", Into::into, text)
+        self.get_with_mapper(0, Into::into, text)
     }
 
     /// Get an identifier from a text string, adding it to the interner if necessary.
@@ -70,19 +70,19 @@ impl StringsInterner {
     #[must_use]
     pub fn get_with_mapper<S: AsRef<str>>(
         &mut self,
-        category: &str,
+        category: u8,
         mapper: impl FnOnce(S) -> ImmutableString,
         text: S,
     ) -> ImmutableString {
         let key = text.as_ref();
 
         let hasher = &mut get_hasher();
-        category.hash(hasher);
+        hasher.write_u8(category);
         key.hash(hasher);
         let hash = hasher.finish();
 
-        // Cache long strings only on the second try to avoid caching "one-hit wonders".
-        if key.len() > MAX_STRING_LEN && self.bloom_filter.is_absent_and_set(hash) {
+        // Do not cache long strings and avoid caching "one-hit wonders".
+        if key.len() > MAX_STRING_LEN || self.bloom_filter.is_absent_and_set(hash) {
             return mapper(text);
         }
 
