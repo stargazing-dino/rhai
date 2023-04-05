@@ -65,8 +65,8 @@ macro_rules! defer {
 /// Run custom restoration logic upon the end of scope.
 #[must_use]
 pub struct Deferred<'a, T: ?Sized, R: FnOnce(&mut T)> {
-    value: &'a mut T,
-    restore: Option<R>,
+    lock: &'a mut T,
+    defer: Option<R>,
 }
 
 impl<'a, T: ?Sized, R: FnOnce(&mut T)> Deferred<'a, T, R> {
@@ -78,8 +78,8 @@ impl<'a, T: ?Sized, R: FnOnce(&mut T)> Deferred<'a, T, R> {
     #[inline(always)]
     pub fn lock(value: &'a mut T, restore: R) -> Self {
         Self {
-            value,
-            restore: Some(restore),
+            lock: value,
+            defer: Some(restore),
         }
     }
 }
@@ -87,7 +87,7 @@ impl<'a, T: ?Sized, R: FnOnce(&mut T)> Deferred<'a, T, R> {
 impl<'a, T: ?Sized, R: FnOnce(&mut T)> Drop for Deferred<'a, T, R> {
     #[inline(always)]
     fn drop(&mut self) {
-        self.restore.take().unwrap()(self.value);
+        self.defer.take().unwrap()(self.lock);
     }
 }
 
@@ -96,13 +96,13 @@ impl<'a, T: ?Sized, R: FnOnce(&mut T)> Deref for Deferred<'a, T, R> {
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        self.value
+        self.lock
     }
 }
 
 impl<'a, T: ?Sized, R: FnOnce(&mut T)> DerefMut for Deferred<'a, T, R> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.value
+        self.lock
     }
 }

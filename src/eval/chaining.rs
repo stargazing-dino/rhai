@@ -362,21 +362,14 @@ impl Engine {
             Expr::Property(..) if chain_type == ChainType::Dotting => (),
             #[cfg(not(feature = "no_object"))]
             Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
-            // Short-circuit for simple method call: {expr}.func()
-            #[cfg(not(feature = "no_object"))]
-            Expr::FnCall(x, ..) if chain_type == ChainType::Dotting && x.args.is_empty() => (),
-            // Short-circuit for method call with all literal arguments: {expr}.func(1, 2, 3)
-            #[cfg(not(feature = "no_object"))]
-            Expr::FnCall(x, ..)
-                if chain_type == ChainType::Dotting && x.args.iter().all(Expr::is_constant) =>
-            {
-                idx_values.extend(x.args.iter().map(|expr| expr.get_literal_value().unwrap()))
-            }
             // Short-circuit for indexing with literal: {expr}[1]
             #[cfg(not(feature = "no_index"))]
             _ if chain_type == ChainType::Indexing && rhs.is_constant() => {
                 idx_values.push(rhs.get_literal_value().unwrap())
             }
+            // Short-circuit for simple method call: {expr}.func()
+            #[cfg(not(feature = "no_object"))]
+            Expr::MethodCall(x, ..) if chain_type == ChainType::Dotting && x.args.is_empty() => (),
             // All other patterns - evaluate the arguments chain
             _ => self.eval_dot_index_chain_arguments(
                 global,
@@ -439,27 +432,25 @@ impl Engine {
     ) -> RhaiResultOf<()> {
         self.track_operation(global, expr.position())?;
 
-        let chain_type = ChainType::from(parent);
-
-        match expr {
+        match (expr, ChainType::from(parent)) {
             #[cfg(not(feature = "no_object"))]
-            Expr::MethodCall(x, ..) if chain_type == ChainType::Dotting && !x.is_qualified() => {
+            (Expr::MethodCall(x, ..), ChainType::Dotting) => {
+                debug_assert!(
+                    !x.is_qualified(),
+                    "function call in dot chain should not be namespace-qualified"
+                );
+
                 for expr in &x.args {
                     let arg_value =
                         self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
                     idx_values.push(arg_value.0.flatten());
                 }
             }
-            #[cfg(not(feature = "no_object"))]
-            Expr::MethodCall(..) if chain_type == ChainType::Dotting => {
-                unreachable!("function call in dot chain should not be namespace-qualified")
-            }
 
             #[cfg(not(feature = "no_object"))]
-            Expr::Property(..) if chain_type == ChainType::Dotting => (),
-            Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
+            (Expr::Property(..), ChainType::Dotting) => (),
 
-            Expr::Index(x, ..) | Expr::Dot(x, ..)
+            (Expr::Index(x, ..), chain_type) | (Expr::Dot(x, ..), chain_type)
                 if !parent.options().contains(ASTFlags::BREAK) =>
             {
                 let BinaryExpr { lhs, rhs, .. } = &**x;
@@ -467,37 +458,34 @@ impl Engine {
                 let mut _arg_values = FnArgsVec::new_const();
 
                 // Evaluate in left-to-right order
-                match lhs {
+                match (lhs, chain_type) {
                     #[cfg(not(feature = "no_object"))]
-                    Expr::Property(..) if chain_type == ChainType::Dotting => (),
-                    Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
+                    (Expr::Property(..), ChainType::Dotting) => (),
 
                     #[cfg(not(feature = "no_object"))]
-                    Expr::MethodCall(x, ..)
-                        if chain_type == ChainType::Dotting && !x.is_qualified() =>
-                    {
+                    (Expr::MethodCall(x, ..), ChainType::Dotting) => {
+                        debug_assert!(
+                            !x.is_qualified(),
+                            "function call in dot chain should not be namespace-qualified"
+                        );
+
                         for expr in &x.args {
                             let tp = this_ptr.as_deref_mut();
                             let arg_value = self.get_arg_value(global, caches, scope, tp, expr)?;
                             _arg_values.push(arg_value.0.flatten());
                         }
                     }
-                    #[cfg(not(feature = "no_object"))]
-                    Expr::MethodCall(..) if chain_type == ChainType::Dotting => {
-                        unreachable!("function call in dot chain should not be namespace-qualified")
-                    }
-                    #[cfg(not(feature = "no_object"))]
-                    expr if chain_type == ChainType::Dotting => {
-                        unreachable!("invalid dot expression: {:?}", expr);
-                    }
                     #[cfg(not(feature = "no_index"))]
-                    _ if chain_type == ChainType::Indexing => {
+                    (_, ChainType::Indexing) => {
                         _arg_values.push(
                             self.eval_expr(global, caches, scope, this_ptr.as_deref_mut(), lhs)?
                                 .flatten(),
                         );
                     }
-                    expr => unreachable!("unknown chained expression: {:?}", expr),
+                    #[allow(unreachable_patterns)]
+                    (expr, chain_type) => {
+                        unreachable!("unknown {:?} expression: {:?}", chain_type, expr)
+                    }
                 }
 
                 // Push in reverse order
@@ -508,16 +496,13 @@ impl Engine {
                 idx_values.extend(_arg_values);
             }
 
-            #[cfg(not(feature = "no_object"))]
-            _ if chain_type == ChainType::Dotting => {
-                unreachable!("invalid dot expression: {:?}", expr);
-            }
             #[cfg(not(feature = "no_index"))]
-            _ if chain_type == ChainType::Indexing => idx_values.push(
+            (_, ChainType::Indexing) => idx_values.push(
                 self.eval_expr(global, caches, scope, this_ptr, expr)?
                     .flatten(),
             ),
-            _ => unreachable!("unknown chained expression: {:?}", expr),
+            #[allow(unreachable_patterns)]
+            (expr, chain_type) => unreachable!("unknown {:?} expression: {:?}", chain_type, expr),
         }
 
         Ok(())
