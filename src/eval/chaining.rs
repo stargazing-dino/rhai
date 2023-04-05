@@ -344,8 +344,6 @@ impl Engine {
         expr: &Expr,
         new_val: Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResult {
-        let chain_type = ChainType::from(expr);
-
         let BinaryExpr { lhs, rhs } = match expr {
             #[cfg(not(feature = "no_index"))]
             Expr::Index(x, ..) => &**x,
@@ -356,20 +354,22 @@ impl Engine {
 
         let idx_values = &mut FnArgsVec::new_const();
 
-        match rhs {
+        match (rhs, ChainType::from(expr)) {
             // Short-circuit for simple property access: {expr}.prop
             #[cfg(not(feature = "no_object"))]
-            Expr::Property(..) if chain_type == ChainType::Dotting => (),
+            (Expr::Property(..), ChainType::Dotting) => (),
             #[cfg(not(feature = "no_object"))]
-            Expr::Property(..) => unreachable!("unexpected Expr::Property for indexing"),
+            (Expr::Property(..), ..) => {
+                unreachable!("unexpected Expr::Property for indexing")
+            }
             // Short-circuit for indexing with literal: {expr}[1]
             #[cfg(not(feature = "no_index"))]
-            _ if chain_type == ChainType::Indexing && rhs.is_constant() => {
+            (_, ChainType::Indexing) if rhs.is_constant() => {
                 idx_values.push(rhs.get_literal_value().unwrap())
             }
             // Short-circuit for simple method call: {expr}.func()
             #[cfg(not(feature = "no_object"))]
-            Expr::MethodCall(x, ..) if chain_type == ChainType::Dotting && x.args.is_empty() => (),
+            (Expr::MethodCall(x, ..), ChainType::Dotting) if x.args.is_empty() => (),
             // All other patterns - evaluate the arguments chain
             _ => self.eval_dot_index_chain_arguments(
                 global,
@@ -387,9 +387,9 @@ impl Engine {
         #[cfg(not(feature = "debugging"))]
         let scope2 = ();
 
-        match lhs {
+        match (lhs, new_val) {
             // id.??? or id[???]
-            Expr::Variable(.., var_pos) => {
+            (Expr::Variable(.., var_pos), new_val) => {
                 self.track_operation(global, *var_pos)?;
 
                 #[cfg(feature = "debugging")]
@@ -402,9 +402,9 @@ impl Engine {
                 )
             }
             // {expr}.??? = ??? or {expr}[???] = ???
-            _ if new_val.is_some() => unreachable!("cannot assign to an expression"),
+            (_, Some(..)) => unreachable!("cannot assign to an expression"),
             // {expr}.??? or {expr}[???]
-            lhs_expr => {
+            (lhs_expr, None) => {
                 let value = self
                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), lhs_expr)?
                     .flatten();
@@ -412,7 +412,7 @@ impl Engine {
 
                 self.eval_dot_index_chain_raw(
                     global, caches, scope2, this_ptr, lhs_expr, expr, obj_ptr, rhs, idx_values,
-                    new_val,
+                    None,
                 )
             }
         }
@@ -437,7 +437,7 @@ impl Engine {
             (Expr::MethodCall(x, ..), ChainType::Dotting) => {
                 debug_assert!(
                     !x.is_qualified(),
-                    "function call in dot chain should not be namespace-qualified"
+                    "method call in dot chain should not be namespace-qualified"
                 );
 
                 for expr in &x.args {
@@ -450,7 +450,7 @@ impl Engine {
             #[cfg(not(feature = "no_object"))]
             (Expr::Property(..), ChainType::Dotting) => (),
 
-            (Expr::Index(x, ..), chain_type) | (Expr::Dot(x, ..), chain_type)
+            (Expr::Index(x, ..) | Expr::Dot(x, ..), chain_type)
                 if !parent.options().contains(ASTFlags::BREAK) =>
             {
                 let BinaryExpr { lhs, rhs, .. } = &**x;
@@ -466,7 +466,7 @@ impl Engine {
                     (Expr::MethodCall(x, ..), ChainType::Dotting) => {
                         debug_assert!(
                             !x.is_qualified(),
-                            "function call in dot chain should not be namespace-qualified"
+                            "method call in dot chain should not be namespace-qualified"
                         );
 
                         for expr in &x.args {
@@ -540,9 +540,9 @@ impl Engine {
 
                 let pos = rhs.start_position();
 
-                match rhs {
+                match (rhs, new_val) {
                     // xxx[idx].expr... | xxx[idx][expr]...
-                    Expr::Dot(x, ..) | Expr::Index(x, ..)
+                    (Expr::Dot(x, ..) | Expr::Index(x, ..), new_val)
                         if !parent.options().contains(ASTFlags::BREAK) =>
                     {
                         #[cfg(feature = "debugging")]
@@ -589,11 +589,10 @@ impl Engine {
                         Ok(result)
                     }
                     // xxx[rhs] op= new_val
-                    _ if new_val.is_some() => {
+                    (_, Some((new_val, op_info))) => {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, parent)?;
 
-                        let (new_val, op_info) = new_val.expect("`Some`");
                         let idx_val = &mut idx_values.pop().unwrap();
                         let idx = &mut idx_val.clone();
 
@@ -646,7 +645,7 @@ impl Engine {
                         Ok((Dynamic::UNIT, true))
                     }
                     // xxx[rhs]
-                    _ => {
+                    (_, None) => {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, parent)?;
 
@@ -667,9 +666,18 @@ impl Engine {
                     return Ok((Dynamic::UNIT, false));
                 }
 
-                match rhs {
+                match (rhs, new_val, target.is_map()) {
+                    // xxx.fn_name(...) = ???
+                    (Expr::MethodCall(..), Some(..), ..) => {
+                        unreachable!("method call cannot be assigned to")
+                    }
                     // xxx.fn_name(arg_expr_list)
-                    Expr::MethodCall(x, pos) if !x.is_qualified() && new_val.is_none() => {
+                    (Expr::MethodCall(x, pos), None, ..) => {
+                        debug_assert!(
+                            !x.is_qualified(),
+                            "method call in dot chain should not be namespace-qualified"
+                        );
+
                         #[cfg(feature = "debugging")]
                         let reset =
                             self.run_debugger_with_reset(global, caches, scope, this_ptr, rhs)?;
@@ -690,21 +698,12 @@ impl Engine {
                             global, caches, name, *hashes, target, call_args, arg1_pos, *pos,
                         )
                     }
-                    // xxx.fn_name(...) = ???
-                    Expr::MethodCall(..) if new_val.is_some() => {
-                        unreachable!("method call cannot be assigned to")
-                    }
-                    // xxx.module::fn_name(...) - syntax error
-                    Expr::MethodCall(..) => {
-                        unreachable!("function call in dot chain should not be namespace-qualified")
-                    }
                     // {xxx:map}.id op= ???
-                    Expr::Property(x, pos) if new_val.is_some() && target.is_map() => {
+                    (Expr::Property(x, pos), Some((new_val, op_info)), true) => {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, rhs)?;
 
                         let index = &mut x.2.clone().into();
-                        let (new_val, op_info) = new_val.expect("`Some`");
                         {
                             let val_target = &mut self.get_indexed_mut(
                                 global, caches, target, index, *pos, op_pos, true, false,
@@ -717,7 +716,7 @@ impl Engine {
                         Ok((Dynamic::UNIT, true))
                     }
                     // {xxx:map}.id
-                    Expr::Property(x, pos) if target.is_map() => {
+                    (Expr::Property(x, pos), None, true) => {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, rhs)?;
 
@@ -728,12 +727,11 @@ impl Engine {
                         Ok((val.take_or_clone(), false))
                     }
                     // xxx.id op= ???
-                    Expr::Property(x, pos) if new_val.is_some() => {
+                    (Expr::Property(x, pos), Some((mut new_val, op_info)), false) => {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, rhs)?;
 
                         let ((getter, hash_get), (setter, hash_set), name) = &**x;
-                        let (mut new_val, op_info) = new_val.expect("`Some`");
 
                         if op_info.is_op_assignment() {
                             let args = &mut [target.as_mut()];
@@ -793,7 +791,7 @@ impl Engine {
                         })
                     }
                     // xxx.id
-                    Expr::Property(x, pos) => {
+                    (Expr::Property(x, pos), None, false) => {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, rhs)?;
 
@@ -822,7 +820,7 @@ impl Engine {
                         )
                     }
                     // {xxx:map}.sub_lhs[expr] | {xxx:map}.sub_lhs.expr
-                    Expr::Index(x, ..) | Expr::Dot(x, ..) if target.is_map() => {
+                    (Expr::Index(x, ..) | Expr::Dot(x, ..), new_val, true) => {
                         let _node = &x.lhs;
                         let mut _this_ptr = this_ptr;
                         let _tp = _this_ptr.as_deref_mut();
@@ -838,7 +836,12 @@ impl Engine {
                                 )?
                             }
                             // {xxx:map}.fn_name(arg_expr_list)[expr] | {xxx:map}.fn_name(arg_expr_list).expr
-                            Expr::MethodCall(ref x, pos) if !x.is_qualified() => {
+                            Expr::MethodCall(ref x, pos) => {
+                                debug_assert!(
+                                    !x.is_qualified(),
+                                    "method call in dot chain should not be namespace-qualified"
+                                );
+
                                 #[cfg(feature = "debugging")]
                                 let reset = self
                                     .run_debugger_with_reset(global, caches, scope, _tp, _node)?;
@@ -861,10 +864,6 @@ impl Engine {
                                 .0
                                 .into()
                             }
-                            // {xxx:map}.module::fn_name(...) - syntax error
-                            Expr::MethodCall(..) => unreachable!(
-                                "function call in dot chain should not be namespace-qualified"
-                            ),
                             // Others - syntax error
                             ref expr => unreachable!("invalid dot expression: {:?}", expr),
                         };
@@ -875,7 +874,7 @@ impl Engine {
                         )
                     }
                     // xxx.sub_lhs[expr] | xxx.sub_lhs.expr
-                    Expr::Index(x, ..) | Expr::Dot(x, ..) => {
+                    (Expr::Index(x, ..) | Expr::Dot(x, ..), new_val, ..) => {
                         let _node = &x.lhs;
                         let mut _this_ptr = this_ptr;
                         let _tp = _this_ptr.as_deref_mut();
@@ -956,7 +955,12 @@ impl Engine {
                                 Ok((result, may_be_changed))
                             }
                             // xxx.fn_name(arg_expr_list)[expr] | xxx.fn_name(arg_expr_list).expr
-                            Expr::MethodCall(ref f, pos) if !f.is_qualified() => {
+                            Expr::MethodCall(ref f, pos) => {
+                                debug_assert!(
+                                    !f.is_qualified(),
+                                    "method call in dot chain should not be namespace-qualified"
+                                );
+
                                 let val = {
                                     #[cfg(feature = "debugging")]
                                     let reset = self.run_debugger_with_reset(
@@ -988,16 +992,12 @@ impl Engine {
                                     idx_values, new_val,
                                 )
                             }
-                            // xxx.module::fn_name(...) - syntax error
-                            Expr::MethodCall(..) => unreachable!(
-                                "function call in dot chain should not be namespace-qualified"
-                            ),
                             // Others - syntax error
                             ref expr => unreachable!("invalid dot expression: {:?}", expr),
                         }
                     }
                     // Syntax error
-                    expr => unreachable!("invalid chaining expression: {:?}", expr),
+                    (expr, ..) => unreachable!("invalid chaining expression: {:?}", expr),
                 }
             }
         }
