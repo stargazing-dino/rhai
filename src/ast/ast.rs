@@ -839,6 +839,8 @@ impl AST {
     ///
     ///     {                   // <- new block scope
     ///         const Z = 0;    // <- literal constant not at top-level
+    ///
+    ///         print(Z);       // make sure the block is not optimized away
     ///     }
     /// ")?;
     ///
