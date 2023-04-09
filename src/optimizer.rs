@@ -840,6 +840,20 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         // return expr;
         Stmt::Return(Some(ref mut expr), ..) => optimize_expr(expr, state, false),
 
+        // Share nothing
+        Stmt::Share(x) if x.is_empty() => {
+            state.set_dirty();
+            *stmt = Stmt::Noop(Position::NONE);
+        }
+        // Share constants
+        Stmt::Share(x) => {
+            let len = x.len();
+            x.retain(|(v, _, _)| !state.find_constant(v).is_some());
+            if x.len() != len {
+                state.set_dirty();
+            }
+        }
+
         // All other statements - skip
         _ => (),
     }
