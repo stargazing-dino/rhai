@@ -182,7 +182,7 @@ pub fn gen_metadata_to_json(
     let mut global = ModuleMetadata::new();
 
     #[cfg(not(feature = "no_module"))]
-    for (name, m) in engine.global_sub_modules.as_deref().into_iter().flatten() {
+    for (name, m) in engine.global_sub_modules.as_ref().into_iter().flatten() {
         global.modules.insert(name, m.as_ref().into());
     }
 

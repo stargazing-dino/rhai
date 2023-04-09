@@ -5,56 +5,56 @@ use std::ops::{Deref, DerefMut};
 use std::prelude::v1::*;
 
 /// Automatically restore state at the end of the scope.
-macro_rules! auto_restore {
+macro_rules! defer {
     (let $temp:ident = $var:ident . $prop:ident; $code:stmt) => {
-        auto_restore!(let $temp = $var.$prop; $code => move |v| v.$prop = $temp);
+        defer!(let $temp = $var.$prop; $code => move |v| v.$prop = $temp);
     };
     (let $temp:ident = $var:ident . $prop:ident; $code:stmt => $restore:expr) => {
         let $temp = $var.$prop;
         $code
-        auto_restore!($var => $restore);
+        defer!($var => $restore);
     };
     ($var:ident => $restore:ident; let $temp:ident = $save:expr;) => {
-        auto_restore!($var => $restore; let $temp = $save; {});
+        defer!($var => $restore; let $temp = $save; {});
     };
     ($var:ident if $guard:expr => $restore:ident; let $temp:ident = $save:expr;) => {
-        auto_restore!($var if $guard => $restore; let $temp = $save; {});
+        defer!($var if $guard => $restore; let $temp = $save; {});
     };
     ($var:ident => $restore:ident; let $temp:ident = $save:expr; $code:stmt) => {
         let $temp = $save;
         $code
-        auto_restore!($var => move |v| { v.$restore($temp); });
+        defer!($var => move |v| { v.$restore($temp); });
     };
     ($var:ident if $guard:expr => $restore:ident; let $temp:ident = $save:expr; $code:stmt) => {
         let $temp = $save;
         $code
-        auto_restore!($var if $guard => move |v| { v.$restore($temp); });
+        defer!($var if $guard => move |v| { v.$restore($temp); });
     };
     ($var:ident => $restore:expr) => {
-        auto_restore!($var = $var => $restore);
+        defer!($var = $var => $restore);
     };
     ($var:ident = $value:expr => $restore:expr) => {
-        let $var = &mut *crate::RestoreOnDrop::lock($value, $restore);
+        let $var = &mut *crate::Deferred::lock($value, $restore);
     };
     ($var:ident if Some($guard:ident) => $restore:expr) => {
-        auto_restore!($var = ($var) if Some($guard) => $restore);
+        defer!($var = ($var) if Some($guard) => $restore);
     };
     ($var:ident = ( $value:expr ) if Some($guard:ident) => $restore:expr) => {
         let mut __rx__;
         let $var = if let Some($guard) = $guard {
-            __rx__ = crate::RestoreOnDrop::lock($value, $restore);
+            __rx__ = crate::Deferred::lock($value, $restore);
             &mut *__rx__
         } else {
             &mut *$value
         };
     };
     ($var:ident if $guard:expr => $restore:expr) => {
-        auto_restore!($var = ($var) if $guard => $restore);
+        defer!($var = ($var) if $guard => $restore);
     };
     ($var:ident = ( $value:expr ) if $guard:expr => $restore:expr) => {
         let mut __rx__;
         let $var = if $guard {
-            __rx__ = crate::RestoreOnDrop::lock($value, $restore);
+            __rx__ = crate::Deferred::lock($value, $restore);
             &mut *__rx__
         } else {
             &mut *$value
@@ -64,13 +64,13 @@ macro_rules! auto_restore {
 
 /// Run custom restoration logic upon the end of scope.
 #[must_use]
-pub struct RestoreOnDrop<'a, T: ?Sized, R: FnOnce(&mut T)> {
-    value: &'a mut T,
-    restore: Option<R>,
+pub struct Deferred<'a, T: ?Sized, R: FnOnce(&mut T)> {
+    lock: &'a mut T,
+    defer: Option<R>,
 }
 
-impl<'a, T: ?Sized, R: FnOnce(&mut T)> RestoreOnDrop<'a, T, R> {
-    /// Create a new [`RestoreOnDrop`] that locks a mutable reference and runs restoration logic at
+impl<'a, T: ?Sized, R: FnOnce(&mut T)> Deferred<'a, T, R> {
+    /// Create a new [`Deferred`] that locks a mutable reference and runs restoration logic at
     /// the end of scope.
     ///
     /// Beware that the end of scope means the end of its lifetime, not necessarily waiting until
@@ -78,31 +78,31 @@ impl<'a, T: ?Sized, R: FnOnce(&mut T)> RestoreOnDrop<'a, T, R> {
     #[inline(always)]
     pub fn lock(value: &'a mut T, restore: R) -> Self {
         Self {
-            value,
-            restore: Some(restore),
+            lock: value,
+            defer: Some(restore),
         }
     }
 }
 
-impl<'a, T: ?Sized, R: FnOnce(&mut T)> Drop for RestoreOnDrop<'a, T, R> {
+impl<'a, T: ?Sized, R: FnOnce(&mut T)> Drop for Deferred<'a, T, R> {
     #[inline(always)]
     fn drop(&mut self) {
-        self.restore.take().unwrap()(self.value);
+        self.defer.take().unwrap()(self.lock);
     }
 }
 
-impl<'a, T: ?Sized, R: FnOnce(&mut T)> Deref for RestoreOnDrop<'a, T, R> {
+impl<'a, T: ?Sized, R: FnOnce(&mut T)> Deref for Deferred<'a, T, R> {
     type Target = T;
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        self.value
+        self.lock
     }
 }
 
-impl<'a, T: ?Sized, R: FnOnce(&mut T)> DerefMut for RestoreOnDrop<'a, T, R> {
+impl<'a, T: ?Sized, R: FnOnce(&mut T)> DerefMut for Deferred<'a, T, R> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.value
+        self.lock
     }
 }

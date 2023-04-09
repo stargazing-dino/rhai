@@ -372,7 +372,7 @@ impl Definitions<'_> {
         let mut m = self
             .engine
             .global_sub_modules
-            .as_deref()
+            .as_ref()
             .into_iter()
             .flatten()
             .map(move |(name, module)| {
@@ -461,7 +461,7 @@ impl Module {
                     || def
                         .engine
                         .custom_keywords
-                        .as_deref()
+                        .as_ref()
                         .map_or(false, |m| m.contains_key(f.metadata.name.as_str()));
 
                 f.write_definition(writer, def, operator)?;

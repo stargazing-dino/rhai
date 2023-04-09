@@ -112,6 +112,21 @@ fn curry(fn_ptr: FnPtr, ...args: ?) -> FnPtr;
 /// ```
 fn is_def_fn(fn_name: String, num_params: int) -> bool;
 
+/// Return `true` if a script-defined function exists with a specified name and
+/// number of parameters, bound to a specified type for `this`.
+/// 
+/// # Example
+/// 
+/// ```rhai
+/// // A method that requires `this` to be `MyType`
+/// fn MyType.foo(x) { }
+/// 
+/// print(is_def_fn("MyType", "foo", 1));   // prints true
+/// print(is_def_fn("foo", 1));             // prints false
+/// print(is_def_fn("MyType", "foo", 2));   // prints false
+/// ```
+fn is_def_fn(this_type: String, fn_name: String, num_params: int) -> bool;
+
 /// Return `true` if a variable matching a specified name is defined.
 /// 
 /// # Example

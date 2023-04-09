@@ -206,7 +206,7 @@ impl Engine {
                         .or_else(|| _global.get_qualified_fn(hash, true))
                         .or_else(|| {
                             self.global_sub_modules
-                                .as_deref()
+                                .as_ref()
                                 .into_iter()
                                 .flatten()
                                 .filter(|(_, m)| m.contains_indexed_global_functions())
@@ -248,7 +248,7 @@ impl Engine {
                         #[cfg(not(feature = "no_module"))]
                         let is_dynamic = is_dynamic
                             || _global.may_contain_dynamic_fn(hash_base)
-                            || self.global_sub_modules.as_deref().map_or(false, |m| {
+                            || self.global_sub_modules.as_ref().map_or(false, |m| {
                                 m.values().any(|m| m.may_contain_dynamic_fn(hash_base))
                             });
 
@@ -488,7 +488,7 @@ impl Engine {
             // index getter function not found?
             #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
             crate::engine::FN_IDX_GET => {
-                assert!(args.len() == 2);
+                debug_assert_eq!(args.len(), 2);
 
                 let t0 = self.map_type_name(args[0].type_name());
                 let t1 = self.map_type_name(args[1].type_name());
@@ -499,7 +499,7 @@ impl Engine {
             // index setter function not found?
             #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
             crate::engine::FN_IDX_SET => {
-                assert!(args.len() == 3);
+                debug_assert_eq!(args.len(), 3);
 
                 let t0 = self.map_type_name(args[0].type_name());
                 let t1 = self.map_type_name(args[1].type_name());
@@ -511,7 +511,7 @@ impl Engine {
             // Getter function not found?
             #[cfg(not(feature = "no_object"))]
             _ if name.starts_with(crate::engine::FN_GET) => {
-                assert!(args.len() == 1);
+                debug_assert_eq!(args.len(), 1);
 
                 let prop = &name[crate::engine::FN_GET.len()..];
                 let t0 = self.map_type_name(args[0].type_name());
@@ -528,7 +528,7 @@ impl Engine {
             // Setter function not found?
             #[cfg(not(feature = "no_object"))]
             _ if name.starts_with(crate::engine::FN_SET) => {
-                assert!(args.len() == 2);
+                debug_assert_eq!(args.len(), 2);
 
                 let prop = &name[crate::engine::FN_SET.len()..];
                 let t0 = self.map_type_name(args[0].type_name());
@@ -573,57 +573,46 @@ impl Engine {
         _is_method_call: bool,
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
+        // These may be redirected from method style calls.
+        if hashes.is_native_only() {
+            let error = match fn_name {
+                // Handle type_of()
+                KEYWORD_TYPE_OF => {
+                    if args.len() == 1 {
+                        let typ = self.get_interned_string(self.map_type_name(args[0].type_name()));
+                        return Ok((typ.into(), false));
+                    }
+                    true
+                }
+
+                #[cfg(not(feature = "no_closure"))]
+                crate::engine::KEYWORD_IS_SHARED => {
+                    if args.len() == 1 {
+                        return Ok((args[0].is_shared().into(), false));
+                    }
+                    true
+                }
+
+                #[cfg(not(feature = "no_function"))]
+                crate::engine::KEYWORD_IS_DEF_FN => true,
+
+                KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR | KEYWORD_FN_PTR_CALL
+                | KEYWORD_FN_PTR_CURRY => true,
+
+                _ => false,
+            };
+
+            if error {
+                let sig = self.gen_fn_call_signature(fn_name, args);
+                return Err(ERR::ErrorFunctionNotFound(sig, pos).into());
+            }
+        }
+
         // Check for data race.
         #[cfg(not(feature = "no_closure"))]
         ensure_no_data_race(fn_name, args, is_ref_mut)?;
 
-        auto_restore! { let orig_level = global.level; global.level += 1 }
-
-        // These may be redirected from method style calls.
-        if hashes.is_native_only() {
-            match fn_name {
-                // Handle type_of()
-                KEYWORD_TYPE_OF if args.len() == 1 => {
-                    let typ = self.get_interned_string(self.map_type_name(args[0].type_name()));
-                    return Ok((typ.into(), false));
-                }
-
-                // Handle is_def_fn()
-                #[cfg(not(feature = "no_function"))]
-                crate::engine::KEYWORD_IS_DEF_FN
-                    if args.len() == 2 && args[0].is_fnptr() && args[1].is_int() =>
-                {
-                    let fn_name = args[0].read_lock::<ImmutableString>().expect("`FnPtr`");
-                    let num_params = args[1].as_int().expect("`INT`");
-
-                    return Ok((
-                        if (0..=crate::MAX_USIZE_INT).contains(&num_params) {
-                            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-                            let hash_script =
-                                calc_fn_hash(None, fn_name.as_str(), num_params as usize);
-                            self.has_script_fn(global, caches, hash_script)
-                        } else {
-                            false
-                        }
-                        .into(),
-                        false,
-                    ));
-                }
-
-                // Handle is_shared()
-                #[cfg(not(feature = "no_closure"))]
-                crate::engine::KEYWORD_IS_SHARED => {
-                    unreachable!("{} called as method", fn_name)
-                }
-
-                KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR | KEYWORD_FN_PTR_CALL
-                | KEYWORD_FN_PTR_CURRY => {
-                    unreachable!("{} called as method", fn_name)
-                }
-
-                _ => (),
-            }
-        }
+        defer! { let orig_level = global.level; global.level += 1 }
 
         // Script-defined function call?
         #[cfg(not(feature = "no_function"))]
@@ -668,7 +657,7 @@ impl Engine {
                 };
 
                 let orig_source = mem::replace(&mut global.source, source.clone());
-                auto_restore! { global => move |g| g.source = orig_source }
+                defer! { global => move |g| g.source = orig_source }
 
                 return if _is_method_call {
                     // Method call of script function - map first argument to `this`
@@ -696,7 +685,7 @@ impl Engine {
                         backup.change_first_arg_to_copy(args);
                     }
 
-                    auto_restore! { args = (args) if swap => move |a| backup.restore_first_arg(a) }
+                    defer! { args = (args) if swap => move |a| backup.restore_first_arg(a) }
 
                     self.call_script_fn(global, caches, scope, None, environ, f, args, true, pos)
                 }
@@ -740,7 +729,7 @@ impl Engine {
             })
         });
         #[cfg(feature = "debugging")]
-        auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
+        defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
         self.eval_expr(global, caches, scope, this_ptr, arg_expr)
             .map(|r| (r, arg_expr.start_position()))
@@ -1110,7 +1099,7 @@ impl Engine {
                     FnCallHashes::from_hash(calc_fn_hash(None, name, args_len))
                 };
             }
-            // Handle Fn()
+            // Handle Fn(fn_name)
             KEYWORD_FN_PTR if total_args == 1 => {
                 let arg = first_arg.unwrap();
                 let (arg_value, arg_pos) =
@@ -1125,7 +1114,7 @@ impl Engine {
                     .map_err(|err| err.fill_position(arg_pos));
             }
 
-            // Handle curry()
+            // Handle curry(x, ...)
             KEYWORD_FN_PTR_CURRY if total_args > 1 => {
                 let first = first_arg.unwrap();
                 let (arg_value, arg_pos) =
@@ -1148,7 +1137,7 @@ impl Engine {
                 return Ok(fn_ptr.into());
             }
 
-            // Handle is_shared()
+            // Handle is_shared(var)
             #[cfg(not(feature = "no_closure"))]
             crate::engine::KEYWORD_IS_SHARED if total_args == 1 => {
                 let arg = first_arg.unwrap();
@@ -1157,7 +1146,7 @@ impl Engine {
                 return Ok(arg_value.is_shared().into());
             }
 
-            // Handle is_def_fn()
+            // Handle is_def_fn(fn_name, arity)
             #[cfg(not(feature = "no_function"))]
             crate::engine::KEYWORD_IS_DEF_FN if total_args == 2 => {
                 let first = first_arg.unwrap();
@@ -1175,17 +1164,54 @@ impl Engine {
                     .as_int()
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
 
-                return Ok(if (0..=crate::MAX_USIZE_INT).contains(&num_params) {
+                return Ok(if num_params >= 0 {
                     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                     let hash_script = calc_fn_hash(None, &fn_name, num_params as usize);
-                    self.has_script_fn(global, caches, hash_script)
+                    self.has_script_fn(global, caches, hash_script).into()
                 } else {
-                    false
-                }
-                .into());
+                    Dynamic::FALSE
+                });
             }
 
-            // Handle is_def_var()
+            // Handle is_def_fn(this_type, fn_name, arity)
+            #[cfg(not(feature = "no_function"))]
+            #[cfg(not(feature = "no_object"))]
+            crate::engine::KEYWORD_IS_DEF_FN if total_args == 3 => {
+                let first = first_arg.unwrap();
+                let (arg_value, arg_pos) =
+                    self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), first)?;
+
+                let this_type = arg_value
+                    .into_immutable_string()
+                    .map_err(|typ| self.make_type_mismatch_err::<ImmutableString>(typ, arg_pos))?;
+
+                let (arg_value, arg_pos) =
+                    self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), &a_expr[0])?;
+
+                let fn_name = arg_value
+                    .into_immutable_string()
+                    .map_err(|typ| self.make_type_mismatch_err::<ImmutableString>(typ, arg_pos))?;
+
+                let (arg_value, arg_pos) =
+                    self.get_arg_value(global, caches, scope, this_ptr, &a_expr[1])?;
+
+                let num_params = arg_value
+                    .as_int()
+                    .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
+
+                return Ok(if num_params >= 0 {
+                    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+                    let hash_script = crate::calc_typed_method_hash(
+                        calc_fn_hash(None, &fn_name, num_params as usize),
+                        &this_type,
+                    );
+                    self.has_script_fn(global, caches, hash_script).into()
+                } else {
+                    Dynamic::FALSE
+                });
+            }
+
+            // Handle is_def_var(fn_name)
             KEYWORD_IS_DEF_VAR if total_args == 1 => {
                 let arg = first_arg.unwrap();
                 let (arg_value, arg_pos) =
@@ -1196,7 +1222,7 @@ impl Engine {
                 return Ok(scope.contains(&var_name).into());
             }
 
-            // Handle eval()
+            // Handle eval(script)
             KEYWORD_EVAL if total_args == 1 => {
                 // eval - only in function call style
                 let orig_scope_len = scope.len();
@@ -1365,9 +1391,10 @@ impl Engine {
 
                 // Get target reference to first argument
                 let first_arg = &args_expr[0];
-                let target = self.search_scope_only(global, caches, scope, this_ptr, first_arg)?;
 
                 self.track_operation(global, first_arg.position())?;
+
+                let target = self.search_scope_only(global, caches, scope, this_ptr, first_arg)?;
 
                 #[cfg(not(feature = "no_closure"))]
                 let target_is_shared = target.is_shared();
@@ -1433,8 +1460,6 @@ impl Engine {
                     }),
                 );
 
-                self.track_operation(global, pos)?;
-
                 if let Some(f) = module.get_qualified_fn(hash_qualified_fn) {
                     func = Some(f);
                     break;
@@ -1452,7 +1477,7 @@ impl Engine {
             }
         }
 
-        auto_restore! { let orig_level = global.level; global.level += 1 }
+        defer! { let orig_level = global.level; global.level += 1 }
 
         match func {
             #[cfg(not(feature = "no_function"))]
@@ -1463,7 +1488,7 @@ impl Engine {
                 let scope = &mut Scope::new();
 
                 let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
-                auto_restore! { global => move |g| g.source = orig_source }
+                defer! { global => move |g| g.source = orig_source }
 
                 self.call_script_fn(global, caches, scope, None, environ, f, args, true, pos)
             }
@@ -1730,7 +1755,7 @@ impl Engine {
                 get_builtin_binary_op_fn(op_token.as_ref().unwrap(), operands[0], operands[1])
             {
                 // We may not need to bump the level because built-in's do not need it.
-                //auto_restore! { let orig_level = global.level; global.level += 1 }
+                //defer! { let orig_level = global.level; global.level += 1 }
 
                 let context =
                     need_context.then(|| (self, name.as_str(), None, &*global, pos).into());

@@ -276,9 +276,9 @@ pub enum Expr {
     /// [String][ImmutableString] constant.
     StringConstant(ImmutableString, Position),
     /// An interpolated [string][ImmutableString].
-    InterpolatedString(Box<StaticVec<Expr>>, Position),
+    InterpolatedString(Box<FnArgsVec<Expr>>, Position),
     /// [ expr, ... ]
-    Array(Box<StaticVec<Expr>>, Position),
+    Array(Box<FnArgsVec<Expr>>, Position),
     /// #{ name:expr, ... }
     Map(
         Box<(StaticVec<(Ident, Expr)>, BTreeMap<Identifier, Dynamic>)>,
@@ -288,8 +288,8 @@ pub enum Expr {
     Unit(Position),
     /// Variable access - (optional long index, namespace, namespace hash, variable name), optional short index, position
     ///
-    /// The short index is [`u8`] which is used when the index is <= 255, which should be the vast
-    /// majority of cases (unless there are more than 255 variables defined!).
+    /// The short index is [`u8`] which is used when the index is <= 255, which should be
+    /// the vast majority of cases (unless there are more than 255 variables defined!).
     /// This is to avoid reading a pointer redirection during each variable access.
     Variable(
         Box<(Option<NonZeroUsize>, Namespace, u64, ImmutableString)>,
@@ -315,15 +315,15 @@ pub enum Expr {
     ///
     /// ### Flags
     ///
-    /// [`NEGATED`][ASTFlags::NEGATED] = `?.` (`.` if unset)
-    /// [`BREAK`][ASTFlags::BREAK] = terminate the chain (recurse into the chain if unset)
+    /// * [`NEGATED`][ASTFlags::NEGATED] = `?.` (`.` if unset)
+    /// * [`BREAK`][ASTFlags::BREAK] = terminate the chain (recurse into the chain if unset)
     Dot(Box<BinaryExpr>, ASTFlags, Position),
     /// lhs `[` rhs `]`
     ///
     /// ### Flags
     ///
-    /// [`NEGATED`][ASTFlags::NEGATED] = `?[` ... `]` (`[` ... `]` if unset)
-    /// [`BREAK`][ASTFlags::BREAK] = terminate the chain (recurse into the chain if unset)
+    /// * [`NEGATED`][ASTFlags::NEGATED] = `?[` ... `]` (`[` ... `]` if unset)
+    /// * [`BREAK`][ASTFlags::BREAK] = terminate the chain (recurse into the chain if unset)
     Index(Box<BinaryExpr>, ASTFlags, Position),
     /// lhs `&&` rhs
     And(Box<BinaryExpr>, Position),

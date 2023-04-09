@@ -663,7 +663,7 @@ pub enum Stmt {
     ///
     /// ### Flags
     ///
-    /// * [`NONE`][ASTFlags::NONE] = `while`
+    /// * [`NONE`][ASTFlags::NONE] = `while`  
     /// * [`NEGATED`][ASTFlags::NEGATED] = `until`
     Do(Box<FlowControl>, ASTFlags, Position),
     /// `for` `(` id `,` counter `)` `in` expr `{` stmt `}`
@@ -672,7 +672,7 @@ pub enum Stmt {
     ///
     /// ### Flags
     ///
-    /// * [`EXPORTED`][ASTFlags::EXPORTED] = `export`
+    /// * [`EXPORTED`][ASTFlags::EXPORTED] = `export`  
     /// * [`CONSTANT`][ASTFlags::CONSTANT] = `const`
     Var(Box<(Ident, Expr, Option<NonZeroUsize>)>, ASTFlags, Position),
     /// expr op`=` expr

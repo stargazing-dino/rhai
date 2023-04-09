@@ -171,7 +171,7 @@ impl Engine {
             Some(token) if token.is_standard_keyword() => {
                 if !self
                     .disabled_symbols
-                    .as_deref()
+                    .as_ref()
                     .map_or(false, |m| m.contains(token.literal_syntax()))
                 {
                     return Err(format!("'{keyword}' is a reserved keyword"));
@@ -181,7 +181,7 @@ impl Engine {
             Some(token) if token.is_standard_symbol() => {
                 if !self
                     .disabled_symbols
-                    .as_deref()
+                    .as_ref()
                     .map_or(false, |m| m.contains(token.literal_syntax()))
                 {
                     return Err(format!("'{keyword}' is a reserved operator"));
@@ -191,7 +191,7 @@ impl Engine {
             Some(token)
                 if !self
                     .disabled_symbols
-                    .as_deref()
+                    .as_ref()
                     .map_or(false, |m| m.contains(token.literal_syntax())) =>
             {
                 return Err(format!("'{keyword}' is a reserved symbol"))

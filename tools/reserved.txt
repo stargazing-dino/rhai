@@ -7,7 +7,7 @@
 //
 // Generate the output table via:
 // ```bash
-// gperf -t reserved.txt
+// gperf reserved.txt
 // ```
 //
 // Since GNU gperf does not produce Rust output, the ANSI-C output must be hand-edited and
@@ -21,73 +21,88 @@
 // * Copy the `wordlist` array into `RESERVED_LIST` with the following modifications:
 //   - Remove the `#line` comments
 //   - Change the entry wrapping `{ .. }` into tuples `( .. )`
-//   - Replace all entries `("")` by `("", false, false, false)`
 //   - Feature flags can be incorporated directly into the output via the `cfg!` macro
 //
+%global-table
+%struct-type
+%omit-struct-type
+%define initializer-suffix ,false,false,false
 struct reserved;
 %%
-"?.",           cfg!(feature = "no_object"), false, false
-"?[",           cfg!(feature = "no_index"), false, false
-"fn",           cfg!(feature = "no_function"), false, false
-"private",      cfg!(feature = "no_function"), false, false
-"import",       cfg!(feature = "no_module"), false, false
-"export",       cfg!(feature = "no_module"), false, false
-"as",           cfg!(feature = "no_module"), false, false
-"===",          true, false, false
-"!==",          true, false, false
-"->",           true, false, false
-"<-",           true, false, false
-"?",            true, false, false
-":=",           true, false, false
-":;",           true, false, false
-"~",            true, false, false
-"!.",           true, false, false
-"::<",          true, false, false
-"(*",           true, false, false
-"*)",           true, false, false
+# reserved under certain flags
+#
+?.,             cfg!(feature = no_object), false, false
+?[,             cfg!(feature = no_index), false, false
+fn,             cfg!(feature = no_function), false, false
+private,        cfg!(feature = no_function), false, false
+import,         cfg!(feature = no_module), false, false
+export,         cfg!(feature = no_module), false, false
+as,             cfg!(feature = no_module), false, false
+#   
+# reserved symbols
+#   
+===,            true, false, false
+!==,            true, false, false
+->,             true, false, false
+<-,             true, false, false
+?,              true, false, false
+:=,             true, false, false
+:;,             true, false, false
+~,              true, false, false
+!.,             true, false, false
+::<,            true, false, false
+(*,             true, false, false
+*),             true, false, false
 "#",            true, false, false
 "#!",           true, false, false
-"@",            true, false, false
-"$",            true, false, false
-"++",           true, false, false
-"--",           true, false, false
-"...",          true, false, false
-"<|",           true, false, false
-"|>",           true, false, false
-"public",       true, false, false
-"protected",    true, false, false
-"super",        true, false, false
-"new",          true, false, false
-"use",          true, false, false
-"module",       true, false, false
-"package",      true, false, false
-"var",          true, false, false
-"static",       true, false, false
-"shared",       true, false, false
-"with",         true, false, false
-"is",           true, false, false
-"goto",         true, false, false
-"exit",         true, false, false
-"match",        true, false, false
-"case",         true, false, false
-"default",      true, false, false
-"void",         true, false, false
-"null",         true, false, false
-"nil",          true, false, false
-"spawn",        true, false, false
-"thread",       true, false, false
-"go",           true, false, false
-"sync",         true, false, false
-"async",        true, false, false
-"await",        true, false, false
-"yield",        true, false, false
-"print",        true, true, false
-"debug",        true, true, false
-"type_of",      true, true, true
-"eval",         true, true, false
-"Fn",           true, true, false
-"call",         true, true, true
-"curry",        true, true, true
-"this",         true, false, false
-"is_def_var",   true, true, false
-"is_def_fn",    cfg!(not(feature = "no_function")), true, false
+@,              true, false, false
+$,              true, false, false
+++,             true, false, false
+--,             true, false, false
+...,            true, false, false
+<|,             true, false, false
+|>,             true, false, false
+#   
+# reserved keywords
+#   
+public,         true, false, false
+protected,      true, false, false
+super,          true, false, false
+new,            true, false, false
+use,            true, false, false
+module,         true, false, false
+package,        true, false, false
+var,            true, false, false
+static,         true, false, false
+shared,         true, false, false
+with,           true, false, false
+is,             true, false, false
+goto,           true, false, false
+exit,           true, false, false
+match,          true, false, false
+case,           true, false, false
+default,        true, false, false
+void,           true, false, false
+null,           true, false, false
+nil,            true, false, false
+spawn,          true, false, false
+thread,         true, false, false
+go,             true, false, false
+sync,           true, false, false
+async,          true, false, false
+await,          true, false, false
+yield,          true, false, false
+#   
+# keyword functions
+#   
+print,          true, true, false
+debug,          true, true, false
+type_of,        true, true, true
+eval,           true, true, false
+Fn,             true, true, false
+call,           true, true, true
+curry,          true, true, true
+this,           true, false, false
+is_def_var,     true, true, false
+is_def_fn,      cfg!(not(feature = no_function)), true, false
+is_shared,      cfg!(not(feature = no_closure)), true, true

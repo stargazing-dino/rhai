@@ -35,7 +35,7 @@ impl Engine {
         rewind_scope: bool,
         pos: Position,
     ) -> RhaiResult {
-        assert_eq!(fn_def.params.len(), args.len());
+        debug_assert_eq!(fn_def.params.len(), args.len());
 
         self.track_operation(global, pos)?;
 
@@ -219,7 +219,7 @@ impl Engine {
             // Then check imported modules
             global.contains_qualified_fn(hash_script)
             // Then check sub-modules
-            || self.global_sub_modules.as_deref().map_or(false, |m| {
+            || self.global_sub_modules.as_ref().map_or(false, |m| {
                 m.values().any(|m| m.contains_qualified_fn(hash_script))
             });
 

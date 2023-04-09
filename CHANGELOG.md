@@ -6,10 +6,17 @@ Version 1.14.0
 
 The code hacks that attempt to optimize branch prediction performance are removed because benchmarks do not show any material speed improvements.
 
+Buf fixes
+----------
+
+* `is_shared` is a reserved keyword and is now handled properly (e.g. it cannot be the target of a function pointer).
+* Re-optimizing an AST via `optimize_ast` with constants now works correctly for closures. Previously the hidden `Share` nodes are not removed and causes variable-not-found errors during runtime if the constants are not available in the scope.
+
 New features
 ------------
 
 * It is now possible to require a specific _type_ to the `this` pointer for a particular script-defined function so that it is called only when the `this` pointer contains the specified type.
+* `is_def_fn` is extended to support checking for typed methods, with syntax `is_def_fn(this_type, fn_name, arity)`
 
 
 Version 1.13.0

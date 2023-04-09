@@ -261,7 +261,7 @@ impl<'e, 's> ParseState<'e, 's> {
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
         self.interned_strings.get_with_mapper(
-            crate::engine::FN_GET,
+            b'g',
             |s| crate::engine::make_getter(s.as_ref()).into(),
             text,
         )
@@ -276,7 +276,7 @@ impl<'e, 's> ParseState<'e, 's> {
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
         self.interned_strings.get_with_mapper(
-            crate::engine::FN_SET,
+            b's',
             |s| crate::engine::make_setter(s.as_ref()).into(),
             text,
         )
@@ -601,7 +601,7 @@ impl Engine {
                             .any(|m| m.as_str() == root)
                         && !self
                             .global_sub_modules
-                            .as_deref()
+                            .as_ref()
                             .map_or(false, |m| m.contains_key(root))
                     {
                         return Err(
@@ -676,7 +676,7 @@ impl Engine {
                                 .any(|m| m.as_str() == root)
                             && !self
                                 .global_sub_modules
-                                .as_deref()
+                                .as_ref()
                                 .map_or(false, |m| m.contains_key(root))
                         {
                             return Err(
@@ -908,7 +908,7 @@ impl Engine {
         let mut settings = settings;
         settings.pos = eat_token(input, Token::LeftBracket);
 
-        let mut array = StaticVec::new_const();
+        let mut array = FnArgsVec::new_const();
 
         loop {
             const MISSING_RBRACKET: &str = "to end this array literal";
@@ -1501,7 +1501,7 @@ impl Engine {
 
             // Interpolated string
             Token::InterpolatedString(..) => {
-                let mut segments = StaticVec::<Expr>::new();
+                let mut segments = FnArgsVec::new_const();
                 let settings = settings.level_up()?;
 
                 match input.next().expect(NEVER_ENDS) {
@@ -1577,12 +1577,12 @@ impl Engine {
             Token::Custom(key) | Token::Reserved(key) | Token::Identifier(key)
                 if self
                     .custom_syntax
-                    .as_deref()
+                    .as_ref()
                     .map_or(false, |m| m.contains_key(&**key)) =>
             {
                 let (key, syntax) = self
                     .custom_syntax
-                    .as_deref()
+                    .as_ref()
                     .and_then(|m| m.get_key_value(&**key))
                     .unwrap();
                 let (.., pos) = input.next().expect(NEVER_ENDS);
@@ -1888,7 +1888,7 @@ impl Engine {
                             .any(|m| m.as_str() == root)
                         && !self
                             .global_sub_modules
-                            .as_deref()
+                            .as_ref()
                             .map_or(false, |m| m.contains_key(root))
                     {
                         return Err(
@@ -2303,7 +2303,7 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .as_deref()
+                    .as_ref()
                     .and_then(|m| m.get(&**c))
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*current_pos))?,
@@ -2329,7 +2329,7 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .as_deref()
+                    .as_ref()
                     .and_then(|m| m.get(&**c))
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*next_pos))?,
@@ -2434,7 +2434,7 @@ impl Engine {
                 Token::Custom(s)
                     if self
                         .custom_keywords
-                        .as_deref()
+                        .as_ref()
                         .and_then(|m| m.get(s.as_str()))
                         .map_or(false, Option::is_some) =>
                 {
@@ -3612,31 +3612,39 @@ impl Engine {
 
         // Parse type for `this` pointer
         #[cfg(not(feature = "no_object"))]
-        let ((token, pos), this_type) = match token {
-            Token::StringConstant(s) if input.peek().expect(NEVER_ENDS).0 == Token::Period => {
-                eat_token(input, Token::Period);
-                let s = match s.as_str() {
-                    "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
-                    #[cfg(not(feature = "no_float"))]
-                    "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
-                    _ => state.get_interned_string(*s),
-                };
-                (input.next().expect(NEVER_ENDS), Some(s))
+        let ((token, pos), this_type) = {
+            let (next_token, next_pos) = input.peek().expect(NEVER_ENDS);
+
+            match token {
+                Token::StringConstant(s) if next_token == &Token::Period => {
+                    eat_token(input, Token::Period);
+                    let s = match s.as_str() {
+                        "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
+                        #[cfg(not(feature = "no_float"))]
+                        "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
+                        _ => state.get_interned_string(*s),
+                    };
+                    (input.next().expect(NEVER_ENDS), Some(s))
+                }
+                Token::StringConstant(..) => {
+                    return Err(PERR::MissingToken(
+                        Token::Period.into(),
+                        "after the type name for 'this'".into(),
+                    )
+                    .into_err(*next_pos))
+                }
+                Token::Identifier(s) if next_token == &Token::Period => {
+                    eat_token(input, Token::Period);
+                    let s = match s.as_str() {
+                        "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
+                        #[cfg(not(feature = "no_float"))]
+                        "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
+                        _ => state.get_interned_string(*s),
+                    };
+                    (input.next().expect(NEVER_ENDS), Some(s))
+                }
+                _ => ((token, pos), None),
             }
-            Token::StringConstant(..) => {
-                return Err(PERR::MissingSymbol(".".to_string()).into_err(pos))
-            }
-            Token::Identifier(s) if input.peek().expect(NEVER_ENDS).0 == Token::Period => {
-                eat_token(input, Token::Period);
-                let s = match s.as_str() {
-                    "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
-                    #[cfg(not(feature = "no_float"))]
-                    "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
-                    _ => state.get_interned_string(*s),
-                };
-                (input.next().expect(NEVER_ENDS), Some(s))
-            }
-            _ => ((token, pos), None),
         };
 
         let name = match token.into_function_name_for_override() {
@@ -3921,7 +3929,7 @@ impl Engine {
         let expr = self.parse_expr(&mut input, state, &mut functions, settings)?;
 
         #[cfg(feature = "no_function")]
-        assert!(functions.is_empty());
+        debug_assert!(functions.is_empty());
 
         match input.peek().expect(NEVER_ENDS) {
             (Token::EOF, ..) => (),

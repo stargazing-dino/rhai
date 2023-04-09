@@ -236,16 +236,13 @@ impl Engine {
         mut this_ptr: Option<&mut Dynamic>,
         expr: &Expr,
     ) -> RhaiResult {
-        // Coded this way for better branch prediction.
-        // Popular branches are lifted out of the `match` statement into their own branches.
+        self.track_operation(global, expr.position())?;
 
         #[cfg(feature = "debugging")]
         let reset =
             self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
         #[cfg(feature = "debugging")]
-        auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
-
-        self.track_operation(global, expr.position())?;
+        defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
         match expr {
             // Constants
@@ -262,16 +259,17 @@ impl Engine {
                 self.eval_fn_call_expr(global, caches, scope, this_ptr, x, *pos)
             }
 
-            Expr::Variable(x, index, var_pos) => {
-                if index.is_none() && x.0.is_none() && x.3 == KEYWORD_THIS {
-                    this_ptr
-                        .ok_or_else(|| ERR::ErrorUnboundThis(*var_pos).into())
-                        .cloned()
-                } else {
-                    self.search_namespace(global, caches, scope, this_ptr, expr)
-                        .map(Target::take_or_clone)
-                }
+            Expr::Variable(x, index, var_pos)
+                if index.is_none() && x.0.is_none() && x.3 == KEYWORD_THIS =>
+            {
+                this_ptr
+                    .ok_or_else(|| ERR::ErrorUnboundThis(*var_pos).into())
+                    .cloned()
             }
+
+            Expr::Variable(..) => self
+                .search_namespace(global, caches, scope, this_ptr, expr)
+                .map(Target::take_or_clone),
 
             Expr::InterpolatedString(x, _) => {
                 let mut concat = SmartString::new_const();

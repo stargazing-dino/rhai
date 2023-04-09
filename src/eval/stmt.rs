@@ -43,7 +43,7 @@ impl Engine {
         }
 
         // Restore scope at end of block if necessary
-        auto_restore! { scope if restore_orig_state => rewind; let orig_scope_len = scope.len(); }
+        defer! { scope if restore_orig_state => rewind; let orig_scope_len = scope.len(); }
 
         // Restore global state at end of block if necessary
         let orig_always_search_scope = global.always_search_scope;
@@ -54,7 +54,7 @@ impl Engine {
             global.scope_level += 1;
         }
 
-        auto_restore! { global if restore_orig_state => move |g| {
+        defer! { global if restore_orig_state => move |g| {
             g.scope_level -= 1;
 
             #[cfg(not(feature = "no_module"))]
@@ -66,7 +66,7 @@ impl Engine {
         }}
 
         // Pop new function resolution caches at end of block
-        auto_restore! {
+        defer! {
             caches => rewind_fn_resolution_caches;
             let orig_fn_resolution_caches_len = caches.fn_resolution_caches_len();
         }
@@ -209,7 +209,7 @@ impl Engine {
                         get_builtin_op_assignment_fn(op_x, &*lock_guard, &new_val)
                     {
                         // We may not need to bump the level because built-in's do not need it.
-                        //auto_restore! { let orig_level = global.level; global.level += 1 }
+                        //defer! { let orig_level = global.level; global.level += 1 }
 
                         let args = &mut [&mut *lock_guard, &mut new_val];
                         let context = need_context
@@ -267,13 +267,13 @@ impl Engine {
         stmt: &Stmt,
         rewind_scope: bool,
     ) -> RhaiResult {
+        self.track_operation(global, stmt.position())?;
+
         #[cfg(feature = "debugging")]
         let reset =
             self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), stmt)?;
         #[cfg(feature = "debugging")]
-        auto_restore! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
-
-        self.track_operation(global, stmt.position())?;
+        defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
         match stmt {
             // No-op
@@ -307,6 +307,8 @@ impl Engine {
                         .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), rhs)?
                         .flatten();
 
+                    self.track_operation(global, lhs.position())?;
+
                     let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
 
                     let is_temp_result = !target.is_ref();
@@ -325,8 +327,6 @@ impl Engine {
                         )
                         .into());
                     }
-
-                    self.track_operation(global, lhs.position())?;
 
                     self.eval_op_assignment(global, caches, op_info, lhs, &mut target, rhs_val)?;
                 } else {
@@ -664,7 +664,7 @@ impl Engine {
                     .or_else(|| global.get_iter(iter_type))
                     .or_else(|| {
                         self.global_sub_modules
-                            .as_deref()
+                            .as_ref()
                             .into_iter()
                             .flatten()
                             .find_map(|(_, m)| m.get_qualified_iter(iter_type))
@@ -673,7 +673,7 @@ impl Engine {
                 let iter_func = iter_func.ok_or_else(|| ERR::ErrorFor(expr.start_position()))?;
 
                 // Restore scope at end of statement
-                auto_restore! { scope => rewind; let orig_scope_len = scope.len(); }
+                defer! { scope => rewind; let orig_scope_len = scope.len(); }
 
                 // Add the loop variables
                 let counter_index = (!counter.is_empty()).then(|| {
@@ -686,53 +686,53 @@ impl Engine {
 
                 let mut result = Dynamic::UNIT;
 
-                for (x, iter_value) in iter_func(iter_obj).enumerate() {
-                    // Increment counter
-                    if let Some(counter_index) = counter_index {
-                        // As the variable increments from 0, this should always work
-                        // since any overflow will first be caught below.
-                        let index_value = x as INT;
+                if body.is_empty() {
+                    for _ in iter_func(iter_obj) {
+                        self.track_operation(global, body.position())?;
+                    }
+                } else {
+                    for (x, iter_value) in iter_func(iter_obj).enumerate() {
+                        // Increment counter
+                        if let Some(counter_index) = counter_index {
+                            // As the variable increments from 0, this should always work
+                            // since any overflow will first be caught below.
+                            let index_value = x as INT;
 
-                        #[cfg(not(feature = "unchecked"))]
-                        #[allow(clippy::absurd_extreme_comparisons)]
-                        if index_value > crate::MAX_USIZE_INT {
-                            return Err(ERR::ErrorArithmetic(
-                                format!("for-loop counter overflow: {x}"),
-                                counter.pos,
-                            )
-                            .into());
+                            #[cfg(not(feature = "unchecked"))]
+                            #[allow(clippy::absurd_extreme_comparisons)]
+                            if index_value > crate::MAX_USIZE_INT {
+                                return Err(ERR::ErrorArithmetic(
+                                    format!("for-loop counter overflow: {x}"),
+                                    counter.pos,
+                                )
+                                .into());
+                            }
+
+                            *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
+                                Dynamic::from_int(index_value);
                         }
 
-                        *scope.get_mut_by_index(counter_index).write_lock().unwrap() =
-                            Dynamic::from_int(index_value);
-                    }
+                        // Set loop value
+                        let value = iter_value
+                            .map_err(|err| err.fill_position(expr.position()))?
+                            .flatten();
 
-                    // Set loop value
-                    let value = iter_value
-                        .map_err(|err| err.fill_position(expr.position()))?
-                        .flatten();
+                        *scope.get_mut_by_index(index).write_lock().unwrap() = value;
 
-                    *scope.get_mut_by_index(index).write_lock().unwrap() = value;
+                        // Run block
+                        let this_ptr = this_ptr.as_deref_mut();
 
-                    // Run block
-                    self.track_operation(global, body.position())?;
-
-                    if body.is_empty() {
-                        continue;
-                    }
-
-                    let this_ptr = this_ptr.as_deref_mut();
-
-                    match self.eval_stmt_block(global, caches, scope, this_ptr, body, true) {
-                        Ok(_) => (),
-                        Err(err) => match *err {
-                            ERR::LoopBreak(false, ..) => (),
-                            ERR::LoopBreak(true, value, ..) => {
-                                result = value;
-                                break;
-                            }
-                            _ => return Err(err),
-                        },
+                        match self.eval_stmt_block(global, caches, scope, this_ptr, body, true) {
+                            Ok(_) => (),
+                            Err(err) => match *err {
+                                ERR::LoopBreak(false, ..) => (),
+                                ERR::LoopBreak(true, value, ..) => {
+                                    result = value;
+                                    break;
+                                }
+                                _ => return Err(err),
+                            },
+                        }
                     }
                 }
 
@@ -808,7 +808,7 @@ impl Engine {
                         };
 
                         // Restore scope at end of block
-                        auto_restore! { scope if !catch_var.is_unit() => rewind; let orig_scope_len = scope.len(); }
+                        defer! { scope if !catch_var.is_unit() => rewind; let orig_scope_len = scope.len(); }
 
                         if let Expr::Variable(x, ..) = catch_var {
                             scope.push(x.3.clone(), err_value);
