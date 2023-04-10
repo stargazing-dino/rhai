@@ -3781,9 +3781,9 @@ impl Engine {
         statements.push(Stmt::Share(
             externals
                 .into_iter()
-                .map(|Ident { name, pos }| {
-                    let (index, _) = parent.access_var(&name, lib, pos);
-                    (name, index, pos)
+                .map(|var| {
+                    let (index, _) = parent.access_var(&var.name, lib, var.pos);
+                    (var, index)
                 })
                 .collect::<crate::FnArgsVec<_>>()
                 .into(),

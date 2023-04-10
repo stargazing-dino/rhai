@@ -14,10 +14,9 @@ use crate::func::builtin::get_builtin_binary_op_fn;
 use crate::func::hashing::get_hasher;
 use crate::module::ModuleFlags;
 use crate::tokenizer::Token;
-use crate::types::dynamic::AccessMode;
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnPtr, Identifier, ImmutableString, Position,
-    Scope, StaticVec, AST,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnPtr, ImmutableString, Position, Scope,
+    StaticVec, AST,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -54,8 +53,8 @@ impl Default for OptimizationLevel {
 struct OptimizerState<'a> {
     /// Has the [`AST`] been changed during this pass?
     changed: bool,
-    /// Collection of constants to use for eager function evaluations.
-    variables: StaticVec<(Identifier, AccessMode, Option<Dynamic>)>,
+    /// Collection of variables/constants to use for eager function evaluations.
+    variables: StaticVec<(ImmutableString, Option<Dynamic>)>,
     /// Activate constants propagation?
     propagate_constants: bool,
     /// An [`Engine`] instance for eager function evaluation.
@@ -115,14 +114,11 @@ impl<'a> OptimizerState<'a> {
         self.variables.truncate(len);
     }
     /// Add a new variable to the list.
+    ///
+    /// `Some(value)` if constant, `None` or otherwise.
     #[inline(always)]
-    pub fn push_var(
-        &mut self,
-        name: impl Into<Identifier>,
-        access: AccessMode,
-        value: Option<Dynamic>,
-    ) {
-        self.variables.push((name.into(), access, value));
+    pub fn push_var(&mut self, name: ImmutableString, value: Option<Dynamic>) {
+        self.variables.push((name, value));
     }
     /// Look up a constant from the list.
     #[inline]
@@ -131,12 +127,9 @@ impl<'a> OptimizerState<'a> {
             return None;
         }
 
-        for (n, access, value) in self.variables.iter().rev() {
-            if n == name {
-                return match access {
-                    AccessMode::ReadWrite => None,
-                    AccessMode::ReadOnly => value.as_ref(),
-                };
+        for (n, value) in self.variables.iter().rev() {
+            if n.as_str() == name {
+                return value.as_ref();
             }
         }
 
@@ -237,16 +230,13 @@ fn optimize_stmt_block(
                         optimize_expr(&mut x.1, state, false);
 
                         if x.1.is_constant() {
-                            state.push_var(
-                                x.0.as_str(),
-                                AccessMode::ReadOnly,
-                                x.1.get_literal_value(),
-                            );
+                            state
+                                .push_var(x.0.name.clone(), Some(x.1.get_literal_value().unwrap()));
                         }
                     } else {
                         // Add variables into the state
                         optimize_expr(&mut x.1, state, false);
-                        state.push_var(x.0.as_str(), AccessMode::ReadWrite, None);
+                        state.push_var(x.0.name.clone(), None);
                     }
                 }
                 // Optimize the statement
@@ -858,7 +848,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         #[cfg(not(feature = "no_closure"))]
         Stmt::Share(x) => {
             let len = x.len();
-            x.retain(|(v, _, _)| !state.find_constant(v).is_some());
+            x.retain(|(v, _)| !state.find_constant(v).is_some());
             if x.len() != len {
                 state.set_dirty();
             }
@@ -1335,20 +1325,14 @@ impl Engine {
             .iter()
             .rev()
             .flat_map(|m| m.iter_var())
-            .for_each(|(name, value)| {
-                state.push_var(name, AccessMode::ReadOnly, Some(value.clone()))
-            });
+            .for_each(|(name, value)| state.push_var(name.into(), Some(value.clone())));
 
         // Add constants and variables from the scope
         scope
             .into_iter()
             .flat_map(Scope::iter)
             .for_each(|(name, constant, value)| {
-                if constant {
-                    state.push_var(name, AccessMode::ReadOnly, Some(value));
-                } else {
-                    state.push_var(name, AccessMode::ReadWrite, None);
-                }
+                state.push_var(name.into(), if constant { Some(value) } else { None });
             });
 
         optimize_stmt_block(statements, &mut state, true, false, true)

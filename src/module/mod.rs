@@ -1986,23 +1986,35 @@ impl Module {
     }
 
     /// Get an iterator to the sub-modules in the [`Module`].
-    #[inline]
+    #[inline(always)]
     pub fn iter_sub_modules(&self) -> impl Iterator<Item = (&str, &SharedModule)> {
+        self.iter_sub_modules_raw().map(|(k, m)| (k.as_str(), m))
+    }
+    /// Get an iterator to the sub-modules in the [`Module`].
+    #[inline]
+    pub(crate) fn iter_sub_modules_raw(
+        &self,
+    ) -> impl Iterator<Item = (&Identifier, &SharedModule)> {
         self.modules
             .as_ref()
             .into_iter()
             .flatten()
-            .map(|(k, m)| (k.as_str(), m))
+            .map(|(k, m)| (k, m))
     }
 
     /// Get an iterator to the variables in the [`Module`].
-    #[inline]
+    #[inline(always)]
     pub fn iter_var(&self) -> impl Iterator<Item = (&str, &Dynamic)> {
+        self.iter_var_raw().map(|(k, v)| (k.as_str(), v))
+    }
+    /// Get an iterator to the variables in the [`Module`].
+    #[inline]
+    pub(crate) fn iter_var_raw(&self) -> impl Iterator<Item = (&Identifier, &Dynamic)> {
         self.variables
             .as_ref()
             .into_iter()
             .flatten()
-            .map(|(k, v)| (k.as_str(), v))
+            .map(|(k, v)| (k, v))
     }
 
     /// Get an iterator to the functions in the [`Module`].

@@ -182,8 +182,6 @@ fn test_optimizer_reoptimize() -> Result<(), Box<EvalAltResult>> {
     let scope: Scope = ast.iter_literal_variables(true, false).collect();
     let ast = engine.optimize_ast(&scope, ast, OptimizationLevel::Simple);
 
-    println!("{ast:#?}");
-
     assert_eq!(engine.eval_ast::<INT>(&ast)?, 84);
 
     Ok(())
