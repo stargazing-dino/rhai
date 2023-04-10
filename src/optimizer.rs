@@ -6,7 +6,8 @@ use crate::ast::{
     SwitchCasesCollection,
 };
 use crate::engine::{
-    KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_PRINT, KEYWORD_TYPE_OF, OP_NOT,
+    KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_FN_PTR_CURRY, KEYWORD_PRINT,
+    KEYWORD_TYPE_OF, OP_NOT,
 };
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::builtin::get_builtin_binary_op_fn;
@@ -816,21 +817,28 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             }
         }
 
-        Stmt::Expr(expr) => {
-            optimize_expr(expr, state, false);
+        // expr(func())
+        Stmt::Expr(expr) if matches!(**expr, Expr::FnCall(..)) => {
+            state.set_dirty();
+            match mem::take(expr.as_mut()) {
+                Expr::FnCall(x, pos) => *stmt = Stmt::FnCall(x, pos),
+                _ => unreachable!(),
+            }
+        }
 
-            // Do not promote until the expression is fully optimized
-            if !state.is_dirty() && matches!(**expr, Expr::FnCall(..) | Expr::Stmt(..)) {
-                *stmt = match *mem::take(expr) {
-                    // func(...);
+        Stmt::Expr(expr) => optimize_expr(expr, state, false),
+
+        // func(...)
+        Stmt::FnCall(..) => {
+            if let Stmt::FnCall(x, pos) = mem::take(stmt) {
+                let mut expr = Expr::FnCall(x, pos);
+                optimize_expr(&mut expr, state, false);
+                *stmt = match expr {
                     Expr::FnCall(x, pos) => Stmt::FnCall(x, pos),
-                    // {};
-                    Expr::Stmt(x) if x.is_empty() => Stmt::Noop(x.position()),
-                    // {...};
-                    Expr::Stmt(x) => (*x).into(),
-                    _ => unreachable!(),
-                };
-                state.set_dirty();
+                    _ => Stmt::Expr(expr.into()),
+                }
+            } else {
+                unreachable!();
             }
         }
 
@@ -1104,7 +1112,6 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         // Fn
         Expr::FnCall(x, pos)
             if !x.is_qualified() // Non-qualified
-            && state.optimization_level == OptimizationLevel::Simple // simple optimizations
             && x.args.len() == 1
             && x.name == KEYWORD_FN_PTR
             && x.constant_args()
@@ -1121,10 +1128,23 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 optimize_expr(&mut x.args[0], state, false);
             }
         }
+        // curry(FnPtr, constants...)
+        Expr::FnCall(x, pos)
+            if !x.is_qualified() // Non-qualified
+            && x.args.len() >= 2
+            && x.name == KEYWORD_FN_PTR_CURRY
+            && matches!(x.args[0], Expr::DynamicConstant(ref v, ..) if v.is_fnptr())
+            && x.constant_args()
+        => {
+            let mut fn_ptr = x.args[0].get_literal_value().unwrap().cast::<FnPtr>();
+            fn_ptr.extend(x.args.iter().skip(1).map(|arg_expr| arg_expr.get_literal_value().unwrap()));
+            state.set_dirty();
+            *expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), *pos);
+        }
 
-        // Do not call some special keywords
+        // Do not call some special keywords that may have side effects
         Expr::FnCall(x, ..) if DONT_EVAL_KEYWORDS.contains(&x.name.as_str()) => {
-            x.args.iter_mut().for_each(|a| optimize_expr(a, state, false));
+            x.args.iter_mut().for_each(|arg_expr| optimize_expr(arg_expr, state, false));
         }
 
         // Call built-in operators
@@ -1133,7 +1153,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 && state.optimization_level == OptimizationLevel::Simple // simple optimizations
                 && x.constant_args() // all arguments are constants
         => {
-            let arg_values = &mut x.args.iter().map(|e| e.get_literal_value().unwrap()).collect::<StaticVec<_>>();
+            let arg_values = &mut x.args.iter().map(|arg_expr| arg_expr.get_literal_value().unwrap()).collect::<StaticVec<_>>();
             let arg_types: StaticVec<_> = arg_values.iter().map(Dynamic::type_id).collect();
 
             match x.name.as_str() {
@@ -1165,10 +1185,10 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 _ => ()
             }
 
-            x.args.iter_mut().for_each(|a| optimize_expr(a, state, false));
+            x.args.iter_mut().for_each(|arg_expr| optimize_expr(arg_expr, state, false));
 
             // Move constant arguments
-            x.args.iter_mut().for_each(|arg| match arg {
+            x.args.iter_mut().for_each(|arg_expr| match arg_expr {
                     Expr::DynamicConstant(..) | Expr::Unit(..)
                     | Expr::StringConstant(..) | Expr::CharConstant(..)
                     | Expr::BoolConstant(..) | Expr::IntegerConstant(..) => (),
@@ -1176,9 +1196,9 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     #[cfg(not(feature = "no_float"))]
                     Expr:: FloatConstant(..) => (),
 
-                    _ => if let Some(value) = arg.get_literal_value() {
+                    _ => if let Some(value) = arg_expr.get_literal_value() {
                         state.set_dirty();
-                        *arg = Expr::DynamicConstant(value.into(), arg.start_position());
+                        *arg_expr = Expr::DynamicConstant(value.into(), arg_expr.start_position());
                     },
                 });
         }
@@ -1216,11 +1236,11 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         }
 
         // id(args ..) or xxx.id(args ..) -> optimize function call arguments
-        Expr::FnCall(x, ..) | Expr::MethodCall(x, ..) => x.args.iter_mut().for_each(|arg| {
-            optimize_expr(arg, state, false);
+        Expr::FnCall(x, ..) | Expr::MethodCall(x, ..) => x.args.iter_mut().for_each(|arg_expr| {
+            optimize_expr(arg_expr, state, false);
 
             // Move constant arguments
-            match arg {
+            match arg_expr {
                 Expr::DynamicConstant(..) | Expr::Unit(..)
                 | Expr::StringConstant(..) | Expr::CharConstant(..)
                 | Expr::BoolConstant(..) | Expr::IntegerConstant(..) => (),
@@ -1228,9 +1248,9 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 #[cfg(not(feature = "no_float"))]
                 Expr:: FloatConstant(..) => (),
 
-                _ => if let Some(value) = arg.get_literal_value() {
+                _ => if let Some(value) = arg_expr.get_literal_value() {
                     state.set_dirty();
-                    *arg = Expr::DynamicConstant(value.into(), arg.start_position());
+                    *arg_expr = Expr::DynamicConstant(value.into(), arg_expr.start_position());
                 },
             }
         }),
@@ -1378,7 +1398,6 @@ impl Engine {
 
                 functions.into_iter().for_each(|fn_def| {
                     let mut fn_def = crate::func::shared_take_or_clone(fn_def);
-
                     // Optimize the function body
                     let body = mem::take(&mut *fn_def.body);
 
