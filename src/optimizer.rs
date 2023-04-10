@@ -1112,7 +1112,6 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         // Fn
         Expr::FnCall(x, pos)
             if !x.is_qualified() // Non-qualified
-            && state.optimization_level == OptimizationLevel::Simple // simple optimizations
             && x.args.len() == 1
             && x.name == KEYWORD_FN_PTR
             && x.constant_args()
@@ -1128,6 +1127,19 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             } else {
                 optimize_expr(&mut x.args[0], state, false);
             }
+        }
+        // curry(FnPtr, constants...)
+        Expr::FnCall(x, pos)
+            if !x.is_qualified() // Non-qualified
+            && x.args.len() >= 2
+            && x.name == KEYWORD_FN_PTR_CURRY
+            && matches!(x.args[0], Expr::DynamicConstant(ref v, ..) if v.is_fnptr())
+            && x.constant_args()
+        => {
+            let mut fn_ptr = x.args[0].get_literal_value().unwrap().cast::<FnPtr>();
+            fn_ptr.extend(x.args.iter().skip(1).map(|arg_expr| arg_expr.get_literal_value().unwrap()));
+            state.set_dirty();
+            *expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), *pos);
         }
 
         // Do not call some special keywords that may have side effects
