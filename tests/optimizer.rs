@@ -163,3 +163,28 @@ fn test_optimizer_scope() -> Result<(), Box<EvalAltResult>> {
 
     Ok(())
 }
+
+#[cfg(not(feature = "no_function"))]
+#[cfg(not(feature = "no_closure"))]
+#[test]
+fn test_optimizer_reoptimize() -> Result<(), Box<EvalAltResult>> {
+    const SCRIPT: &str = "
+        const FOO = 42;
+        fn foo() {
+            let f = || FOO * 2;
+            f.call()
+         }
+        foo()
+    ";
+
+    let engine = Engine::new();
+    let ast = engine.compile(SCRIPT)?;
+    let scope: Scope = ast.iter_literal_variables(true, false).collect();
+    let ast = engine.optimize_ast(&scope, ast, OptimizationLevel::Simple);
+
+    println!("{ast:#?}");
+
+    assert_eq!(engine.eval_ast::<INT>(&ast)?, 84);
+
+    Ok(())
+}

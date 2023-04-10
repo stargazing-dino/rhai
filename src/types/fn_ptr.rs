@@ -581,3 +581,10 @@ impl IndexMut<usize> for FnPtr {
         self.curry.index_mut(index)
     }
 }
+
+impl Extend<Dynamic> for FnPtr {
+    #[inline(always)]
+    fn extend<T: IntoIterator<Item = Dynamic>>(&mut self, iter: T) {
+        self.curry.extend(iter)
+    }
+}
