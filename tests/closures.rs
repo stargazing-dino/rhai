@@ -47,10 +47,7 @@ fn test_closures() -> Result<(), Box<EvalAltResult>> {
     scope.push("x", 42 as INT);
 
     assert!(matches!(
-        engine
-            .compile_expression("|x| {}")
-            .expect_err("should error")
-            .err_type(),
+        engine.compile_expression("|x| {}").unwrap_err().err_type(),
         ParseErrorType::BadInput(..)
     ));
 
@@ -292,7 +289,7 @@ fn test_closures_data_race() -> Result<(), Box<EvalAltResult>> {
                     a
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataRace(..)
     ));
 

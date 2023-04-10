@@ -109,7 +109,7 @@ fn test_internal_fn_overloading() -> Result<(), Box<EvalAltResult>> {
                     fn abc(x) { x - 42 }
                 "
             )
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::FnDuplicatedDefinition("abc".to_string(), 1)
     );
@@ -125,7 +125,7 @@ fn test_internal_fn_params() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(
         *engine
             .compile("fn hello(x, x) { x }")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::FnDuplicatedParam("hello".to_string(), "x".to_string())
     );
@@ -169,7 +169,7 @@ fn test_function_pointers() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_object"))]
     assert!(matches!(
-        *engine.eval::<INT>(r#"let f = Fn("abc"); f.call(0)"#).expect_err("should error"),
+        *engine.eval::<INT>(r#"let f = Fn("abc"); f.call(0)"#).unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("abc (")
     ));
 
@@ -247,7 +247,7 @@ fn test_internal_fn_bang() -> Result<(), Box<EvalAltResult>> {
                     y.foo!();
                 "
             )
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::MalformedCapture(..)
     ));

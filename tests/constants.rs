@@ -86,7 +86,7 @@ fn test_constant_mut() -> Result<(), Box<EvalAltResult>> {
                     MY_NUMBER.value = 42;
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorNonPureMethodCallOnConstant(..)
     ));
 
@@ -119,7 +119,7 @@ fn test_constant_mut() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         *engine
             .run_with_scope(&mut scope, "MY_NUMBER.value = 42;")
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorNonPureMethodCallOnConstant(..)
     ));
 

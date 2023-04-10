@@ -110,7 +110,7 @@ fn test_switch_errors() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine
             .compile("switch x { _ => 123, 1 => 42 }")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::WrongSwitchDefaultCase
     ));
@@ -174,7 +174,7 @@ fn test_switch_condition() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine
             .compile("switch x { 1 => 123, _ if true => 42 }")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::WrongSwitchCaseCondition
     ));
@@ -269,14 +269,14 @@ fn test_switch_ranges() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine.compile(
             "switch x { 10..20 => (), 20..=42 => 'a', 25..45 => 'z', 42 => 'x', 30..100 => true }"
-        ).expect_err("should error").err_type(),
+        ).unwrap_err().err_type(),
         ParseErrorType::WrongSwitchIntegerCase
     ));
     #[cfg(not(feature = "no_float"))]
     assert!(matches!(
         engine.compile(
             "switch x { 10..20 => (), 20..=42 => 'a', 25..45 => 'z', 42.0 => 'x', 30..100 => true }"
-        ).expect_err("should error").err_type(),
+        ).unwrap_err().err_type(),
         ParseErrorType::WrongSwitchIntegerCase
     ));
     assert_eq!(

@@ -18,7 +18,7 @@ fn test_max_operations() -> Result<(), Box<EvalAltResult>> {
     engine.run("let x = 0; while x < 20 { x += 1; }")?;
 
     assert!(matches!(
-        *engine.run("for x in 0..500 {}").expect_err("should error"),
+        *engine.run("for x in 0..500 {}").unwrap_err(),
         EvalAltResult::ErrorTooManyOperations(..)
     ));
 
@@ -41,9 +41,7 @@ fn test_max_operations_literal() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_index"))]
     assert!(matches!(
-        *engine
-            .run("[1, 2, 3, 4, 5, 6, 7, 8, 9]")
-            .expect_err("should error"),
+        *engine.run("[1, 2, 3, 4, 5, 6, 7, 8, 9]").unwrap_err(),
         EvalAltResult::ErrorTooManyOperations(..)
     ));
 
@@ -54,7 +52,7 @@ fn test_max_operations_literal() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         *engine
             .run("#{a:1, b:2, c:3, d:4, e:5, f:6, g:7, h:8, i:9}")
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorTooManyOperations(..)
     ));
 
@@ -110,7 +108,7 @@ fn test_max_operations_functions() -> Result<(), Box<EvalAltResult>> {
                     }
                 "#,
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorTooManyOperations(..)
     ));
 
@@ -137,7 +135,7 @@ fn test_max_operations_eval() -> Result<(), Box<EvalAltResult>> {
                     eval(script);
                 "#
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorInFunctionCall(.., err, _) if matches!(*err, EvalAltResult::ErrorTooManyOperations(..))
     ));
 
@@ -162,7 +160,7 @@ fn test_max_operations_progress() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         *engine
             .run("for x in 0..500 {}")
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorTerminated(x, ..) if x.as_int()? == 42
     ));
 

@@ -210,34 +210,25 @@ fn test_array_index_types() -> Result<(), Box<EvalAltResult>> {
     engine.compile("[1, 2, 3][0]['x']")?;
 
     assert!(matches!(
-        engine
-            .compile("[1, 2, 3]['x']")
-            .expect_err("should error")
-            .err_type(),
+        engine.compile("[1, 2, 3]['x']").unwrap_err().err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     #[cfg(not(feature = "no_float"))]
     assert!(matches!(
-        engine
-            .compile("[1, 2, 3][123.456]")
-            .expect_err("should error")
-            .err_type(),
+        engine.compile("[1, 2, 3][123.456]").unwrap_err().err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     assert!(matches!(
-        engine
-            .compile("[1, 2, 3][()]")
-            .expect_err("should error")
-            .err_type(),
+        engine.compile("[1, 2, 3][()]").unwrap_err().err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     assert!(matches!(
         engine
             .compile(r#"[1, 2, 3]["hello"]"#)
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
@@ -245,7 +236,7 @@ fn test_array_index_types() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine
             .compile("[1, 2, 3][true && false]")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));

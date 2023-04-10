@@ -169,7 +169,7 @@ fn test_eval_disabled() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine
             .compile(r#"eval("40 + 2")"#)
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::BadInput(LexError::ImproperSymbol(err, ..)) if err == "eval"
     ));
