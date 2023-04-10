@@ -186,3 +186,39 @@ fn test_optimizer_reoptimize() -> Result<(), Box<EvalAltResult>> {
 
     Ok(())
 }
+
+#[test]
+fn test_optimizer_full() -> Result<(), Box<EvalAltResult>> {
+    #[derive(Debug, Clone)]
+    struct TestStruct(INT);
+
+    const SCRIPT: &str = "
+        const FOO = ts(40) + ts(2);
+        value(FOO)
+    ";
+
+    let mut engine = Engine::new();
+    let mut scope = Scope::new();
+
+    engine.set_optimization_level(OptimizationLevel::Full);
+
+    engine
+        .register_type_with_name::<TestStruct>("TestStruct")
+        .register_fn("ts", |n: INT| TestStruct(n))
+        .register_fn("value", |ts: &mut TestStruct| ts.0)
+        .register_fn("+", |ts1: &mut TestStruct, ts2: TestStruct| {
+            TestStruct(ts1.0 + ts2.0)
+        });
+
+    let ast = engine.compile(SCRIPT)?;
+
+    assert_eq!(ast.statements().len(), 2);
+
+    assert_eq!(engine.eval_ast_with_scope::<INT>(&mut scope, &ast)?, 42);
+
+    assert_eq!(scope.len(), 1);
+
+    assert_eq!(scope.get_value::<TestStruct>("FOO").unwrap().0, 42);
+
+    Ok(())
+}
