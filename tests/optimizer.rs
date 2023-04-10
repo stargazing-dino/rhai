@@ -172,7 +172,7 @@ fn test_optimizer_reoptimize() -> Result<(), Box<EvalAltResult>> {
         const FOO = 42;
         fn foo() {
             let f = || FOO * 2;
-            f.call()
+            call(f)
          }
         foo()
     ";
