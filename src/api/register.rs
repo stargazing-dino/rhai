@@ -90,15 +90,15 @@ impl Engine {
         let param_type_names: Option<&[&str]> = None;
 
         let fn_name = name.as_ref();
-        let no_const = false;
+        let is_pure = true;
 
         #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-        let no_const = no_const || (F::num_params() == 3 && fn_name == crate::engine::FN_IDX_SET);
+        let is_pure = is_pure && (F::num_params() != 3 || fn_name != crate::engine::FN_IDX_SET);
         #[cfg(not(feature = "no_object"))]
-        let no_const =
-            no_const || (F::num_params() == 2 && fn_name.starts_with(crate::engine::FN_SET));
+        let is_pure =
+            is_pure && (F::num_params() != 2 || !fn_name.starts_with(crate::engine::FN_SET));
 
-        let func = func.into_callable_function(fn_name.into(), no_const);
+        let func = func.into_callable_function(fn_name.into(), is_pure);
 
         self.global_namespace_mut().set_fn(
             name,

@@ -276,6 +276,7 @@ impl Engine {
                                             func: CallableFunction::Method {
                                                 func: Shared::new(f),
                                                 has_context,
+                                                is_pure: false,
                                             },
                                             source: None,
                                         })
@@ -285,6 +286,7 @@ impl Engine {
                                         func: CallableFunction::Method {
                                             func: Shared::new(f),
                                             has_context,
+                                            is_pure: true,
                                         },
                                         source: None,
                                     }),
@@ -372,8 +374,8 @@ impl Engine {
 
             let backup = &mut ArgBackup::new();
 
-            // Calling pure function but the first argument is a reference?
-            let swap = is_ref_mut && func.is_pure() && !args.is_empty();
+            // Calling non-method function but the first argument is a reference?
+            let swap = is_ref_mut && !func.is_method() && !args.is_empty();
 
             if swap {
                 // Clone the first argument
@@ -400,12 +402,11 @@ impl Engine {
                 .has_context()
                 .then(|| (self, name, src, &*global, pos).into());
 
-            let mut _result = if let Some(f) = func.get_plugin_fn() {
-                if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
-                    Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
-                } else {
-                    f.call(context, args)
-                }
+            let mut _result = if !func.is_pure() && !args.is_empty() && args[0].is_read_only() {
+                // If function is not pure, there must be at least one argument
+                Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
+            } else if let Some(f) = func.get_plugin_fn() {
+                f.call(context, args)
             } else if let Some(f) = func.get_native_fn() {
                 f(context, args)
             } else {
@@ -1493,17 +1494,18 @@ impl Engine {
                 self.call_script_fn(global, caches, scope, None, environ, f, args, true, pos)
             }
 
+            Some(f) if !f.is_pure() && args[0].is_read_only() => {
+                // If function is not pure, there must be at least one argument
+                Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
+            }
+
             Some(f) if f.is_plugin_fn() => {
                 let f = f.get_plugin_fn().expect("plugin function");
                 let context = f
                     .has_context()
                     .then(|| (self, fn_name, module.id(), &*global, pos).into());
-                if !f.is_pure() && !args.is_empty() && args[0].is_read_only() {
-                    Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
-                } else {
-                    f.call(context, args)
-                        .and_then(|r| self.check_data_size(r, pos))
-                }
+                f.call(context, args)
+                    .and_then(|r| self.check_data_size(r, pos))
             }
 
             Some(f) if f.is_native() => {
