@@ -212,6 +212,7 @@ fn test_optimizer_full() -> Result<(), Box<EvalAltResult>> {
 
     let ast = engine.compile(SCRIPT)?;
 
+    #[cfg(feature = "internals")]
     assert_eq!(ast.statements().len(), 2);
 
     assert_eq!(engine.eval_ast_with_scope::<INT>(&mut scope, &ast)?, 42);
