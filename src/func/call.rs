@@ -604,8 +604,11 @@ impl Engine {
             };
 
             if error {
-                let sig = self.gen_fn_call_signature(fn_name, args);
-                return Err(ERR::ErrorFunctionNotFound(sig, pos).into());
+                return Err(ERR::ErrorFunctionNotFound(
+                    self.gen_fn_call_signature(fn_name, args),
+                    pos,
+                )
+                .into());
             }
         }
 
@@ -815,12 +818,16 @@ impl Engine {
             // Handle obj.call(fn_ptr, ...)
             KEYWORD_FN_PTR_CALL => {
                 if call_args.is_empty() {
-                    let typ = self.map_type_name(target.type_name());
-                    return Err(self.make_type_mismatch_err::<FnPtr>(typ, fn_call_pos));
+                    return Err(self.make_type_mismatch_err::<FnPtr>(
+                        self.map_type_name(target.type_name()),
+                        fn_call_pos,
+                    ));
                 }
                 if !call_args[0].is_fnptr() {
-                    let typ = self.map_type_name(call_args[0].type_name());
-                    return Err(self.make_type_mismatch_err::<FnPtr>(typ, first_arg_pos));
+                    return Err(self.make_type_mismatch_err::<FnPtr>(
+                        self.map_type_name(call_args[0].type_name()),
+                        first_arg_pos,
+                    ));
                 }
 
                 // FnPtr call on object
@@ -904,8 +911,10 @@ impl Engine {
             }
             KEYWORD_FN_PTR_CURRY => {
                 if !target.is_fnptr() {
-                    let typ = self.map_type_name(target.type_name());
-                    return Err(self.make_type_mismatch_err::<FnPtr>(typ, fn_call_pos));
+                    return Err(self.make_type_mismatch_err::<FnPtr>(
+                        self.map_type_name(target.type_name()),
+                        fn_call_pos,
+                    ));
                 }
 
                 let mut fn_ptr = target.read_lock::<FnPtr>().expect("`FnPtr`").clone();
@@ -1036,8 +1045,10 @@ impl Engine {
                     self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), arg)?;
 
                 if !arg_value.is_fnptr() {
-                    let typ = self.map_type_name(arg_value.type_name());
-                    return Err(self.make_type_mismatch_err::<FnPtr>(typ, arg_pos));
+                    return Err(self.make_type_mismatch_err::<FnPtr>(
+                        self.map_type_name(arg_value.type_name()),
+                        arg_pos,
+                    ));
                 }
 
                 let fn_ptr = arg_value.cast::<FnPtr>();
@@ -1122,8 +1133,10 @@ impl Engine {
                     self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), first)?;
 
                 if !arg_value.is_fnptr() {
-                    let typ = self.map_type_name(arg_value.type_name());
-                    return Err(self.make_type_mismatch_err::<FnPtr>(typ, arg_pos));
+                    return Err(self.make_type_mismatch_err::<FnPtr>(
+                        self.map_type_name(arg_value.type_name()),
+                        arg_pos,
+                    ));
                 }
 
                 let mut fn_ptr = arg_value.cast::<FnPtr>();

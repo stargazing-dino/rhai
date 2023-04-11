@@ -928,20 +928,18 @@ impl Engine {
             #[cfg(not(feature = "no_closure"))]
             Stmt::Share(x) => {
                 for (var, index) in &**x {
-                    if let Some(index) = index
+                    let index = index
                         .map(|n| scope.len() - n.get())
                         .or_else(|| scope.search(&var.name))
-                    {
-                        let val = scope.get_mut_by_index(index);
+                        .ok_or_else(|| {
+                            Box::new(ERR::ErrorVariableNotFound(var.name.to_string(), var.pos))
+                        })?;
 
-                        if !val.is_shared() {
-                            // Replace the variable with a shared value.
-                            *val = std::mem::take(val).into_shared();
-                        }
-                    } else {
-                        return Err(
-                            ERR::ErrorVariableNotFound(var.name.to_string(), var.pos).into()
-                        );
+                    let val = scope.get_mut_by_index(index);
+
+                    if !val.is_shared() {
+                        // Replace the variable with a shared value.
+                        *val = std::mem::take(val).into_shared();
                     }
                 }
 

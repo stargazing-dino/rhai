@@ -259,15 +259,9 @@ impl Engine {
                 // Keyword/symbol not in first position
                 _ if !segments.is_empty() && token.is_some() => {
                     // Make it a custom keyword/symbol if it is disabled or reserved
-                    if (self
-                        .disabled_symbols
-                        .as_ref()
-                        .map_or(false, |m| m.contains(s))
+                    if (self.is_symbol_disabled(s)
                         || token.as_ref().map_or(false, Token::is_reserved))
-                        && !self
-                            .custom_keywords
-                            .as_ref()
-                            .map_or(false, |m| m.contains_key(s))
+                        && !self.is_custom_keyword(s)
                     {
                         self.custom_keywords
                             .get_or_insert_with(Default::default)
@@ -279,10 +273,7 @@ impl Engine {
                 // Standard keyword in first position but not disabled
                 _ if segments.is_empty()
                     && token.as_ref().map_or(false, Token::is_standard_keyword)
-                    && !self
-                        .disabled_symbols
-                        .as_ref()
-                        .map_or(false, |m| m.contains(s)) =>
+                    && !self.is_symbol_disabled(s) =>
                 {
                     return Err(LexError::ImproperSymbol(
                         s.to_string(),
@@ -299,15 +290,9 @@ impl Engine {
                     && (is_valid_identifier(s) || is_reserved_keyword_or_symbol(s).0) =>
                 {
                     // Make it a custom keyword/symbol if it is disabled or reserved
-                    if self
-                        .disabled_symbols
-                        .as_ref()
-                        .map_or(false, |m| m.contains(s))
+                    if self.is_symbol_disabled(s)
                         || (token.as_ref().map_or(false, Token::is_reserved)
-                            && !self
-                                .custom_keywords
-                                .as_ref()
-                                .map_or(false, |m| m.contains_key(s)))
+                            && !self.is_custom_keyword(s))
                     {
                         self.custom_keywords
                             .get_or_insert_with(Default::default)

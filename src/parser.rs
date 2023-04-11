@@ -2431,13 +2431,7 @@ impl Engine {
                 }
 
                 #[cfg(not(feature = "no_custom_syntax"))]
-                Token::Custom(s)
-                    if self
-                        .custom_keywords
-                        .as_ref()
-                        .and_then(|m| m.get(s.as_str()))
-                        .map_or(false, Option::is_some) =>
-                {
+                Token::Custom(s) if self.is_custom_keyword(s.as_str()) => {
                     op_base.hashes = if native_only {
                         FnCallHashes::from_native_only(calc_fn_hash(None, &s, 2))
                     } else {
