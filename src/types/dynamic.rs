@@ -1017,18 +1017,23 @@ impl Dynamic {
     }
     /// Create a [`Dynamic`] from any type.  A [`Dynamic`] value is simply returned as is.
     ///
-    /// # Notes
+    /// # Arrays
     ///
     /// Beware that you need to pass in an [`Array`][crate::Array] type for it to be recognized as
     /// an [`Array`][crate::Array]. A [`Vec<T>`][Vec] does not get automatically converted to an
-    /// [`Array`][crate::Array], but will be a custom type instead (stored as a trait object).  Use
-    /// [`Dynamic::from_array`] to convert a [`Vec<T>`][Vec] into a [`Dynamic`] as an
-    /// [`Array`][crate::Array] value.
+    /// [`Array`][crate::Array], but will be a custom type instead (stored as a trait object).
+    ///
+    /// Use `array.into()` or `array.into_iter()` to convert a [`Vec<T>`][Vec] into a [`Dynamic`] as
+    /// an [`Array`][crate::Array] value.  See the examples for details.
+    ///
+    /// # Hash Maps
     ///
     /// Similarly, passing in a [`HashMap<String, T>`][std::collections::HashMap] or
     /// [`BTreeMap<String, T>`][std::collections::BTreeMap] will not get a [`Map`][crate::Map] but a
-    /// custom type. Again, use [`Dynamic::from_map`] to get a [`Dynamic`] with a [`Map`][crate::Map]
-    /// value.
+    /// custom type.
+    ///
+    /// Again, use `map.into()` to get a [`Dynamic`] with a [`Map`][crate::Map] value.
+    /// See the examples for details.
     ///
     /// # Examples
     ///
@@ -1046,6 +1051,33 @@ impl Dynamic {
     /// let new_result = Dynamic::from(result);
     /// assert_eq!(new_result.type_name(), "string");
     /// assert_eq!(new_result.to_string(), "hello");
+    ///
+    /// # #[cfg(not(feature = "no_index"))]
+    /// # {
+    /// // Arrays - this is a custom object!
+    /// let result = Dynamic::from(vec![1_i64, 2, 3]);
+    /// assert_eq!(result.type_name(), "alloc::vec::Vec<i64>");
+    ///
+    /// // Use '.into()' to convert a Vec<T> into an Array
+    /// let result: Dynamic = vec![1_i64, 2, 3].into();
+    /// assert_eq!(result.type_name(), "array");
+    /// # }
+    ///
+    /// # #[cfg(not(feature = "no_object"))]
+    /// # {
+    /// # use std::collections::HashMap;
+    /// // Hash map
+    /// let mut map = HashMap::new();
+    /// map.insert("a".to_string(), 1_i64);
+    ///
+    /// // This is a custom object!
+    /// let result = Dynamic::from(map.clone());
+    /// assert_eq!(result.type_name(), "std::collections::hash::map::HashMap<alloc::string::String, i64>");
+    ///
+    /// // Use '.into()' to convert a HashMap<String, T> into an object map
+    /// let result: Dynamic = map.into();
+    /// assert_eq!(result.type_name(), "map");
+    /// # }
     /// ```
     #[inline]
     pub fn from<T: Variant + Clone>(value: T) -> Self {
