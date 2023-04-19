@@ -122,7 +122,6 @@ impl Engine {
     /// # Examples
     ///
     /// ```rust
-    /// # fn main() -> Result<(), rhai::ParseError> {
     /// use rhai::Engine;
     ///
     /// let mut engine = Engine::new();
