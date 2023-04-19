@@ -1728,6 +1728,9 @@ impl Engine {
     ) -> ParseResult<Expr> {
         let mut settings = settings;
 
+        // Break just in case `lhs` is `Expr::Dot` or `Expr::Index`
+        let mut parent_options = ASTFlags::BREAK;
+
         // Tail processing all possible postfix operators
         loop {
             let (tail_token, ..) = input.peek().expect(NEVER_ENDS);
@@ -1842,13 +1845,16 @@ impl Engine {
                     let rhs =
                         self.parse_primary(input, state, lib, settings.level_up()?, options)?;
 
-                    Self::make_dot_expr(state, expr, rhs, ASTFlags::empty(), op_flags, tail_pos)?
+                    Self::make_dot_expr(state, expr, rhs, parent_options, op_flags, tail_pos)?
                 }
                 // Unknown postfix operator
                 (expr, token) => {
                     unreachable!("unknown postfix operator '{}' for {:?}", token, expr)
                 }
-            }
+            };
+
+            // The chain is now extended
+            parent_options = ASTFlags::empty();
         }
 
         // Cache the hash key for namespace-qualified variables

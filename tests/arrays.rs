@@ -203,6 +203,22 @@ fn test_arrays() -> Result<(), Box<EvalAltResult>> {
     Ok(())
 }
 
+#[cfg(not(feature = "no_float"))]
+#[cfg(not(feature = "no_object"))]
+#[test]
+fn test_array_chaining() -> Result<(), Box<EvalAltResult>> {
+    let engine = Engine::new();
+
+    assert!(engine.eval::<bool>(
+        "
+            let v = [ PI() ];
+            ( v[0].cos() ).sin() == v[0].cos().sin()
+        "
+    )?);
+
+    Ok(())
+}
+
 #[test]
 fn test_array_index_types() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
@@ -508,9 +524,9 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
 
     engine.eval::<()>(
         "
-                let x = [1, 2, 3, 2, 1];
-                x.find(|v| v > 4)
-            ",
+            let x = [1, 2, 3, 2, 1];
+            x.find(|v| v > 4)
+        ",
     )?;
 
     assert_eq!(
@@ -525,9 +541,9 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
 
     engine.eval::<()>(
         "
-                let x = [#{alice: 1}, #{bob: 2}, #{clara: 3}];
-                x.find_map(|v| v.dave)
-            ",
+            let x = [#{alice: 1}, #{bob: 2}, #{clara: 3}];
+            x.find_map(|v| v.dave)
+        ",
     )?;
 
     Ok(())
