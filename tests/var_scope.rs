@@ -209,7 +209,7 @@ fn test_var_resolver() -> Result<(), Box<EvalAltResult>> {
 
     assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "chameleon")?, 1);
     assert!(
-        matches!(*engine.eval_with_scope::<INT>(&mut scope, "DO_NOT_USE").expect_err("should error"),
+        matches!(*engine.eval_with_scope::<INT>(&mut scope, "DO_NOT_USE").unwrap_err(),
         EvalAltResult::ErrorVariableNotFound(n, ..) if n == "DO_NOT_USE")
     );
 
@@ -235,7 +235,7 @@ fn test_var_def_filter() -> Result<(), Box<EvalAltResult>> {
     );
 
     assert!(matches!(
-        engine.compile("let x = 42;").expect_err("should error").err_type(),
+        engine.compile("let x = 42;").unwrap_err().err_type(),
         ParseErrorType::ForbiddenVariable(s) if s == "x"
     ));
     assert!(matches!(

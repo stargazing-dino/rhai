@@ -1266,6 +1266,7 @@ impl Module {
             CallableFunction::Method {
                 func: Shared::new(f),
                 has_context: true,
+                is_pure: false,
             },
         )
     }
@@ -1303,15 +1304,15 @@ impl Module {
         F: RegisterNativeFunction<A, N, C, T, true>,
     {
         let fn_name = name.into();
-        let no_const = false;
+        let is_pure = true;
 
         #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-        let no_const = no_const || (F::num_params() == 3 && fn_name == crate::engine::FN_IDX_SET);
+        let is_pure = is_pure && (F::num_params() != 3 || fn_name != crate::engine::FN_IDX_SET);
         #[cfg(not(feature = "no_object"))]
-        let no_const =
-            no_const || (F::num_params() == 2 && fn_name.starts_with(crate::engine::FN_SET));
+        let is_pure =
+            is_pure && (F::num_params() != 2 || !fn_name.starts_with(crate::engine::FN_SET));
 
-        let func = func.into_callable_function(fn_name.clone(), no_const);
+        let func = func.into_callable_function(fn_name.clone(), is_pure);
 
         self.set_fn(
             fn_name,
@@ -1350,7 +1351,7 @@ impl Module {
         F: RegisterNativeFunction<(Mut<A>,), 1, C, T, true> + SendSync + 'static,
     {
         let fn_name = crate::engine::make_getter(name.as_ref());
-        let func = func.into_callable_function(fn_name.clone(), false);
+        let func = func.into_callable_function(fn_name.clone(), true);
 
         self.set_fn(
             fn_name,
@@ -1394,7 +1395,7 @@ impl Module {
         F: RegisterNativeFunction<(Mut<A>, T), 2, C, (), true> + SendSync + 'static,
     {
         let fn_name = crate::engine::make_setter(name.as_ref());
-        let func = func.into_callable_function(fn_name.clone(), true);
+        let func = func.into_callable_function(fn_name.clone(), false);
 
         self.set_fn(
             fn_name,
@@ -1510,7 +1511,7 @@ impl Module {
             FnAccess::Public,
             None,
             F::param_types(),
-            func.into_callable_function(crate::engine::FN_IDX_GET.into(), false),
+            func.into_callable_function(crate::engine::FN_IDX_GET.into(), true),
         )
     }
 
@@ -1571,7 +1572,7 @@ impl Module {
             FnAccess::Public,
             None,
             F::param_types(),
-            func.into_callable_function(crate::engine::FN_IDX_SET.into(), true),
+            func.into_callable_function(crate::engine::FN_IDX_SET.into(), false),
         )
     }
 
@@ -1986,23 +1987,35 @@ impl Module {
     }
 
     /// Get an iterator to the sub-modules in the [`Module`].
-    #[inline]
+    #[inline(always)]
     pub fn iter_sub_modules(&self) -> impl Iterator<Item = (&str, &SharedModule)> {
+        self.iter_sub_modules_raw().map(|(k, m)| (k.as_str(), m))
+    }
+    /// Get an iterator to the sub-modules in the [`Module`].
+    #[inline]
+    pub(crate) fn iter_sub_modules_raw(
+        &self,
+    ) -> impl Iterator<Item = (&Identifier, &SharedModule)> {
         self.modules
             .as_ref()
             .into_iter()
             .flatten()
-            .map(|(k, m)| (k.as_str(), m))
+            .map(|(k, m)| (k, m))
     }
 
     /// Get an iterator to the variables in the [`Module`].
-    #[inline]
+    #[inline(always)]
     pub fn iter_var(&self) -> impl Iterator<Item = (&str, &Dynamic)> {
+        self.iter_var_raw().map(|(k, v)| (k.as_str(), v))
+    }
+    /// Get an iterator to the variables in the [`Module`].
+    #[inline]
+    pub(crate) fn iter_var_raw(&self) -> impl Iterator<Item = (&Identifier, &Dynamic)> {
         self.variables
             .as_ref()
             .into_iter()
             .flatten()
-            .map(|(k, v)| (k.as_str(), v))
+            .map(|(k, v)| (k, v))
     }
 
     /// Get an iterator to the functions in the [`Module`].

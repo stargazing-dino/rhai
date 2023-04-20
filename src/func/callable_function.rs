@@ -39,6 +39,8 @@ pub enum CallableFunction {
         func: Shared<FnAny>,
         /// Does the function take a [`NativeCallContext`][crate::NativeCallContext] parameter?
         has_context: bool,
+        /// This is a dummy field and is not used.
+        is_pure: bool,
     },
     /// A native Rust object method with the first argument passed by reference,
     /// and the rest passed by value.
@@ -47,6 +49,8 @@ pub enum CallableFunction {
         func: Shared<FnAny>,
         /// Does the function take a [`NativeCallContext`][crate::NativeCallContext] parameter?
         has_context: bool,
+        /// Allow operating on constants?
+        is_pure: bool,
     },
     /// An iterator function.
     Iterator {
@@ -105,9 +109,10 @@ impl CallableFunction {
     pub fn is_pure(&self) -> bool {
         match self {
             Self::Pure { .. } => true,
-            Self::Method { .. } | Self::Iterator { .. } => false,
+            Self::Method { is_pure, .. } => *is_pure,
+            Self::Iterator { .. } => true,
 
-            Self::Plugin { func, .. } => !func.is_method_call(),
+            Self::Plugin { func, .. } => func.is_pure(),
 
             #[cfg(not(feature = "no_function"))]
             Self::Script { .. } => false,

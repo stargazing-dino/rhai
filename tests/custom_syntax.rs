@@ -13,11 +13,11 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
     // Disable 'while' and make sure it still works with custom syntax
     engine.disable_symbol("while");
     assert!(matches!(
-        engine.compile("while false {}").expect_err("should error").err_type(),
+        engine.compile("while false {}").unwrap_err().err_type(),
         ParseErrorType::Reserved(err) if err == "while"
     ));
     assert!(matches!(
-        engine.compile("let while = 0").expect_err("should error").err_type(),
+        engine.compile("let while = 0").unwrap_err().err_type(),
         ParseErrorType::Reserved(err) if err == "while"
     ));
 
@@ -127,7 +127,7 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         *engine
             .run("let foo = (exec [x<<15] -> { x += 2 } while x < 42) * 10;")
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorRuntime(..)
     ));
 
@@ -195,7 +195,7 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(
         *engine
             .register_custom_syntax(["!"], false, |_, _| Ok(Dynamic::UNIT))
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::BadInput(LexError::ImproperSymbol(
             "!".to_string(),
@@ -364,10 +364,7 @@ fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
     );
     assert_eq!(engine.eval::<INT>("(hello kitty) + foo")?, 1041);
     assert_eq!(
-        *engine
-            .compile("hello hey")
-            .expect_err("should error")
-            .err_type(),
+        *engine.compile("hello hey").unwrap_err().err_type(),
         ParseErrorType::BadInput(LexError::ImproperSymbol("hey".to_string(), String::new()))
     );
 

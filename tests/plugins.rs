@@ -118,7 +118,7 @@ fn test_plugins_package() -> Result<(), Box<EvalAltResult>> {
         engine.run("const A = [1, 2, 3]; A.no_effect = 42;")?;
 
         assert!(
-            matches!(*engine.run("const A = [1, 2, 3]; A.test(42);").expect_err("should error"),
+            matches!(*engine.run("const A = [1, 2, 3]; A.test(42);").unwrap_err(),
             EvalAltResult::ErrorNonPureMethodCallOnConstant(x, ..) if x == "test")
         )
     }

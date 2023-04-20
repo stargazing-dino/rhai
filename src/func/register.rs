@@ -84,7 +84,7 @@ pub trait RegisterNativeFunction<
 {
     /// Convert this function into a [`CallableFunction`].
     #[must_use]
-    fn into_callable_function(self, name: Identifier, no_const: bool) -> CallableFunction;
+    fn into_callable_function(self, name: Identifier, is_pure: bool) -> CallableFunction;
     /// Get the type ID's of this function's parameters.
     #[must_use]
     fn param_types() -> [TypeId; N];
@@ -127,19 +127,6 @@ pub trait RegisterNativeFunction<
     }
 }
 
-macro_rules! check_constant {
-    ($abi:ident, $n:expr, $fn_name:ident, $no_const:ident, $args:ident) => {
-        #[cfg(any(not(feature = "no_object"), not(feature = "no_index")))]
-        if stringify!($abi) == "Method" && $no_const && $args[0].is_read_only() {
-            return Err(crate::ERR::ErrorNonPureMethodCallOnConstant(
-                $fn_name.to_string(),
-                crate::Position::NONE,
-            )
-            .into());
-        }
-    };
-}
-
 macro_rules! def_register {
     () => {
         def_register!(imp Pure : 0;);
@@ -160,11 +147,9 @@ macro_rules! def_register {
         > RegisterNativeFunction<($($mark,)*), $n, false, RET, false> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
-            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool) -> CallableFunction {
                 CallableFunction::$abi { func: Shared::new(move |_, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, $n, fn_name, no_const, args);
-
                     let mut drain = args.iter_mut();
                     $(let mut $par = $clone(drain.next().unwrap()); )*
 
@@ -173,7 +158,7 @@ macro_rules! def_register {
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }), has_context: false }
+                }), has_context: false, is_pure }
             }
         }
 
@@ -184,13 +169,11 @@ macro_rules! def_register {
         > RegisterNativeFunction<($($mark,)*), $n, true, RET, false> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
-            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool) -> CallableFunction {
                 CallableFunction::$abi { func: Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
                     let ctx = ctx.unwrap();
 
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, $n, fn_name, no_const, args);
-
                     let mut drain = args.iter_mut();
                     $(let mut $par = $clone(drain.next().unwrap()); )*
 
@@ -199,7 +182,7 @@ macro_rules! def_register {
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }), has_context: true }
+                }), has_context: true, is_pure }
             }
         }
 
@@ -211,17 +194,15 @@ macro_rules! def_register {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
-            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool) -> CallableFunction {
                 CallableFunction::$abi { func: Shared::new(move |_, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, $n, fn_name, no_const, args);
-
                     let mut drain = args.iter_mut();
                     $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     self($($arg),*).map(Dynamic::from)
-                }), has_context: false }
+                }), has_context: false, is_pure }
             }
         }
 
@@ -233,19 +214,17 @@ macro_rules! def_register {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
-            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, no_const: bool) -> CallableFunction {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool) -> CallableFunction {
                 CallableFunction::$abi { func: Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
                     let ctx = ctx.unwrap();
 
                     // The arguments are assumed to be of the correct number and types!
-                    check_constant!($abi, $n, fn_name, no_const, args);
-
                     let mut drain = args.iter_mut();
                     $(let mut $par = $clone(drain.next().unwrap()); )*
 
                     // Call the function with each argument value
                     self(ctx, $($arg),*).map(Dynamic::from)
-                }), has_context: true }
+                }), has_context: true, is_pure }
             }
         }
 

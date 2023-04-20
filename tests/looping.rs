@@ -27,10 +27,7 @@ fn test_loop() -> Result<(), Box<EvalAltResult>> {
     );
 
     assert_eq!(
-        *engine
-            .compile("let x = 0; break;")
-            .expect_err("should error")
-            .err_type(),
+        *engine.compile("let x = 0; break;").unwrap_err().err_type(),
         ParseErrorType::LoopBreak
     );
 
@@ -38,7 +35,7 @@ fn test_loop() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(
         *engine
             .compile("loop { let f = || { break;  } }")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::LoopBreak
     );
@@ -46,7 +43,7 @@ fn test_loop() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(
         *engine
             .compile("let x = 0; if x > 0 { continue; }")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::LoopBreak
     );

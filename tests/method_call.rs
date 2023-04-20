@@ -127,7 +127,7 @@ fn test_method_call_typed() -> Result<(), Box<EvalAltResult>> {
                     foo(1000);
                 "#
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("foo")
     ));
 
@@ -142,7 +142,7 @@ fn test_method_call_typed() -> Result<(), Box<EvalAltResult>> {
                     x.foo(1000);
                 "#
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("foo")
     ));
 

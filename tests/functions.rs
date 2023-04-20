@@ -93,7 +93,7 @@ fn test_functions_global_module() -> Result<(), Box<EvalAltResult>> {
                 const ANSWER = 42;
                 foo()
             }
-        ").expect_err("should error"),
+        ").unwrap_err(),
         EvalAltResult::ErrorInFunctionCall(.., err, _)
             if matches!(&*err, EvalAltResult::ErrorVariableNotFound(v, ..) if v == "global::ANSWER")
     ));
@@ -112,7 +112,7 @@ fn test_functions_global_module() -> Result<(), Box<EvalAltResult>> {
                 const LOCAL_VALUE = 42;
                 global::LOCAL_VALUE
             });
-        ").expect_err("should error"),
+        ").unwrap_err(),
         EvalAltResult::ErrorInFunctionCall(.., err, _)
             if matches!(&*err, EvalAltResult::ErrorVariableNotFound(v, ..) if v == "global::LOCAL_VALUE")
     ));

@@ -36,21 +36,21 @@ fn test_mismatched_op_custom_type() -> Result<(), Box<EvalAltResult>> {
             let x = new_ts();
             let y = new_ts();
             x == y
-        ").expect_err("should error"),
+        ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f == "== (TestStruct, TestStruct)"));
 
     assert!(
-        matches!(*engine.eval::<bool>("new_ts() == 42").expect_err("should error"),
+        matches!(*engine.eval::<bool>("new_ts() == 42").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("== (TestStruct, "))
     );
 
     assert!(matches!(
-        *engine.eval::<INT>("60 + new_ts()").expect_err("should error"),
+        *engine.eval::<INT>("60 + new_ts()").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f == format!("+ ({}, TestStruct)", std::any::type_name::<INT>())
     ));
 
     assert!(matches!(
-        *engine.eval::<TestStruct>("42").expect_err("should error"),
+        *engine.eval::<TestStruct>("42").unwrap_err(),
         EvalAltResult::ErrorMismatchOutputType(need, actual, ..)
             if need == "TestStruct" && actual == std::any::type_name::<INT>()
     ));

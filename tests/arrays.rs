@@ -203,6 +203,22 @@ fn test_arrays() -> Result<(), Box<EvalAltResult>> {
     Ok(())
 }
 
+#[cfg(not(feature = "no_float"))]
+#[cfg(not(feature = "no_object"))]
+#[test]
+fn test_array_chaining() -> Result<(), Box<EvalAltResult>> {
+    let engine = Engine::new();
+
+    assert!(engine.eval::<bool>(
+        "
+            let v = [ PI() ];
+            ( v[0].cos() ).sin() == v[0].cos().sin()
+        "
+    )?);
+
+    Ok(())
+}
+
 #[test]
 fn test_array_index_types() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
@@ -210,34 +226,25 @@ fn test_array_index_types() -> Result<(), Box<EvalAltResult>> {
     engine.compile("[1, 2, 3][0]['x']")?;
 
     assert!(matches!(
-        engine
-            .compile("[1, 2, 3]['x']")
-            .expect_err("should error")
-            .err_type(),
+        engine.compile("[1, 2, 3]['x']").unwrap_err().err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     #[cfg(not(feature = "no_float"))]
     assert!(matches!(
-        engine
-            .compile("[1, 2, 3][123.456]")
-            .expect_err("should error")
-            .err_type(),
+        engine.compile("[1, 2, 3][123.456]").unwrap_err().err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     assert!(matches!(
-        engine
-            .compile("[1, 2, 3][()]")
-            .expect_err("should error")
-            .err_type(),
+        engine.compile("[1, 2, 3][()]").unwrap_err().err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
 
     assert!(matches!(
         engine
             .compile(r#"[1, 2, 3]["hello"]"#)
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
@@ -245,7 +252,7 @@ fn test_array_index_types() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine
             .compile("[1, 2, 3][true && false]")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
@@ -517,9 +524,9 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
 
     engine.eval::<()>(
         "
-                let x = [1, 2, 3, 2, 1];
-                x.find(|v| v > 4)
-            ",
+            let x = [1, 2, 3, 2, 1];
+            x.find(|v| v > 4)
+        ",
     )?;
 
     assert_eq!(
@@ -534,9 +541,9 @@ fn test_arrays_map_reduce() -> Result<(), Box<EvalAltResult>> {
 
     engine.eval::<()>(
         "
-                let x = [#{alice: 1}, #{bob: 2}, #{clara: 3}];
-                x.find_map(|v| v.dave)
-            ",
+            let x = [#{alice: 1}, #{bob: 2}, #{clara: 3}];
+            x.find_map(|v| v.dave)
+        ",
     )?;
 
     Ok(())

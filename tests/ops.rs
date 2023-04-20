@@ -26,17 +26,17 @@ fn test_ops_other_number_types() -> Result<(), Box<EvalAltResult>> {
     scope.push("x", 42_u16);
 
     assert!(matches!(
-        *engine.eval_with_scope::<bool>(&mut scope, "x == 42").expect_err("should error"),
+        *engine.eval_with_scope::<bool>(&mut scope, "x == 42").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("== (u16,")
     ));
     #[cfg(not(feature = "no_float"))]
     assert!(matches!(
-        *engine.eval_with_scope::<bool>(&mut scope, "x == 42.0").expect_err("should error"),
+        *engine.eval_with_scope::<bool>(&mut scope, "x == 42.0").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("== (u16,")
     ));
 
     assert!(
-        matches!(*engine.eval_with_scope::<bool>(&mut scope, r#"x == "hello""#).expect_err("should error"),
+        matches!(*engine.eval_with_scope::<bool>(&mut scope, r#"x == "hello""#).unwrap_err(),
             EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("== (u16,")
         )
     );

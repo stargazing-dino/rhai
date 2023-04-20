@@ -109,12 +109,32 @@ impl Engine {
     /// # Ok(())
     /// # }
     /// ```
-    #[inline(always)]
+    #[inline]
     pub fn disable_symbol(&mut self, symbol: impl Into<Identifier>) -> &mut Self {
         self.disabled_symbols
             .get_or_insert_with(Default::default)
             .insert(symbol.into());
         self
+    }
+
+    /// Is a particular keyword or operator disabled?
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use rhai::Engine;
+    ///
+    /// let mut engine = Engine::new();
+    ///
+    /// engine.disable_symbol("if");    // disable the 'if' keyword
+    ///
+    /// assert!(engine.is_symbol_disabled("if"));
+    /// ```
+    #[inline]
+    pub fn is_symbol_disabled(&self, symbol: &str) -> bool {
+        self.disabled_symbols
+            .as_ref()
+            .map_or(false, |m| m.contains(symbol))
     }
 
     /// Register a custom operator with a precedence into the language.
@@ -168,32 +188,21 @@ impl Engine {
             Some(Token::Custom(..)) => (),
             // Active standard keywords cannot be made custom
             // Disabled keywords are OK
-            Some(token) if token.is_standard_keyword() => {
-                if !self
-                    .disabled_symbols
-                    .as_ref()
-                    .map_or(false, |m| m.contains(token.literal_syntax()))
-                {
-                    return Err(format!("'{keyword}' is a reserved keyword"));
-                }
-            }
-            // Active standard symbols cannot be made custom
-            Some(token) if token.is_standard_symbol() => {
-                if !self
-                    .disabled_symbols
-                    .as_ref()
-                    .map_or(false, |m| m.contains(token.literal_syntax()))
-                {
-                    return Err(format!("'{keyword}' is a reserved operator"));
-                }
+            Some(token)
+                if token.is_standard_keyword()
+                    && !self.is_symbol_disabled(token.literal_syntax()) =>
+            {
+                return Err(format!("'{keyword}' is a reserved keyword"))
             }
             // Active standard symbols cannot be made custom
             Some(token)
-                if !self
-                    .disabled_symbols
-                    .as_ref()
-                    .map_or(false, |m| m.contains(token.literal_syntax())) =>
+                if token.is_standard_symbol()
+                    && !self.is_symbol_disabled(token.literal_syntax()) =>
             {
+                return Err(format!("'{keyword}' is a reserved operator"))
+            }
+            // Active standard symbols cannot be made custom
+            Some(token) if !self.is_symbol_disabled(token.literal_syntax()) => {
                 return Err(format!("'{keyword}' is a reserved symbol"))
             }
             // Disabled symbols are OK
@@ -206,6 +215,16 @@ impl Engine {
             .insert(keyword.into(), Some(precedence));
 
         Ok(self)
+    }
+    /// Is a keyword registered as a custom keyword?
+    ///
+    /// Not available under `no_custom_syntax`.
+    #[cfg(not(feature = "no_custom_syntax"))]
+    #[inline]
+    pub(crate) fn is_custom_keyword(&self, keyword: &str) -> bool {
+        self.custom_keywords
+            .as_ref()
+            .map_or(false, |m| m.contains_key(keyword))
     }
 
     /// Get the default value of the custom state for each evaluation run.

@@ -1728,6 +1728,9 @@ impl Engine {
     ) -> ParseResult<Expr> {
         let mut settings = settings;
 
+        // Break just in case `lhs` is `Expr::Dot` or `Expr::Index`
+        let mut parent_options = ASTFlags::BREAK;
+
         // Tail processing all possible postfix operators
         loop {
             let (tail_token, ..) = input.peek().expect(NEVER_ENDS);
@@ -1842,13 +1845,16 @@ impl Engine {
                     let rhs =
                         self.parse_primary(input, state, lib, settings.level_up()?, options)?;
 
-                    Self::make_dot_expr(state, expr, rhs, ASTFlags::empty(), op_flags, tail_pos)?
+                    Self::make_dot_expr(state, expr, rhs, parent_options, op_flags, tail_pos)?
                 }
                 // Unknown postfix operator
                 (expr, token) => {
                     unreachable!("unknown postfix operator '{}' for {:?}", token, expr)
                 }
-            }
+            };
+
+            // The chain is now extended
+            parent_options = ASTFlags::empty();
         }
 
         // Cache the hash key for namespace-qualified variables
@@ -2431,13 +2437,7 @@ impl Engine {
                 }
 
                 #[cfg(not(feature = "no_custom_syntax"))]
-                Token::Custom(s)
-                    if self
-                        .custom_keywords
-                        .as_ref()
-                        .and_then(|m| m.get(s.as_str()))
-                        .map_or(false, Option::is_some) =>
-                {
+                Token::Custom(s) if self.is_custom_keyword(s.as_str()) => {
                     op_base.hashes = if native_only {
                         FnCallHashes::from_native_only(calc_fn_hash(None, &s, 2))
                     } else {
@@ -3781,9 +3781,9 @@ impl Engine {
         statements.push(Stmt::Share(
             externals
                 .into_iter()
-                .map(|Ident { name, pos }| {
-                    let (index, _) = parent.access_var(&name, lib, pos);
-                    (name, index, pos)
+                .map(|var| {
+                    let (index, _) = parent.access_var(&var.name, lib, var.pos);
+                    (var, index)
                 })
                 .collect::<crate::FnArgsVec<_>>()
                 .into(),

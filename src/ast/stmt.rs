@@ -721,7 +721,7 @@ pub enum Stmt {
     /// This variant does not map to any language structure.  It is currently only used only to
     /// convert normal variables into shared variables when they are _captured_ by a closure.
     #[cfg(not(feature = "no_closure"))]
-    Share(Box<crate::FnArgsVec<(crate::ImmutableString, Option<NonZeroUsize>, Position)>>),
+    Share(Box<crate::FnArgsVec<(crate::ast::Ident, Option<NonZeroUsize>)>>),
 }
 
 impl Default for Stmt {
@@ -816,7 +816,7 @@ impl Stmt {
             Self::Export(.., pos) => *pos,
 
             #[cfg(not(feature = "no_closure"))]
-            Self::Share(x) => x[0].2,
+            Self::Share(x) => x[0].0.pos,
         }
     }
     /// Override the [position][Position] of this statement.
@@ -848,7 +848,7 @@ impl Stmt {
             Self::Export(.., pos) => *pos = new_pos,
 
             #[cfg(not(feature = "no_closure"))]
-            Self::Share(x) => x.iter_mut().for_each(|(_, _, pos)| *pos = new_pos),
+            Self::Share(x) => x.iter_mut().for_each(|(x, _)| x.pos = new_pos),
         }
 
         self

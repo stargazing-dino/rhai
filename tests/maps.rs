@@ -52,7 +52,7 @@ b`: 1}; y["a\nb"]
     assert!(matches!(
         *engine
             .eval::<INT>("let y = #{`a${1}`: 1}; y.a1")
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorParsing(ParseErrorType::PropertyExpected, ..)
     ));
 
@@ -116,7 +116,7 @@ fn test_map_prop() -> Result<(), Box<EvalAltResult>> {
     engine.set_fail_on_invalid_map_property(true);
 
     assert!(
-        matches!(*engine.eval::<()>("let x = #{a: 42}; x.b").expect_err("should error"),
+        matches!(*engine.eval::<()>("let x = #{a: 42}; x.b").unwrap_err(),
             EvalAltResult::ErrorPropertyNotFound(prop, _) if prop == "b"
         )
     );
@@ -134,7 +134,7 @@ fn test_map_index_types() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine
             .compile("#{a:1, b:2, c:3}['x']")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
@@ -142,7 +142,7 @@ fn test_map_index_types() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine
             .compile("#{a:1, b:2, c:3}[1]")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
@@ -151,7 +151,7 @@ fn test_map_index_types() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine
             .compile("#{a:1, b:2, c:3}[123.456]")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
@@ -159,7 +159,7 @@ fn test_map_index_types() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine
             .compile("#{a:1, b:2, c:3}[()]")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
@@ -167,7 +167,7 @@ fn test_map_index_types() -> Result<(), Box<EvalAltResult>> {
     assert!(matches!(
         engine
             .compile("#{a:1, b:2, c:3}[true && false]")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
@@ -272,38 +272,32 @@ fn test_map_json() -> Result<(), Box<EvalAltResult>> {
     engine.parse_json(json, true)?;
 
     assert!(matches!(
-        *engine.parse_json("123", true).expect_err("should error"),
+        *engine.parse_json("123", true).unwrap_err(),
         EvalAltResult::ErrorMismatchOutputType(..)
     ));
 
     assert!(matches!(
-        *engine.parse_json("{a:42}", true).expect_err("should error"),
+        *engine.parse_json("{a:42}", true).unwrap_err(),
         EvalAltResult::ErrorParsing(..)
     ));
 
     assert!(matches!(
-        *engine
-            .parse_json("#{a:123}", true)
-            .expect_err("should error"),
+        *engine.parse_json("#{a:123}", true).unwrap_err(),
         EvalAltResult::ErrorParsing(..)
     ));
 
     assert!(matches!(
-        *engine.parse_json("{a:()}", true).expect_err("should error"),
+        *engine.parse_json("{a:()}", true).unwrap_err(),
         EvalAltResult::ErrorParsing(..)
     ));
 
     assert!(matches!(
-        *engine
-            .parse_json("#{a:123+456}", true)
-            .expect_err("should error"),
+        *engine.parse_json("#{a:123+456}", true).unwrap_err(),
         EvalAltResult::ErrorParsing(..)
     ));
 
     assert!(matches!(
-        *engine
-            .parse_json("{a:`hello${world}`}", true)
-            .expect_err("should error"),
+        *engine.parse_json("{a:`hello${world}`}", true).unwrap_err(),
         EvalAltResult::ErrorParsing(..)
     ));
 

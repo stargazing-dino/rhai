@@ -9,7 +9,7 @@ fn test_tokens_disabled() {
     assert!(matches!(
         engine
             .compile("let x = if true { 42 } else { 0 };")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::Reserved(err) if err == "if"
     ));
@@ -19,13 +19,13 @@ fn test_tokens_disabled() {
     assert_eq!(
         *engine
             .compile("let x = 40 + 2; x += 1;")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::UnknownOperator("+=".to_string())
     );
 
     assert!(matches!(
-        engine.compile("let x = += 0;").expect_err("should error").err_type(),
+        engine.compile("let x = += 0;").unwrap_err().err_type(),
         ParseErrorType::Reserved(err) if err == "+="
     ));
 }

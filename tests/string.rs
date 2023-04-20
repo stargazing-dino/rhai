@@ -116,7 +116,7 @@ fn test_string_mut() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(engine.eval::<INT>(r#"foo("hello")"#)?, 5);
     assert_eq!(engine.eval::<INT>(r#"bar("hello")"#)?, 5);
     assert!(
-        matches!(*engine.eval::<INT>(r#"baz("hello")"#).expect_err("should error"),
+        matches!(*engine.eval::<INT>(r#"baz("hello")"#).unwrap_err(),
             EvalAltResult::ErrorFunctionNotFound(f, ..) if f == "baz (&str | ImmutableString | String)"
         )
     );

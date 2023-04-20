@@ -15,7 +15,7 @@ fn test_max_string_size() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(
         *engine
             .compile(r#"let x = "hello, world!";"#)
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::LiteralTooLarge("Length of string".to_string(), 10)
     );
@@ -23,7 +23,7 @@ fn test_max_string_size() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(
         *engine
             .compile(r#"let x = "朝に紅顔、暮に白骨";"#)
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::LiteralTooLarge("Length of string".to_string(), 10)
     );
@@ -37,7 +37,7 @@ fn test_max_string_size() -> Result<(), Box<EvalAltResult>> {
                     x + y
                 "#
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -51,7 +51,7 @@ fn test_max_string_size() -> Result<(), Box<EvalAltResult>> {
                     x
                 "#
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -83,7 +83,7 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(
         *engine
             .compile("let x = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];")
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::LiteralTooLarge("Size of array literal".to_string(), 10)
     );
@@ -97,7 +97,7 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
                     x + y
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -130,7 +130,7 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
                     }
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -142,7 +142,7 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
                     loop { x[0] = x; }
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -168,7 +168,7 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
                     x
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -190,7 +190,7 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
                     [x, x, x, x]
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -203,7 +203,7 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
                     [x, x, x, x]
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -217,7 +217,7 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
                     [z, z, z]
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -265,7 +265,7 @@ fn test_max_map_size() -> Result<(), Box<EvalAltResult>> {
             .compile(
                 "let x = #{a:1,b:2,c:3,d:4,e:5,f:6,g:7,h:8,i:9,j:10,k:11,l:12,m:13,n:14,o:15};"
             )
-            .expect_err("should error")
+            .unwrap_err()
             .err_type(),
         ParseErrorType::LiteralTooLarge(
             "Number of properties in object map literal".to_string(),
@@ -281,7 +281,7 @@ fn test_max_map_size() -> Result<(), Box<EvalAltResult>> {
                     loop { x.a = x; }
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -294,7 +294,7 @@ fn test_max_map_size() -> Result<(), Box<EvalAltResult>> {
                     x + y
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -306,7 +306,7 @@ fn test_max_map_size() -> Result<(), Box<EvalAltResult>> {
                     #{u:x, v:x, w:x, z:x}
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
@@ -319,7 +319,7 @@ fn test_max_map_size() -> Result<(), Box<EvalAltResult>> {
                     #{u:x, v:x, w:x, z:x}
                 "
             )
-            .expect_err("should error"),
+            .unwrap_err(),
         EvalAltResult::ErrorDataTooLarge(..)
     ));
 
