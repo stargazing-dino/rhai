@@ -2974,18 +2974,13 @@ impl Engine {
         let stack = state.stack.as_mut().unwrap();
 
         let existing = if !hit_barrier && existing > 0 {
-            let offset = stack.len() - existing;
-
-            if !stack.get_entry_by_index(offset).2.is_empty() {
+            match stack.len() - existing {
                 // Variable has been aliased
-                None
-            } else {
-                if offset < state.block_stack_len {
-                    // Defined in parent block
-                    None
-                } else {
-                    Some(offset)
-                }
+                #[cfg(not(feature = "no_module"))]
+                offset if !stack.get_entry_by_index(offset).2.is_empty() => None,
+                // Defined in parent block
+                offset if offset < state.block_stack_len => None,
+                offset => Some(offset),
             }
         } else {
             None
@@ -2999,6 +2994,7 @@ impl Engine {
             None
         };
 
+        #[cfg(not(feature = "no_module"))]
         if is_export {
             stack.add_alias_by_index(stack.len() - 1, name.clone());
         }
