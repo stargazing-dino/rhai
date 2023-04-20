@@ -55,7 +55,7 @@ pub struct ParseState<'e, 's> {
     /// Global runtime state.
     pub global: Option<Box<GlobalRuntimeState>>,
     /// Encapsulates a local stack with variable names to simulate an actual runtime scope.
-    pub stack: Option<Box<Scope<'e>>>,
+    pub stack: Option<Scope<'e>>,
     /// Size of the local variables stack upon entry of the current block scope.
     pub block_stack_len: usize,
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
@@ -143,7 +143,7 @@ impl<'e, 's> ParseState<'e, 's> {
 
         let index = self
             .stack
-            .as_deref()
+            .as_ref()
             .into_iter()
             .flat_map(Scope::iter_rev_raw)
             .enumerate()
@@ -2890,7 +2890,7 @@ impl Engine {
         settings.flags |= ParseSettingFlags::BREAKABLE;
         let body = self.parse_block(input, state, lib, settings)?.into();
 
-        state.stack.as_deref_mut().unwrap().rewind(prev_stack_len);
+        state.stack.as_mut().unwrap().rewind(prev_stack_len);
 
         let branch = StmtBlock::NONE;
 
@@ -2971,15 +2971,21 @@ impl Engine {
 
         let (existing, hit_barrier) = state.find_var(&name);
 
-        let stack = state.stack.as_deref_mut().unwrap();
+        let stack = state.stack.as_mut().unwrap();
 
         let existing = if !hit_barrier && existing > 0 {
             let offset = stack.len() - existing;
-            if offset < state.block_stack_len {
-                // Defined in parent block
+
+            if !stack.get_entry_by_index(offset).2.is_empty() {
+                // Variable has been aliased
                 None
             } else {
-                Some(offset)
+                if offset < state.block_stack_len {
+                    // Defined in parent block
+                    None
+                } else {
+                    Some(offset)
+                }
             }
         } else {
             None
@@ -2992,6 +2998,10 @@ impl Engine {
             stack.push_entry(name.as_str(), access, Dynamic::UNIT);
             None
         };
+
+        if is_export {
+            stack.add_alias_by_index(stack.len() - 1, name.clone());
+        }
 
         let var_def = (Ident { name, pos }, expr, idx).into();
 
@@ -3077,10 +3087,17 @@ impl Engine {
         let (id, id_pos) = parse_var_name(input)?;
 
         let (alias, alias_pos) = if match_token(input, Token::As).0 {
-            parse_var_name(input).map(|(name, pos)| (Some(name), pos))?
+            parse_var_name(input).map(|(name, pos)| (state.get_interned_string(name), pos))?
         } else {
-            (None, Position::NONE)
+            (state.get_interned_string(""), Position::NONE)
         };
+
+        let (existing, hit_barrier) = state.find_var(&id);
+
+        if !hit_barrier && existing > 0 {
+            let stack = state.stack.as_mut().unwrap();
+            stack.add_alias_by_index(stack.len() - existing, alias.clone());
+        }
 
         let export = (
             Ident {
@@ -3088,7 +3105,7 @@ impl Engine {
                 pos: id_pos,
             },
             Ident {
-                name: state.get_interned_string(alias.as_deref().unwrap_or("")),
+                name: alias,
                 pos: alias_pos,
             },
         );
@@ -3137,7 +3154,7 @@ impl Engine {
         }
 
         let prev_entry_stack_len = state.block_stack_len;
-        state.block_stack_len = state.stack.as_deref().map_or(0, Scope::len);
+        state.block_stack_len = state.stack.as_ref().map_or(0, Scope::len);
 
         #[cfg(not(feature = "no_module"))]
         let orig_imports_len = state.imports.as_deref().map_or(0, StaticVec::len);
@@ -3580,7 +3597,7 @@ impl Engine {
             Expr::Unit(catch_var.pos)
         } else {
             // Remove the error variable from the stack
-            state.stack.as_deref_mut().unwrap().pop();
+            state.stack.as_mut().unwrap().pop();
 
             Expr::Variable(
                 (None, Namespace::default(), 0, catch_var.name).into(),

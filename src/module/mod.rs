@@ -2211,8 +2211,17 @@ impl Module {
         });
 
         // Variables with an alias left in the scope become module variables
-        while scope.len() > orig_scope_len {
-            let (_name, mut value, mut aliases) = scope.pop_entry().expect("not empty");
+        let mut i = scope.len();
+        while i > 0 {
+            i -= 1;
+
+            let (mut value, mut aliases) = if i >= orig_scope_len {
+                let (_, v, a) = scope.pop_entry().expect("not empty");
+                (v, a)
+            } else {
+                let (_, v, a) = scope.get_entry_by_index(i);
+                (v.clone(), a.to_vec())
+            };
 
             value.deep_scan(|v| {
                 if let Some(fn_ptr) = v.downcast_mut::<crate::FnPtr>() {
@@ -2224,15 +2233,28 @@ impl Module {
                 0 => (),
                 1 => {
                     let alias = aliases.pop().unwrap();
-                    module.set_var(alias, value);
+                    if !module.contains_var(&alias) {
+                        module.set_var(alias, value);
+                    }
                 }
                 _ => {
-                    let last_alias = aliases.pop().unwrap();
-                    for alias in aliases {
-                        module.set_var(alias, value.clone());
-                    }
                     // Avoid cloning the last value
-                    module.set_var(last_alias, value);
+                    let mut first_alias = None;
+
+                    for alias in aliases {
+                        if module.contains_var(&alias) {
+                            continue;
+                        }
+                        if first_alias.is_none() {
+                            first_alias = Some(alias);
+                        } else {
+                            module.set_var(alias, value.clone());
+                        }
+                    }
+
+                    if let Some(alias) = first_alias {
+                        module.set_var(alias, value);
+                    }
                 }
             }
         }

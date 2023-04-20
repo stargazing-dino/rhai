@@ -6,12 +6,13 @@ Version 1.14.0
 
 The code hacks that attempt to optimize branch prediction performance are removed because benchmarks do not show any material speed improvements.
 
-Buf fixes
+Bug fixes
 ----------
 
 * `is_shared` is a reserved keyword and is now handled properly (e.g. it cannot be the target of a function pointer).
 * Re-optimizing an AST via `optimize_ast` with constants now works correctly for closures. Previously the hidden `Share` nodes are not removed and causes variable-not-found errors during runtime if the constants are not available in the scope.
 * Expressions such as `(v[0].func()).prop` now parse correctly.
+* Shadowed variable exports are now handled correctly.
 
 New features
 ------------
