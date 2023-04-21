@@ -831,7 +831,7 @@ impl Engine {
                 }
 
                 // FnPtr call on object
-                let fn_ptr = mem::take(&mut call_args[0]).cast::<FnPtr>();
+                let fn_ptr = call_args[0].take().cast::<FnPtr>();
 
                 #[cfg(not(feature = "no_function"))]
                 let (fn_name, is_anon, fn_curry, _environ, fn_def) = {

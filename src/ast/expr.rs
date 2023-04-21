@@ -16,6 +16,7 @@ use std::{
     fmt::Write,
     hash::Hash,
     iter::once,
+    mem,
     num::{NonZeroU8, NonZeroUsize},
 };
 
@@ -832,6 +833,11 @@ impl Expr {
 
             Self::Property(..) => matches!(token, Token::LeftParen),
         }
+    }
+    /// Return this [`Expr`], replacing it with [`Expr::Unit`].
+    #[inline(always)]
+    pub fn take(&mut self) -> Self {
+        mem::take(self)
     }
     /// Recursively walk this expression.
     /// Return `false` from the callback to terminate the walk.

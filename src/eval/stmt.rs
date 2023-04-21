@@ -939,7 +939,7 @@ impl Engine {
 
                     if !val.is_shared() {
                         // Replace the variable with a shared value.
-                        *val = std::mem::take(val).into_shared();
+                        *val = val.take().into_shared();
                     }
                 }
 

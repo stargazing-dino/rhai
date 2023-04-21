@@ -19,6 +19,7 @@ New features
 
 * It is now possible to require a specific _type_ to the `this` pointer for a particular script-defined function so that it is called only when the `this` pointer contains the specified type.
 * `is_def_fn` is extended to support checking for typed methods, with syntax `is_def_fn(this_type, fn_name, arity)`
+* `Dynamic::take` is added as a short-cut for `std::mem::take(&mut value)`.
 
 Enhancements
 ------------

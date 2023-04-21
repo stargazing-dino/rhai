@@ -1036,6 +1036,11 @@ impl Stmt {
     pub const fn is_control_flow_break(&self) -> bool {
         matches!(self, Self::Return(..) | Self::BreakLoop(..))
     }
+    /// Return this [`Stmt`], replacing it with [`Stmt::Noop`].
+    #[inline(always)]
+    pub fn take(&mut self) -> Self {
+        mem::take(self)
+    }
     /// Recursively walk this statement.
     /// Return `false` from the callback to terminate the walk.
     pub fn walk<'a>(

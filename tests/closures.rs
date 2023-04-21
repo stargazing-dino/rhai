@@ -16,8 +16,8 @@ fn test_fn_ptr_curry_call() -> Result<(), Box<EvalAltResult>> {
         "call_with_arg",
         [TypeId::of::<FnPtr>(), TypeId::of::<INT>()],
         |context, args| {
-            let fn_ptr = std::mem::take(args[0]).cast::<FnPtr>();
-            fn_ptr.call_raw(&context, None, [std::mem::take(args[1])])
+            let fn_ptr = args[0].take().cast::<FnPtr>();
+            fn_ptr.call_raw(&context, None, [args[1].take()])
         },
     );
 

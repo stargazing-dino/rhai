@@ -1204,7 +1204,7 @@ impl Module {
     ///
     /// To access a primary argument value (i.e. cloning is cheap), use: `args[n].as_xxx().unwrap()`
     ///
-    /// To access an argument value and avoid cloning, use `std::mem::take(args[n]).cast::<T>()`.
+    /// To access an argument value and avoid cloning, use `args[n].take().cast::<T>()`.
     /// Notice that this will _consume_ the argument, replacing it with `()`.
     ///
     /// To access the first mutable argument, use `args.get_mut(0).unwrap()`
@@ -1227,7 +1227,7 @@ impl Module {
     ///                     // 'args' is guaranteed to be the right length and of the correct types
     ///
     ///                     // Get the second parameter by 'consuming' it
-    ///                     let double = std::mem::take(args[1]).cast::<bool>();
+    ///                     let double = args[1].take().cast::<bool>();
     ///                     // Since it is a primary type, it can also be cheaply copied
     ///                     let double = args[1].clone_cast::<bool>();
     ///                     // Get a mutable reference to the first argument.

@@ -748,7 +748,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
             return match op {
                 PlusAssign => Some((
                     |_ctx, args| {
-                        let x = std::mem::take(args[1]).into_array().unwrap();
+                        let x = args[1].take().into_array().unwrap();
 
                         if x.is_empty() {
                             return Ok(Dynamic::UNIT);
@@ -783,7 +783,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
             return match op {
                 PlusAssign => Some((
                     |_ctx, args| {
-                        let blob2 = std::mem::take(args[1]).into_blob().unwrap();
+                        let blob2 = args[1].take().into_blob().unwrap();
                         let blob1 = &mut *args[0].write_lock::<Blob>().unwrap();
 
                         #[cfg(not(feature = "unchecked"))]
@@ -931,7 +931,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
             PlusAssign => Some((
                 |_ctx, args| {
                     {
-                        let x = std::mem::take(args[1]);
+                        let x = args[1].take();
                         let array = &mut *args[0].write_lock::<Array>().unwrap();
                         push(array, x);
                     }
