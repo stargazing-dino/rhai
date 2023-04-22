@@ -539,6 +539,82 @@ fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position
     }
 }
 
+/// Optimize the structure of a chained expression where the root expression is another chained expression.
+///
+/// # Panics
+///
+/// Panics if the expression is not a combo chain.
+#[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+fn optimize_combo_chain(expr: &mut Expr) {
+    let (mut x, x_options, x_pos, mut root, mut root_options, root_pos, make_sub, make_root): (
+        _,
+        _,
+        _,
+        _,
+        _,
+        _,
+        fn(_, _, _) -> Expr,
+        fn(_, _, _) -> Expr,
+    ) = match expr.take() {
+        #[cfg(not(feature = "no_index"))]
+        Expr::Index(mut x, opt, pos) => match x.lhs.take() {
+            Expr::Index(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Index, Expr::Index),
+            #[cfg(not(feature = "no_object"))]
+            Expr::Dot(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Index, Expr::Dot),
+            _ => panic!("combo chain expected"),
+        },
+        #[cfg(not(feature = "no_object"))]
+        Expr::Dot(mut x, opt, pos) => match x.lhs.take() {
+            #[cfg(not(feature = "no_index"))]
+            Expr::Index(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Dot, Expr::Index),
+            Expr::Dot(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Dot, Expr::Index),
+            _ => panic!("combo chain expected"),
+        },
+        _ => panic!("combo chain expected"),
+    };
+
+    // Rewrite the chains like this:
+    //
+    // Source: ( x[y].prop_a )[z].prop_b
+    //         ^             ^
+    //         parentheses that generated the combo chain
+    //
+    // From: Index( Index( x, Dot(y, prop_a) ), Dot(z, prop_b) )
+    //       ^      ^         ^
+    //       x      root      tail
+    //
+    // To:   Index( x, Dot(y, Index(prop_a, Dot(z, prop_b) ) ) )
+    //
+    // Equivalent to:  x[y].prop_a[z].prop_b
+
+    // Find the end of the root chain.
+    let mut tail = root.as_mut();
+    let mut tail_options = &mut root_options;
+
+    while !tail_options.contains(ASTFlags::BREAK) {
+        match tail.rhs {
+            Expr::Index(ref mut x, ref mut options2, ..) => {
+                tail = x.as_mut();
+                tail_options = options2;
+            }
+            #[cfg(not(feature = "no_object"))]
+            Expr::Dot(ref mut x, ref mut options2, ..) => {
+                tail = x.as_mut();
+                tail_options = options2;
+            }
+            _ => break,
+        }
+    }
+
+    // Since we attach the outer chain to the root chain, we no longer terminate at the end of the
+    // root chain, so remove the ASTFlags::BREAK flag.
+    tail_options.remove(ASTFlags::BREAK);
+
+    x.lhs = tail.rhs.take(); // remove tail and insert it into head of outer chain
+    tail.rhs = make_sub(x, x_options, x_pos); // attach outer chain to tail
+    *expr = make_root(root, root_options, root_pos);
+}
+
 impl Engine {
     /// Parse a function call.
     fn parse_fn_call(
@@ -1855,6 +1931,13 @@ impl Engine {
 
             // The chain is now extended
             parent_options = ASTFlags::empty();
+        }
+
+        // Optimize chain where the root expression is another chain
+        #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+        if matches!(lhs, Expr::Index(ref x, ..) | Expr::Dot(ref x, ..) if matches!(x.lhs, Expr::Index(..) | Expr::Dot(..)))
+        {
+            optimize_combo_chain(&mut lhs)
         }
 
         // Cache the hash key for namespace-qualified variables
