@@ -857,6 +857,63 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
     }
 }
 
+/// Optimize the structure of a chained expression.
+#[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+fn optimize_chain_structure(expr: &mut Expr, state: &mut OptimizerState) {
+    let (mut x, options, pos, mut lhs_x, mut lhs_options, lhs_pos, sub, root): (
+        _,
+        _,
+        _,
+        _,
+        _,
+        _,
+        fn(_, _, _) -> Expr,
+        fn(_, _, _) -> Expr,
+    ) = match expr.take() {
+        #[cfg(not(feature = "no_index"))]
+        Expr::Index(mut x, opt, pos) => match x.lhs.take() {
+            Expr::Index(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Index, Expr::Index),
+            #[cfg(not(feature = "no_object"))]
+            Expr::Dot(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Index, Expr::Dot),
+            _ => return,
+        },
+        #[cfg(not(feature = "no_object"))]
+        Expr::Dot(mut x, opt, pos) => match x.lhs.take() {
+            #[cfg(not(feature = "no_index"))]
+            Expr::Index(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Dot, Expr::Index),
+            Expr::Dot(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Dot, Expr::Index),
+            _ => return,
+        },
+        _ => return,
+    };
+
+    // Find the end of the chain
+    let mut last_node = lhs_x.as_mut();
+    let mut last_options = &mut lhs_options;
+
+    while !last_options.contains(ASTFlags::BREAK) {
+        match last_node.rhs {
+            Expr::Index(ref mut x, ref mut options2, ..) => {
+                last_node = x.as_mut();
+                last_options = options2;
+            }
+            #[cfg(not(feature = "no_object"))]
+            Expr::Dot(ref mut x, ref mut options2, ..) => {
+                last_node = x.as_mut();
+                last_options = options2;
+            }
+            _ => break,
+        }
+    }
+
+    last_options.remove(ASTFlags::BREAK);
+
+    x.lhs = last_node.rhs.take();
+    last_node.rhs = sub(x, options, pos);
+    *expr = root(lhs_x, lhs_options, lhs_pos);
+    state.set_dirty();
+}
+
 /// Optimize an [expression][Expr].
 fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
     // These keywords are handled specially
@@ -922,6 +979,11 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     *expr = Expr::from_dynamic(Dynamic::FALSE, *pos);
                 }
             }
+            #[cfg(not(feature = "no_index"))]
+            // (lhs_lhs[lhs_rhs])[rhs]
+            (Expr::Index(..), ..) => optimize_chain_structure(expr, state),
+            // (lhs_lhs[lhs_rhs]).rhs
+            (Expr::Dot(..), ..) => optimize_chain_structure(expr, state),
             // lhs.rhs
             (lhs, rhs) => { optimize_expr(lhs, state, false); optimize_expr(rhs, state, true); }
         }
@@ -992,6 +1054,11 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             }
             // var[rhs]
             (Expr::Variable(..), rhs) => optimize_expr(rhs, state, true),
+            // (lhs_lhs[lhs_rhs])[rhs]
+            (Expr::Index(..), ..) => optimize_chain_structure(expr, state),
+            // (lhs_lhs[lhs_rhs]).rhs
+            #[cfg(not(feature = "no_object"))]
+            (Expr::Dot(..), ..) => optimize_chain_structure(expr, state),
             // lhs[rhs]
             (lhs, rhs) => { optimize_expr(lhs, state, false); optimize_expr(rhs, state, true); }
         },
