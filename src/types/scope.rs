@@ -12,7 +12,7 @@ use std::{
 };
 
 /// Keep a number of entries inline (since [`Dynamic`] is usually small enough).
-const SCOPE_ENTRIES_INLINED: usize = 8;
+pub const SCOPE_ENTRIES_INLINED: usize = 8;
 
 /// Type containing information about the current scope. Useful for keeping state between
 /// [`Engine`][crate::Engine] evaluation runs.

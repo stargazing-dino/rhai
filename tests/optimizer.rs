@@ -5,15 +5,14 @@ use rhai::{Engine, EvalAltResult, Module, OptimizationLevel, Scope, INT};
 #[test]
 fn test_optimizer() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
-    engine.set_optimization_level(OptimizationLevel::Full);
+    engine.set_optimization_level(OptimizationLevel::Simple);
 
-    #[cfg(not(feature = "no_function"))]
     assert_eq!(
         engine.eval::<INT>(
             "
-                fn foo(x) { print(x); return; }
-                fn foo2(x) { if x > 0 {} return; }
-                42
+                const X = 0;
+                const X = 40 + 2 - 1 + 1;
+                X
             "
         )?,
         42
@@ -201,6 +200,18 @@ fn test_optimizer_full() -> Result<(), Box<EvalAltResult>> {
     let mut scope = Scope::new();
 
     engine.set_optimization_level(OptimizationLevel::Full);
+
+    #[cfg(not(feature = "no_function"))]
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                fn foo(x) { print(x); return; }
+                fn foo2(x) { if x > 0 {} return; }
+                42
+            "
+        )?,
+        42
+    );
 
     engine
         .register_type_with_name::<TestStruct>("TestStruct")

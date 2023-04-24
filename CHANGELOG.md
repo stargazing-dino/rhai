@@ -13,6 +13,7 @@ Bug fixes
 * Re-optimizing an AST via `optimize_ast` with constants now works correctly for closures. Previously the hidden `Share` nodes are not removed and causes variable-not-found errors during runtime if the constants are not available in the scope.
 * Expressions such as `(v[0].func()).prop` now parse correctly.
 * Shadowed variable exports are now handled correctly.
+* Shadowed constant definitions are now optimized correctly when propagated (e.g. `const X = 1; const X = 1 + 1 + 1; X` now evaluates to 3 instead of 0).
 
 New features
 ------------

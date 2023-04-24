@@ -14,10 +14,12 @@ use crate::func::builtin::get_builtin_binary_op_fn;
 use crate::func::hashing::get_hasher;
 use crate::module::ModuleFlags;
 use crate::tokenizer::Token;
+use crate::types::scope::SCOPE_ENTRIES_INLINED;
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnPtr, ImmutableString, Position, Scope,
-    StaticVec, AST,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString, Position,
+    Scope, AST,
 };
+use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -52,12 +54,12 @@ impl Default for OptimizationLevel {
 #[derive(Debug, Clone)]
 struct OptimizerState<'a> {
     /// Has the [`AST`] been changed during this pass?
-    changed: bool,
-    /// Collection of variables/constants to use for eager function evaluations.
-    variables: StaticVec<(ImmutableString, Option<Dynamic>)>,
+    is_dirty: bool,
+    /// Stack of variables/constants for constants propagation.
+    variables: SmallVec<[(ImmutableString, Option<Dynamic>); SCOPE_ENTRIES_INLINED]>,
     /// Activate constants propagation?
     propagate_constants: bool,
-    /// An [`Engine`] instance for eager function evaluation.
+    /// [`Engine`] instance for eager function evaluation.
     engine: &'a Engine,
     /// The global runtime state.
     global: GlobalRuntimeState,
@@ -84,8 +86,8 @@ impl<'a> OptimizerState<'a> {
         }
 
         Self {
-            changed: false,
-            variables: StaticVec::new_const(),
+            is_dirty: false,
+            variables: SmallVec::new_const(),
             propagate_constants: true,
             engine,
             global: _global,
@@ -96,48 +98,42 @@ impl<'a> OptimizerState<'a> {
     /// Set the [`AST`] state to be dirty (i.e. changed).
     #[inline(always)]
     pub fn set_dirty(&mut self) {
-        self.changed = true;
+        self.is_dirty = true;
     }
     /// Set the [`AST`] state to be not dirty (i.e. unchanged).
     #[inline(always)]
     pub fn clear_dirty(&mut self) {
-        self.changed = false;
+        self.is_dirty = false;
     }
     /// Is the [`AST`] dirty (i.e. changed)?
     #[inline(always)]
     pub const fn is_dirty(&self) -> bool {
-        self.changed
+        self.is_dirty
     }
-    /// Prune the list of constants back to a specified size.
+    /// Rewind the variables stack back to a specified size.
     #[inline(always)]
-    pub fn restore_var(&mut self, len: usize) {
+    pub fn rewind_var(&mut self, len: usize) {
         self.variables.truncate(len);
     }
-    /// Add a new variable to the list.
+    /// Add a new variable to the stack.
     ///
-    /// `Some(value)` if constant, `None` or otherwise.
+    /// `Some(value)` if literal constant (which can be used for constants propagation), `None` otherwise.
     #[inline(always)]
     pub fn push_var(&mut self, name: ImmutableString, value: Option<Dynamic>) {
         self.variables.push((name, value));
     }
-    /// Look up a constant from the list.
+    /// Look up a literal constant from the variables stack.
     #[inline]
-    pub fn find_constant(&self, name: &str) -> Option<&Dynamic> {
-        if !self.propagate_constants {
-            return None;
-        }
-
-        for (n, value) in self.variables.iter().rev() {
-            if n.as_str() == name {
-                return value.as_ref();
-            }
-        }
-
-        None
+    pub fn find_literal_constant(&self, name: &str) -> Option<&Dynamic> {
+        self.variables
+            .iter()
+            .rev()
+            .find(|(n, _)| n.as_str() == name)
+            .and_then(|(_, value)| value.as_ref())
     }
     /// Call a registered function
     #[inline]
-    pub fn call_fn_with_constant_arguments(
+    pub fn call_fn_with_const_args(
         &mut self,
         fn_name: &str,
         op_token: Option<&Token>,
@@ -150,7 +146,7 @@ impl<'a> OptimizerState<'a> {
                 fn_name,
                 op_token,
                 calc_fn_hash(None, fn_name, arg_values.len()),
-                &mut arg_values.iter_mut().collect::<StaticVec<_>>(),
+                &mut arg_values.iter_mut().collect::<FnArgsVec<_>>(),
                 false,
                 Position::NONE,
             )
@@ -225,19 +221,16 @@ fn optimize_stmt_block(
         statements.iter_mut().for_each(|stmt| {
             match stmt {
                 Stmt::Var(x, options, ..) => {
-                    if options.contains(ASTFlags::CONSTANT) {
-                        // Add constant literals into the state
-                        optimize_expr(&mut x.1, state, false);
+                    optimize_expr(&mut x.1, state, false);
 
-                        if x.1.is_constant() {
-                            state
-                                .push_var(x.0.name.clone(), Some(x.1.get_literal_value().unwrap()));
-                        }
+                    let value = if options.contains(ASTFlags::CONSTANT) && x.1.is_constant() {
+                        // constant literal
+                        Some(x.1.get_literal_value().unwrap())
                     } else {
-                        // Add variables into the state
-                        optimize_expr(&mut x.1, state, false);
-                        state.push_var(x.0.name.clone(), None);
-                    }
+                        // variable
+                        None
+                    };
+                    state.push_var(x.0.name.clone(), value);
                 }
                 // Optimize the statement
                 _ => optimize_stmt(stmt, state, preserve_result),
@@ -371,7 +364,7 @@ fn optimize_stmt_block(
         }
 
         // Pop the stack and remove all the local constants
-        state.restore_var(orig_constants_len);
+        state.rewind_var(orig_constants_len);
         state.propagate_constants = orig_propagate_constants;
 
         if !state.is_dirty() {
@@ -845,10 +838,14 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         // Share constants
         #[cfg(not(feature = "no_closure"))]
         Stmt::Share(x) => {
-            let len = x.len();
-            x.retain(|(v, _)| !state.find_constant(v).is_some());
-            if x.len() != len {
-                state.set_dirty();
+            let orig_len = x.len();
+
+            if state.propagate_constants {
+                x.retain(|(v, _)| state.find_literal_constant(v).is_none());
+
+                if x.len() != orig_len {
+                    state.set_dirty();
+                }
             }
         }
 
@@ -1141,8 +1138,8 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 && state.optimization_level == OptimizationLevel::Simple // simple optimizations
                 && x.constant_args() // all arguments are constants
         => {
-            let arg_values = &mut x.args.iter().map(|arg_expr| arg_expr.get_literal_value().unwrap()).collect::<StaticVec<_>>();
-            let arg_types: StaticVec<_> = arg_values.iter().map(Dynamic::type_id).collect();
+            let arg_values = &mut x.args.iter().map(|arg_expr| arg_expr.get_literal_value().unwrap()).collect::<FnArgsVec<_>>();
+            let arg_types = arg_values.iter().map(Dynamic::type_id).collect::<FnArgsVec<_>>();
 
             match x.name.as_str() {
                 KEYWORD_TYPE_OF if arg_values.len() == 1 => {
@@ -1204,13 +1201,13 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             let has_script_fn = false;
 
             if !has_script_fn {
-                let arg_values = &mut x.args.iter().map(Expr::get_literal_value).collect::<Option<StaticVec<_>>>().unwrap();
+                let arg_values = &mut x.args.iter().map(Expr::get_literal_value).collect::<Option<FnArgsVec<_>>>().unwrap();
 
                 let result = match x.name.as_str() {
                     KEYWORD_TYPE_OF if arg_values.len() == 1 => Some(state.engine.map_type_name(arg_values[0].type_name()).into()),
                     #[cfg(not(feature = "no_closure"))]
                     crate::engine::KEYWORD_IS_SHARED if arg_values.len() == 1 => Some(Dynamic::FALSE),
-                    _ => state.call_fn_with_constant_arguments(&x.name, x.op_token.as_ref(), arg_values)
+                    _ => state.call_fn_with_const_args(&x.name, x.op_token.as_ref(), arg_values)
                 };
 
                 if let Some(r) = result {
@@ -1246,9 +1243,9 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         // constant-name
         #[cfg(not(feature = "no_module"))]
         Expr::Variable(x, ..) if !x.1.is_empty() => (),
-        Expr::Variable(x, .., pos) if state.find_constant(&x.3).is_some() => {
+        Expr::Variable(x, .., pos) if state.propagate_constants && state.find_literal_constant(&x.3).is_some() => {
             // Replace constant with value
-            *expr = Expr::from_dynamic(state.find_constant(&x.3).unwrap().clone(), *pos);
+            *expr = Expr::from_dynamic(state.find_literal_constant(&x.3).unwrap().clone(), *pos);
             state.set_dirty();
         }
 
@@ -1341,7 +1338,7 @@ impl Engine {
         &self,
         scope: Option<&Scope>,
         statements: StmtBlockContainer,
-        #[cfg(not(feature = "no_function"))] functions: StaticVec<
+        #[cfg(not(feature = "no_function"))] functions: crate::StaticVec<
             crate::Shared<crate::ast::ScriptFnDef>,
         >,
         optimization_level: OptimizationLevel,
