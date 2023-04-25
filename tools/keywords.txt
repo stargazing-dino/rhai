@@ -42,7 +42,7 @@ struct keyword;
 ::,         Token::DoubleColon
 =>,         Token::DoubleArrow
 _,          Token::Underscore
-,,          Token::Comma
+",",        Token::Comma
 .,          Token::Period
 ?.,         Token::Elvis
 ??,         Token::DoubleQuestion
@@ -94,8 +94,8 @@ catch,      Token::Catch
 <<,         Token::LeftShift
 >>,         Token::RightShift
 ^,          Token::XOr
-%,          Token::Modulo
-%=,         Token::ModuloAssign
+"%",        Token::Modulo
+"%=",       Token::ModuloAssign
 **,         Token::PowerOf
 **=,        Token::PowerOfAssign
 fn,         Token::Fn
