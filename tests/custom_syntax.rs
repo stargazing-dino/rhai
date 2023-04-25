@@ -252,6 +252,65 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
 }
 
 #[test]
+fn test_custom_syntax_scope() -> Result<(), Box<EvalAltResult>> {
+    let mut engine = Engine::new();
+
+    engine.register_custom_syntax(
+        [
+            "with", "offset", "(", "$expr$", ",", "$expr$", ")", "$block$",
+        ],
+        true,
+        |context, inputs| {
+            let x = context
+                .eval_expression_tree(&inputs[0])?
+                .as_int()
+                .map_err(|typ| {
+                    Box::new(EvalAltResult::ErrorMismatchDataType(
+                        "integer".to_string(),
+                        typ.to_string(),
+                        inputs[0].position(),
+                    ))
+                })?;
+
+            let y = context
+                .eval_expression_tree(&inputs[1])?
+                .as_int()
+                .map_err(|typ| {
+                    Box::new(EvalAltResult::ErrorMismatchDataType(
+                        "integer".to_string(),
+                        typ.to_string(),
+                        inputs[1].position(),
+                    ))
+                })?;
+
+            let orig_len = context.scope().len();
+
+            context.scope_mut().push_constant("x", x);
+            context.scope_mut().push_constant("y", y);
+
+            let result = context.eval_expression_tree(&inputs[2]);
+
+            context.scope_mut().rewind(orig_len);
+
+            result
+        },
+    )?;
+
+    assert_eq!(
+        engine.eval::<INT>(
+            "
+                let y = 1;
+                let x = 0;
+                with offset(44, 2) { x - y }
+            "
+        )?,
+        42
+    );
+
+    Ok(())
+}
+
+#[test]
 fn test_custom_syntax_matrix() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
 

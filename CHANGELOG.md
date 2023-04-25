@@ -14,6 +14,7 @@ Bug fixes
 * Expressions such as `(v[0].func()).prop` now parse correctly.
 * Shadowed variable exports are now handled correctly.
 * Shadowed constant definitions are now optimized correctly when propagated (e.g. `const X = 1; const X = 1 + 1 + 1; X` now evaluates to 3 instead of 0).
+* Identifiers and comma's in the middle of custom syntax now register correctly.
 
 New features
 ------------
