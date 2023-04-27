@@ -768,51 +768,55 @@ impl Engine {
 
                 // Linked to scripted function?
                 #[cfg(not(feature = "no_function"))]
-                if let Some(fn_def) = fn_ptr.fn_def() {
-                    if fn_def.params.len() == args.len() {
-                        return self
-                            .call_script_fn(
-                                global,
-                                caches,
-                                &mut Scope::new(),
-                                None,
-                                fn_ptr.encapsulated_environ(),
-                                fn_def,
-                                args,
-                                true,
-                                fn_call_pos,
-                            )
-                            .map(|v| (v, false));
+                let fn_def = fn_ptr.fn_def();
+                #[cfg(feature = "no_function")]
+                let fn_def = ();
+
+                match fn_def {
+                    #[cfg(not(feature = "no_function"))]
+                    Some(fn_def) if fn_def.params.len() == args.len() => self
+                        .call_script_fn(
+                            global,
+                            caches,
+                            &mut Scope::new(),
+                            None,
+                            fn_ptr.encapsulated_environ().map(|r| r.as_ref()),
+                            fn_def,
+                            args,
+                            true,
+                            fn_call_pos,
+                        )
+                        .map(|v| (v, false)),
+                    _ => {
+                        #[cfg(not(feature = "no_function"))]
+                        let is_anon = fn_ptr.is_anonymous();
+                        #[cfg(feature = "no_function")]
+                        let is_anon = false;
+
+                        // Redirect function name
+                        let fn_name = fn_ptr.fn_name();
+                        // Recalculate hashes
+                        let new_hash = if !is_anon && !is_valid_function_name(fn_name) {
+                            FnCallHashes::from_native_only(calc_fn_hash(None, fn_name, args.len()))
+                        } else {
+                            FnCallHashes::from_hash(calc_fn_hash(None, fn_name, args.len()))
+                        };
+
+                        // Map it to name(args) in function-call style
+                        self.exec_fn_call(
+                            global,
+                            caches,
+                            None,
+                            fn_name,
+                            None,
+                            new_hash,
+                            args,
+                            false,
+                            false,
+                            fn_call_pos,
+                        )
                     }
                 }
-
-                #[cfg(not(feature = "no_function"))]
-                let is_anon = fn_ptr.is_anonymous();
-                #[cfg(feature = "no_function")]
-                let is_anon = false;
-
-                // Redirect function name
-                let fn_name = fn_ptr.fn_name();
-                // Recalculate hashes
-                let new_hash = if !is_anon && !is_valid_function_name(fn_name) {
-                    FnCallHashes::from_native_only(calc_fn_hash(None, fn_name, args.len()))
-                } else {
-                    FnCallHashes::from_hash(calc_fn_hash(None, fn_name, args.len()))
-                };
-
-                // Map it to name(args) in function-call style
-                self.exec_fn_call(
-                    global,
-                    caches,
-                    None,
-                    fn_name,
-                    None,
-                    new_hash,
-                    args,
-                    false,
-                    false,
-                    fn_call_pos,
-                )
             }
 
             // Handle obj.call(fn_ptr, ...)
@@ -833,16 +837,27 @@ impl Engine {
                 // FnPtr call on object
                 let fn_ptr = call_args[0].take().cast::<FnPtr>();
 
-                #[cfg(not(feature = "no_function"))]
                 let (fn_name, is_anon, fn_curry, _environ, fn_def) = {
+                    #[cfg(not(feature = "no_function"))]
                     let is_anon = fn_ptr.is_anonymous();
+                    #[cfg(feature = "no_function")]
+                    let is_anon = false;
+
+                    #[cfg(not(feature = "no_function"))]
                     let (fn_name, fn_curry, environ, fn_def) = fn_ptr.take_data();
-                    (fn_name, is_anon, fn_curry, environ, fn_def)
-                };
-                #[cfg(feature = "no_function")]
-                let (fn_name, is_anon, fn_curry, _environ) = {
+                    #[cfg(feature = "no_function")]
                     let (fn_name, fn_curry, environ) = fn_ptr.take_data();
-                    (fn_name, false, fn_curry, environ)
+
+                    (
+                        fn_name,
+                        is_anon,
+                        fn_curry,
+                        environ,
+                        #[cfg(not(feature = "no_function"))]
+                        fn_def,
+                        #[cfg(feature = "no_function")]
+                        (),
+                    )
                 };
 
                 // Replace the first argument with the object pointer, adding the curried arguments
@@ -855,59 +870,67 @@ impl Engine {
                 args.extend(call_args.iter_mut());
 
                 // Linked to scripted function?
-                #[cfg(not(feature = "no_function"))]
-                if let Some(fn_def) = fn_def {
-                    if fn_def.params.len() == args.len() {
+                match fn_def {
+                    #[cfg(not(feature = "no_function"))]
+                    Some(fn_def) if fn_def.params.len() == args.len() => {
                         // Check for data race.
                         #[cfg(not(feature = "no_closure"))]
                         ensure_no_data_race(&fn_def.name, args, false)?;
 
-                        return self
-                            .call_script_fn(
-                                global,
-                                caches,
-                                &mut Scope::new(),
-                                Some(target),
-                                _environ.as_deref(),
-                                &fn_def,
-                                args,
-                                true,
-                                fn_call_pos,
-                            )
-                            .map(|v| (v, false));
+                        self.call_script_fn(
+                            global,
+                            caches,
+                            &mut Scope::new(),
+                            Some(target),
+                            _environ.as_deref(),
+                            &fn_def,
+                            args,
+                            true,
+                            fn_call_pos,
+                        )
+                        .map(|v| (v, false))
+                    }
+                    _ => {
+                        // Add the first argument with the object pointer
+                        args.insert(0, target.as_mut());
+
+                        // Recalculate hash
+                        let new_hash = match is_anon {
+                            false if !is_valid_function_name(&fn_name) => {
+                                FnCallHashes::from_native_only(calc_fn_hash(
+                                    None,
+                                    &fn_name,
+                                    args.len(),
+                                ))
+                            }
+                            #[cfg(not(feature = "no_function"))]
+                            _ => FnCallHashes::from_script_and_native(
+                                calc_fn_hash(None, &fn_name, args.len() - 1),
+                                calc_fn_hash(None, &fn_name, args.len()),
+                            ),
+                            #[cfg(feature = "no_function")]
+                            _ => FnCallHashes::from_native_only(calc_fn_hash(
+                                None,
+                                &fn_name,
+                                args.len(),
+                            )),
+                        };
+
+                        // Map it to name(args) in function-call style
+                        self.exec_fn_call(
+                            global,
+                            caches,
+                            None,
+                            &fn_name,
+                            None,
+                            new_hash,
+                            args,
+                            is_ref_mut,
+                            true,
+                            fn_call_pos,
+                        )
                     }
                 }
-
-                // Add the first argument with the object pointer
-                args.insert(0, target.as_mut());
-
-                // Recalculate hash
-                let new_hash = match is_anon {
-                    false if !is_valid_function_name(&fn_name) => {
-                        FnCallHashes::from_native_only(calc_fn_hash(None, &fn_name, args.len()))
-                    }
-                    #[cfg(not(feature = "no_function"))]
-                    _ => FnCallHashes::from_script_and_native(
-                        calc_fn_hash(None, &fn_name, args.len() - 1),
-                        calc_fn_hash(None, &fn_name, args.len()),
-                    ),
-                    #[cfg(feature = "no_function")]
-                    _ => FnCallHashes::from_native_only(calc_fn_hash(None, &fn_name, args.len())),
-                };
-
-                // Map it to name(args) in function-call style
-                self.exec_fn_call(
-                    global,
-                    caches,
-                    None,
-                    &fn_name,
-                    None,
-                    new_hash,
-                    args,
-                    is_ref_mut,
-                    true,
-                    fn_call_pos,
-                )
             }
             KEYWORD_FN_PTR_CURRY => {
                 if !target.is_fnptr() {
@@ -936,19 +959,16 @@ impl Engine {
             _ => {
                 let mut fn_name = fn_name;
                 let _redirected;
+                let mut _linked = None;
                 let mut _arg_values: FnArgsVec<_>;
                 let mut call_args = call_args;
 
                 // Check if it is a map method call in OOP style
+
                 #[cfg(not(feature = "no_object"))]
                 if let Some(map) = target.read_lock::<crate::Map>() {
                     if let Some(val) = map.get(fn_name) {
                         if let Some(fn_ptr) = val.read_lock::<FnPtr>() {
-                            #[cfg(not(feature = "no_function"))]
-                            let is_anon = fn_ptr.is_anonymous();
-                            #[cfg(feature = "no_function")]
-                            let is_anon = false;
-
                             // Remap the function name
                             _redirected = fn_ptr.fn_name_raw().clone();
                             fn_name = &_redirected;
@@ -962,45 +982,90 @@ impl Engine {
                                     .collect();
                                 call_args = &mut _arg_values;
                             }
-                            // Recalculate the hash based on the new function name and new arguments
-                            let args_len = call_args.len() + 1;
-                            hash = match is_anon {
-                                false if !is_valid_function_name(fn_name) => {
-                                    FnCallHashes::from_native_only(calc_fn_hash(
-                                        None, fn_name, args_len,
+
+                            // Linked to scripted function?
+                            #[cfg(not(feature = "no_function"))]
+                            let fn_def = fn_ptr.fn_def();
+                            #[cfg(feature = "no_function")]
+                            let fn_def = ();
+
+                            match fn_def {
+                                #[cfg(not(feature = "no_function"))]
+                                Some(fn_def) if fn_def.params.len() == call_args.len() => {
+                                    _linked = Some((
+                                        fn_def.clone(),
+                                        fn_ptr.encapsulated_environ().cloned(),
                                     ))
                                 }
-                                #[cfg(not(feature = "no_function"))]
-                                _ => FnCallHashes::from_script_and_native(
-                                    calc_fn_hash(None, fn_name, args_len - 1),
-                                    calc_fn_hash(None, fn_name, args_len),
-                                ),
-                                #[cfg(feature = "no_function")]
-                                _ => FnCallHashes::from_native_only(calc_fn_hash(
-                                    None, fn_name, args_len,
-                                )),
-                            };
+                                _ => {
+                                    #[cfg(not(feature = "no_function"))]
+                                    let is_anon = fn_ptr.is_anonymous();
+                                    #[cfg(feature = "no_function")]
+                                    let is_anon = false;
+
+                                    // Recalculate the hash based on the new function name and new arguments
+                                    let args_len = call_args.len() + 1;
+                                    hash = match is_anon {
+                                        false if !is_valid_function_name(fn_name) => {
+                                            FnCallHashes::from_native_only(calc_fn_hash(
+                                                None, fn_name, args_len,
+                                            ))
+                                        }
+                                        #[cfg(not(feature = "no_function"))]
+                                        _ => FnCallHashes::from_script_and_native(
+                                            calc_fn_hash(None, fn_name, args_len - 1),
+                                            calc_fn_hash(None, fn_name, args_len),
+                                        ),
+                                        #[cfg(feature = "no_function")]
+                                        _ => FnCallHashes::from_native_only(calc_fn_hash(
+                                            None, fn_name, args_len,
+                                        )),
+                                    };
+                                }
+                            }
                         }
                     }
-                };
+                }
 
-                // Attached object pointer in front of the arguments
-                let mut args = FnArgsVec::with_capacity(call_args.len() + 1);
-                args.push(target.as_mut());
-                args.extend(call_args.iter_mut());
+                match _linked {
+                    #[cfg(not(feature = "no_function"))]
+                    Some((fn_def, environ)) => {
+                        // Linked to scripted function
+                        self.call_script_fn(
+                            global,
+                            caches,
+                            &mut Scope::new(),
+                            Some(target),
+                            environ.as_deref(),
+                            &*fn_def,
+                            &mut call_args.iter_mut().collect::<FnArgsVec<_>>(),
+                            true,
+                            fn_call_pos,
+                        )
+                        .map(|v| (v, false))
+                    }
+                    #[cfg(feature = "no_function")]
+                    Some(()) => unreachable!(),
+                    None => {
+                        // Attached object pointer in front of the arguments
+                        let mut args = FnArgsVec::with_capacity(call_args.len() + 1);
+                        args.push(target.as_mut());
+                        args.extend(call_args.iter_mut());
 
-                self.exec_fn_call(
-                    global,
-                    caches,
-                    None,
-                    fn_name,
-                    None,
-                    hash,
-                    &mut args,
-                    is_ref_mut,
-                    true,
-                    fn_call_pos,
-                )
+                        self.exec_fn_call(
+                            global,
+                            caches,
+                            None,
+                            fn_name,
+                            None,
+                            hash,
+                            &mut args,
+                            is_ref_mut,
+                            true,
+                            fn_call_pos,
+                        )
+                    }
+                }
             }
         }?;
 

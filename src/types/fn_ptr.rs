@@ -313,7 +313,7 @@ impl FnPtr {
                     caches,
                     &mut crate::Scope::new(),
                     this_ptr,
-                    self.encapsulated_environ(),
+                    self.encapsulated_environ().map(|r| r.as_ref()),
                     fn_def,
                     args,
                     true,
@@ -334,8 +334,8 @@ impl FnPtr {
     #[inline(always)]
     #[must_use]
     #[allow(dead_code)]
-    pub(crate) fn encapsulated_environ(&self) -> Option<&EncapsulatedEnviron> {
-        self.environ.as_deref()
+    pub(crate) fn encapsulated_environ(&self) -> Option<&Shared<EncapsulatedEnviron>> {
+        self.environ.as_ref()
     }
     /// Set a reference to the [encapsulated environment][EncapsulatedEnviron].
     #[inline(always)]
@@ -350,8 +350,8 @@ impl FnPtr {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn fn_def(&self) -> Option<&crate::ast::ScriptFnDef> {
-        self.fn_def.as_deref()
+    pub(crate) fn fn_def(&self) -> Option<&Shared<crate::ast::ScriptFnDef>> {
+        self.fn_def.as_ref()
     }
     /// Set a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
     #[cfg(not(feature = "no_function"))]

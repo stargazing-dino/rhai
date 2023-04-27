@@ -15,6 +15,7 @@ Bug fixes
 * Shadowed variable exports are now handled correctly.
 * Shadowed constant definitions are now optimized correctly when propagated (e.g. `const X = 1; const X = 1 + 1 + 1; X` now evaluates to 3 instead of 0).
 * Identifiers and comma's in the middle of custom syntax now register correctly.
+* Exporting an object map from a module with closures defined on properties now works correctly when those properties are called to mimic method calls in OOP-style.
 
 New features
 ------------
