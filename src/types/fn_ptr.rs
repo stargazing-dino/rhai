@@ -49,16 +49,19 @@ impl fmt::Debug for FnPtr {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_curried() {
-            self.curry
-                .iter()
-                .fold(f.debug_tuple("Fn").field(&self.name), |f, curry| {
-                    f.field(curry)
-                })
-                .finish()
-        } else {
-            write!(f, "Fn({})", self.fn_name())
+        let ff = &mut f.debug_tuple("Fn");
+        ff.field(&self.name);
+        self.curry.iter().for_each(|curry| {
+            ff.field(curry);
+        });
+        ff.finish()?;
+
+        #[cfg(not(feature = "no_function"))]
+        if let Some(ref fn_def) = self.fn_def {
+            write!(f, ": {fn_def}")?;
         }
+
+        Ok(())
     }
 }
 
