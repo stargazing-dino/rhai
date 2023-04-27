@@ -49,16 +49,19 @@ impl fmt::Debug for FnPtr {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_curried() {
-            self.curry
-                .iter()
-                .fold(f.debug_tuple("Fn").field(&self.name), |f, curry| {
-                    f.field(curry)
-                })
-                .finish()
-        } else {
-            write!(f, "Fn({})", self.fn_name())
+        let ff = &mut f.debug_tuple("Fn");
+        ff.field(&self.name);
+        self.curry.iter().for_each(|curry| {
+            ff.field(curry);
+        });
+        ff.finish()?;
+
+        #[cfg(not(feature = "no_function"))]
+        if let Some(ref fn_def) = self.fn_def {
+            write!(f, ": {fn_def}")?;
         }
+
+        Ok(())
     }
 }
 
@@ -310,7 +313,7 @@ impl FnPtr {
                     caches,
                     &mut crate::Scope::new(),
                     this_ptr,
-                    self.encapsulated_environ(),
+                    self.encapsulated_environ().map(|r| r.as_ref()),
                     fn_def,
                     args,
                     true,
@@ -331,8 +334,8 @@ impl FnPtr {
     #[inline(always)]
     #[must_use]
     #[allow(dead_code)]
-    pub(crate) fn encapsulated_environ(&self) -> Option<&EncapsulatedEnviron> {
-        self.environ.as_deref()
+    pub(crate) fn encapsulated_environ(&self) -> Option<&Shared<EncapsulatedEnviron>> {
+        self.environ.as_ref()
     }
     /// Set a reference to the [encapsulated environment][EncapsulatedEnviron].
     #[inline(always)]
@@ -347,8 +350,8 @@ impl FnPtr {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn fn_def(&self) -> Option<&crate::ast::ScriptFnDef> {
-        self.fn_def.as_deref()
+    pub(crate) fn fn_def(&self) -> Option<&Shared<crate::ast::ScriptFnDef>> {
+        self.fn_def.as_ref()
     }
     /// Set a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
     #[cfg(not(feature = "no_function"))]

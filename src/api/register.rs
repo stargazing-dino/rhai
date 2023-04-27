@@ -124,7 +124,7 @@ impl Engine {
     ///
     /// To access a primary argument value (i.e. cloning is cheap), use: `args[n].as_xxx().unwrap()`
     ///
-    /// To access an argument value and avoid cloning, use `std::mem::take(args[n]).cast::<T>()`.
+    /// To access an argument value and avoid cloning, use `args[n].take().cast::<T>()`.
     /// Notice that this will _consume_ the argument, replacing it with `()`.
     ///
     /// To access the first mutable parameter, use `args.get_mut(0).unwrap()`

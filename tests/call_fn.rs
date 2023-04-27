@@ -175,7 +175,7 @@ fn test_fn_ptr_raw() -> Result<(), Box<EvalAltResult>> {
                 TypeId::of::<INT>(),
             ],
             move |context, args| {
-                let fp = std::mem::take(args[1]).cast::<FnPtr>();
+                let fp = args[1].take().cast::<FnPtr>();
                 let value = args[2].clone();
                 let this_ptr = args.get_mut(0).unwrap();
 

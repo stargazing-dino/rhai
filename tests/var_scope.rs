@@ -1,4 +1,4 @@
-use rhai::{Dynamic, Engine, EvalAltResult, ParseErrorType, Position, Scope, INT};
+use rhai::{Dynamic, Engine, EvalAltResult, Module, ParseErrorType, Position, Scope, INT};
 
 #[test]
 fn test_var_scope() -> Result<(), Box<EvalAltResult>> {
@@ -89,6 +89,41 @@ fn test_var_scope() -> Result<(), Box<EvalAltResult>> {
 
     assert_eq!(scope2.is_constant("x"), Some(true));
     assert_eq!(scope3.is_constant("x"), Some(true));
+
+    Ok(())
+}
+
+#[cfg(not(feature = "no_module"))]
+#[test]
+fn test_var_scope_alias() -> Result<(), Box<EvalAltResult>> {
+    let engine = Engine::new();
+    let mut scope = Scope::new();
+
+    scope.push("x", 42 as INT);
+    scope.set_alias("x", "a");
+    scope.set_alias("x", "b");
+    scope.set_alias("x", "y");
+    scope.push("x", 123 as INT);
+    scope.set_alias("x", "b");
+    scope.set_alias("x", "c");
+
+    let ast = engine.compile(
+        "
+            let x = 999;
+            export x as a;
+            export x as c;
+            let x = 0;
+            export x as z;
+        ",
+    )?;
+
+    let m = Module::eval_ast_as_new(scope, &ast, &engine)?;
+
+    assert_eq!(m.get_var_value::<INT>("a").unwrap(), 999);
+    assert_eq!(m.get_var_value::<INT>("b").unwrap(), 123);
+    assert_eq!(m.get_var_value::<INT>("c").unwrap(), 999);
+    assert_eq!(m.get_var_value::<INT>("y").unwrap(), 42);
+    assert_eq!(m.get_var_value::<INT>("z").unwrap(), 0);
 
     Ok(())
 }

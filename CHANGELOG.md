@@ -6,18 +6,23 @@ Version 1.14.0
 
 The code hacks that attempt to optimize branch prediction performance are removed because benchmarks do not show any material speed improvements.
 
-Buf fixes
+Bug fixes
 ----------
 
 * `is_shared` is a reserved keyword and is now handled properly (e.g. it cannot be the target of a function pointer).
 * Re-optimizing an AST via `optimize_ast` with constants now works correctly for closures. Previously the hidden `Share` nodes are not removed and causes variable-not-found errors during runtime if the constants are not available in the scope.
 * Expressions such as `(v[0].func()).prop` now parse correctly.
+* Shadowed variable exports are now handled correctly.
+* Shadowed constant definitions are now optimized correctly when propagated (e.g. `const X = 1; const X = 1 + 1 + 1; X` now evaluates to 3 instead of 0).
+* Identifiers and comma's in the middle of custom syntax now register correctly.
+* Exporting an object map from a module with closures defined on properties now works correctly when those properties are called to mimic method calls in OOP-style.
 
 New features
 ------------
 
 * It is now possible to require a specific _type_ to the `this` pointer for a particular script-defined function so that it is called only when the `this` pointer contains the specified type.
 * `is_def_fn` is extended to support checking for typed methods, with syntax `is_def_fn(this_type, fn_name, arity)`
+* `Dynamic::take` is added as a short-cut for `std::mem::take(&mut value)`.
 
 Enhancements
 ------------

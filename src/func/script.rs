@@ -67,7 +67,7 @@ impl Engine {
         // Put arguments into scope as variables
         scope.extend(fn_def.params.iter().cloned().zip(args.iter_mut().map(|v| {
             // Actually consume the arguments instead of cloning them
-            mem::take(*v)
+            v.take()
         })));
 
         // Push a new call stack frame

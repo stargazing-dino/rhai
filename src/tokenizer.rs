@@ -472,7 +472,7 @@ static KEYWORDS_LIST: [(&str, Token); 153] = [
     ("", Token::EOF),
     ("", Token::EOF),
     ("", Token::EOF),
-    (",Token::", Token::Comma),
+    (",", Token::Comma),
     ("do", Token::Do),
     ("", Token::EOF),
     ("", Token::EOF),

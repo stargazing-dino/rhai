@@ -55,7 +55,7 @@ pub struct ParseState<'e, 's> {
     /// Global runtime state.
     pub global: Option<Box<GlobalRuntimeState>>,
     /// Encapsulates a local stack with variable names to simulate an actual runtime scope.
-    pub stack: Option<Box<Scope<'e>>>,
+    pub stack: Option<Scope<'e>>,
     /// Size of the local variables stack upon entry of the current block scope.
     pub block_stack_len: usize,
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
@@ -143,7 +143,7 @@ impl<'e, 's> ParseState<'e, 's> {
 
         let index = self
             .stack
-            .as_deref()
+            .as_ref()
             .into_iter()
             .flat_map(Scope::iter_rev_raw)
             .enumerate()
@@ -537,6 +537,82 @@ fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position
         // Not a variable name
         (.., pos) => Err(PERR::VariableExpected.into_err(pos)),
     }
+}
+
+/// Optimize the structure of a chained expression where the root expression is another chained expression.
+///
+/// # Panics
+///
+/// Panics if the expression is not a combo chain.
+#[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+fn optimize_combo_chain(expr: &mut Expr) {
+    let (mut x, x_options, x_pos, mut root, mut root_options, root_pos, make_sub, make_root): (
+        _,
+        _,
+        _,
+        _,
+        _,
+        _,
+        fn(_, _, _) -> Expr,
+        fn(_, _, _) -> Expr,
+    ) = match expr.take() {
+        #[cfg(not(feature = "no_index"))]
+        Expr::Index(mut x, opt, pos) => match x.lhs.take() {
+            Expr::Index(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Index, Expr::Index),
+            #[cfg(not(feature = "no_object"))]
+            Expr::Dot(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Index, Expr::Dot),
+            _ => panic!("combo chain expected"),
+        },
+        #[cfg(not(feature = "no_object"))]
+        Expr::Dot(mut x, opt, pos) => match x.lhs.take() {
+            #[cfg(not(feature = "no_index"))]
+            Expr::Index(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Dot, Expr::Index),
+            Expr::Dot(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Dot, Expr::Index),
+            _ => panic!("combo chain expected"),
+        },
+        _ => panic!("combo chain expected"),
+    };
+
+    // Rewrite the chains like this:
+    //
+    // Source: ( x[y].prop_a )[z].prop_b
+    //         ^             ^
+    //         parentheses that generated the combo chain
+    //
+    // From: Index( Index( x, Dot(y, prop_a) ), Dot(z, prop_b) )
+    //       ^      ^         ^
+    //       x      root      tail
+    //
+    // To:   Index( x, Dot(y, Index(prop_a, Dot(z, prop_b) ) ) )
+    //
+    // Equivalent to:  x[y].prop_a[z].prop_b
+
+    // Find the end of the root chain.
+    let mut tail = root.as_mut();
+    let mut tail_options = &mut root_options;
+
+    while !tail_options.contains(ASTFlags::BREAK) {
+        match tail.rhs {
+            Expr::Index(ref mut x, ref mut options2, ..) => {
+                tail = x.as_mut();
+                tail_options = options2;
+            }
+            #[cfg(not(feature = "no_object"))]
+            Expr::Dot(ref mut x, ref mut options2, ..) => {
+                tail = x.as_mut();
+                tail_options = options2;
+            }
+            _ => break,
+        }
+    }
+
+    // Since we attach the outer chain to the root chain, we no longer terminate at the end of the
+    // root chain, so remove the ASTFlags::BREAK flag.
+    tail_options.remove(ASTFlags::BREAK);
+
+    x.lhs = tail.rhs.take(); // remove tail and insert it into head of outer chain
+    tail.rhs = make_sub(x, x_options, x_pos); // attach outer chain to tail
+    *expr = make_root(root, root_options, root_pos);
 }
 
 impl Engine {
@@ -1857,6 +1933,13 @@ impl Engine {
             parent_options = ASTFlags::empty();
         }
 
+        // Optimize chain where the root expression is another chain
+        #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+        if matches!(lhs, Expr::Index(ref x, ..) | Expr::Dot(ref x, ..) if matches!(x.lhs, Expr::Index(..) | Expr::Dot(..)))
+        {
+            optimize_combo_chain(&mut lhs)
+        }
+
         // Cache the hash key for namespace-qualified variables
         #[cfg(not(feature = "no_module"))]
         let namespaced_variable = match lhs {
@@ -2890,7 +2973,7 @@ impl Engine {
         settings.flags |= ParseSettingFlags::BREAKABLE;
         let body = self.parse_block(input, state, lib, settings)?.into();
 
-        state.stack.as_deref_mut().unwrap().rewind(prev_stack_len);
+        state.stack.as_mut().unwrap().rewind(prev_stack_len);
 
         let branch = StmtBlock::NONE;
 
@@ -2971,15 +3054,16 @@ impl Engine {
 
         let (existing, hit_barrier) = state.find_var(&name);
 
-        let stack = state.stack.as_deref_mut().unwrap();
+        let stack = state.stack.as_mut().unwrap();
 
         let existing = if !hit_barrier && existing > 0 {
-            let offset = stack.len() - existing;
-            if offset < state.block_stack_len {
+            match stack.len() - existing {
+                // Variable has been aliased
+                #[cfg(not(feature = "no_module"))]
+                offset if !stack.get_entry_by_index(offset).2.is_empty() => None,
                 // Defined in parent block
-                None
-            } else {
-                Some(offset)
+                offset if offset < state.block_stack_len => None,
+                offset => Some(offset),
             }
         } else {
             None
@@ -2992,6 +3076,11 @@ impl Engine {
             stack.push_entry(name.as_str(), access, Dynamic::UNIT);
             None
         };
+
+        #[cfg(not(feature = "no_module"))]
+        if is_export {
+            stack.add_alias_by_index(stack.len() - 1, name.clone());
+        }
 
         let var_def = (Ident { name, pos }, expr, idx).into();
 
@@ -3077,10 +3166,17 @@ impl Engine {
         let (id, id_pos) = parse_var_name(input)?;
 
         let (alias, alias_pos) = if match_token(input, Token::As).0 {
-            parse_var_name(input).map(|(name, pos)| (Some(name), pos))?
+            parse_var_name(input).map(|(name, pos)| (state.get_interned_string(name), pos))?
         } else {
-            (None, Position::NONE)
+            (state.get_interned_string(""), Position::NONE)
         };
+
+        let (existing, hit_barrier) = state.find_var(&id);
+
+        if !hit_barrier && existing > 0 {
+            let stack = state.stack.as_mut().unwrap();
+            stack.add_alias_by_index(stack.len() - existing, alias.clone());
+        }
 
         let export = (
             Ident {
@@ -3088,7 +3184,7 @@ impl Engine {
                 pos: id_pos,
             },
             Ident {
-                name: state.get_interned_string(alias.as_deref().unwrap_or("")),
+                name: alias,
                 pos: alias_pos,
             },
         );
@@ -3137,7 +3233,7 @@ impl Engine {
         }
 
         let prev_entry_stack_len = state.block_stack_len;
-        state.block_stack_len = state.stack.as_deref().map_or(0, Scope::len);
+        state.block_stack_len = state.stack.as_ref().map_or(0, Scope::len);
 
         #[cfg(not(feature = "no_module"))]
         let orig_imports_len = state.imports.as_deref().map_or(0, StaticVec::len);
@@ -3580,7 +3676,7 @@ impl Engine {
             Expr::Unit(catch_var.pos)
         } else {
             // Remove the error variable from the stack
-            state.stack.as_deref_mut().unwrap().pop();
+            state.stack.as_mut().unwrap().pop();
 
             Expr::Variable(
                 (None, Namespace::default(), 0, catch_var.name).into(),

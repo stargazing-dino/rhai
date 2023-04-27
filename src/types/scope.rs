@@ -12,7 +12,7 @@ use std::{
 };
 
 /// Keep a number of entries inline (since [`Dynamic`] is usually small enough).
-const SCOPE_ENTRIES_INLINED: usize = 8;
+pub const SCOPE_ENTRIES_INLINED: usize = 8;
 
 /// Type containing information about the current scope. Useful for keeping state between
 /// [`Engine`][crate::Engine] evaluation runs.
@@ -635,6 +635,24 @@ impl Scope<'_> {
     pub fn get(&self, name: &str) -> Option<&Dynamic> {
         self.search(name).map(|index| &self.values[index])
     }
+    /// Get a reference to an entry in the [`Scope`] based on the index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the index is out of bounds.
+    #[inline(always)]
+    #[must_use]
+    #[allow(dead_code)]
+    pub(crate) fn get_entry_by_index(
+        &mut self,
+        index: usize,
+    ) -> (&Identifier, &Dynamic, &[ImmutableString]) {
+        (
+            &self.names[index],
+            &self.values[index],
+            &self.aliases[index],
+        )
+    }
     /// Remove the last entry in the [`Scope`] by the specified name and return its value.
     ///
     /// If the entry by the specified name is not found, [`None`] is returned.
@@ -670,7 +688,7 @@ impl Scope<'_> {
             self.values.remove(index).try_cast()
         })
     }
-    /// Get a mutable reference to an entry in the [`Scope`].
+    /// Get a mutable reference to the value of an entry in the [`Scope`].
     ///
     /// If the entry by the specified name is not found, or if it is read-only,
     /// [`None`] is returned.
@@ -702,14 +720,14 @@ impl Scope<'_> {
                 AccessMode::ReadOnly => None,
             })
     }
-    /// Get a mutable reference to an entry in the [`Scope`] based on the index.
+    /// Get a mutable reference to the value of an entry in the [`Scope`] based on the index.
     ///
     /// # Panics
     ///
     /// Panics if the index is out of bounds.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn get_mut_by_index(&mut self, index: usize) -> &mut Dynamic {
-        self.values.get_mut(index).unwrap()
+        &mut self.values[index]
     }
     /// Add an alias to an entry in the [`Scope`].
     ///
@@ -728,12 +746,14 @@ impl Scope<'_> {
     /// Add an alias to a variable in the [`Scope`] so that it is exported under that name.
     /// This is an advanced API.
     ///
+    /// Variable aliases are used, for example, in [`Module::eval_ast_as_new`][crate::Module::eval_ast_as_new]
+    /// to create a new module with exported variables under different names.
+    ///
     /// If the alias is empty, then the variable is exported under its original name.
     ///
     /// Multiple aliases can be added to any variable.
     ///
-    /// Only the last variable matching the name (and not other shadowed versions) is aliased by
-    /// this call.
+    /// Only the last variable matching the name (and not other shadowed versions) is aliased by this call.
     #[cfg(not(feature = "no_module"))]
     #[inline]
     pub fn set_alias(

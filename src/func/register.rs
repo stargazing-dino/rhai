@@ -57,12 +57,12 @@ pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
     }
     if TypeId::of::<T>() == TypeId::of::<String>() {
         // If T is `String`, data must be `ImmutableString`, so map directly to it
-        return reify! { mem::take(data).into_string().expect("`ImmutableString`") => T };
+        return reify! { data.take().into_string().expect("`ImmutableString`") => T };
     }
 
     // We consume the argument and then replace it with () - the argument is not supposed to be used again.
     // This way, we avoid having to clone the argument again, because it is already a clone when passed here.
-    mem::take(data).cast::<T>()
+    data.take().cast::<T>()
 }
 
 /// Trait to register custom Rust functions.

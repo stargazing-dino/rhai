@@ -1204,7 +1204,7 @@ impl Module {
     ///
     /// To access a primary argument value (i.e. cloning is cheap), use: `args[n].as_xxx().unwrap()`
     ///
-    /// To access an argument value and avoid cloning, use `std::mem::take(args[n]).cast::<T>()`.
+    /// To access an argument value and avoid cloning, use `args[n].take().cast::<T>()`.
     /// Notice that this will _consume_ the argument, replacing it with `()`.
     ///
     /// To access the first mutable argument, use `args.get_mut(0).unwrap()`
@@ -1227,7 +1227,7 @@ impl Module {
     ///                     // 'args' is guaranteed to be the right length and of the correct types
     ///
     ///                     // Get the second parameter by 'consuming' it
-    ///                     let double = std::mem::take(args[1]).cast::<bool>();
+    ///                     let double = args[1].take().cast::<bool>();
     ///                     // Since it is a primary type, it can also be cheaply copied
     ///                     let double = args[1].clone_cast::<bool>();
     ///                     // Get a mutable reference to the first argument.
@@ -2211,8 +2211,17 @@ impl Module {
         });
 
         // Variables with an alias left in the scope become module variables
-        while scope.len() > orig_scope_len {
-            let (_name, mut value, mut aliases) = scope.pop_entry().expect("not empty");
+        let mut i = scope.len();
+        while i > 0 {
+            i -= 1;
+
+            let (mut value, mut aliases) = if i >= orig_scope_len {
+                let (_, v, a) = scope.pop_entry().expect("not empty");
+                (v, a)
+            } else {
+                let (_, v, a) = scope.get_entry_by_index(i);
+                (v.clone(), a.to_vec())
+            };
 
             value.deep_scan(|v| {
                 if let Some(fn_ptr) = v.downcast_mut::<crate::FnPtr>() {
@@ -2224,15 +2233,28 @@ impl Module {
                 0 => (),
                 1 => {
                     let alias = aliases.pop().unwrap();
-                    module.set_var(alias, value);
+                    if !module.contains_var(&alias) {
+                        module.set_var(alias, value);
+                    }
                 }
                 _ => {
-                    let last_alias = aliases.pop().unwrap();
-                    for alias in aliases {
-                        module.set_var(alias, value.clone());
-                    }
                     // Avoid cloning the last value
-                    module.set_var(last_alias, value);
+                    let mut first_alias = None;
+
+                    for alias in aliases {
+                        if module.contains_var(&alias) {
+                            continue;
+                        }
+                        if first_alias.is_none() {
+                            first_alias = Some(alias);
+                        } else {
+                            module.set_var(alias, value.clone());
+                        }
+                    }
+
+                    if let Some(alias) = first_alias {
+                        module.set_var(alias, value);
+                    }
                 }
             }
         }

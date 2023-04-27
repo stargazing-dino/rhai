@@ -232,11 +232,9 @@ impl Engine {
             }
 
             let token = Token::lookup_symbol_from_syntax(s).or_else(|| {
-                if is_reserved_keyword_or_symbol(s).0 {
-                    Some(Token::Reserved(Box::new(s.into())))
-                } else {
-                    None
-                }
+                is_reserved_keyword_or_symbol(s)
+                    .0
+                    .then(|| Token::Reserved(Box::new(s.into())))
             });
 
             let seg = match s {
@@ -255,6 +253,9 @@ impl Engine {
                 // Markers not in first position
                 #[cfg(not(feature = "no_float"))]
                 CUSTOM_SYNTAX_MARKER_FLOAT if !segments.is_empty() => s.into(),
+
+                // Identifier not in first position
+                _ if !segments.is_empty() && is_valid_identifier(s) => s.into(),
 
                 // Keyword/symbol not in first position
                 _ if !segments.is_empty() && token.is_some() => {
@@ -277,10 +278,7 @@ impl Engine {
                 {
                     return Err(LexError::ImproperSymbol(
                         s.to_string(),
-                        format!(
-                            "Improper symbol for custom syntax at position #{}: '{s}'",
-                            segments.len() + 1,
-                        ),
+                        format!("Improper symbol for custom syntax at position #0: '{s}'"),
                     )
                     .into_err(Position::NONE));
                 }

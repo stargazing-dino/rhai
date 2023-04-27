@@ -1146,6 +1146,11 @@ impl Dynamic {
             )),
         }
     }
+    /// Return this [`Dynamic`], replacing it with [`Dynamic::UNIT`].
+    #[inline(always)]
+    pub fn take(&mut self) -> Self {
+        mem::take(self)
+    }
     /// Convert the [`Dynamic`] value into specific type.
     ///
     /// Casting to a [`Dynamic`] just returns as is, but if it contains a shared value,
