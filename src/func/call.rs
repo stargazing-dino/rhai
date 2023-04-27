@@ -750,7 +750,7 @@ impl Engine {
         target: &mut crate::eval::Target,
         mut call_args: &mut [Dynamic],
         first_arg_pos: Position,
-        fn_call_pos: Position,
+        pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
         let is_ref_mut = target.is_ref();
 
@@ -774,29 +774,24 @@ impl Engine {
 
                 match fn_def {
                     #[cfg(not(feature = "no_function"))]
-                    Some(fn_def) if fn_def.params.len() == args.len() => self
-                        .call_script_fn(
-                            global,
-                            caches,
-                            &mut Scope::new(),
-                            None,
-                            fn_ptr.encapsulated_environ().map(|r| r.as_ref()),
-                            fn_def,
-                            args,
-                            true,
-                            fn_call_pos,
+                    Some(fn_def) if fn_def.params.len() == args.len() => {
+                        let scope = &mut Scope::new();
+                        let environ = fn_ptr.encapsulated_environ().map(|r| r.as_ref());
+
+                        self.call_script_fn(
+                            global, caches, scope, None, environ, fn_def, args, true, pos,
                         )
-                        .map(|v| (v, false)),
+                        .map(|v| (v, false))
+                    }
                     _ => {
+                        let _is_anon = false;
                         #[cfg(not(feature = "no_function"))]
-                        let is_anon = fn_ptr.is_anonymous();
-                        #[cfg(feature = "no_function")]
-                        let is_anon = false;
+                        let _is_anon = fn_ptr.is_anonymous();
 
                         // Redirect function name
                         let fn_name = fn_ptr.fn_name();
                         // Recalculate hashes
-                        let new_hash = if !is_anon && !is_valid_function_name(fn_name) {
+                        let new_hash = if !_is_anon && !is_valid_function_name(fn_name) {
                             FnCallHashes::from_native_only(calc_fn_hash(None, fn_name, args.len()))
                         } else {
                             FnCallHashes::from_hash(calc_fn_hash(None, fn_name, args.len()))
@@ -804,16 +799,7 @@ impl Engine {
 
                         // Map it to name(args) in function-call style
                         self.exec_fn_call(
-                            global,
-                            caches,
-                            None,
-                            fn_name,
-                            None,
-                            new_hash,
-                            args,
-                            false,
-                            false,
-                            fn_call_pos,
+                            global, caches, None, fn_name, None, new_hash, args, false, false, pos,
                         )
                     }
                 }
@@ -824,7 +810,7 @@ impl Engine {
                 if call_args.is_empty() {
                     return Err(self.make_type_mismatch_err::<FnPtr>(
                         self.map_type_name(target.type_name()),
-                        fn_call_pos,
+                        pos,
                     ));
                 }
                 if !call_args[0].is_fnptr() {
@@ -837,28 +823,11 @@ impl Engine {
                 // FnPtr call on object
                 let fn_ptr = call_args[0].take().cast::<FnPtr>();
 
-                let (fn_name, is_anon, fn_curry, _environ, fn_def) = {
-                    #[cfg(not(feature = "no_function"))]
-                    let is_anon = fn_ptr.is_anonymous();
-                    #[cfg(feature = "no_function")]
-                    let is_anon = false;
-
-                    #[cfg(not(feature = "no_function"))]
-                    let (fn_name, fn_curry, environ, fn_def) = fn_ptr.take_data();
-                    #[cfg(feature = "no_function")]
-                    let (fn_name, fn_curry, environ) = fn_ptr.take_data();
-
-                    (
-                        fn_name,
-                        is_anon,
-                        fn_curry,
-                        environ,
-                        #[cfg(not(feature = "no_function"))]
-                        fn_def,
-                        #[cfg(feature = "no_function")]
-                        (),
-                    )
-                };
+                #[cfg(not(feature = "no_function"))]
+                let (is_anon, (fn_name, fn_curry, environ, fn_def)) =
+                    (fn_ptr.is_anonymous(), fn_ptr.take_data());
+                #[cfg(feature = "no_function")]
+                let (is_anon, (fn_name, fn_curry, _), fn_def) = (false, fn_ptr.take_data(), ());
 
                 // Replace the first argument with the object pointer, adding the curried arguments
                 call_args = &mut call_args[1..];
@@ -877,16 +846,12 @@ impl Engine {
                         #[cfg(not(feature = "no_closure"))]
                         ensure_no_data_race(&fn_def.name, args, false)?;
 
+                        let scope = &mut Scope::new();
+                        let this_ptr = Some(target.as_mut());
+                        let environ = environ.as_deref();
+
                         self.call_script_fn(
-                            global,
-                            caches,
-                            &mut Scope::new(),
-                            Some(target),
-                            _environ.as_deref(),
-                            &fn_def,
-                            args,
-                            true,
-                            fn_call_pos,
+                            global, caches, scope, this_ptr, environ, &fn_def, args, true, pos,
                         )
                         .map(|v| (v, false))
                     }
@@ -918,16 +883,8 @@ impl Engine {
 
                         // Map it to name(args) in function-call style
                         self.exec_fn_call(
-                            global,
-                            caches,
-                            None,
-                            &fn_name,
-                            None,
-                            new_hash,
-                            args,
-                            is_ref_mut,
-                            true,
-                            fn_call_pos,
+                            global, caches, None, &fn_name, None, new_hash, args, is_ref_mut, true,
+                            pos,
                         )
                     }
                 }
@@ -936,7 +893,7 @@ impl Engine {
                 if !target.is_fnptr() {
                     return Err(self.make_type_mismatch_err::<FnPtr>(
                         self.map_type_name(target.type_name()),
-                        fn_call_pos,
+                        pos,
                     ));
                 }
 
@@ -998,14 +955,13 @@ impl Engine {
                                     ))
                                 }
                                 _ => {
+                                    let _is_anon = false;
                                     #[cfg(not(feature = "no_function"))]
-                                    let is_anon = fn_ptr.is_anonymous();
-                                    #[cfg(feature = "no_function")]
-                                    let is_anon = false;
+                                    let _is_anon = fn_ptr.is_anonymous();
 
                                     // Recalculate the hash based on the new function name and new arguments
                                     let args_len = call_args.len() + 1;
-                                    hash = match is_anon {
+                                    hash = match _is_anon {
                                         false if !is_valid_function_name(fn_name) => {
                                             FnCallHashes::from_native_only(calc_fn_hash(
                                                 None, fn_name, args_len,
@@ -1031,16 +987,13 @@ impl Engine {
                     #[cfg(not(feature = "no_function"))]
                     Some((fn_def, environ)) => {
                         // Linked to scripted function
+                        let scope = &mut Scope::new();
+                        let environ = environ.as_deref();
+                        let this_ptr = Some(target.as_mut());
+                        let args = &mut call_args.iter_mut().collect::<FnArgsVec<_>>();
+
                         self.call_script_fn(
-                            global,
-                            caches,
-                            &mut Scope::new(),
-                            Some(target),
-                            environ.as_deref(),
-                            &*fn_def,
-                            &mut call_args.iter_mut().collect::<FnArgsVec<_>>(),
-                            true,
-                            fn_call_pos,
+                            global, caches, scope, this_ptr, environ, &*fn_def, args, true, pos,
                         )
                         .map(|v| (v, false))
                     }
@@ -1053,16 +1006,8 @@ impl Engine {
                         args.extend(call_args.iter_mut());
 
                         self.exec_fn_call(
-                            global,
-                            caches,
-                            None,
-                            fn_name,
-                            None,
-                            hash,
-                            &mut args,
-                            is_ref_mut,
-                            true,
-                            fn_call_pos,
+                            global, caches, None, fn_name, None, hash, &mut args, is_ref_mut, true,
+                            pos,
                         )
                     }
                 }
@@ -1071,7 +1016,7 @@ impl Engine {
 
         // Propagate the changed value back to the source if necessary
         if updated {
-            target.propagate_changed_value(fn_call_pos)?;
+            target.propagate_changed_value(pos)?;
         }
 
         Ok((result, updated))
@@ -1093,8 +1038,8 @@ impl Engine {
         pos: Position,
     ) -> RhaiResult {
         let mut first_arg = first_arg;
-        let mut a_expr = args_expr;
-        let mut total_args = usize::from(first_arg.is_some()) + a_expr.len();
+        let mut args_expr = args_expr;
+        let mut total_args = usize::from(first_arg.is_some()) + args_expr.len();
         let mut curry = FnArgsVec::new_const();
         let mut name = fn_name;
         let mut hashes = hashes;
@@ -1119,28 +1064,22 @@ impl Engine {
                 let fn_ptr = arg_value.cast::<FnPtr>();
 
                 #[cfg(not(feature = "no_function"))]
-                let (fn_name, is_anon, fn_curry, _environ, fn_def) = {
-                    let is_anon = fn_ptr.is_anonymous();
-                    let (fn_name, fn_curry, environ, fn_def) = fn_ptr.take_data();
-                    (fn_name, is_anon, fn_curry, environ, fn_def)
-                };
+                let (is_anon, (fn_name, fn_curry, _environ, fn_def)) =
+                    (fn_ptr.is_anonymous(), fn_ptr.take_data());
                 #[cfg(feature = "no_function")]
-                let (fn_name, is_anon, fn_curry, _environ) = {
-                    let (fn_name, fn_curry, environ) = fn_ptr.take_data();
-                    (fn_name, false, fn_curry, environ)
-                };
+                let (is_anon, (fn_name, fn_curry, _environ)) = (false, fn_ptr.take_data());
 
                 curry.extend(fn_curry.into_iter());
 
                 // Linked to scripted function?
                 #[cfg(not(feature = "no_function"))]
                 if let Some(fn_def) = fn_def {
-                    if fn_def.params.len() == curry.len() + a_expr.len() {
+                    if fn_def.params.len() == curry.len() + args_expr.len() {
                         // Evaluate arguments
                         let mut arg_values = curry
                             .into_iter()
                             .map(Ok)
-                            .chain(a_expr.iter().map(|expr| -> Result<_, crate::RhaiError> {
+                            .chain(args_expr.iter().map(|expr| -> Result<_, crate::RhaiError> {
                                 let this_ptr = this_ptr.as_deref_mut();
                                 self.get_arg_value(global, caches, scope, this_ptr, expr)
                                     .map(|(v, ..)| v)
@@ -1161,9 +1100,9 @@ impl Engine {
                 name = &redirected;
 
                 // Shift the arguments
-                first_arg = a_expr.get(0);
-                if !a_expr.is_empty() {
-                    a_expr = &a_expr[1..];
+                first_arg = args_expr.get(0);
+                if !args_expr.is_empty() {
+                    args_expr = &args_expr[1..];
                 }
                 total_args -= 1;
 
@@ -1207,7 +1146,7 @@ impl Engine {
                 let mut fn_ptr = arg_value.cast::<FnPtr>();
 
                 // Append the new curried arguments to the existing list.
-                for expr in a_expr {
+                for expr in args_expr {
                     let (value, ..) =
                         self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
                     fn_ptr.add_curry(value);
@@ -1237,7 +1176,7 @@ impl Engine {
                     .map_err(|typ| self.make_type_mismatch_err::<ImmutableString>(typ, arg_pos))?;
 
                 let (arg_value, arg_pos) =
-                    self.get_arg_value(global, caches, scope, this_ptr, &a_expr[0])?;
+                    self.get_arg_value(global, caches, scope, this_ptr, &args_expr[0])?;
 
                 let num_params = arg_value
                     .as_int()
@@ -1264,15 +1203,20 @@ impl Engine {
                     .into_immutable_string()
                     .map_err(|typ| self.make_type_mismatch_err::<ImmutableString>(typ, arg_pos))?;
 
-                let (arg_value, arg_pos) =
-                    self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), &a_expr[0])?;
+                let (arg_value, arg_pos) = self.get_arg_value(
+                    global,
+                    caches,
+                    scope,
+                    this_ptr.as_deref_mut(),
+                    &args_expr[0],
+                )?;
 
                 let fn_name = arg_value
                     .into_immutable_string()
                     .map_err(|typ| self.make_type_mismatch_err::<ImmutableString>(typ, arg_pos))?;
 
                 let (arg_value, arg_pos) =
-                    self.get_arg_value(global, caches, scope, this_ptr, &a_expr[1])?;
+                    self.get_arg_value(global, caches, scope, this_ptr, &args_expr[1])?;
 
                 let num_params = arg_value
                     .as_int()
@@ -1354,7 +1298,7 @@ impl Engine {
         // If so, do it separately because we cannot convert the first argument (if it is a simple
         // variable access) to &mut because `scope` is needed.
         if capture_scope && !scope.is_empty() {
-            for expr in first_arg.iter().copied().chain(a_expr.iter()) {
+            for expr in first_arg.iter().copied().chain(args_expr.iter()) {
                 let (value, ..) =
                     self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
                 arg_values.push(value.flatten());
@@ -1381,11 +1325,13 @@ impl Engine {
             if curry.is_empty() && first_arg.map_or(false, |expr| expr.is_variable_access(false)) {
                 let first_expr = first_arg.unwrap();
 
+                self.track_operation(global, first_expr.position())?;
+
                 #[cfg(feature = "debugging")]
                 self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), first_expr)?;
 
                 // func(x, ...) -> x.func(...)
-                for expr in a_expr {
+                for expr in args_expr {
                     let (value, ..) =
                         self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
                     arg_values.push(value.flatten());
@@ -1398,8 +1344,6 @@ impl Engine {
                     target = target.into_owned();
                 }
 
-                self.track_operation(global, first_expr.position())?;
-
                 if target.is_shared() || target.is_temp_value() {
                     arg_values.insert(0, target.take_or_clone().flatten());
                 } else {
@@ -1410,7 +1354,7 @@ impl Engine {
                 }
             } else {
                 // func(..., ...)
-                for expr in first_arg.into_iter().chain(a_expr.iter()) {
+                for expr in first_arg.into_iter().chain(args_expr.iter()) {
                     let (value, ..) =
                         self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
                     arg_values.push(value.flatten());
@@ -1450,14 +1394,13 @@ impl Engine {
             // If so, convert to method-call style in order to leverage potential &mut first argument
             // and avoid cloning the value
             if !args_expr.is_empty() && args_expr[0].is_variable_access(true) {
+                // Get target reference to first argument
+                let first_arg = &args_expr[0];
+
+                self.track_operation(global, first_arg.position())?;
+
                 #[cfg(feature = "debugging")]
-                self.run_debugger(
-                    global,
-                    caches,
-                    scope,
-                    this_ptr.as_deref_mut(),
-                    &args_expr[0],
-                )?;
+                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), first_arg)?;
 
                 // func(x, ...) -> x.func(...)
                 arg_values.push(Dynamic::UNIT);
@@ -1467,11 +1410,6 @@ impl Engine {
                         self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
                     arg_values.push(value.flatten());
                 }
-
-                // Get target reference to first argument
-                let first_arg = &args_expr[0];
-
-                self.track_operation(global, first_arg.position())?;
 
                 let target = self.search_scope_only(global, caches, scope, this_ptr, first_arg)?;
 
