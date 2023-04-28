@@ -8,6 +8,8 @@
 /// * `reify! { `_variable_ or _expression_` => |`_temp-variable_`: `_type_`|` _code_ `)`
 /// * `reify! { `_variable_ or _expression_ `=>` `Option<`_type_`>` `)`
 /// * `reify! { `_variable_ or _expression_ `=>` _type_ `)`
+///
+/// * `reify! { `_expression_ `=> !!!` _type_ `)`  (unsafe, no type checks!)
 macro_rules! reify {
     ($old:ident => |$new:ident : $t:ty| $code:expr, || $fallback:expr) => {{
         #[allow(clippy::redundant_else)]
@@ -45,4 +47,11 @@ macro_rules! reify {
     ($old:expr => $t:ty) => {
         reify! { $old => |v: $t| v, || unreachable!() }
     };
+
+    ($old:expr => !!! $t:ty) => {{
+        let old_value = $old;
+        let new_value: $t =
+            unsafe { std::mem::transmute_copy(&std::mem::ManuallyDrop::new(old_value)) };
+        new_value
+    }};
 }

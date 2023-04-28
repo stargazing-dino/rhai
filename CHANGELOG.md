@@ -28,6 +28,7 @@ Enhancements
 ------------
 
 * `Engine::is_symbol_disabled` is added to test whether a particular keyword/symbol is disabled.
+* Support is added to deserialize a `Dynamic` value containing custom types or shared values back into another `Dynamic` (essentially a straight cloned copy).
 
 
 Version 1.13.0
