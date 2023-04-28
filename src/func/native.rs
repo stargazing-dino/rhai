@@ -7,8 +7,8 @@ use crate::plugin::PluginFunction;
 use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
-    calc_fn_hash, Dynamic, Engine, EvalContext, FuncArgs, Position, RhaiResult, RhaiResultOf,
-    StaticVec, VarDefInfo, ERR,
+    calc_fn_hash, Dynamic, Engine, EvalContext, FnArgsVec, FuncArgs, Position, RhaiResult,
+    RhaiResultOf, StaticVec, VarDefInfo, ERR,
 };
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
@@ -309,9 +309,9 @@ impl<'a> NativeCallContext<'a> {
         let mut arg_values = StaticVec::new_const();
         args.parse(&mut arg_values);
 
-        let mut args: StaticVec<_> = arg_values.iter_mut().collect();
+        let args = &mut arg_values.iter_mut().collect::<FnArgsVec<_>>();
 
-        self._call_fn_raw(fn_name, &mut args, false, false, false)
+        self._call_fn_raw(fn_name, args, false, false, false)
             .and_then(|result| {
                 // Bail out early if the return type needs no cast
                 if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
@@ -340,9 +340,9 @@ impl<'a> NativeCallContext<'a> {
         let mut arg_values = StaticVec::new_const();
         args.parse(&mut arg_values);
 
-        let mut args: StaticVec<_> = arg_values.iter_mut().collect();
+        let args = &mut arg_values.iter_mut().collect::<FnArgsVec<_>>();
 
-        self._call_fn_raw(fn_name, &mut args, true, false, false)
+        self._call_fn_raw(fn_name, args, true, false, false)
             .and_then(|result| {
                 // Bail out early if the return type needs no cast
                 if TypeId::of::<T>() == TypeId::of::<Dynamic>() {

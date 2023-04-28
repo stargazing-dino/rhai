@@ -1195,12 +1195,11 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 && x.constant_args() // all arguments are constants
         => {
             // First search for script-defined functions (can override built-in)
+            let _has_script_fn = false;
             #[cfg(not(feature = "no_function"))]
-            let has_script_fn = !x.hashes.is_native_only() && state.global.lib.iter().find_map(|m| m.get_script_fn(&x.name, x.args.len())).is_some();
-            #[cfg(feature = "no_function")]
-            let has_script_fn = false;
+            let _has_script_fn = !x.hashes.is_native_only() && state.global.lib.iter().find_map(|m| m.get_script_fn(&x.name, x.args.len())).is_some();
 
-            if !has_script_fn {
+            if !_has_script_fn {
                 let arg_values = &mut x.args.iter().map(Expr::get_literal_value).collect::<Option<FnArgsVec<_>>>().unwrap();
 
                 let result = match x.name.as_str() {

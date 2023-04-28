@@ -265,7 +265,7 @@ mod string_functions {
     ///
     /// print(text);    // prints "hello, world!"
     ///
-    /// x.truncate(10);
+    /// text.truncate(10);
     ///
     /// print(text);    // prints "hello, world!"
     /// ```
@@ -273,10 +273,10 @@ mod string_functions {
         if len > 0 {
             #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             let len = len.min(MAX_USIZE_INT) as usize;
-            let chars: StaticVec<_> = string.chars().collect();
-            let copy = string.make_mut();
-            copy.clear();
-            copy.extend(chars.into_iter().take(len));
+            if let Some((index, _)) = string.char_indices().nth(len) {
+                let copy = string.make_mut();
+                copy.truncate(index);
+            }
         } else {
             clear(string);
         }
@@ -1109,7 +1109,7 @@ mod string_functions {
         copy.clear();
         copy.extend(chars.iter().skip(offset).take(len));
     }
-    /// Remove all characters from the string except until the `start` position.
+    /// Remove all characters from the string up to the `start` position.
     ///
     /// * If `start` < 0, position counts from the end of the string (`-1` is the last character).
     /// * If `start` < -length of string, the string is not modified.

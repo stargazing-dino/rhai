@@ -118,7 +118,7 @@ impl FuncInfo {
                 }
             }
         } else {
-            let params: FnArgsVec<_> = self
+            let params = self
                 .metadata
                 .params_info
                 .iter()
@@ -134,7 +134,7 @@ impl FuncInfo {
                     };
                     result
                 })
-                .collect();
+                .collect::<FnArgsVec<_>>();
             signature.push_str(&params.join(", "));
         }
         signature.push(')');
@@ -932,7 +932,10 @@ impl Module {
         hash_fn: u64,
         arg_names: impl IntoIterator<Item = S>,
     ) -> &mut Self {
-        let mut param_names: FnArgsVec<_> = arg_names.into_iter().map(Into::into).collect();
+        let mut param_names = arg_names
+            .into_iter()
+            .map(Into::into)
+            .collect::<FnArgsVec<_>>();
 
         if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
             let (param_names, return_type_name) = if param_names.len() > f.metadata.num_params {
@@ -1053,13 +1056,12 @@ impl Module {
         let _arg_names = arg_names;
         let is_method = func.is_method();
 
-        let mut param_types: FnArgsVec<_> = arg_types
+        let param_types = arg_types
             .as_ref()
             .iter()
             .enumerate()
             .map(|(i, &type_id)| Self::map_type(!is_method || i > 0, type_id))
-            .collect();
-        param_types.shrink_to_fit();
+            .collect::<FnArgsVec<_>>();
 
         let is_dynamic = param_types
             .iter()
