@@ -4,8 +4,9 @@ use rhai::{
     serde::{from_dynamic, to_dynamic},
     Dynamic, Engine, EvalAltResult, ImmutableString, Scope, INT,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::json;
+use std::sync::Arc;
 
 #[cfg(not(feature = "no_index"))]
 use rhai::Array;
@@ -379,6 +380,37 @@ fn test_serde_de_primary_types() -> Result<(), Box<EvalAltResult>> {
         "hello",
         from_dynamic::<String>(&"hello".to_string().into())?
     );
+
+    Ok(())
+}
+
+#[cfg(not(feature = "no_object"))]
+#[test]
+fn test_serde_de_variants() -> Result<(), Box<EvalAltResult>> {
+    #[derive(Debug)]
+    struct Foo;
+
+    #[derive(Debug, Deserialize)]
+    struct Bar {
+        #[serde(deserialize_with = "deserialize_foo")]
+        value: Arc<Foo>,
+    }
+
+    fn deserialize_foo<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Arc<Foo>, D::Error> {
+        let value = <Dynamic as Deserialize>::deserialize(deserializer)?;
+
+        value
+            .try_cast::<Arc<Foo>>()
+            .ok_or_else(|| serde::de::Error::custom("type error"))
+    }
+
+    let value = Arc::new(Foo);
+    let mut map = Map::new();
+    map.insert("value".into(), Dynamic::from(value.clone()));
+    let x = Dynamic::from(map);
+    let bar = from_dynamic::<Bar>(&x)?;
+
+    assert!(Arc::ptr_eq(&bar.value, &value));
 
     Ok(())
 }

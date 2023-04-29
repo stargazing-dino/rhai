@@ -57,7 +57,7 @@ pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
     }
     if TypeId::of::<T>() == TypeId::of::<String>() {
         // If T is `String`, data must be `ImmutableString`, so map directly to it
-        return reify! { data.take().into_string().expect("`ImmutableString`") => T };
+        return reify! { data.take().into_string().expect("`ImmutableString`") => !!! T };
     }
 
     // We consume the argument and then replace it with () - the argument is not supposed to be used again.
