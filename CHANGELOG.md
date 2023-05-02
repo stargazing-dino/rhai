@@ -4,6 +4,10 @@ Rhai Release Notes
 Version 1.14.0
 ==============
 
+This new version contains a substantial number of bug fixes for edge cases.
+
+A new syntax is supported to facilitate writing object methods in script.
+
 The code hacks that attempt to optimize branch prediction performance are removed because benchmarks do not show any material speed improvements.
 
 Bug fixes
