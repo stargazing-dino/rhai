@@ -50,7 +50,8 @@ impl HokmaLock {
 
     pub fn write(&'static self) -> WhenTheHokmaSuppression {
         loop {
-            let previous = self.lock.swap(1, Ordering::SeqCst);
+            let previous = self.lock.load(Ordering::SeqCst);
+            self.lock.store(1, Ordering::SeqCst);
 
             if previous != 1 {
                 return WhenTheHokmaSuppression {
