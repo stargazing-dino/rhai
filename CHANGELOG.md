@@ -16,6 +16,7 @@ Bug fixes
 * Shadowed constant definitions are now optimized correctly when propagated (e.g. `const X = 1; const X = 1 + 1 + 1; X` now evaluates to 3 instead of 0).
 * Identifiers and comma's in the middle of custom syntax now register correctly.
 * Exporting an object map from a module with closures defined on properties now works correctly when those properties are called to mimic method calls in OOP-style.
+* Compiling for `thumbv6m-none-eabi` target (e.g. Raspberry Pi Pico) now completes successfully. Dependency to `no-std-compat` is now pointed to the latest repo instead of `crates.io`.
 
 New features
 ------------
