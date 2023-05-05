@@ -796,9 +796,11 @@ impl Engine {
                 debug_assert!(!call_args.is_empty());
 
                 // FnPtr call on object
-                let typ = call_args[0].type_name();
-                let fn_ptr = call_args[0].take().try_cast::<FnPtr>().ok_or_else(|| {
-                    self.make_type_mismatch_err::<FnPtr>(self.map_type_name(typ), first_arg_pos)
+                let fn_ptr = call_args[0].take().try_cast_raw::<FnPtr>().map_err(|v| {
+                    self.make_type_mismatch_err::<FnPtr>(
+                        self.map_type_name(v.type_name()),
+                        first_arg_pos,
+                    )
                 })?;
 
                 #[cfg(not(feature = "no_function"))]
@@ -1025,9 +1027,11 @@ impl Engine {
                 let (first_arg_value, first_arg_pos) =
                     self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), arg)?;
 
-                let typ = first_arg_value.type_name();
-                let fn_ptr = first_arg_value.try_cast::<FnPtr>().ok_or_else(|| {
-                    self.make_type_mismatch_err::<FnPtr>(self.map_type_name(typ), first_arg_pos)
+                let fn_ptr = first_arg_value.try_cast_raw::<FnPtr>().map_err(|v| {
+                    self.make_type_mismatch_err::<FnPtr>(
+                        self.map_type_name(v.type_name()),
+                        first_arg_pos,
+                    )
                 })?;
 
                 #[cfg(not(feature = "no_function"))]
@@ -1104,9 +1108,11 @@ impl Engine {
                 let (first_arg_value, first_arg_pos) =
                     self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), first)?;
 
-                let typ = first_arg_value.type_name();
-                let mut fn_ptr = first_arg_value.try_cast::<FnPtr>().ok_or_else(|| {
-                    self.make_type_mismatch_err::<FnPtr>(self.map_type_name(typ), first_arg_pos)
+                let mut fn_ptr = first_arg_value.try_cast_raw::<FnPtr>().map_err(|v| {
+                    self.make_type_mismatch_err::<FnPtr>(
+                        self.map_type_name(v.type_name()),
+                        first_arg_pos,
+                    )
                 })?;
 
                 // Append the new curried arguments to the existing list.
