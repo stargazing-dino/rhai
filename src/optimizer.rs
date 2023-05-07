@@ -901,8 +901,8 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 *expr = mem::take(&mut m.0).into_iter().find(|(x, ..)| x.as_str() == prop)
                             .map_or_else(|| Expr::Unit(*pos), |(.., mut expr)| { expr.set_position(*pos); expr });
             }
-            // var.rhs
-            (Expr::Variable(..), rhs) => optimize_expr(rhs, state, true),
+            // var.rhs or this.rhs
+            (Expr::Variable(..) | Expr::ThisPtr(..), rhs) => optimize_expr(rhs, state, true),
             // const.type_of()
             (lhs, Expr::MethodCall(x, pos)) if lhs.is_constant() && x.name == KEYWORD_TYPE_OF && x.args.is_empty() => {
                 if let Some(value) = lhs.get_literal_value() {
@@ -987,8 +987,8 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 state.set_dirty();
                 *expr = Expr::CharConstant(s.chars().rev().nth(i.unsigned_abs() as usize - 1).unwrap(), *pos);
             }
-            // var[rhs]
-            (Expr::Variable(..), rhs) => optimize_expr(rhs, state, true),
+            // var[rhs] or this[rhs]
+            (Expr::Variable(..) | Expr::ThisPtr(..), rhs) => optimize_expr(rhs, state, true),
             // lhs[rhs]
             (lhs, rhs) => { optimize_expr(lhs, state, false); optimize_expr(rhs, state, true); }
         },

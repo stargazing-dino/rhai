@@ -1186,6 +1186,7 @@ impl Dynamic {
     /// it is cloned into a [`Dynamic`] with a normal value.
     ///
     /// Returns itself if types mismatched.
+    #[allow(unused_mut)]
     pub(crate) fn try_cast_raw<T: Any>(mut self) -> Result<T, Self> {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
 

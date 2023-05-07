@@ -2,7 +2,6 @@
 
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::ast::Expr;
-use crate::engine::KEYWORD_THIS;
 use crate::packages::string_basic::{print_with_func, FUNC_TO_STRING};
 use crate::types::dynamic::AccessMode;
 use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, SmartString, ERR};
@@ -140,9 +139,7 @@ impl Engine {
 
         let index = match expr {
             // Check if the variable is `this`
-            Expr::Variable(v, None, ..)
-                if v.0.is_none() && v.1.is_empty() && v.3 == KEYWORD_THIS =>
-            {
+            Expr::ThisPtr(..) => {
                 return if let Some(this_ptr) = this_ptr {
                     Ok(this_ptr.into())
                 } else {
@@ -259,13 +256,9 @@ impl Engine {
                 self.eval_fn_call_expr(global, caches, scope, this_ptr, x, *pos)
             }
 
-            Expr::Variable(x, index, var_pos)
-                if index.is_none() && x.0.is_none() && x.3 == KEYWORD_THIS =>
-            {
-                this_ptr
-                    .ok_or_else(|| ERR::ErrorUnboundThis(*var_pos).into())
-                    .cloned()
-            }
+            Expr::ThisPtr(var_pos) => this_ptr
+                .ok_or_else(|| ERR::ErrorUnboundThis(*var_pos).into())
+                .cloned(),
 
             Expr::Variable(..) => self
                 .search_namespace(global, caches, scope, this_ptr, expr)
@@ -413,13 +406,7 @@ impl Engine {
                     .and_then(|r| self.check_data_size(r, expr.start_position()))
             }
 
-            Expr::Stmt(x) => {
-                if x.is_empty() {
-                    Ok(Dynamic::UNIT)
-                } else {
-                    self.eval_stmt_block(global, caches, scope, this_ptr, x, true)
-                }
-            }
+            Expr::Stmt(x) => self.eval_stmt_block(global, caches, scope, this_ptr, x, true),
 
             #[cfg(not(feature = "no_index"))]
             Expr::Index(..) => {
