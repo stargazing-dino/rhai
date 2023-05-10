@@ -139,13 +139,7 @@ impl Engine {
 
         let index = match expr {
             // Check if the variable is `this`
-            Expr::ThisPtr(..) => {
-                return if let Some(this_ptr) = this_ptr {
-                    Ok(this_ptr.into())
-                } else {
-                    Err(ERR::ErrorUnboundThis(expr.position()).into())
-                };
-            }
+            Expr::ThisPtr(..) => unreachable!("Expr::ThisPtr should have been handled outside"),
 
             _ if global.always_search_scope => 0,
 

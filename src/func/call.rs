@@ -1288,14 +1288,32 @@ impl Engine {
         }
 
         // Call with blank scope
-        if num_args > 0 || !curry.is_empty() {
-            // If the first argument is a variable, and there is no curried arguments,
-            // convert to method-call style in order to leverage potential &mut first argument and
-            // avoid cloning the value
-            if curry.is_empty() && first_arg.map_or(false, |expr| expr.is_variable_access(false)) {
-                let first_expr = first_arg.unwrap();
 
-                self.track_operation(global, first_expr.position())?;
+        // If the first argument is a variable, and there are no curried arguments,
+        // convert to method-call style in order to leverage potential &mut first argument
+        // and avoid cloning the value.
+        match first_arg {
+            Some(_first_expr @ Expr::ThisPtr(pos))
+                if curry.is_empty() && this_ptr.as_ref().map_or(false, |v| !v.is_shared()) =>
+            {
+                // Turn it into a method call only if the object is not shared
+                self.track_operation(global, *pos)?;
+
+                #[cfg(feature = "debugging")]
+                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), _first_expr)?;
+
+                // func(x, ...) -> x.func(...)
+                for expr in args_expr {
+                    let (value, ..) =
+                        self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
+                    arg_values.push(value.flatten());
+                }
+
+                is_ref_mut = true;
+                args.push(this_ptr.unwrap());
+            }
+            Some(first_expr @ Expr::Variable(.., pos)) if curry.is_empty() => {
+                self.track_operation(global, *pos)?;
 
                 #[cfg(feature = "debugging")]
                 self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), first_expr)?;
@@ -1322,7 +1340,8 @@ impl Engine {
                     let obj_ref = target.take_ref().expect("ref");
                     args.push(obj_ref);
                 }
-            } else {
+            }
+            _ => {
                 // func(..., ...)
                 for expr in first_arg.into_iter().chain(args_expr.iter()) {
                     let (value, ..) =
@@ -1331,9 +1350,9 @@ impl Engine {
                 }
                 args.extend(curry.iter_mut());
             }
-
-            args.extend(arg_values.iter_mut());
         }
+
+        args.extend(arg_values.iter_mut());
 
         self.exec_fn_call(
             global, caches, None, name, op_token, hashes, &mut args, is_ref_mut, false, pos,
@@ -1359,18 +1378,29 @@ impl Engine {
         let args = &mut FnArgsVec::with_capacity(args_expr.len());
         let mut first_arg_value = None;
 
-        if !args_expr.is_empty() {
-            // See if the first argument is a variable (not namespace-qualified).
-            // If so, convert to method-call style in order to leverage potential &mut first argument
-            // and avoid cloning the value
-            if !args_expr.is_empty() && args_expr[0].is_variable_access(true) {
-                // Get target reference to first argument
-                let first_arg = &args_expr[0];
-
-                self.track_operation(global, first_arg.position())?;
+        // See if the first argument is a variable.
+        // If so, convert to method-call style in order to leverage potential
+        // &mut first argument and avoid cloning the value.
+        match args_expr.get(0) {
+            Some(_first_expr @ Expr::ThisPtr(pos))
+                if this_ptr.as_ref().map_or(false, |v| v.is_shared()) =>
+            {
+                self.track_operation(global, *pos)?;
 
                 #[cfg(feature = "debugging")]
-                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), first_arg)?;
+                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), _first_expr)?;
+
+                // Turn it into a method call only if the object is not shared
+                let (first, rest) = arg_values.split_first_mut().unwrap();
+                first_arg_value = Some(first);
+                args.push(this_ptr.unwrap());
+                args.extend(rest.iter_mut());
+            }
+            Some(first_expr @ Expr::Variable(.., pos)) => {
+                self.track_operation(global, *pos)?;
+
+                #[cfg(feature = "debugging")]
+                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), first_expr)?;
 
                 // func(x, ...) -> x.func(...)
                 arg_values.push(Dynamic::UNIT);
@@ -1381,14 +1411,9 @@ impl Engine {
                     arg_values.push(value.flatten());
                 }
 
-                let target = self.search_scope_only(global, caches, scope, this_ptr, first_arg)?;
+                let target = self.search_namespace(global, caches, scope, this_ptr, first_expr)?;
 
-                #[cfg(not(feature = "no_closure"))]
-                let target_is_shared = target.is_shared();
-                #[cfg(feature = "no_closure")]
-                let target_is_shared = false;
-
-                if target_is_shared || target.is_temp_value() {
+                if target.is_shared() || target.is_temp_value() {
                     arg_values[0] = target.take_or_clone().flatten();
                     args.extend(arg_values.iter_mut());
                 } else {
@@ -1399,7 +1424,8 @@ impl Engine {
                     args.push(obj_ref);
                     args.extend(rest.iter_mut());
                 }
-            } else {
+            }
+            Some(_) => {
                 // func(..., ...) or func(mod::x, ...)
                 for expr in args_expr {
                     let (value, ..) =
@@ -1408,6 +1434,7 @@ impl Engine {
                 }
                 args.extend(arg_values.iter_mut());
             }
+            None => (),
         }
 
         // Search for the root namespace

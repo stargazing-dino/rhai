@@ -1,6 +1,15 @@
 Rhai Release Notes
 ==================
 
+Version 1.15.0
+==============
+
+Enhancements
+------------
+
+* Expressions involving `this` should now run slightly faster due to a dedicated `AST` node `ThisPtr`.
+
+
 Version 1.14.0
 ==============
 
