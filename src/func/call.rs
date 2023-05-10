@@ -1288,14 +1288,16 @@ impl Engine {
         }
 
         // Call with blank scope
+        #[cfg(not(feature = "no_closure"))]
+        let this_ptr_not_shared = this_ptr.as_ref().map_or(false, |v| !v.is_shared());
+        #[cfg(feature = "no_closure")]
+        let this_ptr_not_shared = true;
 
         // If the first argument is a variable, and there are no curried arguments,
         // convert to method-call style in order to leverage potential &mut first argument
         // and avoid cloning the value.
         match first_arg {
-            Some(_first_expr @ Expr::ThisPtr(pos))
-                if curry.is_empty() && this_ptr.as_ref().map_or(false, |v| !v.is_shared()) =>
-            {
+            Some(_first_expr @ Expr::ThisPtr(pos)) if curry.is_empty() && this_ptr_not_shared => {
                 // Turn it into a method call only if the object is not shared
                 self.track_operation(global, *pos)?;
 
@@ -1378,13 +1380,16 @@ impl Engine {
         let args = &mut FnArgsVec::with_capacity(args_expr.len());
         let mut first_arg_value = None;
 
+        #[cfg(not(feature = "no_closure"))]
+        let this_ptr_not_shared = this_ptr.as_ref().map_or(false, |v| !v.is_shared());
+        #[cfg(feature = "no_closure")]
+        let this_ptr_not_shared = true;
+
         // See if the first argument is a variable.
         // If so, convert to method-call style in order to leverage potential
         // &mut first argument and avoid cloning the value.
         match args_expr.get(0) {
-            Some(_first_expr @ Expr::ThisPtr(pos))
-                if this_ptr.as_ref().map_or(false, |v| v.is_shared()) =>
-            {
+            Some(_first_expr @ Expr::ThisPtr(pos)) if this_ptr_not_shared => {
                 self.track_operation(global, *pos)?;
 
                 #[cfg(feature = "debugging")]
