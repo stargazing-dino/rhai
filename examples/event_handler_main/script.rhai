@@ -23,7 +23,6 @@ fn start(data) {
     if value <= 0 {
         throw "Conditions not yet ready to start!";
     }
-    bool_state = true;
 
     // Constants 'MY_CONSTANT' and 'EXTRA_CONSTANT'
     // in custom scope are also visible!
@@ -31,6 +30,7 @@ fn start(data) {
     print(`EXTRA_CONSTANT = ${EXTRA_CONSTANT}`);
 
     value += parse_int(data);
+    bool_state = true;
 }
 
 /// 'end' event handler
@@ -41,8 +41,8 @@ fn end(data) {
     if value > 0 {
         throw "Conditions not yet ready to end!";
     }
-    bool_state = false;
     value = parse_int(data);
+    bool_state = false;
 }
 
 /// 'update' event handler

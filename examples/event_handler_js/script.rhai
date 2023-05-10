@@ -22,11 +22,12 @@ fn start(data) {
     if this.value <= 0 {
         throw "Conditions not yet ready to start!";
     }
-    this.bool_state = true;
-    this.value += parse_int(data);
 
     // Constant 'MY_CONSTANT' in custom scope is also visible!
     print(`MY_CONSTANT = ${MY_CONSTANT}`);
+
+    this.value += parse_int(data);
+    this.bool_state = true;
 }
 
 /// 'end' event handler
@@ -37,8 +38,8 @@ fn end(data) {
     if this.value > 0 {
         throw "Conditions not yet ready to end!";
     }
-    this.bool_state = false;
     this.value = parse_int(data);
+    this.bool_state = false;
 }
 
 /// 'update' event handler
