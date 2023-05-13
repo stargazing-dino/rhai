@@ -226,8 +226,11 @@ impl FnPtr {
             let typ = engine.map_type_name(result.type_name());
 
             result.try_cast().ok_or_else(|| {
-                let t = engine.map_type_name(type_name::<T>()).into();
-                ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+                let typename = match type_name::<T>() {
+                    typ @ _ if typ.contains("::") => engine.map_type_name(typ),
+                    typ @ _ => typ,
+                };
+                ERR::ErrorMismatchOutputType(typename.into(), typ.into(), Position::NONE).into()
             })
         })
     }
@@ -255,8 +258,11 @@ impl FnPtr {
             let typ = context.engine().map_type_name(result.type_name());
 
             result.try_cast().ok_or_else(|| {
-                let t = context.engine().map_type_name(type_name::<T>()).into();
-                ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+                let typename = match type_name::<T>() {
+                    typ @ _ if typ.contains("::") => context.engine().map_type_name(typ),
+                    typ @ _ => typ,
+                };
+                ERR::ErrorMismatchOutputType(typename.into(), typ.into(), Position::NONE).into()
             })
         })
     }

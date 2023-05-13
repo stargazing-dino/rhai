@@ -11,6 +11,21 @@ fn test_mismatched_op() {
 }
 
 #[test]
+fn test_mismatched_op_name() {
+    let engine = Engine::new();
+
+    assert!(matches!(
+        *engine.eval::<String>("true").expect_err("expects error"),
+        EvalAltResult::ErrorMismatchOutputType(need, actual, ..) if need == "string" && actual == "bool"
+    ));
+
+    assert!(matches!(
+        *engine.eval::<&str>("true").expect_err("expects error"),
+        EvalAltResult::ErrorMismatchOutputType(need, actual, ..) if need == "&str" && actual == "bool"
+    ));
+}
+
+#[test]
 #[cfg(not(feature = "no_object"))]
 fn test_mismatched_op_custom_type() -> Result<(), Box<EvalAltResult>> {
     #[allow(dead_code)] // used inside `register_type_with_name`

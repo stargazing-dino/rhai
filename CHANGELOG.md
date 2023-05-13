@@ -9,6 +9,7 @@ Enhancements
 
 * Expressions involving `this` should now run slightly faster due to a dedicated `AST` node `ThisPtr`.
 * A `take` function is added to the standard library to take ownership of any data (replacing with `()`) in order to avoid cloning.
+* `EvalAltResult::ErrorMismatchOutputType` now gives a better name for the requested generic type (e.g. `&str` is now `&str` and not `string`).
 
 
 Version 1.14.0

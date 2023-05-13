@@ -213,8 +213,13 @@ impl Engine {
         }
 
         result.try_cast_raw::<T>().map_err(|v| {
+            let typename = match type_name::<T>() {
+                typ @ _ if typ.contains("::") => self.map_type_name(typ),
+                typ @ _ => typ,
+            };
+
             ERR::ErrorMismatchOutputType(
-                self.map_type_name(type_name::<T>()).into(),
+                typename.into(),
                 self.map_type_name(v.type_name()).into(),
                 Position::NONE,
             )
