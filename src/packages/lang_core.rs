@@ -26,6 +26,30 @@ def_package! {
 
 #[export_module]
 mod core_functions {
+    /// Take ownership of the data in a `Dynamic` value and return it.
+    /// The data is _NOT_ cloned.
+    ///
+    /// The original value is replaced with `()`.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = 42;
+    ///
+    /// print(take(x));         // prints 42
+    ///
+    /// print(x);               // prints ()
+    /// ```
+    #[rhai_fn(return_raw)]
+    pub fn take(value: &mut Dynamic) -> RhaiResultOf<Dynamic> {
+        if value.is_read_only() {
+            return Err(
+                ERR::ErrorNonPureMethodCallOnConstant("take".to_string(), Position::NONE).into(),
+            );
+        }
+
+        Ok(std::mem::take(value))
+    }
     /// Return the _tag_ of a `Dynamic` value.
     ///
     /// # Example

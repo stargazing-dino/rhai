@@ -64,6 +64,48 @@ fn test_internal_fn() -> Result<(), Box<EvalAltResult>> {
     Ok(())
 }
 
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
+struct TestStruct(INT);
+
+impl Clone for TestStruct {
+    fn clone(&self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
+#[test]
+fn test_internal_fn_take() -> Result<(), Box<EvalAltResult>> {
+    let mut engine = Engine::new();
+
+    engine
+        .register_type_with_name::<TestStruct>("TestStruct")
+        .register_fn("new_ts", |x: INT| TestStruct(x));
+
+    assert_eq!(
+        engine.eval::<TestStruct>(
+            "
+                let x = new_ts(0);
+                for n in 0..41 { x = x }
+                x
+            ",
+        )?,
+        TestStruct(42)
+    );
+
+    assert_eq!(
+        engine.eval::<TestStruct>(
+            "
+                let x = new_ts(0);
+                for n in 0..41 { x = take(x) }
+                take(x)
+            ",
+        )?,
+        TestStruct(0)
+    );
+
+    Ok(())
+}
+
 #[test]
 fn test_internal_fn_big() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
