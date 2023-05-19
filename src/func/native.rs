@@ -10,7 +10,7 @@ use crate::{
     calc_fn_hash, Dynamic, Engine, EvalContext, FnArgsVec, FuncArgs, Position, RhaiResult,
     RhaiResultOf, StaticVec, VarDefInfo, ERR,
 };
-use std::any::{type_name, TypeId};
+use std::any::type_name;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -313,19 +313,18 @@ impl<'a> NativeCallContext<'a> {
 
         self._call_fn_raw(fn_name, args, false, false, false)
             .and_then(|result| {
-                // Bail out early if the return type needs no cast
-                if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-                    return Ok(reify! { result => T });
-                }
-
-                let typ = self.engine().map_type_name(result.type_name());
-
-                result.try_cast().ok_or_else(|| {
-                    let typename = match type_name::<T>() {
+                result.try_cast_raw().map_err(|r| {
+                    let result_type = self.engine().map_type_name(r.type_name());
+                    let cast_type = match type_name::<T>() {
                         typ @ _ if typ.contains("::") => self.engine.map_type_name(typ),
                         typ @ _ => typ,
                     };
-                    ERR::ErrorMismatchOutputType(typename.into(), typ.into(), Position::NONE).into()
+                    ERR::ErrorMismatchOutputType(
+                        cast_type.into(),
+                        result_type.into(),
+                        Position::NONE,
+                    )
+                    .into()
                 })
             })
     }
@@ -347,19 +346,18 @@ impl<'a> NativeCallContext<'a> {
 
         self._call_fn_raw(fn_name, args, true, false, false)
             .and_then(|result| {
-                // Bail out early if the return type needs no cast
-                if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-                    return Ok(reify! { result => T });
-                }
-
-                let typ = self.engine().map_type_name(result.type_name());
-
-                result.try_cast().ok_or_else(|| {
-                    let typename = match type_name::<T>() {
+                result.try_cast_raw().map_err(|r| {
+                    let result_type = self.engine().map_type_name(r.type_name());
+                    let cast_type = match type_name::<T>() {
                         typ @ _ if typ.contains("::") => self.engine.map_type_name(typ),
                         typ @ _ => typ,
                     };
-                    ERR::ErrorMismatchOutputType(typename.into(), typ.into(), Position::NONE).into()
+                    ERR::ErrorMismatchOutputType(
+                        cast_type.into(),
+                        result_type.into(),
+                        Position::NONE,
+                    )
+                    .into()
                 })
             })
     }

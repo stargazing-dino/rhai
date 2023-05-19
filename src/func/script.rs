@@ -6,7 +6,6 @@ use crate::ast::ScriptFnDef;
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::EncapsulatedEnviron;
 use crate::{Dynamic, Engine, Position, RhaiResult, Scope, ERR};
-use std::mem;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -100,7 +99,7 @@ impl Engine {
 
             global.lib.push(lib.clone());
 
-            mem::replace(&mut global.constants, constants.clone())
+            std::mem::replace(&mut global.constants, constants.clone())
         });
 
         #[cfg(feature = "debugging")]
