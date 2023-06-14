@@ -50,14 +50,17 @@ impl HokmaLock {
 
     pub fn write(&'static self) -> WhenTheHokmaSuppression {
         loop {
-            let previous = self.lock.load(Ordering::SeqCst);
-            self.lock.store(1, Ordering::SeqCst);
-
-            if previous != 1 {
-                return WhenTheHokmaSuppression {
-                    hokma: self,
-                    state: previous,
-                };
+            // We are only interested in error results
+            if let Err(previous) = self
+                .lock
+                .compare_exchange(1, 1, Ordering::Acquire, Ordering::Relaxed)
+            {
+                if previous != 1 {
+                    return WhenTheHokmaSuppression {
+                        hokma: self,
+                        state: previous,
+                    };
+                }
             }
         }
     }
