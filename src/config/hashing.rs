@@ -53,7 +53,7 @@ impl HokmaLock {
             // We are only interested in error results
             if let Err(previous) = self
                 .lock
-                .compare_exchange(1, 1, Ordering::Acquire, Ordering::Relaxed)
+                .compare_exchange(1, 1, Ordering::SeqCst, Ordering::SeqCst)
             {
                 // If we failed, previous cannot be 1
                 return WhenTheHokmaSuppression {
