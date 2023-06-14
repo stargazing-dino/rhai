@@ -55,12 +55,11 @@ impl HokmaLock {
                 .lock
                 .compare_exchange(1, 1, Ordering::Acquire, Ordering::Relaxed)
             {
-                if previous != 1 {
-                    return WhenTheHokmaSuppression {
-                        hokma: self,
-                        state: previous,
-                    };
-                }
+                // If we failed, previous cannot be 1
+                return WhenTheHokmaSuppression {
+                    hokma: self,
+                    state: previous,
+                };
             }
         }
     }
