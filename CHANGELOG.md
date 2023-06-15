@@ -4,6 +4,11 @@ Rhai Release Notes
 Version 1.15.0
 ==============
 
+Bug fixes
+---------
+
+* Fixes a concurrency error in static hashing keys (thanks [`garypen`](https://github.com/garypen)!).
+
 Enhancements
 ------------
 
