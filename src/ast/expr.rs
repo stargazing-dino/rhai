@@ -297,6 +297,8 @@ pub enum Expr {
         Option<NonZeroU8>,
         Position,
     ),
+    /// `this`.
+    ThisPtr(Position),
     /// Property access - ((getter, hash), (setter, hash), prop)
     Property(
         Box<(
@@ -375,6 +377,7 @@ impl fmt::Debug for Expr {
                     .entries(x.0.iter().map(|(k, v)| (k, v)))
                     .finish()
             }
+            Self::ThisPtr(..) => f.debug_struct("ThisPtr").finish(),
             Self::Variable(x, i, ..) => {
                 f.write_str("Variable(")?;
 
@@ -632,6 +635,7 @@ impl Expr {
             | Self::Array(..)
             | Self::Map(..)
             | Self::Variable(..)
+            | Self::ThisPtr(..)
             | Self::And(..)
             | Self::Or(..)
             | Self::Coalesce(..)
@@ -662,6 +666,7 @@ impl Expr {
             | Self::Array(.., pos)
             | Self::Map(.., pos)
             | Self::Variable(.., pos)
+            | Self::ThisPtr(pos)
             | Self::And(.., pos)
             | Self::Or(.., pos)
             | Self::Coalesce(.., pos)
@@ -725,6 +730,7 @@ impl Expr {
             | Self::Dot(.., pos)
             | Self::Index(.., pos)
             | Self::Variable(.., pos)
+            | Self::ThisPtr(pos)
             | Self::FnCall(.., pos)
             | Self::MethodCall(.., pos)
             | Self::InterpolatedString(.., pos)
@@ -816,6 +822,7 @@ impl Expr {
             | Self::StringConstant(..)
             | Self::InterpolatedString(..)
             | Self::FnCall(..)
+            | Self::ThisPtr(..)
             | Self::MethodCall(..)
             | Self::Stmt(..)
             | Self::Dot(..)

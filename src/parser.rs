@@ -7,7 +7,7 @@ use crate::ast::{
     FnCallHashes, Ident, Namespace, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock,
     StmtBlockContainer, SwitchCasesCollection,
 };
-use crate::engine::{Precedence, KEYWORD_THIS, OP_CONTAINS, OP_NOT};
+use crate::engine::{Precedence, OP_CONTAINS, OP_NOT};
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::{hashing::get_hasher, StraightHashMap};
 use crate::tokenizer::{
@@ -1750,21 +1750,19 @@ impl Engine {
                             settings.pos,
                         )
                     }
-                    // Access to `this` as a variable is OK within a function scope
+                    // Access to `this` as a variable
                     #[cfg(not(feature = "no_function"))]
-                    _ if *s == KEYWORD_THIS && settings.has_flag(ParseSettingFlags::FN_SCOPE) => {
-                        Expr::Variable(
-                            (None, ns, 0, state.get_interned_string(*s)).into(),
-                            None,
-                            settings.pos,
-                        )
-                    }
-                    // Cannot access to `this` as a variable not in a function scope
-                    _ if *s == KEYWORD_THIS => {
-                        let msg = format!("'{s}' can only be used in functions");
-                        return Err(
-                            LexError::ImproperSymbol(s.to_string(), msg).into_err(settings.pos)
-                        );
+                    _ if *s == crate::engine::KEYWORD_THIS => {
+                        // OK within a function scope
+                        if settings.has_flag(ParseSettingFlags::FN_SCOPE) {
+                            Expr::ThisPtr(settings.pos)
+                        } else {
+                            // Cannot access to `this` as a variable not in a function scope
+                            let msg = format!("'{s}' can only be used in functions");
+                            return Err(
+                                LexError::ImproperSymbol(s.to_string(), msg).into_err(settings.pos)
+                            );
+                        }
                     }
                     _ => return Err(PERR::Reserved(s.to_string()).into_err(settings.pos)),
                 }
@@ -2148,10 +2146,8 @@ impl Engine {
         };
 
         match lhs {
-            // const_expr = rhs
-            ref expr if expr.is_constant() => {
-                Err(PERR::AssignmentToConstant(String::new()).into_err(lhs.start_position()))
-            }
+            // this = rhs
+            Expr::ThisPtr(_) => Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into())),
             // var (non-indexed) = rhs
             Expr::Variable(ref x, None, _) if x.0.is_none() => {
                 Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
@@ -2186,8 +2182,8 @@ impl Engine {
                 match valid_lvalue {
                     None => {
                         match x.lhs {
-                            // var[???] = rhs, var.??? = rhs
-                            Expr::Variable(..) => {
+                            // var[???] = rhs, this[???] = rhs, var.??? = rhs, this.??? = rhs
+                            Expr::Variable(..) | Expr::ThisPtr(..) => {
                                 Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
                             }
                             // expr[???] = rhs, expr.??? = rhs
@@ -2199,6 +2195,10 @@ impl Engine {
                         Err(PERR::AssignmentToInvalidLHS(String::new()).into_err(err_pos))
                     }
                 }
+            }
+            // const_expr = rhs
+            ref expr if expr.is_constant() => {
+                Err(PERR::AssignmentToConstant(String::new()).into_err(lhs.start_position()))
             }
             // ??? && ??? = rhs, ??? || ??? = rhs, xxx ?? xxx = rhs
             Expr::And(..) | Expr::Or(..) | Expr::Coalesce(..) if !op_info.is_op_assignment() => {

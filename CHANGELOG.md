@@ -1,8 +1,28 @@
 Rhai Release Notes
 ==================
 
+Version 1.15.0
+==============
+
+Bug fixes
+---------
+
+* Fixes a concurrency error in static hashing keys (thanks [`garypen`](https://github.com/garypen)!).
+
+Enhancements
+------------
+
+* Expressions involving `this` should now run slightly faster due to a dedicated `AST` node `ThisPtr`.
+* A `take` function is added to the standard library to take ownership of any data (replacing with `()`) in order to avoid cloning.
+* `EvalAltResult::ErrorMismatchOutputType` now gives a better name for the requested generic type (e.g. `&str` is now `&str` and not `string`).
+
+
 Version 1.14.0
 ==============
+
+This new version contains a substantial number of bug fixes for edge cases.
+
+A new syntax is supported to facilitate writing object methods in script.
 
 The code hacks that attempt to optimize branch prediction performance are removed because benchmarks do not show any material speed improvements.
 

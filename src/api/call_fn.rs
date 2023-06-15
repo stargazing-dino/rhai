@@ -8,10 +8,7 @@ use crate::{
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{
-    any::{type_name, TypeId},
-    mem,
-};
+use std::{any::type_name, mem};
 
 /// Options for calling a script-defined function via [`Engine::call_fn_with_options`].
 #[derive(Debug, Hash)]
@@ -181,17 +178,14 @@ impl Engine {
             options,
         )
         .and_then(|result| {
-            // Bail out early if the return type needs no cast
-            if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-                return Ok(reify! { result => T });
-            }
-
-            // Cast return type
-            let typ = self.map_type_name(result.type_name());
-
-            result.try_cast().ok_or_else(|| {
-                let t = self.map_type_name(type_name::<T>()).into();
-                ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            result.try_cast_raw().map_err(|r| {
+                let result_type = self.map_type_name(r.type_name());
+                let cast_type = match type_name::<T>() {
+                    typ @ _ if typ.contains("::") => self.map_type_name(typ),
+                    typ @ _ => typ,
+                };
+                ERR::ErrorMismatchOutputType(cast_type.into(), result_type.into(), Position::NONE)
+                    .into()
             })
         })
     }

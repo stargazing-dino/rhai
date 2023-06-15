@@ -1174,108 +1174,120 @@ impl Dynamic {
     ///
     /// assert_eq!(x.try_cast::<u32>().expect("x should be u32"), 42);
     /// ```
-    #[inline]
+    #[inline(always)]
     #[must_use]
     #[allow(unused_mut)]
     pub fn try_cast<T: Any>(mut self) -> Option<T> {
+        self.try_cast_raw().ok()
+    }
+    /// Convert the [`Dynamic`] value into specific type.
+    ///
+    /// Casting to a [`Dynamic`] just returns as is, but if it contains a shared value,
+    /// it is cloned into a [`Dynamic`] with a normal value.
+    ///
+    /// Returns itself if types mismatched.
+    #[allow(unused_mut)]
+    pub(crate) fn try_cast_raw<T: Any>(mut self) -> Result<T, Self> {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
 
         #[cfg(not(feature = "no_closure"))]
         self.flatten_in_place();
 
         if TypeId::of::<T>() == TypeId::of::<Self>() {
-            return Some(reify! { self => !!! T });
+            return Ok(reify! { self => !!! T });
         }
         if TypeId::of::<T>() == TypeId::of::<()>() {
             return match self.0 {
-                Union::Unit(..) => Some(reify! { () => !!! T }),
-                _ => None,
+                Union::Unit(..) => Ok(reify! { () => !!! T }),
+                _ => Err(self),
             };
         }
         if TypeId::of::<T>() == TypeId::of::<INT>() {
             return match self.0 {
-                Union::Int(n, ..) => Some(reify! { n => !!! T }),
-                _ => None,
+                Union::Int(n, ..) => Ok(reify! { n => !!! T }),
+                _ => Err(self),
             };
         }
         #[cfg(not(feature = "no_float"))]
         if TypeId::of::<T>() == TypeId::of::<crate::FLOAT>() {
             return match self.0 {
-                Union::Float(v, ..) => Some(reify! { *v => !!! T }),
-                _ => None,
+                Union::Float(v, ..) => Ok(reify! { *v => !!! T }),
+                _ => Err(self),
             };
         }
         #[cfg(feature = "decimal")]
         if TypeId::of::<T>() == TypeId::of::<rust_decimal::Decimal>() {
             return match self.0 {
-                Union::Decimal(v, ..) => Some(reify! { *v => !!! T }),
-                _ => None,
+                Union::Decimal(v, ..) => Ok(reify! { *v => !!! T }),
+                _ => Err(self),
             };
         }
         if TypeId::of::<T>() == TypeId::of::<bool>() {
             return match self.0 {
-                Union::Bool(b, ..) => Some(reify! { b => !!! T }),
-                _ => None,
+                Union::Bool(b, ..) => Ok(reify! { b => !!! T }),
+                _ => Err(self),
             };
         }
         if TypeId::of::<T>() == TypeId::of::<ImmutableString>() {
             return match self.0 {
-                Union::Str(s, ..) => Some(reify! { s => !!! T }),
-                _ => None,
+                Union::Str(s, ..) => Ok(reify! { s => !!! T }),
+                _ => Err(self),
             };
         }
         if TypeId::of::<T>() == TypeId::of::<String>() {
             return match self.0 {
-                Union::Str(s, ..) => Some(reify! { s.to_string() => !!! T }),
-                _ => None,
+                Union::Str(s, ..) => Ok(reify! { s.to_string() => !!! T }),
+                _ => Err(self),
             };
         }
         if TypeId::of::<T>() == TypeId::of::<char>() {
             return match self.0 {
-                Union::Char(c, ..) => Some(reify! { c => !!! T }),
-                _ => None,
+                Union::Char(c, ..) => Ok(reify! { c => !!! T }),
+                _ => Err(self),
             };
         }
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<T>() == TypeId::of::<crate::Array>() {
             return match self.0 {
-                Union::Array(a, ..) => Some(reify! { *a => !!! T }),
-                _ => None,
+                Union::Array(a, ..) => Ok(reify! { *a => !!! T }),
+                _ => Err(self),
             };
         }
         #[cfg(not(feature = "no_index"))]
         if TypeId::of::<T>() == TypeId::of::<crate::Blob>() {
             return match self.0 {
-                Union::Blob(b, ..) => Some(reify! { *b => !!! T }),
-                _ => None,
+                Union::Blob(b, ..) => Ok(reify! { *b => !!! T }),
+                _ => Err(self),
             };
         }
         #[cfg(not(feature = "no_object"))]
         if TypeId::of::<T>() == TypeId::of::<crate::Map>() {
             return match self.0 {
-                Union::Map(m, ..) => Some(reify! { *m => !!! T }),
-                _ => None,
+                Union::Map(m, ..) => Ok(reify! { *m => !!! T }),
+                _ => Err(self),
             };
         }
         if TypeId::of::<T>() == TypeId::of::<FnPtr>() {
             return match self.0 {
-                Union::FnPtr(f, ..) => Some(reify! { *f => !!! T }),
-                _ => None,
+                Union::FnPtr(f, ..) => Ok(reify! { *f => !!! T }),
+                _ => Err(self),
             };
         }
         #[cfg(not(feature = "no_time"))]
         if TypeId::of::<T>() == TypeId::of::<Instant>() {
             return match self.0 {
-                Union::TimeStamp(t, ..) => Some(reify! { *t => !!! T }),
-                _ => None,
+                Union::TimeStamp(t, ..) => Ok(reify! { *t => !!! T }),
+                _ => Err(self),
             };
         }
 
         match self.0 {
-            Union::Variant(v, ..) => (*v).as_boxed_any().downcast().ok().map(|x| *x),
+            Union::Variant(v, ..) if TypeId::of::<T>() == (**v).type_id() => {
+                Ok((*v).as_boxed_any().downcast().map(|x| *x).unwrap())
+            }
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => unreachable!("Union::Shared case should be already handled"),
-            _ => None,
+            _ => Err(self),
         }
     }
     /// Convert the [`Dynamic`] value into a specific type.

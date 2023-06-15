@@ -28,11 +28,12 @@ fn start(data) {
     if state.value <= 0 {
         throw "Conditions not yet ready to start!";
     }
-    state.bool_state = true;
-    state.value = parse_int(data);
 
     // Constant 'MY_CONSTANT' in custom scope is also visible!
     print(`MY_CONSTANT = ${MY_CONSTANT}`);
+
+    state.value = parse_int(data);
+    state.bool_state = true;
 }
 
 /// 'end' event handler
@@ -43,8 +44,8 @@ fn end(data) {
     if state.value > 0 {
         throw "Conditions not yet ready to end!";
     }
-    state.bool_state = false;
     state.value = parse_int(data);
+    state.bool_state = false;
 }
 
 /// 'update' event handler

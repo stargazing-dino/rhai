@@ -212,11 +212,18 @@ impl Engine {
             return Ok(reify! { result => T });
         }
 
-        let typ = self.map_type_name(result.type_name());
+        result.try_cast_raw::<T>().map_err(|v| {
+            let typename = match type_name::<T>() {
+                typ @ _ if typ.contains("::") => self.map_type_name(typ),
+                typ @ _ => typ,
+            };
 
-        result.try_cast::<T>().ok_or_else(|| {
-            let t = self.map_type_name(type_name::<T>()).into();
-            ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            ERR::ErrorMismatchOutputType(
+                typename.into(),
+                self.map_type_name(v.type_name()).into(),
+                Position::NONE,
+            )
+            .into()
         })
     }
     /// Evaluate an [`AST`] with own scope, returning the result value or an error.

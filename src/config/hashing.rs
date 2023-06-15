@@ -51,9 +51,9 @@ impl HokmaLock {
     pub fn write(&'static self) -> WhenTheHokmaSuppression {
         loop {
             // We are only interested in error results
-            if let Err(previous) = self
-                .lock
-                .compare_exchange(1, 1, Ordering::SeqCst, Ordering::SeqCst)
+            if let Err(previous) =
+                self.lock
+                    .compare_exchange(1, 1, Ordering::SeqCst, Ordering::SeqCst)
             {
                 // If we failed, previous cannot be 1
                 return WhenTheHokmaSuppression {

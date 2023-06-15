@@ -302,7 +302,26 @@ impl Engine {
             Stmt::Assignment(x, ..) => {
                 let (op_info, BinaryExpr { lhs, rhs }) = &**x;
 
-                if let Expr::Variable(x, ..) = lhs {
+                if let Expr::ThisPtr(..) = lhs {
+                    if this_ptr.is_none() {
+                        return Err(ERR::ErrorUnboundThis(lhs.position()).into());
+                    }
+
+                    #[cfg(not(feature = "no_function"))]
+                    {
+                        let rhs_val = self
+                            .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), rhs)?
+                            .flatten();
+
+                        self.track_operation(global, lhs.position())?;
+
+                        let target = &mut this_ptr.unwrap().into();
+
+                        self.eval_op_assignment(global, caches, op_info, lhs, target, rhs_val)?;
+                    }
+                    #[cfg(feature = "no_function")]
+                    unreachable!();
+                } else if let Expr::Variable(x, ..) = lhs {
                     let rhs_val = self
                         .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), rhs)?
                         .flatten();
@@ -342,6 +361,10 @@ impl Engine {
                         // Must be either `var[index] op= val` or `var.prop op= val`.
                         // The return value of any op-assignment (should be `()`) is thrown away and not used.
                         let _ = match lhs {
+                            // this op= rhs (handled above)
+                            Expr::ThisPtr(..) => {
+                                unreachable!("Expr::ThisPtr case is already handled")
+                            }
                             // name op= rhs (handled above)
                             Expr::Variable(..) => {
                                 unreachable!("Expr::Variable case is already handled")
@@ -861,9 +884,12 @@ impl Engine {
                 }
 
                 let v = self.eval_expr(global, caches, scope, this_ptr, expr)?;
-                let typ = v.type_name();
-                let path = v.try_cast::<crate::ImmutableString>().ok_or_else(|| {
-                    self.make_type_mismatch_err::<crate::ImmutableString>(typ, expr.position())
+
+                let path = v.try_cast_raw::<crate::ImmutableString>().map_err(|v| {
+                    self.make_type_mismatch_err::<crate::ImmutableString>(
+                        v.type_name(),
+                        expr.position(),
+                    )
                 })?;
 
                 let path_pos = expr.start_position();

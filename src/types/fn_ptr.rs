@@ -11,7 +11,7 @@ use crate::{
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
-    any::{type_name, TypeId},
+    any::type_name,
     convert::{TryFrom, TryInto},
     fmt,
     hash::{Hash, Hasher},
@@ -218,16 +218,14 @@ impl FnPtr {
         let ctx = (engine, self.fn_name(), None, &*global, Position::NONE).into();
 
         self.call_raw(&ctx, None, arg_values).and_then(|result| {
-            // Bail out early if the return type needs no cast
-            if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-                return Ok(reify! { result => T });
-            }
-
-            let typ = engine.map_type_name(result.type_name());
-
-            result.try_cast().ok_or_else(|| {
-                let t = engine.map_type_name(type_name::<T>()).into();
-                ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            result.try_cast_raw().map_err(|r| {
+                let result_type = engine.map_type_name(r.type_name());
+                let cast_type = match type_name::<T>() {
+                    typ @ _ if typ.contains("::") => engine.map_type_name(typ),
+                    typ @ _ => typ,
+                };
+                ERR::ErrorMismatchOutputType(cast_type.into(), result_type.into(), Position::NONE)
+                    .into()
             })
         })
     }
@@ -247,16 +245,14 @@ impl FnPtr {
         args.parse(&mut arg_values);
 
         self.call_raw(context, None, arg_values).and_then(|result| {
-            // Bail out early if the return type needs no cast
-            if TypeId::of::<T>() == TypeId::of::<Dynamic>() {
-                return Ok(reify! { result => T });
-            }
-
-            let typ = context.engine().map_type_name(result.type_name());
-
-            result.try_cast().ok_or_else(|| {
-                let t = context.engine().map_type_name(type_name::<T>()).into();
-                ERR::ErrorMismatchOutputType(t, typ.into(), Position::NONE).into()
+            result.try_cast_raw().map_err(|r| {
+                let result_type = context.engine().map_type_name(r.type_name());
+                let cast_type = match type_name::<T>() {
+                    typ @ _ if typ.contains("::") => context.engine().map_type_name(typ),
+                    typ @ _ => typ,
+                };
+                ERR::ErrorMismatchOutputType(cast_type.into(), result_type.into(), Position::NONE)
+                    .into()
             })
         })
     }

@@ -29,6 +29,7 @@ pub const KEYWORD_IS_SHARED: &str = "is_shared";
 pub const KEYWORD_IS_DEF_VAR: &str = "is_def_var";
 #[cfg(not(feature = "no_function"))]
 pub const KEYWORD_IS_DEF_FN: &str = "is_def_fn";
+#[cfg(not(feature = "no_function"))]
 pub const KEYWORD_THIS: &str = "this";
 #[cfg(not(feature = "no_function"))]
 #[cfg(not(feature = "no_module"))]

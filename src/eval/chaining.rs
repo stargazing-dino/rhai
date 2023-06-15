@@ -388,6 +388,23 @@ impl Engine {
         let scope2 = ();
 
         match (lhs, new_val) {
+            // this.??? or this[???]
+            (Expr::ThisPtr(var_pos), new_val) => {
+                self.track_operation(global, *var_pos)?;
+
+                #[cfg(feature = "debugging")]
+                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), lhs)?;
+
+                if let Some(this_ptr) = this_ptr {
+                    let target = &mut this_ptr.into();
+
+                    self.eval_dot_index_chain_raw(
+                        global, caches, scope2, None, lhs, expr, target, rhs, idx_values, new_val,
+                    )
+                } else {
+                    Err(ERR::ErrorUnboundThis(*var_pos).into())
+                }
+            }
             // id.??? or id[???]
             (Expr::Variable(.., var_pos), new_val) => {
                 self.track_operation(global, *var_pos)?;
