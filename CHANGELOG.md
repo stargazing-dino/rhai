@@ -1,6 +1,15 @@
 Rhai Release Notes
 ==================
 
+Version 1.16.0
+==============
+
+Bug fixes
+---------
+
+* `Dynamic::deep_scan` is fixed so now it properly scans arrays, object maps and function pointers embedded inside data.
+
+
 Version 1.15.0
 ==============
 
@@ -14,6 +23,7 @@ Enhancements
 
 * Expressions involving `this` should now run slightly faster due to a dedicated `AST` node `ThisPtr`.
 * A `take` function is added to the standard library to take ownership of any data (replacing with `()`) in order to avoid cloning.
+* `Dynamic::take` is added to take ownership of the data (replacing with `()`) in order to avoid cloning.
 * `EvalAltResult::ErrorMismatchOutputType` now gives a better name for the requested generic type (e.g. `&str` is now `&str` and not `string`).
 
 
