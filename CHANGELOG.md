@@ -1,7 +1,7 @@
 Rhai Release Notes
 ==================
 
-Version 1.16.0
+Version 1.15.1
 ==============
 
 Bug fixes
