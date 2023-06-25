@@ -2107,6 +2107,8 @@ impl Dynamic {
     #[allow(clippy::only_used_in_recursion)]
     pub fn deep_scan(&mut self, mut filter: impl FnMut(&mut Self)) {
         fn scan_inner(value: &mut Dynamic, filter: &mut impl FnMut(&mut Dynamic)) {
+            filter(value);
+
             match &mut value.0 {
                 #[cfg(not(feature = "no_index"))]
                 Union::Array(a, ..) => a.iter_mut().for_each(|v| scan_inner(v, filter)),
@@ -2117,7 +2119,6 @@ impl Dynamic {
             }
         }
 
-        filter(self);
         scan_inner(self, &mut filter);
     }
 }
