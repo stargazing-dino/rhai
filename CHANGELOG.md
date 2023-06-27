@@ -1,6 +1,15 @@
 Rhai Release Notes
 ==================
 
+Version 1.16.0
+==============
+
+Bug fixes
+---------
+
+* Fixes a panic when using `this` as the first parameter in a namespace-qualified function call.
+
+
 Version 1.15.1
 ==============
 
