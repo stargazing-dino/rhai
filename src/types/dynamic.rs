@@ -246,10 +246,7 @@ impl Dynamic {
     #[inline(always)]
     #[must_use]
     pub const fn is_shared(&self) -> bool {
-        #[cfg(not(feature = "no_closure"))]
-        return matches!(self.0, Union::Shared(..));
-        #[cfg(feature = "no_closure")]
-        return false;
+        matches!(self.0, Union::Shared(..))
     }
     /// Is the value held by this [`Dynamic`] a particular type?
     ///
