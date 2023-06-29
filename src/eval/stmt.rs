@@ -464,6 +464,9 @@ impl Engine {
                 if let Some(index) = index {
                     value.set_access_mode(access);
                     *scope.get_mut_by_index(scope.len() - index.get()) = value;
+                } else if !cfg!(feature = "unchecked") && scope.len() >= self.max_variables() {
+                    // Guard against too many variables
+                    return Err(ERR::ErrorTooManyVariables(*pos).into());
                 } else {
                     scope.push_entry(var_name.name.clone(), access, value);
                 }
@@ -879,7 +882,7 @@ impl Engine {
                 let (expr, export) = &**x;
 
                 // Guard against too many modules
-                if global.num_modules_loaded >= self.max_modules() {
+                if !cfg!(feature = "unchecked") && global.num_modules_loaded >= self.max_modules() {
                     return Err(ERR::ErrorTooManyModules(*_pos).into());
                 }
 
