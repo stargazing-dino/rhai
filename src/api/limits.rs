@@ -155,8 +155,6 @@ impl Engine {
         self
     }
     /// The maximum number of operations allowed for a script to run (0 for unlimited).
-    ///
-    /// Not available under `unchecked`.
     #[inline]
     #[must_use]
     pub const fn max_operations(&self) -> u64 {
@@ -168,7 +166,6 @@ impl Engine {
     /// Set the maximum number of imported variables allowed for a script at any instant.
     ///
     /// Not available under `unchecked`.
-    #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     pub fn set_max_variables(&mut self, modules: usize) -> &mut Self {
         self.limits.max_variables = modules;
