@@ -146,7 +146,7 @@ impl Engine {
                     (Union::Bool(b1, ..), Union::Bool(b2, ..)) => match op_x {
                         AndAssign => *b1 = *b1 && *b2,
                         OrAssign => *b1 = *b1 || *b2,
-                        XOrAssign => *b1 ^= *b2,
+                        XOrAssign => *b1 = *b1 ^ *b2,
                         _ => done = false,
                     },
                     (Union::Int(n1, ..), Union::Int(n2, ..)) => {
@@ -206,7 +206,7 @@ impl Engine {
 
                 if !done {
                     if let Some((func, need_context)) =
-                        get_builtin_op_assignment_fn(op_x, &lock_guard, &new_val)
+                        get_builtin_op_assignment_fn(op_x, &*lock_guard, &new_val)
                     {
                         // We may not need to bump the level because built-in's do not need it.
                         //defer! { let orig_level = global.level; global.level += 1 }
@@ -550,7 +550,7 @@ impl Engine {
 
                             let cond_result = match condition {
                                 Expr::BoolConstant(b, ..) => *b,
-                                c => self
+                                ref c => self
                                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), c)?
                                     .as_bool()
                                     .map_err(|typ| {

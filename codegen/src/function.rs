@@ -39,12 +39,17 @@ pub enum Property {
     Set(syn::Ident),
 }
 
-#[derive(Default, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum FnSpecialAccess {
-    #[default]
     None,
     Index(Index),
     Property(Property),
+}
+
+impl Default for FnSpecialAccess {
+    fn default() -> FnSpecialAccess {
+        FnSpecialAccess::None
+    }
 }
 
 impl FnSpecialAccess {

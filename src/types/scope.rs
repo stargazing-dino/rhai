@@ -641,6 +641,7 @@ impl Scope<'_> {
     ///
     /// Panics if the index is out of bounds.
     #[inline(always)]
+    #[must_use]
     #[allow(dead_code)]
     pub(crate) fn get_entry_by_index(
         &mut self,

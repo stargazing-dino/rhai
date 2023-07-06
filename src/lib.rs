@@ -81,13 +81,13 @@
 #![allow(clippy::match_same_arms)]
 // The lints below can be turned off to reduce signal/noise ratio
 #![allow(clippy::too_many_lines)]
+#![allow(clippy::let_underscore_drop)]
 #![allow(clippy::absurd_extreme_comparisons)]
 #![allow(clippy::unnecessary_cast)]
 #![allow(clippy::wildcard_imports)]
 #![allow(clippy::no_effect_underscore_binding)]
 #![allow(clippy::semicolon_if_nothing_returned)]
 #![allow(clippy::type_complexity)]
-#![allow(let_underscore_drop)]
 
 #[cfg(feature = "no_std")]
 extern crate alloc;

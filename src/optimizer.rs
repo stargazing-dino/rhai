@@ -697,7 +697,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             }
 
             // Remove unused block statements
-            (0..expressions.len()).for_each(|index| {
+            (0..expressions.len()).into_iter().for_each(|index| {
                 if *def_case == Some(index)
                     || cases.values().flat_map(|c| c.iter()).any(|&n| n == index)
                     || ranges.iter().any(|r| r.index() == index)

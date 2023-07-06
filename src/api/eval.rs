@@ -214,8 +214,8 @@ impl Engine {
 
         result.try_cast_raw::<T>().map_err(|v| {
             let typename = match type_name::<T>() {
-                typ if typ.contains("::") => self.map_type_name(typ),
-                typ => typ,
+                typ @ _ if typ.contains("::") => self.map_type_name(typ),
+                typ @ _ => typ,
             };
 
             ERR::ErrorMismatchOutputType(

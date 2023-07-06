@@ -316,8 +316,8 @@ impl<'a> NativeCallContext<'a> {
                 result.try_cast_raw().map_err(|r| {
                     let result_type = self.engine().map_type_name(r.type_name());
                     let cast_type = match type_name::<T>() {
-                        typ if typ.contains("::") => self.engine.map_type_name(typ),
-                        typ => typ,
+                        typ @ _ if typ.contains("::") => self.engine.map_type_name(typ),
+                        typ @ _ => typ,
                     };
                     ERR::ErrorMismatchOutputType(
                         cast_type.into(),
@@ -349,8 +349,8 @@ impl<'a> NativeCallContext<'a> {
                 result.try_cast_raw().map_err(|r| {
                     let result_type = self.engine().map_type_name(r.type_name());
                     let cast_type = match type_name::<T>() {
-                        typ if typ.contains("::") => self.engine.map_type_name(typ),
-                        typ => typ,
+                        typ @ _ if typ.contains("::") => self.engine.map_type_name(typ),
+                        typ @ _ => typ,
                     };
                     ERR::ErrorMismatchOutputType(
                         cast_type.into(),

@@ -110,7 +110,14 @@ impl Engine {
 
         // Evaluate the function
         let mut _result: RhaiResult = self
-            .eval_stmt_block(global, caches, scope, this_ptr, &fn_def.body, rewind_scope)
+            .eval_stmt_block(
+                global,
+                caches,
+                scope,
+                this_ptr.as_deref_mut(),
+                &fn_def.body,
+                rewind_scope,
+            )
             .or_else(|err| match *err {
                 // Convert return statement to return value
                 ERR::Return(x, ..) => Ok(x),
