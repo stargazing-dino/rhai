@@ -40,7 +40,7 @@ impl FnAccess {
 bitflags! {
     /// _(internals)_ Bit-flags containing [`AST`][crate::AST] node configuration options.
     /// Exported under the `internals` feature only.
-    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
     pub struct ASTFlags: u8 {
         /// The [`AST`][crate::AST] node is read-only.
         const CONSTANT = 0b_0000_0001;
@@ -50,5 +50,11 @@ bitflags! {
         const NEGATED = 0b_0000_0100;
         /// The [`AST`][crate::AST] node breaks out of normal control flow.
         const BREAK = 0b_0000_1000;
+    }
+}
+
+impl std::fmt::Debug for ASTFlags {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", &self.0)
     }
 }
