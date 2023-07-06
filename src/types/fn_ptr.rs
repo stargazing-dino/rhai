@@ -221,8 +221,8 @@ impl FnPtr {
             result.try_cast_raw().map_err(|r| {
                 let result_type = engine.map_type_name(r.type_name());
                 let cast_type = match type_name::<T>() {
-                    typ @ _ if typ.contains("::") => engine.map_type_name(typ),
-                    typ @ _ => typ,
+                    typ if typ.contains("::") => engine.map_type_name(typ),
+                    typ => typ,
                 };
                 ERR::ErrorMismatchOutputType(cast_type.into(), result_type.into(), Position::NONE)
                     .into()
@@ -248,8 +248,8 @@ impl FnPtr {
             result.try_cast_raw().map_err(|r| {
                 let result_type = context.engine().map_type_name(r.type_name());
                 let cast_type = match type_name::<T>() {
-                    typ @ _ if typ.contains("::") => context.engine().map_type_name(typ),
-                    typ @ _ => typ,
+                    typ if typ.contains("::") => context.engine().map_type_name(typ),
+                    typ => typ,
                 };
                 ERR::ErrorMismatchOutputType(cast_type.into(), result_type.into(), Position::NONE)
                     .into()

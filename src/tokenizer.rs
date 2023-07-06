@@ -1543,7 +1543,7 @@ fn get_next_token_inner(
     // Still inside a comment?
     if state.comment_level > 0 {
         let start_pos = *pos;
-        let mut comment = state.include_comments.then(|| String::new());
+        let mut comment = state.include_comments.then(String::new);
 
         state.comment_level =
             scan_block_comment(stream, state.comment_level, pos, comment.as_mut());
@@ -2492,7 +2492,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             Some((Token::Reserved(s), pos)) => (match
                 (s.as_str(),
                     #[cfg(not(feature = "no_custom_syntax"))]
-                    self.engine.is_custom_keyword(&*s),
+                    self.engine.is_custom_keyword(&s),
                     #[cfg(feature = "no_custom_syntax")]
                     false
                 )
@@ -2538,7 +2538,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             }, pos),
             // Custom keyword
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((Token::Identifier(s), pos)) if self.engine.is_custom_keyword(&*s) => {
+            Some((Token::Identifier(s), pos)) if self.engine.is_custom_keyword(&s) => {
                 (Token::Custom(s), pos)
             }
             // Custom keyword/symbol - must be disabled

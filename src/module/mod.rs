@@ -2448,9 +2448,9 @@ impl Module {
             self.flags
                 .set(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS, has_global_functions);
 
-            self.all_variables = (!variables.is_empty()).then(|| variables.into());
-            self.all_functions = (!functions.is_empty()).then(|| functions.into());
-            self.all_type_iterators = (!type_iterators.is_empty()).then(|| type_iterators.into());
+            self.all_variables = (!variables.is_empty()).then(|| variables);
+            self.all_functions = (!functions.is_empty()).then(|| functions);
+            self.all_type_iterators = (!type_iterators.is_empty()).then(|| type_iterators);
 
             self.flags |= ModuleFlags::INDEXED;
         }
