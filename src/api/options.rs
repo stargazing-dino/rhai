@@ -7,6 +7,7 @@ use std::prelude::v1::*;
 
 bitflags! {
     /// Bit-flags containing all language options for the [`Engine`].
+    #[derive(Eq, PartialEq, Hash, Debug, Clone, Copy)]
     pub struct LangOptions: u16 {
         /// Is `if`-expression allowed?
         const IF_EXPR = 0b_0000_0000_0001;

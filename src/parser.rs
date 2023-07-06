@@ -285,6 +285,7 @@ impl<'e, 's> ParseState<'e, 's> {
 
 bitflags! {
     /// Bit-flags containing all status for [`ParseSettings`].
+    #[derive(Eq, PartialEq, Hash, Debug, Clone, Copy)]
     pub struct ParseSettingFlags: u8 {
         /// Is the construct being parsed located at global level?
         const GLOBAL_LEVEL = 0b0000_0001;

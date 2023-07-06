@@ -40,6 +40,7 @@ impl FnAccess {
 bitflags! {
     /// _(internals)_ Bit-flags containing [`AST`][crate::AST] node configuration options.
     /// Exported under the `internals` feature only.
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct ASTFlags: u8 {
         /// The [`AST`][crate::AST] node is read-only.
         const CONSTANT = 0b_0000_0001;
