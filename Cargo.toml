@@ -18,7 +18,7 @@ keywords = ["scripting", "scripting-engine", "scripting-language", "embedded"]
 categories = ["no-std", "embedded", "wasm", "parser-implementations"]
 
 [dependencies]
-smallvec = { version = "1.10.0", default-features = false, features = ["union", "const_new", "const_generics"] }
+smallvec = { version = "1.7", default-features = false, features = ["union", "const_new", "const_generics"] }
 ahash = { version = "0.8.2", default-features = false, features = ["compile-time-rng"] }
 num-traits = { version = "0.2", default-features = false }
 bitflags = { version = "2.3.1", default-features = false }
@@ -27,7 +27,7 @@ rhai_codegen = { version = "1.5.0", path = "codegen", default-features = false }
 
 no-std-compat = { git = "https://gitlab.com/jD91mZM2/no-std-compat", version = "0.4.1", default-features = false, features = ["alloc"], optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
-hashbrown = { version = "0.14", optional = true }
+hashbrown = { version = "0.13", optional = true }
 core-error = { version = "0.0", default-features = false, features = ["alloc"], optional = true }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"], optional = true }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
