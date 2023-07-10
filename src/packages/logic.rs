@@ -49,7 +49,6 @@ def_package! {
             reg_functions!(lib += numbers; i8, u8, i16, u16, i32, u32, u64);
 
             #[cfg(not(target_family = "wasm"))]
-
             reg_functions!(lib += num_128; i128, u128);
         }
 
@@ -73,6 +72,8 @@ def_package! {
         combine_with_exported_module!(lib, "decimal", decimal_functions);
 
         combine_with_exported_module!(lib, "logic", logic_functions);
+
+        combine_with_exported_module!(lib, "min_max", min_max_functions);
     }
 }
 
@@ -99,6 +100,40 @@ mod logic_functions {
     #[rhai_fn(name = "!")]
     pub fn not(x: bool) -> bool {
         !x
+    }
+}
+
+#[export_module]
+mod min_max_functions {
+    use crate::INT;
+
+    /// Return the number that is larger than the other number.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// max(42, 123);   // returns 132
+    /// ```
+    pub fn max(x: INT, y: INT) -> INT {
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    /// Return the number that is smaller than the other number.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// min(42, 123);   // returns 42
+    /// ```
+    pub fn min(x: INT, y: INT) -> INT {
+        if x <= y {
+            x
+        } else {
+            y
+        }
     }
 }
 
