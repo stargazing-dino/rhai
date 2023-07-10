@@ -1348,6 +1348,66 @@ mod string_functions {
 
         Ok(())
     }
+    /// Return the string that is lexically greater than the other string.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// max("hello", "world");      // returns "world"
+    /// ```
+    #[rhai_fn(name = "max")]
+    pub fn max_string(string1: ImmutableString, string2: ImmutableString) -> ImmutableString {
+        if string1 >= string2 {
+            string1
+        } else {
+            string2
+        }
+    }
+    /// Return the string that is lexically smaller than the other string.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// min("hello", "world");      // returns "hello"
+    /// ```
+    #[rhai_fn(name = "min")]
+    pub fn min_string(string1: ImmutableString, string2: ImmutableString) -> ImmutableString {
+        if string1 <= string2 {
+            string1
+        } else {
+            string2
+        }
+    }
+    /// Return the character that is lexically greater than the other character.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// max('h', 'w');      // returns 'w'
+    /// ```
+    #[rhai_fn(name = "max")]
+    pub fn max_char(char1: char, char2: char) -> char {
+        if char1 >= char2 {
+            char1
+        } else {
+            char2
+        }
+    }
+    /// Return the character that is lexically smaller than the other character.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// max('h', 'w');      // returns 'h'
+    /// ```
+    #[rhai_fn(name = "min")]
+    pub fn min_char(char1: char, char2: char) -> char {
+        if char1 <= char2 {
+            char1
+        } else {
+            char2
+        }
+    }
 
     #[cfg(not(feature = "no_index"))]
     pub mod arrays {

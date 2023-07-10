@@ -8,6 +8,7 @@ Bug fixes
 ---------
 
 * Fixes a panic when using `this` as the first parameter in a namespace-qualified function call.
+* `max` and `min` for integers, strings and characters were missing from the standard library. They are now added.
 
 New features
 ------------
