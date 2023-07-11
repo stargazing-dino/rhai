@@ -46,6 +46,10 @@ fn test_mismatched_op_custom_type() -> Result<(), Box<EvalAltResult>> {
         .register_type_with_name::<TestStruct>("TestStruct")
         .register_fn("new_ts", TestStruct::new);
 
+    assert!(!engine.eval::<bool>("new_ts() == 42")?);
+
+    assert!(engine.eval::<bool>("new_ts() != ()")?);
+
     assert!(matches!(*engine.eval::<bool>(
         "
             let x = new_ts();
@@ -53,11 +57,6 @@ fn test_mismatched_op_custom_type() -> Result<(), Box<EvalAltResult>> {
             x == y
         ").unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f == "== (TestStruct, TestStruct)"));
-
-    assert!(
-        matches!(*engine.eval::<bool>("new_ts() == 42").unwrap_err(),
-        EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("== (TestStruct, "))
-    );
 
     assert!(matches!(
         *engine.eval::<INT>("60 + new_ts()").unwrap_err(),

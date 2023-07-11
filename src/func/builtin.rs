@@ -39,6 +39,46 @@ fn const_true_fn(_: Option<NativeCallContext>, _: &mut [&mut Dynamic]) -> RhaiRe
 fn const_false_fn(_: Option<NativeCallContext>, _: &mut [&mut Dynamic]) -> RhaiResult {
     Ok(Dynamic::FALSE)
 }
+/// Returns true if the type is numeric.
+#[inline(always)]
+fn is_numeric(typ: TypeId) -> bool {
+    if typ == TypeId::of::<INT>() {
+        return true;
+    }
+
+    #[cfg(not(feature = "no_float"))]
+    if typ == TypeId::of::<f32>() || typ == TypeId::of::<f64>() {
+        return true;
+    }
+
+    #[cfg(feature = "decimal")]
+    if typ == TypeId::of::<Decimal>() {
+        return true;
+    }
+
+    #[cfg(not(feature = "only_i32"))]
+    #[cfg(not(feature = "only_i64"))]
+    if typ == TypeId::of::<u8>()
+        || typ == TypeId::of::<u16>()
+        || typ == TypeId::of::<u32>()
+        || typ == TypeId::of::<u64>()
+        || typ == TypeId::of::<i8>()
+        || typ == TypeId::of::<i16>()
+        || typ == TypeId::of::<i32>()
+        || typ == TypeId::of::<i64>()
+    {
+        return true;
+    }
+
+    #[cfg(not(feature = "only_i32"))]
+    #[cfg(not(feature = "only_i64"))]
+    #[cfg(not(target_family = "wasm"))]
+    if typ == TypeId::of::<u128>() || typ == TypeId::of::<i128>() {
+        return true;
+    }
+
+    false
+}
 
 /// Build in common binary operator implementations to avoid the cost of calling a registered function.
 ///
@@ -540,16 +580,13 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
         };
     }
 
-    // One of the operands is a custom type, so it is never built-in
-    if x.is_variant() || y.is_variant() {
-        return None;
-    }
-
-    // Default comparison operators for different types
+    // Default comparison operators for different, non-numeric types
     if type2 != type1 {
         return match op {
-            NotEqualsTo => Some((const_true_fn, false)),
-            EqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo => {
+            NotEqualsTo if !is_numeric(type1) || !is_numeric(type2) => Some((const_true_fn, false)),
+            EqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo
+                if !is_numeric(type1) || !is_numeric(type2) =>
+            {
                 Some((const_false_fn, false))
             }
             _ => None,
