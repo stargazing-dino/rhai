@@ -36,8 +36,9 @@ mod debugging_functions {
     pub fn back_trace(ctx: NativeCallContext) -> Array {
         use crate::debugger::CallStackFrame;
 
-        if let Some(ref debugger) = ctx.global_runtime_state().debugger {
-            debugger
+        match ctx.global_runtime_state().debugger {
+            None => Array::new(),
+            Some(ref debugger) => debugger
                 .call_stack()
                 .iter()
                 .rev()
@@ -82,9 +83,7 @@ mod debugging_functions {
                         display.into()
                     },
                 )
-                .collect()
-        } else {
-            Array::new()
+                .collect(),
         }
     }
 }

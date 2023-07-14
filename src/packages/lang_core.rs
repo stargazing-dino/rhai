@@ -82,25 +82,26 @@ mod core_functions {
         const TAG_MAX: Tag = Tag::MAX;
 
         if tag < TAG_MIN as INT {
-            Err(ERR::ErrorArithmetic(
+            return Err(ERR::ErrorArithmetic(
                 format!(
                     "{tag} is too small to fit into a tag (must be between {TAG_MIN} and {TAG_MAX})"
                 ),
                 Position::NONE,
             )
-            .into())
-        } else if tag > TAG_MAX as INT {
-            Err(ERR::ErrorArithmetic(
+            .into());
+        }
+        if tag > TAG_MAX as INT {
+            return Err(ERR::ErrorArithmetic(
                 format!(
                     "{tag} is too large to fit into a tag (must be between {TAG_MIN} and {TAG_MAX})"
                 ),
                 Position::NONE,
             )
-            .into())
-        } else {
-            value.set_tag(tag as Tag);
-            Ok(())
+            .into());
         }
+
+        value.set_tag(tag as Tag);
+        Ok(())
     }
 
     /// Block the current thread for a particular number of `seconds`.
@@ -134,10 +135,12 @@ mod core_functions {
     /// ```
     #[cfg(not(feature = "no_std"))]
     pub fn sleep(seconds: INT) {
-        if seconds > 0 {
-            #[allow(clippy::cast_sign_loss)]
-            std::thread::sleep(std::time::Duration::from_secs(seconds as u64));
+        if seconds <= 0 {
+            return;
         }
+
+        #[allow(clippy::cast_sign_loss)]
+        std::thread::sleep(std::time::Duration::from_secs(seconds as u64));
     }
 
     /// Parse a JSON string into a value.
@@ -180,11 +183,11 @@ mod reflection_functions {
     #[rhai_fn(name = "get_fn_metadata_list")]
     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn get_fn_metadata2(ctx: NativeCallContext, name: &str, params: INT) -> Array {
-        if (0..=crate::MAX_USIZE_INT).contains(&params) {
-            collect_fn_metadata(&ctx, |_, _, n, p, _| p == (params as usize) && n == name)
-        } else {
-            Array::new()
+        if !(0..=crate::MAX_USIZE_INT).contains(&params) {
+            return Array::new();
         }
+
+        collect_fn_metadata(&ctx, |_, _, n, p, _| p == (params as usize) && n == name)
     }
 }
 

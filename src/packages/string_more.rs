@@ -30,22 +30,24 @@ mod string_functions {
         let s = print_with_func(FUNC_TO_STRING, &ctx, &mut item);
 
         if s.is_empty() {
-            string.clone()
-        } else {
-            let mut buf = SmartString::from(string.as_str());
-            buf.push_str(&s);
-            buf.into()
+            return string.clone();
         }
+
+        let mut buf = SmartString::from(string.as_str());
+        buf.push_str(&s);
+        buf.into()
     }
     #[rhai_fn(name = "+=", name = "append")]
     pub fn add(ctx: NativeCallContext, string: &mut ImmutableString, mut item: Dynamic) {
         let s = print_with_func(FUNC_TO_STRING, &ctx, &mut item);
 
-        if !s.is_empty() {
-            let mut buf = SmartString::from(string.as_str());
-            buf.push_str(&s);
-            *string = buf.into();
+        if s.is_empty() {
+            return;
         }
+
+        let mut buf = SmartString::from(string.as_str());
+        buf.push_str(&s);
+        *string = buf.into();
     }
     #[rhai_fn(name = "+", pure)]
     pub fn add_prepend(
@@ -132,11 +134,13 @@ mod string_functions {
         }
         #[rhai_fn(name = "+=", name = "append")]
         pub fn add(string: &mut ImmutableString, utf8: Blob) {
-            let mut s = SmartString::from(string.as_str());
-            if !utf8.is_empty() {
-                s.push_str(&String::from_utf8_lossy(&utf8));
-                *string = s.into();
+            if utf8.is_empty() {
+                return;
             }
+
+            let mut s = SmartString::from(string.as_str());
+            s.push_str(&String::from_utf8_lossy(&utf8));
+            *string = s.into();
         }
         #[rhai_fn(name = "+")]
         pub fn add_prepend(utf8: Blob, string: &str) -> ImmutableString {
@@ -166,10 +170,10 @@ mod string_functions {
         /// ```
         pub fn to_blob(string: &str) -> Blob {
             if string.is_empty() {
-                Blob::new()
-            } else {
-                string.as_bytes().into()
+                return Blob::new();
             }
+
+            string.as_bytes().into()
         }
     }
 
@@ -185,10 +189,10 @@ mod string_functions {
     #[rhai_fn(name = "len", get = "len")]
     pub fn len(string: &str) -> INT {
         if string.is_empty() {
-            0
-        } else {
-            string.chars().count() as INT
+            return 0;
         }
+
+        string.chars().count() as INT
     }
     /// Return true if the string is empty.
     #[rhai_fn(name = "is_empty", get = "is_empty")]
@@ -207,10 +211,10 @@ mod string_functions {
     #[rhai_fn(name = "bytes", get = "bytes")]
     pub fn bytes(string: &str) -> INT {
         if string.is_empty() {
-            0
-        } else {
-            string.len() as INT
+            return 0;
         }
+
+        string.len() as INT
     }
     /// Remove all occurrences of a sub-string from the string.
     ///
@@ -243,12 +247,14 @@ mod string_functions {
     }
     /// Clear the string, making it empty.
     pub fn clear(string: &mut ImmutableString) {
-        if !string.is_empty() {
-            if let Some(s) = string.get_mut() {
-                s.clear();
-            } else {
-                *string = ImmutableString::new();
-            }
+        if string.is_empty() {
+            return;
+        }
+
+        if let Some(s) = string.get_mut() {
+            s.clear();
+        } else {
+            *string = ImmutableString::new();
         }
     }
     /// Cut off the string at the specified number of characters.
@@ -270,15 +276,16 @@ mod string_functions {
     /// print(text);    // prints "hello, world!"
     /// ```
     pub fn truncate(string: &mut ImmutableString, len: INT) {
-        if len > 0 {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            let len = len.min(MAX_USIZE_INT) as usize;
-            if let Some((index, _)) = string.char_indices().nth(len) {
-                let copy = string.make_mut();
-                copy.truncate(index);
-            }
-        } else {
+        if len <= 0 {
             clear(string);
+            return;
+        }
+
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        let len = len.min(MAX_USIZE_INT) as usize;
+        if let Some((index, _)) = string.char_indices().nth(len) {
+            let copy = string.make_mut();
+            copy.truncate(index);
         }
     }
     /// Remove whitespace characters from both ends of the string.
@@ -322,12 +329,12 @@ mod string_functions {
     /// ```
     pub fn pop(string: &mut ImmutableString) -> Dynamic {
         if string.is_empty() {
-            Dynamic::UNIT
-        } else {
-            match string.make_mut().pop() {
-                Some(c) => c.into(),
-                None => Dynamic::UNIT,
-            }
+            return Dynamic::UNIT;
+        }
+
+        match string.make_mut().pop() {
+            Some(c) => c.into(),
+            None => Dynamic::UNIT,
         }
     }
     /// Remove a specified number of characters from the end of the string and return it as a
@@ -383,10 +390,10 @@ mod string_functions {
     #[rhai_fn(pure)]
     pub fn to_upper(string: &mut ImmutableString) -> ImmutableString {
         if string.chars().all(char::is_uppercase) {
-            string.clone()
-        } else {
-            string.to_uppercase().into()
+            return string.clone();
         }
+
+        string.to_uppercase().into()
     }
     /// Convert the string to all upper-case.
     ///
@@ -400,9 +407,11 @@ mod string_functions {
     /// print(text);        // prints "HELLO, WORLD!";
     /// ```
     pub fn make_upper(string: &mut ImmutableString) {
-        if !string.is_empty() && string.chars().any(|ch| !ch.is_uppercase()) {
-            *string = string.to_uppercase().into();
+        if string.is_empty() || string.chars().all(|ch| ch.is_uppercase()) {
+            return;
         }
+
+        *string = string.to_uppercase().into();
     }
     /// Convert the string to all lower-case and return it as a new string.
     ///
@@ -418,10 +427,10 @@ mod string_functions {
     #[rhai_fn(pure)]
     pub fn to_lower(string: &mut ImmutableString) -> ImmutableString {
         if string.is_empty() || string.chars().all(char::is_lowercase) {
-            string.clone()
-        } else {
-            string.to_lowercase().into()
+            return string.clone();
         }
+
+        string.to_lowercase().into()
     }
     /// Convert the string to all lower-case.
     ///
@@ -435,9 +444,11 @@ mod string_functions {
     /// print(text);        // prints "hello, world!";
     /// ```
     pub fn make_lower(string: &mut ImmutableString) {
-        if string.chars().any(|ch| !ch.is_lowercase()) {
-            *string = string.to_lowercase().into();
+        if string.is_empty() || string.chars().all(|ch| ch.is_lowercase()) {
+            return;
         }
+
+        *string = string.to_lowercase().into();
     }
 
     /// Convert the character to upper-case and return it as a new character.
@@ -650,12 +661,12 @@ mod string_functions {
     #[rhai_fn(name = "index_of")]
     pub fn index_of_char(string: &str, character: char) -> INT {
         if string.is_empty() {
-            -1
-        } else {
-            string
-                .find(character)
-                .map_or(-1 as INT, |index| string[0..index].chars().count() as INT)
+            return -1;
         }
+
+        string
+            .find(character)
+            .map_or(-1 as INT, |index| string[0..index].chars().count() as INT)
     }
     /// Find the specified sub-string in the string, starting from the specified `start` position,
     /// and return the first index where it is found.
@@ -736,12 +747,12 @@ mod string_functions {
     #[rhai_fn(name = "index_of")]
     pub fn index_of(string: &str, find_string: &str) -> INT {
         if string.is_empty() {
-            -1
-        } else {
-            string
-                .find(find_string)
-                .map_or(-1 as INT, |index| string[0..index].chars().count() as INT)
+            return -1;
         }
+
+        string
+            .find(find_string)
+            .map_or(-1 as INT, |index| string[0..index].chars().count() as INT)
     }
 
     /// Get the character at the `index` position in the string.
@@ -919,9 +930,11 @@ mod string_functions {
 
         let mut chars = StaticVec::with_capacity(string.len());
 
-        let offset = if string.is_empty() || len <= 0 {
+        if string.is_empty() || len <= 0 {
             return ctx.engine().const_empty_string();
-        } else if start < 0 {
+        }
+
+        let offset = if start < 0 {
             let abs_start = start.unsigned_abs();
 
             if abs_start as u64 > MAX_USIZE_INT as u64 {
@@ -987,11 +1000,11 @@ mod string_functions {
         start: INT,
     ) -> ImmutableString {
         if string.is_empty() {
-            ctx.engine().const_empty_string()
-        } else {
-            let len = string.len() as INT;
-            sub_string(ctx, string, start, len)
+            return ctx.engine().const_empty_string();
         }
+
+        let len = string.len() as INT;
+        sub_string(ctx, string, start, len)
     }
 
     /// Remove all characters from the string except those within an exclusive `range`.
@@ -1067,10 +1080,12 @@ mod string_functions {
 
         let mut chars = StaticVec::with_capacity(string.len());
 
-        let offset = if string.is_empty() || len <= 0 {
+        if string.is_empty() || len <= 0 {
             string.make_mut().clear();
             return;
-        } else if start < 0 {
+        }
+
+        let offset = if start < 0 {
             let abs_start = start.unsigned_abs();
 
             if abs_start as u64 > MAX_USIZE_INT as u64 {
@@ -1150,9 +1165,11 @@ mod string_functions {
     /// ```
     #[rhai_fn(name = "replace")]
     pub fn replace(string: &mut ImmutableString, find_string: &str, substitute_string: &str) {
-        if !string.is_empty() {
-            *string = string.replace(find_string, substitute_string).into();
+        if string.is_empty() {
+            return;
         }
+
+        *string = string.replace(find_string, substitute_string).into();
     }
     /// Replace all occurrences of the specified sub-string in the string with the specified character.
     ///
@@ -1171,11 +1188,13 @@ mod string_functions {
         find_string: &str,
         substitute_character: char,
     ) {
-        if !string.is_empty() {
-            *string = string
-                .replace(find_string, &substitute_character.to_string())
-                .into();
+        if string.is_empty() {
+            return;
         }
+
+        *string = string
+            .replace(find_string, &substitute_character.to_string())
+            .into();
     }
     /// Replace all occurrences of the specified character in the string with another string.
     ///
@@ -1194,11 +1213,13 @@ mod string_functions {
         find_character: char,
         substitute_string: &str,
     ) {
-        if !string.is_empty() {
-            *string = string
-                .replace(&find_character.to_string(), substitute_string)
-                .into();
+        if string.is_empty() {
+            return;
         }
+
+        *string = string
+            .replace(&find_character.to_string(), substitute_string)
+            .into();
     }
     /// Replace all occurrences of the specified character in the string with another character.
     ///
@@ -1217,14 +1238,16 @@ mod string_functions {
         find_character: char,
         substitute_character: char,
     ) {
-        if !string.is_empty() {
-            *string = string
-                .replace(
-                    &find_character.to_string(),
-                    &substitute_character.to_string(),
-                )
-                .into();
+        if string.is_empty() {
+            return;
         }
+
+        *string = string
+            .replace(
+                &find_character.to_string(),
+                &substitute_character.to_string(),
+            )
+            .into();
     }
 
     /// Pad the string to at least the specified number of characters with the specified `character`.
@@ -1267,19 +1290,20 @@ mod string_functions {
 
         let orig_len = string.chars().count();
 
-        if len > orig_len {
-            let p = string.make_mut();
+        if len <= orig_len {
+            return Ok(());
+        }
 
-            for _ in 0..(len - orig_len) {
-                p.push(character);
-            }
+        let p = string.make_mut();
 
-            if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size()
-            {
-                return Err(
-                    ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
-                );
-            }
+        for _ in 0..(len - orig_len) {
+            p.push(character);
+        }
+
+        if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size() {
+            return Err(
+                ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
+            );
         }
 
         Ok(())
@@ -1325,25 +1349,26 @@ mod string_functions {
         let mut str_len = string.chars().count();
         let padding_len = padding.chars().count();
 
-        if len > str_len {
-            let p = string.make_mut();
+        if len <= str_len {
+            return Ok(());
+        }
 
-            while str_len < len {
-                if str_len + padding_len <= len {
-                    p.push_str(padding);
-                    str_len += padding_len;
-                } else {
-                    p.extend(padding.chars().take(len - str_len));
-                    str_len = len;
-                }
-            }
+        let p = string.make_mut();
 
-            if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size()
-            {
-                return Err(
-                    ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
-                );
+        while str_len < len {
+            if str_len + padding_len <= len {
+                p.push_str(padding);
+                str_len += padding_len;
+            } else {
+                p.extend(padding.chars().take(len - str_len));
+                str_len = len;
             }
+        }
+
+        if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size() {
+            return Err(
+                ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
+            );
         }
 
         Ok(())

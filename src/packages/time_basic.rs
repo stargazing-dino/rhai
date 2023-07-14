@@ -66,14 +66,15 @@ mod time_functions {
             let seconds = timestamp.elapsed().as_secs();
 
             if cfg!(not(feature = "unchecked")) && seconds > (INT::MAX as u64) {
-                Err(make_arithmetic_err(format!(
+                return Err(make_arithmetic_err(format!(
                     "Integer overflow for timestamp.elapsed: {seconds}"
-                )))
-            } else if timestamp > Instant::now() {
-                Err(make_arithmetic_err("Time-stamp is later than now"))
-            } else {
-                Ok((seconds as INT).into())
+                )));
             }
+            if timestamp > Instant::now() {
+                return Err(make_arithmetic_err("Time-stamp is later than now"));
+            }
+
+            Ok((seconds as INT).into())
         }
     }
 
@@ -93,22 +94,22 @@ mod time_functions {
             let seconds = (timestamp2 - timestamp1).as_secs();
 
             if cfg!(not(feature = "unchecked")) && seconds > (INT::MAX as u64) {
-                Err(make_arithmetic_err(format!(
+                return Err(make_arithmetic_err(format!(
                     "Integer overflow for timestamp duration: -{seconds}"
-                )))
-            } else {
-                Ok((-(seconds as INT)).into())
+                )));
             }
+
+            Ok((-(seconds as INT)).into())
         } else {
             let seconds = (timestamp1 - timestamp2).as_secs();
 
             if cfg!(not(feature = "unchecked")) && seconds > (INT::MAX as u64) {
-                Err(make_arithmetic_err(format!(
+                return Err(make_arithmetic_err(format!(
                     "Integer overflow for timestamp duration: {seconds}"
-                )))
-            } else {
-                Ok((seconds as INT).into())
+                )));
             }
+
+            Ok((seconds as INT).into())
         }
     }
 
@@ -117,21 +118,22 @@ mod time_functions {
         #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         fn add_impl(timestamp: Instant, seconds: FLOAT) -> RhaiResultOf<Instant> {
             if seconds < 0.0 {
-                subtract_impl(timestamp, -seconds)
-            } else if cfg!(not(feature = "unchecked")) {
+                return subtract_impl(timestamp, -seconds);
+            }
+            if cfg!(not(feature = "unchecked")) {
                 if seconds > (INT::MAX as FLOAT).min(u64::MAX as FLOAT) {
-                    Err(make_arithmetic_err(format!(
+                    return Err(make_arithmetic_err(format!(
                         "Integer overflow for timestamp add: {seconds}"
-                    )))
-                } else {
-                    timestamp
-                        .checked_add(Duration::from_millis((seconds * 1000.0) as u64))
-                        .ok_or_else(|| {
-                            make_arithmetic_err(format!(
-                                "Timestamp overflow when adding {seconds} second(s)"
-                            ))
-                        })
+                    )));
                 }
+
+                timestamp
+                    .checked_add(Duration::from_millis((seconds * 1000.0) as u64))
+                    .ok_or_else(|| {
+                        make_arithmetic_err(format!(
+                            "Timestamp overflow when adding {seconds} second(s)"
+                        ))
+                    })
             } else {
                 Ok(timestamp + Duration::from_millis((seconds * 1000.0) as u64))
             }
@@ -139,21 +141,22 @@ mod time_functions {
         #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         fn subtract_impl(timestamp: Instant, seconds: FLOAT) -> RhaiResultOf<Instant> {
             if seconds < 0.0 {
-                add_impl(timestamp, -seconds)
-            } else if cfg!(not(feature = "unchecked")) {
+                return add_impl(timestamp, -seconds);
+            }
+            if cfg!(not(feature = "unchecked")) {
                 if seconds > (INT::MAX as FLOAT).min(u64::MAX as FLOAT) {
-                    Err(make_arithmetic_err(format!(
+                    return Err(make_arithmetic_err(format!(
                         "Integer overflow for timestamp subtract: {seconds}"
-                    )))
-                } else {
-                    timestamp
-                        .checked_sub(Duration::from_millis((seconds * 1000.0) as u64))
-                        .ok_or_else(|| {
-                            make_arithmetic_err(format!(
-                                "Timestamp overflow when subtracting {seconds} second(s)"
-                            ))
-                        })
+                    )));
                 }
+
+                timestamp
+                    .checked_sub(Duration::from_millis((seconds * 1000.0) as u64))
+                    .ok_or_else(|| {
+                        make_arithmetic_err(format!(
+                            "Timestamp overflow when subtracting {seconds} second(s)"
+                        ))
+                    })
             } else {
                 Ok(timestamp
                     .checked_sub(Duration::from_millis((seconds * 1000.0) as u64))
@@ -185,11 +188,12 @@ mod time_functions {
         }
     }
 
+    #[allow(clippy::cast_sign_loss)]
     fn add_impl(timestamp: Instant, seconds: INT) -> RhaiResultOf<Instant> {
-        #[allow(clippy::cast_sign_loss)]
         if seconds < 0 {
-            subtract_impl(timestamp, -seconds)
-        } else if cfg!(not(feature = "unchecked")) {
+            return subtract_impl(timestamp, -seconds);
+        }
+        if cfg!(not(feature = "unchecked")) {
             timestamp
                 .checked_add(Duration::from_secs(seconds as u64))
                 .ok_or_else(|| {
@@ -204,8 +208,9 @@ mod time_functions {
     fn subtract_impl(timestamp: Instant, seconds: INT) -> RhaiResultOf<Instant> {
         #[allow(clippy::cast_sign_loss)]
         if seconds < 0 {
-            add_impl(timestamp, -seconds)
-        } else if cfg!(not(feature = "unchecked")) {
+            return add_impl(timestamp, -seconds);
+        }
+        if cfg!(not(feature = "unchecked")) {
             timestamp
                 .checked_sub(Duration::from_secs(seconds as u64))
                 .ok_or_else(|| {

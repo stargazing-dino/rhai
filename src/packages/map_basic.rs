@@ -85,16 +85,18 @@ mod map_functions {
     pub fn set(map: &mut Map, property: &str, value: Dynamic) {
         match map.get_mut(property) {
             Some(value_ref) => *value_ref = value,
-            _ => {
+            None => {
                 map.insert(property.into(), value);
             }
         }
     }
     /// Clear the object map.
     pub fn clear(map: &mut Map) {
-        if !map.is_empty() {
-            map.clear();
+        if map.is_empty() {
+            return;
         }
+
+        map.clear();
     }
     /// Remove any property of the specified `name` from the object map, returning its value.
     ///
@@ -113,10 +115,10 @@ mod map_functions {
     /// ```
     pub fn remove(map: &mut Map, property: &str) -> Dynamic {
         if map.is_empty() {
-            Dynamic::UNIT
-        } else {
-            map.remove(property).unwrap_or(Dynamic::UNIT)
+            return Dynamic::UNIT;
         }
+
+        map.remove(property).unwrap_or(Dynamic::UNIT)
     }
     /// Add all property values of another object map into the object map.
     /// Existing property values of the same names are replaced.
@@ -133,9 +135,11 @@ mod map_functions {
     /// ```
     #[rhai_fn(name = "mixin", name = "+=")]
     pub fn mixin(map: &mut Map, map2: Map) {
-        if !map2.is_empty() {
-            map.extend(map2.into_iter());
+        if map2.is_empty() {
+            return;
         }
+
+        map.extend(map2.into_iter());
     }
     /// Make a copy of the object map, add all property values of another object map
     /// (existing property values of the same names are replaced), then returning it.
@@ -153,14 +157,15 @@ mod map_functions {
     #[rhai_fn(name = "+")]
     pub fn merge(map1: Map, map2: Map) -> Map {
         if map2.is_empty() {
-            map1
-        } else if map1.is_empty() {
-            map2
-        } else {
-            let mut map1 = map1;
-            map1.extend(map2.into_iter());
-            map1
+            return map1;
         }
+        if map1.is_empty() {
+            return map2;
+        }
+
+        let mut map1 = map1;
+        map1.extend(map2.into_iter());
+        map1
     }
     /// Add all property values of another object map into the object map.
     /// Only properties that do not originally exist in the object map are added.
@@ -176,14 +181,16 @@ mod map_functions {
     /// print(m);       // prints "#{a:1, b:2, c:3, d:0}"
     /// ```
     pub fn fill_with(map: &mut Map, map2: Map) {
-        if !map2.is_empty() {
-            if map.is_empty() {
-                *map = map2;
-            } else {
-                for (key, value) in map2 {
-                    map.entry(key).or_insert(value);
-                }
-            }
+        if map2.is_empty() {
+            return;
+        }
+        if map.is_empty() {
+            *map = map2;
+            return;
+        }
+
+        for (key, value) in map2 {
+            map.entry(key).or_insert(value);
         }
     }
     /// Return `true` if two object maps are equal (i.e. all property values are equal).
@@ -263,10 +270,10 @@ mod map_functions {
     #[rhai_fn(pure)]
     pub fn keys(map: &mut Map) -> Array {
         if map.is_empty() {
-            Array::new()
-        } else {
-            map.keys().cloned().map(Into::into).collect()
+            return Array::new();
         }
+
+        map.keys().cloned().map(Into::into).collect()
     }
     /// Return an array with all the property values in the object map.
     ///
@@ -281,10 +288,10 @@ mod map_functions {
     #[rhai_fn(pure)]
     pub fn values(map: &mut Map) -> Array {
         if map.is_empty() {
-            Array::new()
-        } else {
-            map.values().cloned().collect()
+            return Array::new();
         }
+
+        map.values().cloned().collect()
     }
     /// Return the JSON representation of the object map.
     ///

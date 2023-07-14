@@ -329,6 +329,23 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
                 _ => None,
             };
         }
+
+        // Handle ranges here because ranges are implemented as custom type
+        if type1 == TypeId::of::<ExclusiveRange>() {
+            return match op {
+                EqualsTo => impl_op!(ExclusiveRange == ExclusiveRange),
+                NotEqualsTo => impl_op!(ExclusiveRange != ExclusiveRange),
+                _ => None,
+            };
+        }
+
+        if type1 == TypeId::of::<InclusiveRange>() {
+            return match op {
+                EqualsTo => impl_op!(InclusiveRange == InclusiveRange),
+                NotEqualsTo => impl_op!(InclusiveRange != InclusiveRange),
+                _ => None,
+            };
+        }
     }
 
     #[cfg(not(feature = "no_float"))]
@@ -559,23 +576,6 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
         return match op {
             NotEqualsTo => Some((const_true_fn, false)),
             Equals => Some((const_false_fn, false)),
-            _ => None,
-        };
-    }
-
-    // Handle ranges here because ranges are implemented as custom type
-    if type1 == TypeId::of::<ExclusiveRange>() && type1 == type2 {
-        return match op {
-            EqualsTo => impl_op!(ExclusiveRange == ExclusiveRange),
-            NotEqualsTo => impl_op!(ExclusiveRange != ExclusiveRange),
-            _ => None,
-        };
-    }
-
-    if type1 == TypeId::of::<InclusiveRange>() && type1 == type2 {
-        return match op {
-            EqualsTo => impl_op!(InclusiveRange == InclusiveRange),
-            NotEqualsTo => impl_op!(InclusiveRange != InclusiveRange),
             _ => None,
         };
     }

@@ -1152,7 +1152,9 @@ impl Engine {
                     .as_int()
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
 
-                return Ok(if num_params >= 0 {
+                return Ok(if num_params > crate::MAX_USIZE_INT {
+                    Dynamic::FALSE
+                } else if num_params >= 0 {
                     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                     let hash_script = calc_fn_hash(None, &fn_name, num_params as usize);
                     self.has_script_fn(global, caches, hash_script).into()
@@ -1192,7 +1194,9 @@ impl Engine {
                     .as_int()
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
 
-                return Ok(if num_params >= 0 {
+                return Ok(if num_params > crate::MAX_USIZE_INT {
+                    Dynamic::FALSE
+                } else if num_params >= 0 {
                     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                     let hash_script = crate::calc_typed_method_hash(
                         calc_fn_hash(None, &fn_name, num_params as usize),

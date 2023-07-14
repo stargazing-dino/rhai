@@ -187,10 +187,10 @@ pub mod blob_functions {
         let (index, ..) = calc_offset_len(blob.len(), index, 0);
 
         if index >= blob.len() {
-            0
-        } else {
-            blob[index] as INT
+            return 0;
         }
+
+        blob[index] as INT
     }
     /// Set the particular `index` position in the BLOB to a new byte `value`.
     ///
@@ -224,8 +224,12 @@ pub mod blob_functions {
 
         let (index, ..) = calc_offset_len(blob.len(), index, 0);
 
+        if index >= blob.len() {
+            return;
+        }
+
         #[allow(clippy::cast_sign_loss)]
-        if index < blob.len() {
+        {
             blob[index] = (value & 0x0000_00ff) as u8;
         }
     }
@@ -260,12 +264,14 @@ pub mod blob_functions {
     /// print(b1);      // prints "[4242424242111111]"
     /// ```
     pub fn append(blob1: &mut Blob, blob2: Blob) {
-        if !blob2.is_empty() {
-            if blob1.is_empty() {
-                *blob1 = blob2;
-            } else {
-                blob1.extend(blob2);
-            }
+        if blob2.is_empty() {
+            return;
+        }
+
+        if blob1.is_empty() {
+            *blob1 = blob2;
+        } else {
+            blob1.extend(blob2);
         }
     }
     /// Add a string (as UTF-8 encoded byte-stream) to the end of the BLOB
@@ -281,9 +287,11 @@ pub mod blob_functions {
     /// ```
     #[rhai_fn(name = "append")]
     pub fn append_str(blob: &mut Blob, string: &str) {
-        if !string.is_empty() {
-            blob.extend(string.as_bytes());
+        if string.is_empty() {
+            return;
         }
+
+        blob.extend(string.as_bytes());
     }
     /// Add a character (as UTF-8 encoded byte-stream) to the end of the BLOB
     ///
@@ -395,10 +403,10 @@ pub mod blob_functions {
     /// ```
     pub fn pop(blob: &mut Blob) -> INT {
         if blob.is_empty() {
-            0
-        } else {
-            blob.pop().map_or_else(|| 0, |v| v as INT)
+            return 0;
         }
+
+        blob.pop().map_or_else(|| 0, |v| v as INT)
     }
     /// Remove the first byte from the BLOB and return it.
     ///
@@ -417,10 +425,10 @@ pub mod blob_functions {
     /// ```
     pub fn shift(blob: &mut Blob) -> INT {
         if blob.is_empty() {
-            0
-        } else {
-            blob.remove(0) as INT
+            return 0;
         }
+
+        blob.remove(0) as INT
     }
     /// Remove the byte at the specified `index` from the BLOB and return it.
     ///
@@ -444,18 +452,21 @@ pub mod blob_functions {
     /// print(x);               // prints "[010305]"
     /// ```
     pub fn remove(blob: &mut Blob, index: INT) -> INT {
-        let index = match calc_index(blob.len(), index, true, || Err(())) {
-            Ok(n) => n,
-            Err(_) => return 0,
+        let index = if let Ok(n) = calc_index(blob.len(), index, true, || Err(())) {
+            n
+        } else {
+            return 0;
         };
 
         blob.remove(index) as INT
     }
     /// Clear the BLOB.
     pub fn clear(blob: &mut Blob) {
-        if !blob.is_empty() {
-            blob.clear();
+        if blob.is_empty() {
+            return;
         }
+
+        blob.clear();
     }
     /// Cut off the BLOB at the specified length.
     ///
@@ -482,15 +493,17 @@ pub mod blob_functions {
             blob.clear();
             return;
         }
-        if !blob.is_empty() {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            let len = len.min(MAX_USIZE_INT) as usize;
+        if blob.is_empty() {
+            return;
+        }
 
-            if len > 0 {
-                blob.truncate(len);
-            } else {
-                blob.clear();
-            }
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        let len = len.min(MAX_USIZE_INT) as usize;
+
+        if len > 0 {
+            blob.truncate(len);
+        } else {
+            blob.clear();
         }
     }
     /// Cut off the head of the BLOB, leaving a tail of the specified length.
@@ -519,14 +532,18 @@ pub mod blob_functions {
         clippy::cast_possible_truncation
     )]
     pub fn chop(blob: &mut Blob, len: INT) {
-        if !blob.is_empty() {
-            if len <= 0 {
-                blob.clear();
-            } else if len > MAX_USIZE_INT {
-                // len > BLOB length
-            } else if (len as usize) < blob.len() {
-                blob.drain(0..blob.len() - len as usize);
-            }
+        if blob.is_empty() {
+            return;
+        }
+        if len > MAX_USIZE_INT {
+            // len > BLOB length
+            return;
+        }
+
+        if len <= 0 {
+            blob.clear();
+        } else if (len as usize) < blob.len() {
+            blob.drain(0..blob.len() - len as usize);
         }
     }
     /// Reverse the BLOB.
@@ -545,9 +562,11 @@ pub mod blob_functions {
     /// print(b);           // prints "[0504030201]"
     /// ```
     pub fn reverse(blob: &mut Blob) {
-        if !blob.is_empty() {
-            blob.reverse();
+        if blob.is_empty() {
+            return;
         }
+
+        blob.reverse();
     }
     /// Replace an exclusive `range` of the BLOB with another BLOB.
     ///
@@ -688,10 +707,10 @@ pub mod blob_functions {
         let (start, len) = calc_offset_len(blob.len(), start, len);
 
         if len == 0 {
-            Blob::new()
-        } else {
-            blob[start..start + len].to_vec()
+            return Blob::new();
         }
+
+        blob[start..start + len].to_vec()
     }
     /// Copy a portion of the BLOB beginning at the `start` position till the end and return it as
     /// a new BLOB.
@@ -745,21 +764,22 @@ pub mod blob_functions {
 
         let (index, len) = calc_offset_len(blob.len(), index, INT::MAX);
 
+        if index >= blob.len() {
+            return Blob::new();
+        }
         if index == 0 {
             if len > blob.len() {
-                mem::take(blob)
-            } else {
-                let mut result = Blob::new();
-                result.extend(blob.drain(blob.len() - len..));
-                result
+                return mem::take(blob);
             }
-        } else if index >= blob.len() {
-            Blob::new()
-        } else {
+
             let mut result = Blob::new();
-            result.extend(blob.drain(index as usize..));
-            result
+            result.extend(blob.drain(blob.len() - len..));
+            return result;
         }
+
+        let mut result = Blob::new();
+        result.extend(blob.drain(index as usize..));
+        result
     }
     /// Remove all bytes in the BLOB within an exclusive `range` and return them as a new BLOB.
     ///
@@ -850,10 +870,10 @@ pub mod blob_functions {
         let (start, len) = calc_offset_len(blob.len(), start, len);
 
         if len == 0 {
-            Blob::new()
-        } else {
-            blob.drain(start..start + len).collect()
+            return Blob::new();
         }
+
+        blob.drain(start..start + len).collect()
     }
     /// Remove all bytes in the BLOB not within an exclusive `range` and return them as a new BLOB.
     ///
@@ -944,13 +964,12 @@ pub mod blob_functions {
         let (start, len) = calc_offset_len(blob.len(), start, len);
 
         if len == 0 {
-            mem::take(blob)
-        } else {
-            let mut drained: Blob = blob.drain(..start).collect();
-            drained.extend(blob.drain(len..));
-
-            drained
+            return mem::take(blob);
         }
+
+        let mut drained: Blob = blob.drain(..start).collect();
+        drained.extend(blob.drain(len..));
+        drained
     }
 }
 
