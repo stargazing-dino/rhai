@@ -17,10 +17,14 @@
 //! ```sh
 //! env RHAI_AHASH_SEED ="[236,800,954,213]"
 //! ```
-#![cfg(not(feature = "no_std"))]
 
 use super::hashing_env;
-use once_cell::sync::OnceCell;
+
+#[cfg(feature = "std")]
+pub use once_cell::sync::OnceCell;
+
+#[cfg(not(feature = "std"))]
+pub use once_cell::race::OnceBox as OnceCell;
 
 static AHASH_SEED: OnceCell<Option<[u64; 4]>> = OnceCell::new();
 
@@ -50,7 +54,11 @@ static AHASH_SEED: OnceCell<Option<[u64; 4]>> = OnceCell::new();
 /// ```
 #[inline(always)]
 pub fn set_ahash_seed(new_seed: Option<[u64; 4]>) -> Result<(), Option<[u64; 4]>> {
-    AHASH_SEED.set(new_seed)
+    #[cfg(feature = "std")]
+    return AHASH_SEED.set(new_seed);
+
+    #[cfg(not(feature = "std"))]
+    return AHASH_SEED.set(new_seed.into()).map_err(|err| *err);
 }
 
 /// Get the current hashing Seed.

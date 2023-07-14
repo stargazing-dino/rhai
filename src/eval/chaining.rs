@@ -3,6 +3,7 @@
 
 use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, BinaryExpr, Expr, OpAssignment};
+use crate::config::hashing::OnceCell;
 use crate::engine::{FN_IDX_GET, FN_IDX_SET};
 use crate::types::dynamic::Union;
 use crate::{
@@ -13,7 +14,7 @@ use std::hash::Hash;
 use std::prelude::v1::*;
 
 /// Function call hashes to index getters and setters.
-static INDEXER_HASHES: crate::config::StaticCell<(u64, u64)> = crate::config::StaticCell::new();
+static INDEXER_HASHES: OnceCell<(u64, u64)> = OnceCell::new();
 
 /// Get the pre-calculated index getter/setter hashes.
 #[inline(always)]
@@ -24,6 +25,7 @@ fn hash_idx() -> (u64, u64) {
             calc_fn_hash(None, FN_IDX_GET, 2),
             calc_fn_hash(None, FN_IDX_SET, 3),
         )
+            .into()
     })
 }
 

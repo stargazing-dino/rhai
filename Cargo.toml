@@ -21,12 +21,12 @@ categories = ["no-std", "embedded", "wasm", "parser-implementations"]
 smallvec = { version = "1.7", default-features = false, features = ["union", "const_new", "const_generics"] }
 ahash = { version = "0.8.2", default-features = false, features = ["compile-time-rng"] }
 num-traits = { version = "0.2", default-features = false }
+once_cell = { version = "1", default-features = false, features = ["race"] }
 bitflags = { version = "1", default-features = false }
 smartstring = { version = "1", default-features = false }
 rhai_codegen = { version = "1.5.0", path = "codegen", default-features = false }
 
 no-std-compat = { git = "https://gitlab.com/jD91mZM2/no-std-compat", version = "0.4.1", default-features = false, features = ["alloc"], optional = true }
-once_cell = { version = "1", optional = true }
 libm = { version = "0.2", default-features = false, optional = true }
 hashbrown = { version = "0.13", optional = true }
 core-error = { version = "0.0", default-features = false, features = ["alloc"], optional = true }
@@ -47,7 +47,7 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 ## Default features: `std`, uses runtime random numbers for hashing.
 default = ["std", "ahash/runtime-rng"]  # ahash/runtime-rng trumps ahash/compile-time-rng
 ## Standard features: uses compile-time random number for hashing.
-std = ["once_cell", "ahash/std", "num-traits/std", "smartstring/std"]
+std = ["once_cell/std", "ahash/std", "num-traits/std", "smartstring/std"]
 
 #! ### Enable Special Functionalities
 
