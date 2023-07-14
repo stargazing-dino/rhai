@@ -791,10 +791,8 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             return Ok(Dynamic::UNIT);
                         }
 
-                        let _array_is_empty = args[0].read_lock::<Array>().unwrap().is_empty();
-
                         #[cfg(not(feature = "unchecked"))]
-                        if !_array_is_empty {
+                        if !args[0].read_lock::<Array>().unwrap().is_empty() {
                             _ctx.unwrap().engine().check_data_size(
                                 &*args[0].read_lock().unwrap(),
                                 crate::Position::NONE,

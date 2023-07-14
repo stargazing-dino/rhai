@@ -3,7 +3,6 @@
 
 use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, BinaryExpr, Expr, OpAssignment};
-use crate::config::hashing::SusLock;
 use crate::engine::{FN_IDX_GET, FN_IDX_SET};
 use crate::types::dynamic::Union;
 use crate::{
@@ -14,11 +13,7 @@ use std::hash::Hash;
 use std::prelude::v1::*;
 
 /// Function call hashes to index getters and setters.
-///
-/// # Safety
-///
-/// Uses the extremely unsafe [`SusLock`].  Change to [`OnceCell`] when it is stabilized.
-static INDEXER_HASHES: SusLock<(u64, u64)> = SusLock::new();
+static INDEXER_HASHES: crate::config::StaticCell<(u64, u64)> = crate::config::StaticCell::new();
 
 /// Get the pre-calculated index getter/setter hashes.
 #[inline(always)]

@@ -18,8 +18,9 @@
 //! env RHAI_AHASH_SEED ="[236,800,954,213]"
 //! ```
 // [236,800,954,213], haha funny yume nikki reference epic uboachan face numberworld nexus moment 100
+#![cfg(feature = "no_std")]
 
-use crate::config::hashing_env;
+use super::hashing_env;
 use core::panic::{RefUnwindSafe, UnwindSafe};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;

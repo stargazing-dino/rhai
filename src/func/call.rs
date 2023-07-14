@@ -842,17 +842,20 @@ impl Engine {
                         // Recalculate hash
                         let num_args = args.len();
 
-                        let new_hash = match is_anon {
-                            false if !is_valid_function_name(name) => {
+                        let new_hash = if !is_anon && !is_valid_function_name(name) {
+                            FnCallHashes::from_native_only(calc_fn_hash(None, name, num_args))
+                        } else {
+                            #[cfg(not(feature = "no_function"))]
+                            {
+                                FnCallHashes::from_script_and_native(
+                                    calc_fn_hash(None, name, num_args - 1),
+                                    calc_fn_hash(None, name, num_args),
+                                )
+                            }
+                            #[cfg(feature = "no_function")]
+                            {
                                 FnCallHashes::from_native_only(calc_fn_hash(None, name, num_args))
                             }
-                            #[cfg(not(feature = "no_function"))]
-                            _ => FnCallHashes::from_script_and_native(
-                                calc_fn_hash(None, name, num_args - 1),
-                                calc_fn_hash(None, name, num_args),
-                            ),
-                            #[cfg(feature = "no_function")]
-                            _ => FnCallHashes::from_native_only(calc_fn_hash(None, name, num_args)),
                         };
 
                         // Map it to name(args) in function-call style
@@ -933,21 +936,24 @@ impl Engine {
                                     // Recalculate the hash based on the new function name and new arguments
                                     let num_args = call_args.len() + 1;
 
-                                    hash = match _is_anon {
-                                        false if !is_valid_function_name(fn_name) => {
+                                    hash = if !_is_anon && !is_valid_function_name(fn_name) {
+                                        FnCallHashes::from_native_only(calc_fn_hash(
+                                            None, fn_name, num_args,
+                                        ))
+                                    } else {
+                                        #[cfg(not(feature = "no_function"))]
+                                        {
+                                            FnCallHashes::from_script_and_native(
+                                                calc_fn_hash(None, fn_name, num_args - 1),
+                                                calc_fn_hash(None, fn_name, num_args),
+                                            )
+                                        }
+                                        #[cfg(feature = "no_function")]
+                                        {
                                             FnCallHashes::from_native_only(calc_fn_hash(
                                                 None, fn_name, num_args,
                                             ))
                                         }
-                                        #[cfg(not(feature = "no_function"))]
-                                        _ => FnCallHashes::from_script_and_native(
-                                            calc_fn_hash(None, fn_name, num_args - 1),
-                                            calc_fn_hash(None, fn_name, num_args),
-                                        ),
-                                        #[cfg(feature = "no_function")]
-                                        _ => FnCallHashes::from_native_only(calc_fn_hash(
-                                            None, fn_name, num_args,
-                                        )),
                                     };
                                 }
                             }

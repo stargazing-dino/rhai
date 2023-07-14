@@ -11,6 +11,11 @@ Bug fixes
 * Comparing two different data types (e.g. a custom type and a standard type) now correctly defaults to `false` (except for `!=` which defaults to `true`).
 * `max` and `min` for integers, strings and characters were missing from the standard library. They are now added.
 
+Enhancements
+------------
+
+* [`once_cell`](https://crates.io/crates/once_cell) is used in `std` environments instead of the home-brew `SusLock` (which is still kept for `no-std`).
+
 New features
 ------------
 
