@@ -15,11 +15,11 @@ use std::{
 pub use super::Variant;
 
 #[cfg(not(feature = "no_time"))]
-#[cfg(not(target_family = "wasm"))]
+#[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
 pub use std::time::Instant;
 
 #[cfg(not(feature = "no_time"))]
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 pub use instant::Instant;
 
 /// The message: data type was checked

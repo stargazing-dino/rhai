@@ -10,6 +10,7 @@ Bug fixes
 * Fixes a panic when using `this` as the first parameter in a namespace-qualified function call.
 * Comparing two different data types (e.g. a custom type and a standard type) now correctly defaults to `false` (except for `!=` which defaults to `true`).
 * `max` and `min` for integers, strings and characters were missing from the standard library. They are now added.
+* O/S features such as file access and time are no longer disabled when using `wasm32-wasi` (or any WASM target other than `wasm32-unknown`).
 
 Enhancements
 ------------

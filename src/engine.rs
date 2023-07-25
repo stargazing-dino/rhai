@@ -278,7 +278,7 @@ impl Engine {
 
         #[cfg(not(feature = "no_module"))]
         #[cfg(not(feature = "no_std"))]
-        #[cfg(not(target_family = "wasm"))]
+        #[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
         {
             engine.module_resolver =
                 Some(Box::new(crate::module::resolvers::FileModuleResolver::new()));
@@ -288,7 +288,7 @@ impl Engine {
 
         // default print/debug implementations
         #[cfg(not(feature = "no_std"))]
-        #[cfg(not(target_family = "wasm"))]
+        #[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
         {
             engine.print = Some(Box::new(|s| println!("{s}")));
             engine.debug = Some(Box::new(|s, source, pos| match (source, pos) {

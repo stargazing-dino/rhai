@@ -12,7 +12,7 @@ mod stat;
 pub use collection::ModuleResolversCollection;
 pub use dummy::DummyModuleResolver;
 #[cfg(not(feature = "no_std"))]
-#[cfg(not(target_family = "wasm"))]
+#[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
 pub use file::FileModuleResolver;
 pub use stat::StaticModuleResolver;
 

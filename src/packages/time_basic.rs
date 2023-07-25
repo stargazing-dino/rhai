@@ -8,10 +8,10 @@ use crate::{def_package, Dynamic, RhaiResult, RhaiResultOf, INT};
 #[cfg(not(feature = "no_float"))]
 use crate::FLOAT;
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
 use std::time::{Duration, Instant};
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use instant::{Duration, Instant};
 
 def_package! {

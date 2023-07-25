@@ -1,5 +1,5 @@
 #![cfg(not(feature = "no_std"))]
-#![cfg(not(target_family = "wasm"))]
+#![cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
 
 use crate::eval::GlobalRuntimeState;
 use crate::func::{locked_read, locked_write};
