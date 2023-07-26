@@ -209,7 +209,6 @@ def_package! {
             reg_functions!(lib += signed_numbers; i8, i16, i32);
 
             #[cfg(not(target_family = "wasm"))]
-
             {
                 reg_functions!(lib += arith_num_128; i128, u128);
                 reg_functions!(lib += signed_num_128; i128);

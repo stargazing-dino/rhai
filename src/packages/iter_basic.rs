@@ -125,12 +125,12 @@ impl<T: Copy + PartialOrd> FusedIterator for StepRange<T> {}
 pub struct BitRange(INT, usize);
 
 impl BitRange {
-    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn new(value: INT, from: INT, len: INT) -> RhaiResultOf<Self> {
         let from = calc_index(INT_BITS, from, true, || {
             ERR::ErrorBitFieldBounds(INT_BITS, from, Position::NONE).into()
         })?;
 
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let len = if len < 0 {
             0
         } else if from + (len as usize) > INT_BITS {
@@ -204,12 +204,12 @@ impl Iterator for CharsStream {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.1 >= self.0.len() {
-            None
-        } else {
-            let ch = self.0[self.1];
-            self.1 += 1;
-            Some(ch)
+            return None;
         }
+
+        let ch = self.0[self.1];
+        self.1 += 1;
+        Some(ch)
     }
 
     #[inline]

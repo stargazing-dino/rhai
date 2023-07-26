@@ -329,6 +329,23 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
                 _ => None,
             };
         }
+
+        // Handle ranges here because ranges are implemented as custom type
+        if type1 == TypeId::of::<ExclusiveRange>() {
+            return match op {
+                EqualsTo => impl_op!(ExclusiveRange == ExclusiveRange),
+                NotEqualsTo => impl_op!(ExclusiveRange != ExclusiveRange),
+                _ => None,
+            };
+        }
+
+        if type1 == TypeId::of::<InclusiveRange>() {
+            return match op {
+                EqualsTo => impl_op!(InclusiveRange == InclusiveRange),
+                NotEqualsTo => impl_op!(InclusiveRange != InclusiveRange),
+                _ => None,
+            };
+        }
     }
 
     #[cfg(not(feature = "no_float"))]
@@ -563,23 +580,6 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
         };
     }
 
-    // Handle ranges here because ranges are implemented as custom type
-    if type1 == TypeId::of::<ExclusiveRange>() && type1 == type2 {
-        return match op {
-            EqualsTo => impl_op!(ExclusiveRange == ExclusiveRange),
-            NotEqualsTo => impl_op!(ExclusiveRange != ExclusiveRange),
-            _ => None,
-        };
-    }
-
-    if type1 == TypeId::of::<InclusiveRange>() && type1 == type2 {
-        return match op {
-            EqualsTo => impl_op!(InclusiveRange == InclusiveRange),
-            NotEqualsTo => impl_op!(InclusiveRange != InclusiveRange),
-            _ => None,
-        };
-    }
-
     // Default comparison operators for different, non-numeric types
     if type2 != type1 {
         return match op {
@@ -791,10 +791,8 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             return Ok(Dynamic::UNIT);
                         }
 
-                        let _array_is_empty = args[0].read_lock::<Array>().unwrap().is_empty();
-
                         #[cfg(not(feature = "unchecked"))]
-                        if !_array_is_empty {
+                        if !args[0].read_lock::<Array>().unwrap().is_empty() {
                             _ctx.unwrap().engine().check_data_size(
                                 &*args[0].read_lock().unwrap(),
                                 crate::Position::NONE,

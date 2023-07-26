@@ -842,17 +842,20 @@ impl Engine {
                         // Recalculate hash
                         let num_args = args.len();
 
-                        let new_hash = match is_anon {
-                            false if !is_valid_function_name(name) => {
+                        let new_hash = if !is_anon && !is_valid_function_name(name) {
+                            FnCallHashes::from_native_only(calc_fn_hash(None, name, num_args))
+                        } else {
+                            #[cfg(not(feature = "no_function"))]
+                            {
+                                FnCallHashes::from_script_and_native(
+                                    calc_fn_hash(None, name, num_args - 1),
+                                    calc_fn_hash(None, name, num_args),
+                                )
+                            }
+                            #[cfg(feature = "no_function")]
+                            {
                                 FnCallHashes::from_native_only(calc_fn_hash(None, name, num_args))
                             }
-                            #[cfg(not(feature = "no_function"))]
-                            _ => FnCallHashes::from_script_and_native(
-                                calc_fn_hash(None, name, num_args - 1),
-                                calc_fn_hash(None, name, num_args),
-                            ),
-                            #[cfg(feature = "no_function")]
-                            _ => FnCallHashes::from_native_only(calc_fn_hash(None, name, num_args)),
                         };
 
                         // Map it to name(args) in function-call style
@@ -933,21 +936,24 @@ impl Engine {
                                     // Recalculate the hash based on the new function name and new arguments
                                     let num_args = call_args.len() + 1;
 
-                                    hash = match _is_anon {
-                                        false if !is_valid_function_name(fn_name) => {
+                                    hash = if !_is_anon && !is_valid_function_name(fn_name) {
+                                        FnCallHashes::from_native_only(calc_fn_hash(
+                                            None, fn_name, num_args,
+                                        ))
+                                    } else {
+                                        #[cfg(not(feature = "no_function"))]
+                                        {
+                                            FnCallHashes::from_script_and_native(
+                                                calc_fn_hash(None, fn_name, num_args - 1),
+                                                calc_fn_hash(None, fn_name, num_args),
+                                            )
+                                        }
+                                        #[cfg(feature = "no_function")]
+                                        {
                                             FnCallHashes::from_native_only(calc_fn_hash(
                                                 None, fn_name, num_args,
                                             ))
                                         }
-                                        #[cfg(not(feature = "no_function"))]
-                                        _ => FnCallHashes::from_script_and_native(
-                                            calc_fn_hash(None, fn_name, num_args - 1),
-                                            calc_fn_hash(None, fn_name, num_args),
-                                        ),
-                                        #[cfg(feature = "no_function")]
-                                        _ => FnCallHashes::from_native_only(calc_fn_hash(
-                                            None, fn_name, num_args,
-                                        )),
                                     };
                                 }
                             }
@@ -1152,7 +1158,9 @@ impl Engine {
                     .as_int()
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
 
-                return Ok(if num_params >= 0 {
+                return Ok(if num_params > crate::MAX_USIZE_INT {
+                    Dynamic::FALSE
+                } else if num_params >= 0 {
                     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                     let hash_script = calc_fn_hash(None, &fn_name, num_params as usize);
                     self.has_script_fn(global, caches, hash_script).into()
@@ -1192,7 +1200,9 @@ impl Engine {
                     .as_int()
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, arg_pos))?;
 
-                return Ok(if num_params >= 0 {
+                return Ok(if num_params > crate::MAX_USIZE_INT {
+                    Dynamic::FALSE
+                } else if num_params >= 0 {
                     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                     let hash_script = crate::calc_typed_method_hash(
                         calc_fn_hash(None, &fn_name, num_params as usize),

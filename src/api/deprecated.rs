@@ -13,7 +13,7 @@ use std::prelude::v1::*;
 use crate::func::register::Mut;
 
 #[cfg(not(feature = "no_std"))]
-#[cfg(not(target_family = "wasm"))]
+#[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
 use std::path::PathBuf;
 
 impl Engine {
@@ -29,7 +29,7 @@ impl Engine {
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `run_file` instead")]
     #[cfg(not(feature = "no_std"))]
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
     #[inline(always)]
     pub fn consume_file(&self, path: PathBuf) -> RhaiResultOf<()> {
         self.run_file(path)
@@ -47,7 +47,7 @@ impl Engine {
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `run_file_with_scope` instead")]
     #[cfg(not(feature = "no_std"))]
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
     #[inline(always)]
     pub fn consume_file_with_scope(&self, scope: &mut Scope, path: PathBuf) -> RhaiResultOf<()> {
         self.run_file_with_scope(scope, path)
