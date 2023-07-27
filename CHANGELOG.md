@@ -21,6 +21,7 @@ New features
 ------------
 
 * Added `Engine::max_variables` and `Engine::set_max_variables` to limit the maximum number of variables allowed within a scope at any time. This is to guard against defining a huge number of variables containing large data just beyond individual data size limits. When `max_variables` is exceeded a new error, `ErrorTooManyVariables`, is returned.
+* Added `zip` function for arrays.
 
 
 Version 1.15.1

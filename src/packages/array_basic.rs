@@ -1463,6 +1463,56 @@ pub mod array_functions {
                 )
             })
     }
+    /// Iterate through all elements in two arrays, applying a `mapper` function to them,
+    /// and return a new array containing the results.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `array1`: First array
+    /// * `array2`: Second array
+    /// * `index` _(optional)_: current index in the array
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = [1, 2, 3, 4, 5];
+    /// let y = [9, 8, 7, 6];
+    ///
+    /// let z = x.zip(y, |a, b| a + b);
+    ///
+    /// print(z);       // prints [10, 10, 10, 10]
+    ///
+    /// let z = x.zip(y, |a, b, i| a + b + i);
+    ///
+    /// print(z);       // prints [10, 11, 12, 13]
+    /// ```
+    #[rhai_fn(return_raw, pure)]
+    pub fn zip(
+        ctx: NativeCallContext,
+        array1: &mut Array,
+        array2: Array,
+        map: FnPtr,
+    ) -> RhaiResultOf<Array> {
+        if array1.is_empty() && array2.is_empty() {
+            return Ok(Array::new());
+        }
+
+        array1
+            .iter_mut()
+            .zip(array2)
+            .enumerate()
+            .map(|(i, (x, y))| {
+                map.call_raw_with_extra_args(
+                    "zip",
+                    &ctx,
+                    None,
+                    [x.clone(), y],
+                    [(i as INT).into()],
+                    None,
+                )
+            })
+            .collect()
+    }
     /// Sort the array based on applying the `comparer` function.
     ///
     /// # Function Parameters
