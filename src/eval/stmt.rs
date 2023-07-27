@@ -428,6 +428,14 @@ impl Engine {
                     }
                 }
 
+                // Guard against too many variables
+                if !cfg!(feature = "unchecked")
+                    && index.is_none()
+                    && scope.len() >= self.max_variables()
+                {
+                    return Err(ERR::ErrorTooManyVariables(*pos).into());
+                }
+
                 // Evaluate initial value
                 let mut value = self
                     .eval_expr(global, caches, scope, this_ptr, expr)?
@@ -464,9 +472,6 @@ impl Engine {
                 if let Some(index) = index {
                     value.set_access_mode(access);
                     *scope.get_mut_by_index(scope.len() - index.get()) = value;
-                } else if !cfg!(feature = "unchecked") && scope.len() >= self.max_variables() {
-                    // Guard against too many variables
-                    return Err(ERR::ErrorTooManyVariables(*pos).into());
                 } else {
                     scope.push_entry(var_name.name.clone(), access, value);
                 }
@@ -667,6 +672,14 @@ impl Engine {
             Stmt::For(x, ..) => {
                 let (var_name, counter, FlowControl { expr, body, .. }) = &**x;
 
+                // Guard against too many variables
+                if !cfg!(feature = "unchecked") {
+                    let max = self.max_variables() - if counter.is_empty() { 0 } else { 1 };
+                    if scope.len() >= max {
+                        return Err(ERR::ErrorTooManyVariables(var_name.pos).into());
+                    }
+                }
+
                 let iter_obj = self
                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
                     .flatten();
@@ -799,6 +812,9 @@ impl Engine {
                     Err(err) if !err.is_catchable() => Err(err),
                     Err(mut err) => {
                         let err_value = match err.unwrap_inner() {
+                            // No error variable
+                            _ if catch_var.is_unit() => Dynamic::UNIT,
+
                             ERR::ErrorRuntime(x, ..) => x.clone(),
 
                             #[cfg(feature = "no_object")]
@@ -837,6 +853,10 @@ impl Engine {
                         defer! { scope if !catch_var.is_unit() => rewind; let orig_scope_len = scope.len(); }
 
                         if let Expr::Variable(x, ..) = catch_var {
+                            // Guard against too many variables
+                            if !cfg!(feature = "unchecked") && scope.len() >= self.max_variables() {
+                                return Err(ERR::ErrorTooManyVariables(catch_var.position()).into());
+                            }
                             scope.push(x.3.clone(), err_value);
                         }
 
