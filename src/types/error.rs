@@ -95,6 +95,8 @@ pub enum EvalAltResult {
 
     /// Number of operations over maximum limit.
     ErrorTooManyOperations(Position),
+    /// Number of variables over maximum limit.
+    ErrorTooManyVariables(Position),
     /// [Modules][crate::Module] over maximum limit.
     ErrorTooManyModules(Position),
     /// Call stack over maximum limit.
@@ -166,6 +168,7 @@ impl fmt::Display for EvalAltResult {
             Self::ErrorUnboundThis(..) => f.write_str("'this' not bound")?,
             Self::ErrorFor(..) => f.write_str("For loop expects iterable type")?,
             Self::ErrorTooManyOperations(..) => f.write_str("Too many operations")?,
+            Self::ErrorTooManyVariables(..) => f.write_str("Too many variables defined")?,
             Self::ErrorTooManyModules(..) => f.write_str("Too many modules imported")?,
             Self::ErrorStackOverflow(..) => f.write_str("Stack overflow")?,
             Self::ErrorTerminated(..) => f.write_str("Script terminated")?,
@@ -331,6 +334,7 @@ impl EvalAltResult {
             Self::ErrorCustomSyntax(..) => false,
 
             Self::ErrorTooManyOperations(..)
+            | Self::ErrorTooManyVariables(..)
             | Self::ErrorTooManyModules(..)
             | Self::ErrorStackOverflow(..)
             | Self::ErrorDataTooLarge(..)
@@ -350,6 +354,7 @@ impl EvalAltResult {
                 | Self::ErrorParsing(..)
                 | Self::ErrorCustomSyntax(..)
                 | Self::ErrorTooManyOperations(..)
+                | Self::ErrorTooManyVariables(..)
                 | Self::ErrorTooManyModules(..)
                 | Self::ErrorStackOverflow(..)
                 | Self::ErrorDataTooLarge(..)
@@ -379,6 +384,7 @@ impl EvalAltResult {
             | Self::ErrorFor(..)
             | Self::ErrorArithmetic(..)
             | Self::ErrorTooManyOperations(..)
+            | Self::ErrorTooManyVariables(..)
             | Self::ErrorTooManyModules(..)
             | Self::ErrorStackOverflow(..)
             | Self::ErrorRuntime(..) => (),
@@ -483,6 +489,7 @@ impl EvalAltResult {
             | Self::ErrorDotExpr(.., pos)
             | Self::ErrorArithmetic(.., pos)
             | Self::ErrorTooManyOperations(pos)
+            | Self::ErrorTooManyVariables(pos)
             | Self::ErrorTooManyModules(pos)
             | Self::ErrorStackOverflow(pos)
             | Self::ErrorDataTooLarge(.., pos)
@@ -543,6 +550,7 @@ impl EvalAltResult {
             | Self::ErrorDotExpr(.., pos)
             | Self::ErrorArithmetic(.., pos)
             | Self::ErrorTooManyOperations(pos)
+            | Self::ErrorTooManyVariables(pos)
             | Self::ErrorTooManyModules(pos)
             | Self::ErrorStackOverflow(pos)
             | Self::ErrorDataTooLarge(.., pos)

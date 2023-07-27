@@ -63,6 +63,12 @@ impl Engine {
             .as_ref()
             .map_or(0, |dbg| dbg.call_stack().len());
 
+        // Guard against too many variables
+        if !cfg!(feature = "unchecked") && scope.len() + fn_def.params.len() > self.max_variables()
+        {
+            return Err(ERR::ErrorTooManyVariables(pos).into());
+        }
+
         // Put arguments into scope as variables
         scope.extend(fn_def.params.iter().cloned().zip(args.iter_mut().map(|v| {
             // Actually consume the arguments instead of cloning them

@@ -8,6 +8,19 @@ Bug fixes
 ---------
 
 * Fixes a panic when using `this` as the first parameter in a namespace-qualified function call.
+* Comparing two different data types (e.g. a custom type and a standard type) now correctly defaults to `false` (except for `!=` which defaults to `true`).
+* `max` and `min` for integers, strings and characters were missing from the standard library. They are now added.
+* O/S features such as file access and time are no longer disabled when using `wasm32-wasi` (or any WASM target other than `wasm32-unknown`).
+
+Enhancements
+------------
+
+* [`once_cell`](https://crates.io/crates/once_cell) is used in `std` environments instead of the home-brew `SusLock` (which is still kept for `no-std`).
+
+New features
+------------
+
+* Added `Engine::max_variables` and `Engine::set_max_variables` to limit the maximum number of variables allowed within a scope at any time. This is to guard against defining a huge number of variables containing large data just beyond individual data size limits. When `max_variables` is exceeded a new error, `ErrorTooManyVariables`, is returned.
 
 
 Version 1.15.1

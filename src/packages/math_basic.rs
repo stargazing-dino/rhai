@@ -312,26 +312,28 @@ mod float_functions {
     pub fn f32_to_int(x: f32) -> RhaiResultOf<INT> {
         #[allow(clippy::cast_precision_loss)]
         if cfg!(not(feature = "unchecked")) && (x > (INT::MAX as f32) || x < (INT::MIN as f32)) {
-            Err(
-                ERR::ErrorArithmetic(format!("Integer overflow: to_int({x})"), Position::NONE)
-                    .into(),
+            return Err(ERR::ErrorArithmetic(
+                format!("Integer overflow: to_int({x})"),
+                Position::NONE,
             )
-        } else {
-            Ok(x.trunc() as INT)
+            .into());
         }
+
+        Ok(x.trunc() as INT)
     }
     /// Convert the floating-point number into an integer.
     #[rhai_fn(name = "to_int", return_raw)]
     pub fn f64_to_int(x: f64) -> RhaiResultOf<INT> {
         #[allow(clippy::cast_precision_loss)]
         if cfg!(not(feature = "unchecked")) && (x > (INT::MAX as f64) || x < (INT::MIN as f64)) {
-            Err(
-                ERR::ErrorArithmetic(format!("Integer overflow: to_int({x})"), Position::NONE)
-                    .into(),
+            return Err(ERR::ErrorArithmetic(
+                format!("Integer overflow: to_int({x})"),
+                Position::NONE,
             )
-        } else {
-            Ok(x.trunc() as INT)
+            .into());
         }
+
+        Ok(x.trunc() as INT)
     }
     /// Parse a string into a floating-point number.
     ///

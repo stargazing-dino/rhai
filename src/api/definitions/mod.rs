@@ -142,7 +142,8 @@ impl Definitions<'_> {
     /// specified directory.
     ///
     /// This function creates the directories and overrides any existing files if needed.
-    #[cfg(all(not(feature = "no_std"), not(target_family = "wasm")))]
+    #[cfg(not(feature = "no_std"))]
+    #[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
     #[inline]
     pub fn write_to_dir(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
         use std::fs;
@@ -161,7 +162,8 @@ impl Definitions<'_> {
     /// Output all definitions merged into a single file.
     ///
     /// The parent directory must exist but the file will be created or overwritten as needed.
-    #[cfg(all(not(feature = "no_std"), not(target_family = "wasm")))]
+    #[cfg(not(feature = "no_std"))]
+    #[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
     #[inline(always)]
     pub fn write_to_file(&self, path: impl AsRef<std::path::Path>) -> std::io::Result<()> {
         std::fs::write(path, self.single_file())

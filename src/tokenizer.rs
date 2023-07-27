@@ -2572,7 +2572,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             let control = &mut *self.state.tokenizer_control.borrow_mut();
 
             if let Some(ref mut compressed) = control.compressed {
-                if !matches!(token, Token::EOF) {
+                if token != Token::EOF {
                     use std::fmt::Write;
 
                     let last_token = self.state.last_token.as_ref().unwrap();

@@ -20,6 +20,14 @@ impl Engine {
     pub const fn max_operations(&self) -> u64 {
         0
     }
+    /// The maximum number of variables allowed for a script at any instant.
+    ///
+    /// Always returns [`usize::MAX`].
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_variables(&self) -> usize {
+        usize::MAX
+    }
     /// The maximum number of imported [modules][crate::Module] allowed for a script.
     ///
     /// Always returns [`usize::MAX`].

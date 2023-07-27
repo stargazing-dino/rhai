@@ -93,6 +93,155 @@ fn test_var_scope() -> Result<(), Box<EvalAltResult>> {
     Ok(())
 }
 
+#[cfg(not(feature = "unchecked"))]
+#[test]
+fn test_var_scope_max() -> Result<(), Box<EvalAltResult>> {
+    let mut engine = Engine::new();
+    let mut scope = Scope::new();
+
+    engine.set_max_variables(5);
+
+    engine.run_with_scope(
+        &mut scope,
+        "
+            let a = 0;
+            let b = 0;
+            let c = 0;
+            let d = 0;
+            let e = 0;
+        ",
+    )?;
+
+    scope.clear();
+
+    engine.run_with_scope(
+        &mut scope,
+        "
+            let a = 0;
+            let b = 0;
+            let c = 0;
+            let d = 0;
+            let e = 0;
+            let a = 42;     // reuse variable
+        ",
+    )?;
+
+    scope.clear();
+
+    #[cfg(not(feature = "no_function"))]
+    engine.run_with_scope(
+        &mut scope,
+        "
+            fn foo(n) {
+                if n > 3 { return; }
+
+                let w = 0;
+                let x = 0;
+                let y = 0;
+                let z = 0;
+
+                foo(n + 1);
+            }
+
+            let a = 0;
+            let b = 0;
+            let c = 0;
+            let d = 0;
+            let e = 0;
+
+            foo(0);
+        ",
+    )?;
+
+    scope.clear();
+
+    #[cfg(not(feature = "no_function"))]
+    engine.run_with_scope(
+        &mut scope,
+        "
+            fn foo(a, b, c, d, e) {
+                42
+            }
+
+            foo(0, 0, 0, 0, 0);
+        ",
+    )?;
+
+    scope.clear();
+
+    assert!(matches!(
+        *engine
+            .run_with_scope(
+                &mut scope,
+                "
+                    let a = 0;
+                    let b = 0;
+                    let c = 0;
+                    let d = 0;
+                    let e = 0;
+                    let f = 0;
+                "
+            )
+            .unwrap_err(),
+        EvalAltResult::ErrorTooManyVariables(..)
+    ));
+
+    scope.clear();
+
+    #[cfg(not(feature = "no_function"))]
+    assert!(matches!(
+        *engine
+            .run_with_scope(
+                &mut scope,
+                "
+                    fn foo(n) {
+                        if n > 3 { return; }
+
+                        let v = 0;
+                        let w = 0;
+                        let x = 0;
+                        let y = 0;
+                        let z = 0;
+
+                        foo(n + 1);
+                    }
+        
+                    let a = 0;
+                    let b = 0;
+                    let c = 0;
+                    let d = 0;
+                    let e = 0;
+                    let f = 0;
+
+                    foo(0);
+                "
+            )
+            .unwrap_err(),
+        EvalAltResult::ErrorTooManyVariables(..)
+    ));
+
+    scope.clear();
+
+    #[cfg(not(feature = "no_function"))]
+    assert!(matches!(
+        *engine
+            .run_with_scope(
+                &mut scope,
+                "
+                    fn foo(a, b, c, d, e, f) {
+                        42
+                    }
+        
+                    foo(0, 0, 0, 0, 0, 0);
+                "
+            )
+            .unwrap_err(),
+        EvalAltResult::ErrorTooManyVariables(..)
+    ));
+
+    Ok(())
+}
+
 #[cfg(not(feature = "no_module"))]
 #[test]
 fn test_var_scope_alias() -> Result<(), Box<EvalAltResult>> {

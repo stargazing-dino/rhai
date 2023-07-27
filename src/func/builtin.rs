@@ -39,6 +39,46 @@ fn const_true_fn(_: Option<NativeCallContext>, _: &mut [&mut Dynamic]) -> RhaiRe
 fn const_false_fn(_: Option<NativeCallContext>, _: &mut [&mut Dynamic]) -> RhaiResult {
     Ok(Dynamic::FALSE)
 }
+/// Returns true if the type is numeric.
+#[inline(always)]
+fn is_numeric(typ: TypeId) -> bool {
+    if typ == TypeId::of::<INT>() {
+        return true;
+    }
+
+    #[cfg(not(feature = "no_float"))]
+    if typ == TypeId::of::<f32>() || typ == TypeId::of::<f64>() {
+        return true;
+    }
+
+    #[cfg(feature = "decimal")]
+    if typ == TypeId::of::<Decimal>() {
+        return true;
+    }
+
+    #[cfg(not(feature = "only_i32"))]
+    #[cfg(not(feature = "only_i64"))]
+    if typ == TypeId::of::<u8>()
+        || typ == TypeId::of::<u16>()
+        || typ == TypeId::of::<u32>()
+        || typ == TypeId::of::<u64>()
+        || typ == TypeId::of::<i8>()
+        || typ == TypeId::of::<i16>()
+        || typ == TypeId::of::<i32>()
+        || typ == TypeId::of::<i64>()
+    {
+        return true;
+    }
+
+    #[cfg(not(feature = "only_i32"))]
+    #[cfg(not(feature = "only_i64"))]
+    #[cfg(not(target_family = "wasm"))]
+    if typ == TypeId::of::<u128>() || typ == TypeId::of::<i128>() {
+        return true;
+    }
+
+    false
+}
 
 /// Build in common binary operator implementations to avoid the cost of calling a registered function.
 ///
@@ -289,6 +329,23 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
                 _ => None,
             };
         }
+
+        // Handle ranges here because ranges are implemented as custom type
+        if type1 == TypeId::of::<ExclusiveRange>() {
+            return match op {
+                EqualsTo => impl_op!(ExclusiveRange == ExclusiveRange),
+                NotEqualsTo => impl_op!(ExclusiveRange != ExclusiveRange),
+                _ => None,
+            };
+        }
+
+        if type1 == TypeId::of::<InclusiveRange>() {
+            return match op {
+                EqualsTo => impl_op!(InclusiveRange == InclusiveRange),
+                NotEqualsTo => impl_op!(InclusiveRange != InclusiveRange),
+                _ => None,
+            };
+        }
     }
 
     #[cfg(not(feature = "no_float"))]
@@ -523,33 +580,13 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
         };
     }
 
-    // Handle ranges here because ranges are implemented as custom type
-    if type1 == TypeId::of::<ExclusiveRange>() && type1 == type2 {
-        return match op {
-            EqualsTo => impl_op!(ExclusiveRange == ExclusiveRange),
-            NotEqualsTo => impl_op!(ExclusiveRange != ExclusiveRange),
-            _ => None,
-        };
-    }
-
-    if type1 == TypeId::of::<InclusiveRange>() && type1 == type2 {
-        return match op {
-            EqualsTo => impl_op!(InclusiveRange == InclusiveRange),
-            NotEqualsTo => impl_op!(InclusiveRange != InclusiveRange),
-            _ => None,
-        };
-    }
-
-    // One of the operands is a custom type, so it is never built-in
-    if x.is_variant() || y.is_variant() {
-        return None;
-    }
-
-    // Default comparison operators for different types
+    // Default comparison operators for different, non-numeric types
     if type2 != type1 {
         return match op {
-            NotEqualsTo => Some((const_true_fn, false)),
-            EqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo => {
+            NotEqualsTo if !is_numeric(type1) || !is_numeric(type2) => Some((const_true_fn, false)),
+            EqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo
+                if !is_numeric(type1) || !is_numeric(type2) =>
+            {
                 Some((const_false_fn, false))
             }
             _ => None,
@@ -754,10 +791,8 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             return Ok(Dynamic::UNIT);
                         }
 
-                        let _array_is_empty = args[0].read_lock::<Array>().unwrap().is_empty();
-
                         #[cfg(not(feature = "unchecked"))]
-                        if !_array_is_empty {
+                        if !args[0].read_lock::<Array>().unwrap().is_empty() {
                             _ctx.unwrap().engine().check_data_size(
                                 &*args[0].read_lock().unwrap(),
                                 crate::Position::NONE,

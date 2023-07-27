@@ -35,11 +35,7 @@ fn test_ops_other_number_types() -> Result<(), Box<EvalAltResult>> {
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("== (u16,")
     ));
 
-    assert!(
-        matches!(*engine.eval_with_scope::<bool>(&mut scope, r#"x == "hello""#).unwrap_err(),
-            EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("== (u16,")
-        )
-    );
+    assert!(!engine.eval_with_scope::<bool>(&mut scope, r#"x == "hello""#)?);
 
     Ok(())
 }
@@ -82,9 +78,15 @@ fn test_ops_custom_types() -> Result<(), Box<EvalAltResult>> {
         .register_type_with_name::<Test2>("Test2")
         .register_fn("new_ts1", || Test1)
         .register_fn("new_ts2", || Test2)
-        .register_fn("==", |x: Test1, y: Test2| true);
+        .register_fn("==", |_: Test1, _: Test2| true);
 
     assert!(engine.eval::<bool>("let x = new_ts1(); let y = new_ts2(); x == y")?);
+
+    assert!(engine.eval::<bool>("let x = new_ts1(); let y = new_ts2(); x != y")?);
+
+    assert!(!engine.eval::<bool>("let x = new_ts1(); x == ()")?);
+
+    assert!(engine.eval::<bool>("let x = new_ts1(); x != ()")?);
 
     Ok(())
 }

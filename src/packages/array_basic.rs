@@ -64,10 +64,10 @@ pub mod array_functions {
         let (index, ..) = calc_offset_len(array.len(), index, 0);
 
         if index >= array.len() {
-            Dynamic::UNIT
-        } else {
-            array[index].clone()
+            return Dynamic::UNIT;
         }
+
+        array[index].clone()
     }
     /// Set the element at the `index` position in the array to a new `value`.
     ///
@@ -99,9 +99,11 @@ pub mod array_functions {
 
         let (index, ..) = calc_offset_len(array.len(), index, 0);
 
-        if index < array.len() {
-            array[index] = value;
+        if index >= array.len() {
+            return;
         }
+
+        array[index] = value;
     }
     /// Add a new element, which is not another array, to the end of the array.
     ///
@@ -132,12 +134,14 @@ pub mod array_functions {
     /// print(x);       // prints "[1, 2, 3, true, 'x']"
     /// ```
     pub fn append(array: &mut Array, new_array: Array) {
-        if !new_array.is_empty() {
-            if array.is_empty() {
-                *array = new_array;
-            } else {
-                array.extend(new_array);
-            }
+        if new_array.is_empty() {
+            return;
+        }
+
+        if array.is_empty() {
+            *array = new_array;
+        } else {
+            array.extend(new_array);
         }
     }
     /// Combine two arrays into a new array and return it.
@@ -155,14 +159,16 @@ pub mod array_functions {
     #[rhai_fn(name = "+")]
     pub fn concat(array1: Array, array2: Array) -> Array {
         if array2.is_empty() {
-            array1
-        } else if array1.is_empty() {
-            array2
-        } else {
-            let mut array = array1;
-            array.extend(array2);
-            array
+            return array1;
         }
+
+        if array1.is_empty() {
+            return array2;
+        }
+
+        let mut array = array1;
+        array.extend(array2);
+        array
     }
     /// Add a new element into the array at a particular `index` position.
     ///
@@ -264,10 +270,10 @@ pub mod array_functions {
     /// ```
     pub fn pop(array: &mut Array) -> Dynamic {
         if array.is_empty() {
-            Dynamic::UNIT
-        } else {
-            array.pop().unwrap_or(Dynamic::UNIT)
+            return Dynamic::UNIT;
         }
+
+        array.pop().unwrap_or(Dynamic::UNIT)
     }
     /// Remove the first element from the array and return it.
     ///
@@ -284,10 +290,10 @@ pub mod array_functions {
     /// ```
     pub fn shift(array: &mut Array) -> Dynamic {
         if array.is_empty() {
-            Dynamic::UNIT
-        } else {
-            array.remove(0)
+            return Dynamic::UNIT;
         }
+
+        array.remove(0)
     }
     /// Remove the element at the specified `index` from the array and return it.
     ///
@@ -309,18 +315,21 @@ pub mod array_functions {
     /// print(x);               // prints "[3]"
     /// ```
     pub fn remove(array: &mut Array, index: INT) -> Dynamic {
-        let index = match calc_index(array.len(), index, true, || Err(())) {
-            Ok(n) => n,
-            Err(_) => return Dynamic::UNIT,
+        let index = if let Ok(n) = calc_index(array.len(), index, true, || Err(())) {
+            n
+        } else {
+            return Dynamic::UNIT;
         };
 
         array.remove(index)
     }
     /// Clear the array.
     pub fn clear(array: &mut Array) {
-        if !array.is_empty() {
-            array.clear();
+        if array.is_empty() {
+            return;
         }
+
+        array.clear();
     }
     /// Cut off the array at the specified length.
     ///
@@ -345,15 +354,17 @@ pub mod array_functions {
             array.clear();
             return;
         }
-        if !array.is_empty() {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            let len = len.min(MAX_USIZE_INT) as usize;
+        if array.is_empty() {
+            return;
+        }
 
-            if len > 0 {
-                array.truncate(len);
-            } else {
-                array.clear();
-            }
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        let len = len.min(MAX_USIZE_INT) as usize;
+
+        if len > 0 {
+            array.truncate(len);
+        } else {
+            array.clear();
         }
     }
     /// Cut off the head of the array, leaving a tail of the specified length.
@@ -379,15 +390,17 @@ pub mod array_functions {
             array.clear();
             return;
         }
-        if !array.is_empty() {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            let len = len.min(MAX_USIZE_INT) as usize;
+        if array.is_empty() {
+            return;
+        }
 
-            if len <= 0 {
-                array.clear();
-            } else if len < array.len() {
-                array.drain(0..array.len() - len);
-            }
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+        let len = len.min(MAX_USIZE_INT) as usize;
+
+        if len <= 0 {
+            array.clear();
+        } else if len < array.len() {
+            array.drain(0..array.len() - len);
         }
     }
     /// Reverse all the elements in the array.
@@ -402,9 +415,11 @@ pub mod array_functions {
     /// print(x);       // prints "[5, 4, 3, 2, 1]"
     /// ```
     pub fn reverse(array: &mut Array) {
-        if !array.is_empty() {
-            array.reverse();
+        if array.is_empty() {
+            return;
         }
+
+        array.reverse();
     }
     /// Replace an exclusive range of the array with another array.
     ///
@@ -539,10 +554,10 @@ pub mod array_functions {
         let (start, len) = calc_offset_len(array.len(), start, len);
 
         if len == 0 {
-            Array::new()
-        } else {
-            array[start..start + len].to_vec()
+            return Array::new();
         }
+
+        array[start..start + len].to_vec()
     }
     /// Copy a portion of the array beginning at the `start` position till the end and return it as
     /// a new array.
@@ -592,21 +607,23 @@ pub mod array_functions {
 
         let (start, len) = calc_offset_len(array.len(), index, INT::MAX);
 
+        if start >= array.len() {
+            return Array::new();
+        }
+
         if start == 0 {
             if len >= array.len() {
-                mem::take(array)
-            } else {
-                let mut result = Array::new();
-                result.extend(array.drain(array.len() - len..));
-                result
+                return mem::take(array);
             }
-        } else if start >= array.len() {
-            Array::new()
-        } else {
+
             let mut result = Array::new();
-            result.extend(array.drain(start as usize..));
-            result
+            result.extend(array.drain(array.len() - len..));
+            return result;
         }
+
+        let mut result = Array::new();
+        result.extend(array.drain(start as usize..));
+        result
     }
 
     /// Iterate through all the elements in the array, applying a `process` function to each element in turn.
@@ -811,10 +828,10 @@ pub mod array_functions {
         value: Dynamic,
     ) -> RhaiResultOf<INT> {
         if array.is_empty() {
-            Ok(-1)
-        } else {
-            index_of_starting_from(ctx, array, value, 0)
+            return Ok(-1);
         }
+
+        index_of_starting_from(ctx, array, value, 0)
     }
     /// Find the first element in the array, starting from a particular `start` position, that
     /// equals a particular `value` and return its index. If no element equals `value`, `-1` is returned.
@@ -912,10 +929,10 @@ pub mod array_functions {
         filter: FnPtr,
     ) -> RhaiResultOf<INT> {
         if array.is_empty() {
-            Ok(-1)
-        } else {
-            index_of_filter_starting_from(ctx, array, filter, 0)
+            return Ok(-1);
         }
+
+        index_of_filter_starting_from(ctx, array, filter, 0)
     }
     /// Iterate through all the elements in the array, starting from a particular `start` position,
     /// applying a `filter` function to each element in turn, and return the index of the first
@@ -1727,10 +1744,10 @@ pub mod array_functions {
         let (start, len) = calc_offset_len(array.len(), start, len);
 
         if len == 0 {
-            Array::new()
-        } else {
-            array.drain(start..start + len).collect()
+            return Array::new();
         }
+
+        array.drain(start..start + len).collect()
     }
     /// Remove all elements in the array that do not return `true` when applied the `filter`
     /// function and return them as a new array.
@@ -1874,13 +1891,13 @@ pub mod array_functions {
         let (start, len) = calc_offset_len(array.len(), start, len);
 
         if len == 0 {
-            Array::new()
-        } else {
-            let mut drained: Array = array.drain(..start).collect();
-            drained.extend(array.drain(len..));
-
-            drained
+            return Array::new();
         }
+
+        let mut drained: Array = array.drain(..start).collect();
+        drained.extend(array.drain(len..));
+
+        drained
     }
     /// Return `true` if two arrays are equal (i.e. all elements are equal and in the same order).
     ///
