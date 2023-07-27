@@ -171,6 +171,7 @@ pub fn calc_native_fn_hash<'a>(
 
 bitflags! {
     /// Bit-flags containing all status for [`Module`].
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct ModuleFlags: u8 {
         /// Is the [`Module`] internal?
         const INTERNAL = 0b0000_0001;
