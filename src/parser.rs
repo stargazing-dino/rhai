@@ -2921,11 +2921,11 @@ impl Engine {
                 )
                 .into_err(pos));
             }
-            (name, name_pos, counter_name, counter_pos)
+            (name, name_pos, Some(counter_name), counter_pos)
         } else {
             // name
             let (name, name_pos) = parse_var_name(input)?;
-            (name, name_pos, Identifier::new_const(), Position::NONE)
+            (name, name_pos, None, Position::NONE)
         };
 
         // for name in ...
@@ -2947,10 +2947,10 @@ impl Engine {
             .parse_expr(input, state, lib, settings)?
             .ensure_iterable()?;
 
-        let counter_var = Ident {
+        let counter_var = counter_name.map(|counter_name| Ident {
             name: state.get_interned_string(counter_name),
             pos: counter_pos,
-        };
+        });
 
         let loop_var = Ident {
             name: state.get_interned_string(name),
@@ -2962,7 +2962,7 @@ impl Engine {
 
             let prev_stack_len = stack.len();
 
-            if !counter_var.name.is_empty() {
+            if let Some(ref counter_var) = counter_var {
                 stack.push(counter_var.name.clone(), ());
             }
             stack.push(&loop_var.name, ());

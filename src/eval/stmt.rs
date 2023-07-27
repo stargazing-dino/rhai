@@ -674,7 +674,7 @@ impl Engine {
 
                 // Guard against too many variables
                 if !cfg!(feature = "unchecked") {
-                    let max = self.max_variables() - if counter.is_empty() { 0 } else { 1 };
+                    let max = self.max_variables() - counter.as_ref().map_or(0, |_| 1);
                     if scope.len() >= max {
                         return Err(ERR::ErrorTooManyVariables(var_name.pos).into());
                     }
@@ -715,7 +715,7 @@ impl Engine {
                 defer! { scope => rewind; let orig_scope_len = scope.len(); }
 
                 // Add the loop variables
-                let counter_index = (!counter.is_empty()).then(|| {
+                let counter_index = counter.as_ref().map(|counter| {
                     scope.push(counter.name.clone(), 0 as INT);
                     scope.len() - 1
                 });
@@ -742,7 +742,7 @@ impl Engine {
                             if index_value > crate::MAX_USIZE_INT {
                                 return Err(ERR::ErrorArithmetic(
                                     format!("for-loop counter overflow: {x}"),
-                                    counter.pos,
+                                    counter.as_ref().unwrap().pos,
                                 )
                                 .into());
                             }

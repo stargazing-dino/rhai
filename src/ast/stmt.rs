@@ -667,7 +667,7 @@ pub enum Stmt {
     /// * [`NEGATED`][ASTFlags::NEGATED] = `until`
     Do(Box<FlowControl>, ASTFlags, Position),
     /// `for` `(` id `,` counter `)` `in` expr `{` stmt `}`
-    For(Box<(Ident, Ident, FlowControl)>, Position),
+    For(Box<(Ident, Option<Ident>, FlowControl)>, Position),
     /// \[`export`\] `let`|`const` id `=` expr
     ///
     /// ### Flags
@@ -721,7 +721,7 @@ pub enum Stmt {
     /// This variant does not map to any language structure.  It is currently only used only to
     /// convert normal variables into shared variables when they are _captured_ by a closure.
     #[cfg(not(feature = "no_closure"))]
-    Share(Box<crate::FnArgsVec<(crate::ast::Ident, Option<NonZeroUsize>)>>),
+    Share(Box<crate::FnArgsVec<(Ident, Option<NonZeroUsize>)>>),
 }
 
 impl Default for Stmt {
