@@ -1,28 +1,30 @@
-use rhai::{Engine, EvalAltResult, ParseErrorType, INT};
+use rhai::{Engine, ParseErrorType, INT};
 
 #[test]
-fn test_loop() -> Result<(), Box<EvalAltResult>> {
+fn test_loop() {
     let engine = Engine::new();
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-				let x = 0;
-				let i = 0;
+        engine
+            .eval::<INT>(
+                "
+                    let x = 0;
+                    let i = 0;
 
-				loop {
-					if i < 10 {
-						i += 1;
-						if x > 20 { continue; }
-						x += i;
-					} else {
-						break;
-					}
-				}
+                    loop {
+                        if i < 10 {
+                            i += 1;
+                            if x > 20 { continue; }
+                            x += i;
+                        } else {
+                            break;
+                        }
+                    }
 
-				x
-		    "
-        )?,
+                    x
+                "
+            )
+            .unwrap(),
         21
     );
 
@@ -47,27 +49,27 @@ fn test_loop() -> Result<(), Box<EvalAltResult>> {
             .err_type(),
         ParseErrorType::LoopBreak
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_loop_expression() -> Result<(), Box<EvalAltResult>> {
+fn test_loop_expression() {
     let mut engine = Engine::new();
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-				let x = 0;
+        engine
+            .eval::<INT>(
+                "
+                    let x = 0;
 
-				let value = while x < 10 {
-                    if x % 5 == 0 { break 42; }
-                    x += 1;
-				};
+                    let value = while x < 10 {
+                        if x % 5 == 0 { break 42; }
+                        x += 1;
+                    };
 
-				value
-		    "
-        )?,
+                    value
+                "
+            )
+            .unwrap(),
         42
     );
 
@@ -87,6 +89,4 @@ fn test_loop_expression() -> Result<(), Box<EvalAltResult>> {
 		    "
         )
         .is_err());
-
-    Ok(())
 }

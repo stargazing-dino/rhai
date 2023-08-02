@@ -1,9 +1,8 @@
 #![cfg(not(feature = "no_object"))]
-
 use rhai::{Engine, EvalAltResult, NativeCallContext, Scope, INT};
 
 #[test]
-fn test_get_set() -> Result<(), Box<EvalAltResult>> {
+fn test_get_set() {
     #[derive(Clone)]
     struct TestStruct {
         x: INT,
@@ -42,9 +41,24 @@ fn test_get_set() -> Result<(), Box<EvalAltResult>> {
     engine.register_fn("add", |value: &mut INT| *value += 41);
     engine.register_fn("new_ts", TestStruct::new);
 
-    assert_eq!(engine.eval::<INT>("let a = new_ts(); a.x = 500; a.x")?, 500);
-    assert_eq!(engine.eval::<INT>("let a = new_ts(); a.x.add(); a.x")?, 42);
-    assert_eq!(engine.eval::<INT>("let a = new_ts(); a.y.add(); a.y")?, 0);
+    assert_eq!(
+        engine
+            .eval::<INT>("let a = new_ts(); a.x = 500; a.x")
+            .unwrap(),
+        500
+    );
+    assert_eq!(
+        engine
+            .eval::<INT>("let a = new_ts(); a.x.add(); a.x")
+            .unwrap(),
+        42
+    );
+    assert_eq!(
+        engine
+            .eval::<INT>("let a = new_ts(); a.y.add(); a.y")
+            .unwrap(),
+        0
+    );
 
     engine.register_indexer_get_set(
         |value: &mut TestStruct, index: &str| value.array[index.len()],
@@ -52,25 +66,30 @@ fn test_get_set() -> Result<(), Box<EvalAltResult>> {
     );
 
     #[cfg(not(feature = "no_index"))]
-    assert_eq!(engine.eval::<INT>(r#"let a = new_ts(); a["abc"]"#)?, 4);
+    assert_eq!(
+        engine.eval::<INT>(r#"let a = new_ts(); a["abc"]"#).unwrap(),
+        4
+    );
 
     #[cfg(not(feature = "no_index"))]
     assert_eq!(
-        engine.eval::<INT>(r#"let a = new_ts(); a["abc"] = 42; a["abc"]"#)?,
+        engine
+            .eval::<INT>(r#"let a = new_ts(); a["abc"] = 42; a["abc"]"#)
+            .unwrap(),
         42
     );
 
-    assert_eq!(engine.eval::<INT>(r"let a = new_ts(); a.abc")?, 4);
+    assert_eq!(engine.eval::<INT>(r"let a = new_ts(); a.abc").unwrap(), 4);
     assert_eq!(
-        engine.eval::<INT>(r"let a = new_ts(); a.abc = 42; a.abc")?,
+        engine
+            .eval::<INT>(r"let a = new_ts(); a.abc = 42; a.abc")
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_get_set_chain_with_write_back() -> Result<(), Box<EvalAltResult>> {
+fn test_get_set_chain_with_write_back() {
     #[derive(Clone)]
     struct TestChild {
         x: INT,
@@ -131,34 +150,43 @@ fn test_get_set_chain_with_write_back() -> Result<(), Box<EvalAltResult>> {
     engine.register_fn("new_tp", TestParent::new);
     engine.register_fn("new_tc", TestChild::new);
 
-    assert_eq!(engine.eval::<INT>("let a = new_tp(); a.child.x")?, 1);
     assert_eq!(
-        engine.eval::<INT>("let a = new_tp(); a.child.x = 42; a.child.x")?,
+        engine.eval::<INT>("let a = new_tp(); a.child.x").unwrap(),
+        1
+    );
+    assert_eq!(
+        engine
+            .eval::<INT>("let a = new_tp(); a.child.x = 42; a.child.x")
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<String>("let a = new_tp(); type_of(a)")?,
+        engine
+            .eval::<String>("let a = new_tp(); type_of(a)")
+            .unwrap(),
         "TestParent"
     );
 
     #[cfg(not(feature = "no_index"))]
     assert_eq!(
-        engine.eval::<INT>("let a = new_tp(); let c = new_tc(); c.x = 123; a[2] = c; a.child.x")?,
+        engine
+            .eval::<INT>("let a = new_tp(); let c = new_tc(); c.x = 123; a[2] = c; a.child.x")
+            .unwrap(),
         246
     );
 
     #[cfg(not(feature = "no_index"))]
     assert_eq!(
-        engine.eval::<INT>("let a = new_tp(); a[2].x = 42; a.child.x")?,
+        engine
+            .eval::<INT>("let a = new_tp(); a[2].x = 42; a.child.x")
+            .unwrap(),
         84
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_get_set_op_assignment() -> Result<(), Box<EvalAltResult>> {
+fn test_get_set_op_assignment() {
     #[derive(Clone, Debug, Eq, PartialEq)]
     struct Num(INT);
 
@@ -179,19 +207,19 @@ fn test_get_set_op_assignment() -> Result<(), Box<EvalAltResult>> {
         .register_get_set("v", Num::get, Num::set);
 
     assert_eq!(
-        engine.eval::<Num>("let a = new_ts(); a.v = a.v + 2; a")?,
+        engine
+            .eval::<Num>("let a = new_ts(); a.v = a.v + 2; a")
+            .unwrap(),
         Num(42)
     );
     assert_eq!(
-        engine.eval::<Num>("let a = new_ts(); a.v += 2; a")?,
+        engine.eval::<Num>("let a = new_ts(); a.v += 2; a").unwrap(),
         Num(42)
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_get_set_chain_without_write_back() -> Result<(), Box<EvalAltResult>> {
+fn test_get_set_chain_without_write_back() {
     #[derive(Debug, Clone)]
     struct Outer {
         pub inner: Inner,
@@ -239,26 +267,32 @@ fn test_get_set_chain_without_write_back() -> Result<(), Box<EvalAltResult>> {
     );
 
     assert_eq!(
-        engine.eval_with_scope::<INT>(&mut scope, "outer.inner.value")?,
+        engine
+            .eval_with_scope::<INT>(&mut scope, "outer.inner.value")
+            .unwrap(),
         42
     );
 
     #[cfg(not(feature = "no_index"))]
     assert_eq!(
-        engine.eval_with_scope::<INT>(&mut scope, "outer[2].value")?,
+        engine
+            .eval_with_scope::<INT>(&mut scope, "outer[2].value")
+            .unwrap(),
         84
     );
 
-    engine.run_with_scope(&mut scope, "print(outer.inner.value)")?;
+    engine
+        .run_with_scope(&mut scope, "print(outer.inner.value)")
+        .unwrap();
 
     #[cfg(not(feature = "no_index"))]
-    engine.run_with_scope(&mut scope, "print(outer[0].value)")?;
-
-    Ok(())
+    engine
+        .run_with_scope(&mut scope, "print(outer[0].value)")
+        .unwrap();
 }
 
 #[test]
-fn test_get_set_collection() -> Result<(), Box<EvalAltResult>> {
+fn test_get_set_collection() {
     type MyItem = INT;
     type MyBag = std::collections::BTreeSet<MyItem>;
 
@@ -281,33 +315,33 @@ fn test_get_set_collection() -> Result<(), Box<EvalAltResult>> {
             col1
         });
 
-    let result = engine.eval::<INT>(
-        "
-            let bag = new_bag();
+    let result = engine
+        .eval::<INT>(
+            "
+                let bag = new_bag();
 
-            bag += 1;
-            bag += 2;
-            bag += 39;
-            bag -= 2;
+                bag += 1;
+                bag += 2;
+                bag += 39;
+                bag -= 2;
 
-            if !bag.contains(2) {
-                let sum = 0;
-                for n in bag { sum += n; }
-                sum + bag.len
-            } else {
-                -1
-            }
-        ",
-    )?;
+                if !bag.contains(2) {
+                    let sum = 0;
+                    for n in bag { sum += n; }
+                    sum + bag.len
+                } else {
+                    -1
+                }
+            ",
+        )
+        .unwrap();
 
     assert_eq!(result, 42);
-
-    Ok(())
 }
 
 #[cfg(not(feature = "no_index"))]
 #[test]
-fn test_get_set_indexer() -> Result<(), Box<EvalAltResult>> {
+fn test_get_set_indexer() {
     type MyMap = std::collections::BTreeMap<String, INT>;
 
     let mut engine = Engine::new();
@@ -327,37 +361,43 @@ fn test_get_set_indexer() -> Result<(), Box<EvalAltResult>> {
         });
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let my_map = new_map();
-                my_map["eggs"] = 42;
-                my_map["eggs"]
-            "#,
-        )?,
+        engine
+            .eval::<INT>(
+                r#"
+                    let my_map = new_map();
+                    my_map["eggs"] = 42;
+                    my_map["eggs"]
+                "#,
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let my_map = new_map();
-                my_map["eggs"] = 41;
-                my_map["eggs"] = my_map["eggs"] + 1;
-                my_map["eggs"]
-            "#,
-        )?,
+        engine
+            .eval::<INT>(
+                r#"
+                    let my_map = new_map();
+                    my_map["eggs"] = 41;
+                    my_map["eggs"] = my_map["eggs"] + 1;
+                    my_map["eggs"]
+                "#,
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let my_map = new_map();
-                my_map["eggs"] = 41;
-                my_map["eggs"] += 1;
-                my_map["eggs"]
-            "#,
-        )?,
+        engine
+            .eval::<INT>(
+                r#"
+                    let my_map = new_map();
+                    my_map["eggs"] = 41;
+                    my_map["eggs"] += 1;
+                    my_map["eggs"]
+                "#,
+            )
+            .unwrap(),
         42
     );
 
@@ -372,37 +412,40 @@ fn test_get_set_indexer() -> Result<(), Box<EvalAltResult>> {
         .is_err());
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let my_map = new_map();
-                my_map["eggs"] = 42;
+        engine
+            .eval::<INT>(
+                r#"
+                    let my_map = new_map();
+                    my_map["eggs"] = 42;
 
-                try {
-                    let eggs = my_map["eggs"];
-                    let eggs = my_map["not found"];
-                }
-                catch(x)
-                {
-                    print("Not found!");
-                }
+                    try {
+                        let eggs = my_map["eggs"];
+                        let eggs = my_map["not found"];
+                    }
+                    catch(x)
+                    {
+                        print("Not found!");
+                    }
 
-                my_map["eggs"]
-            "#,
-        )?,
+                    my_map["eggs"]
+                "#,
+            )
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_get_set_elvis() -> Result<(), Box<EvalAltResult>> {
+fn test_get_set_elvis() {
     let engine = Engine::new();
 
-    engine.eval::<()>("let x = (); x?.foo.bar.baz")?;
-    engine.eval::<()>("let x = (); x?.foo(1,2,3)")?;
-    engine.eval::<()>("let x = #{a:()}; x.a?.foo.bar.baz")?;
-    assert_eq!(engine.eval::<String>("let x = 'x'; x?.type_of()")?, "char");
-
-    Ok(())
+    engine.eval::<()>("let x = (); x?.foo.bar.baz").unwrap();
+    engine.eval::<()>("let x = (); x?.foo(1,2,3)").unwrap();
+    engine
+        .eval::<()>("let x = #{a:()}; x.a?.foo.bar.baz")
+        .unwrap();
+    assert_eq!(
+        engine.eval::<String>("let x = 'x'; x?.type_of()").unwrap(),
+        "char"
+    );
 }

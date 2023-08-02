@@ -1,51 +1,56 @@
 #![cfg(not(feature = "no_optimize"))]
-
-use rhai::{Engine, EvalAltResult, Module, OptimizationLevel, Scope, INT};
+use rhai::{Engine, Module, OptimizationLevel, Scope, INT};
 
 #[test]
-fn test_optimizer() -> Result<(), Box<EvalAltResult>> {
+fn test_optimizer() {
     let mut engine = Engine::new();
     engine.set_optimization_level(OptimizationLevel::Simple);
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
+        engine
+            .eval::<INT>(
+                "
                 const X = 0;
                 const X = 40 + 2 - 1 + 1;
                 X
             "
-        )?,
+            )
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_optimizer_run() -> Result<(), Box<EvalAltResult>> {
-    fn run_test(engine: &mut Engine) -> Result<(), Box<EvalAltResult>> {
-        assert_eq!(engine.eval::<INT>("if true { 42 } else { 123 }")?, 42);
+fn test_optimizer_run() {
+    fn run_test(engine: &mut Engine) {
         assert_eq!(
-            engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")?,
+            engine.eval::<INT>("if true { 42 } else { 123 }").unwrap(),
             42
         );
         assert_eq!(
-            engine.eval::<INT>(r#"const abc = "hello"; if abc < "foo" { 42 } else { 123 }"#)?,
+            engine
+                .eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")
+                .unwrap(),
+            42
+        );
+        assert_eq!(
+            engine
+                .eval::<INT>(r#"const abc = "hello"; if abc < "foo" { 42 } else { 123 }"#)
+                .unwrap(),
             123
         );
-        Ok(())
     }
 
     let mut engine = Engine::new();
 
     engine.set_optimization_level(OptimizationLevel::None);
-    run_test(&mut engine)?;
+    run_test(&mut engine);
 
     engine.set_optimization_level(OptimizationLevel::Simple);
-    run_test(&mut engine)?;
+    run_test(&mut engine);
 
     engine.set_optimization_level(OptimizationLevel::Full);
-    run_test(&mut engine)?;
+    run_test(&mut engine);
 
     // Override == operator
     engine.register_fn("==", |_x: INT, _y: INT| false);
@@ -53,25 +58,29 @@ fn test_optimizer_run() -> Result<(), Box<EvalAltResult>> {
     engine.set_optimization_level(OptimizationLevel::Simple);
 
     assert_eq!(
-        engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")?,
+        engine
+            .eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")
+            .unwrap(),
         42
     );
 
     engine.set_fast_operators(false);
 
     assert_eq!(
-        engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")?,
+        engine
+            .eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")
+            .unwrap(),
         123
     );
 
     engine.set_optimization_level(OptimizationLevel::Full);
 
     assert_eq!(
-        engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")?,
+        engine
+            .eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")
+            .unwrap(),
         123
     );
-
-    Ok(())
 }
 
 #[cfg(feature = "metadata")]
@@ -79,26 +88,30 @@ fn test_optimizer_run() -> Result<(), Box<EvalAltResult>> {
 #[cfg(not(feature = "no_function"))]
 #[cfg(not(feature = "no_position"))]
 #[test]
-fn test_optimizer_parse() -> Result<(), Box<EvalAltResult>> {
+fn test_optimizer_parse() {
     let mut engine = Engine::new();
 
     engine.set_optimization_level(OptimizationLevel::Simple);
 
-    let ast = engine.compile("{ const DECISION = false; if DECISION { 42 } else { 123 } }")?;
+    let ast = engine
+        .compile("{ const DECISION = false; if DECISION { 42 } else { 123 } }")
+        .unwrap();
 
     assert_eq!(
         format!("{ast:?}"),
         r#"AST { source: None, doc: None, resolver: None, body: [Expr(123 @ 1:53)] }"#
     );
 
-    let ast = engine.compile("const DECISION = false; if DECISION { 42 } else { 123 }")?;
+    let ast = engine
+        .compile("const DECISION = false; if DECISION { 42 } else { 123 }")
+        .unwrap();
 
     assert_eq!(
         format!("{ast:?}"),
         r#"AST { source: None, doc: None, resolver: None, body: [Var(("DECISION" @ 1:7, false @ 1:18, None), CONSTANT, 1:1), Expr(123 @ 1:51)] }"#
     );
 
-    let ast = engine.compile("if 1 == 2 { 42 }")?;
+    let ast = engine.compile("if 1 == 2 { 42 }").unwrap();
 
     assert_eq!(
         format!("{ast:?}"),
@@ -107,14 +120,14 @@ fn test_optimizer_parse() -> Result<(), Box<EvalAltResult>> {
 
     engine.set_optimization_level(OptimizationLevel::Full);
 
-    let ast = engine.compile("abs(-42)")?;
+    let ast = engine.compile("abs(-42)").unwrap();
 
     assert_eq!(
         format!("{ast:?}"),
         r#"AST { source: None, doc: None, resolver: None, body: [Expr(42 @ 1:1)] }"#
     );
 
-    let ast = engine.compile("NUMBER")?;
+    let ast = engine.compile("NUMBER").unwrap();
 
     assert_eq!(
         format!("{ast:?}"),
@@ -126,19 +139,17 @@ fn test_optimizer_parse() -> Result<(), Box<EvalAltResult>> {
 
     engine.register_global_module(module.into());
 
-    let ast = engine.compile("NUMBER")?;
+    let ast = engine.compile("NUMBER").unwrap();
 
     assert_eq!(
         format!("{ast:?}"),
         r#"AST { source: None, doc: None, resolver: None, body: [Expr(42 @ 1:1)] }"#
     );
-
-    Ok(())
 }
 
 #[cfg(not(feature = "no_function"))]
 #[test]
-fn test_optimizer_scope() -> Result<(), Box<EvalAltResult>> {
+fn test_optimizer_scope() {
     const SCRIPT: &str = "
         fn foo() { FOO }
         foo()
@@ -149,52 +160,48 @@ fn test_optimizer_scope() -> Result<(), Box<EvalAltResult>> {
 
     scope.push_constant("FOO", 42 as INT);
 
-    let ast = engine.compile_with_scope(&scope, SCRIPT)?;
+    let ast = engine.compile_with_scope(&scope, SCRIPT).unwrap();
 
     scope.push("FOO", 123 as INT);
 
-    assert_eq!(engine.eval_ast::<INT>(&ast)?, 42);
-    assert_eq!(engine.eval_ast_with_scope::<INT>(&mut scope, &ast)?, 42);
+    assert_eq!(engine.eval_ast::<INT>(&ast).unwrap(), 42);
+    assert_eq!(
+        engine.eval_ast_with_scope::<INT>(&mut scope, &ast).unwrap(),
+        42
+    );
 
-    let ast = engine.compile_with_scope(&scope, SCRIPT)?;
+    let ast = engine.compile_with_scope(&scope, SCRIPT).unwrap();
 
     assert!(engine.eval_ast_with_scope::<INT>(&mut scope, &ast).is_err());
-
-    Ok(())
 }
 
 #[cfg(not(feature = "no_function"))]
 #[cfg(not(feature = "no_closure"))]
 #[test]
-fn test_optimizer_reoptimize() -> Result<(), Box<EvalAltResult>> {
-    const SCRIPT: &str = "
-        const FOO = 42;
-        fn foo() {
-            let f = || FOO * 2;
-            call(f)
-         }
-        foo()
-    ";
-
+fn test_optimizer_re_optimize() {
     let engine = Engine::new();
-    let ast = engine.compile(SCRIPT)?;
+    let ast = engine
+        .compile(
+            "
+                const FOO = 42;
+                fn foo() {
+                    let f = || FOO * 2;
+                    call(f)
+                }
+                foo()
+            ",
+        )
+        .unwrap();
     let scope: Scope = ast.iter_literal_variables(true, false).collect();
     let ast = engine.optimize_ast(&scope, ast, OptimizationLevel::Simple);
 
-    assert_eq!(engine.eval_ast::<INT>(&ast)?, 84);
-
-    Ok(())
+    assert_eq!(engine.eval_ast::<INT>(&ast).unwrap(), 84);
 }
 
 #[test]
-fn test_optimizer_full() -> Result<(), Box<EvalAltResult>> {
+fn test_optimizer_full() {
     #[derive(Debug, Clone)]
     struct TestStruct(INT);
-
-    const SCRIPT: &str = "
-        const FOO = ts(40) + ts(2);
-        value(FOO)
-    ";
 
     let mut engine = Engine::new();
     let mut scope = Scope::new();
@@ -203,13 +210,15 @@ fn test_optimizer_full() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_function"))]
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                fn foo(x) { print(x); return; }
-                fn foo2(x) { if x > 0 {} return; }
-                42
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    fn foo(x) { print(x); return; }
+                    fn foo2(x) { if x > 0 {} return; }
+                    42
+                "
+            )
+            .unwrap(),
         42
     );
 
@@ -221,16 +230,24 @@ fn test_optimizer_full() -> Result<(), Box<EvalAltResult>> {
             TestStruct(ts1.0 + ts2.0)
         });
 
-    let ast = engine.compile(SCRIPT)?;
+    let ast = engine
+        .compile(
+            "
+                const FOO = ts(40) + ts(2);
+                value(FOO)
+            ",
+        )
+        .unwrap();
 
     #[cfg(feature = "internals")]
     assert_eq!(ast.statements().len(), 2);
 
-    assert_eq!(engine.eval_ast_with_scope::<INT>(&mut scope, &ast)?, 42);
+    assert_eq!(
+        engine.eval_ast_with_scope::<INT>(&mut scope, &ast).unwrap(),
+        42
+    );
 
     assert_eq!(scope.len(), 1);
 
     assert_eq!(scope.get_value::<TestStruct>("FOO").unwrap().0, 42);
-
-    Ok(())
 }

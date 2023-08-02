@@ -1,51 +1,63 @@
 #![cfg(not(feature = "no_object"))]
-
 use rhai::{Engine, EvalAltResult, Map, ParseErrorType, Scope, INT};
 
 #[test]
-fn test_map_indexing() -> Result<(), Box<EvalAltResult>> {
+fn test_map_indexing() {
     let engine = Engine::new();
 
     #[cfg(not(feature = "no_index"))]
     {
         assert_eq!(
-            engine.eval::<INT>(r#"let x = #{a: 1, b: 2, c: 3}; x["b"]"#)?,
+            engine
+                .eval::<INT>(r#"let x = #{a: 1, b: 2, c: 3}; x["b"]"#)
+                .unwrap(),
             2
         );
         assert_eq!(
-            engine.eval::<INT>(r#"let x = #{a: 1, b: 2, c: 3,}; x["b"]"#)?,
+            engine
+                .eval::<INT>(r#"let x = #{a: 1, b: 2, c: 3,}; x["b"]"#)
+                .unwrap(),
             2
         );
         assert_eq!(
-            engine.eval::<char>(
-                r#"
-                    let y = #{d: 1, "e": #{a: 42, b: 88, "": "hello"}, " 123 xyz": 9};
-                    y.e[""][4]
-                "#
-            )?,
+            engine
+                .eval::<char>(
+                    r#"
+                        let y = #{d: 1, "e": #{a: 42, b: 88, "": "hello"}, " 123 xyz": 9};
+                        y.e[""][4]
+                    "#
+                )
+                .unwrap(),
             'o'
         );
         assert_eq!(
-            engine.eval::<String>(r#"let a = [#{s:"hello"}]; a[0].s[2] = 'X'; a[0].s"#)?,
+            engine
+                .eval::<String>(r#"let a = [#{s:"hello"}]; a[0].s[2] = 'X'; a[0].s"#)
+                .unwrap(),
             "heXlo"
         );
     }
 
     assert_eq!(
-        engine.eval::<INT>("let y = #{a: 1, b: 2, c: 3}; y.a = 5; y.a")?,
+        engine
+            .eval::<INT>("let y = #{a: 1, b: 2, c: 3}; y.a = 5; y.a")
+            .unwrap(),
         5
     );
 
-    engine.run("let y = #{a: 1, b: 2, c: 3}; y.z")?;
+    engine.run("let y = #{a: 1, b: 2, c: 3}; y.z").unwrap();
 
     #[cfg(not(feature = "no_index"))]
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let y = #{`a
-b`: 1}; y["a\nb"]
-            "#
-        )?,
+        engine
+            .eval::<INT>(
+                r#"
+                    let y = #{`a
+b`: 1};
+                    y["a\nb"]
+                "#
+            )
+            .unwrap(),
         1
     );
 
@@ -56,39 +68,51 @@ b`: 1}; y["a\nb"]
         EvalAltResult::ErrorParsing(ParseErrorType::PropertyExpected, ..)
     ));
 
-    assert!(engine.eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "c" in y"#)?);
-    assert!(engine.eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "b" in y"#)?);
-    assert!(!engine.eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "z" in y"#)?);
+    assert!(engine
+        .eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "c" in y"#)
+        .unwrap());
+    assert!(engine
+        .eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "b" in y"#)
+        .unwrap());
+    assert!(!engine
+        .eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "z" in y"#)
+        .unwrap());
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let x = #{a: 1, b: 2, c: 3};
-                let c = x.remove("c");
-                x.len() + c
-            "#
-        )?,
+        engine
+            .eval::<INT>(
+                r#"
+                    let x = #{a: 1, b: 2, c: 3};
+                    let c = x.remove("c");
+                    x.len() + c
+                "#
+            )
+            .unwrap(),
         5
     );
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let x = #{a: 1, b: 2, c: 3};
-                let y = #{b: 42, d: 9};
-                x.mixin(y);
-                x.len() + x.b
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let x = #{a: 1, b: 2, c: 3};
+                    let y = #{b: 42, d: 9};
+                    x.mixin(y);
+                    x.len() + x.b
+                "
+            )
+            .unwrap(),
         46
     );
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let x = #{a: 1, b: 2, c: 3};
-                x += #{b: 42, d: 9};
-                x.len() + x.b
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let x = #{a: 1, b: 2, c: 3};
+                    x += #{b: 42, d: 9};
+                    x.len() + x.b
+                "
+            )
+            .unwrap(),
         46
     );
     assert_eq!(
@@ -99,16 +123,15 @@ b`: 1}; y["a\nb"]
                     let y = #{b: 42, d: 9};
                     x + y
                 "
-            )?
+            )
+            .unwrap()
             .len(),
         4
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_map_prop() -> Result<(), Box<EvalAltResult>> {
+fn test_map_prop() {
     let mut engine = Engine::new();
 
     engine.eval::<()>("let x = #{a: 42}; x.b").unwrap();
@@ -120,16 +143,14 @@ fn test_map_prop() -> Result<(), Box<EvalAltResult>> {
             EvalAltResult::ErrorPropertyNotFound(prop, _) if prop == "b"
         )
     );
-
-    Ok(())
 }
 
 #[cfg(not(feature = "no_index"))]
 #[test]
-fn test_map_index_types() -> Result<(), Box<EvalAltResult>> {
+fn test_map_index_types() {
     let engine = Engine::new();
 
-    engine.compile(r#"#{a:1, b:2, c:3}["a"]['x']"#)?;
+    engine.compile(r#"#{a:1, b:2, c:3}["a"]['x']"#).unwrap();
 
     assert!(matches!(
         engine
@@ -171,39 +192,37 @@ fn test_map_index_types() -> Result<(), Box<EvalAltResult>> {
             .err_type(),
         ParseErrorType::MalformedIndexExpr(..)
     ));
-
-    Ok(())
 }
 
 #[test]
-fn test_map_assign() -> Result<(), Box<EvalAltResult>> {
+fn test_map_assign() {
     let engine = Engine::new();
 
-    let x = engine.eval::<Map>(r#"let x = #{a: 1, b: true, "c$": "hello"}; x"#)?;
+    let x = engine
+        .eval::<Map>(r#"let x = #{a: 1, b: true, "c$": "hello"}; x"#)
+        .unwrap();
 
     assert_eq!(x["a"].as_int().unwrap(), 1);
     assert!(x["b"].as_bool().unwrap());
     assert_eq!(x["c$"].clone_cast::<String>(), "hello");
-
-    Ok(())
 }
 
 #[test]
-fn test_map_return() -> Result<(), Box<EvalAltResult>> {
+fn test_map_return() {
     let engine = Engine::new();
 
-    let x = engine.eval::<Map>(r#"#{a: 1, b: true, "c$": "hello"}"#)?;
+    let x = engine
+        .eval::<Map>(r#"#{a: 1, b: true, "c$": "hello"}"#)
+        .unwrap();
 
     assert_eq!(x["a"].as_int().unwrap(), 1);
     assert!(x["b"].as_bool().unwrap());
     assert_eq!(x["c$"].clone_cast::<String>(), "hello");
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_index"))]
-fn test_map_for() -> Result<(), Box<EvalAltResult>> {
+fn test_map_for() {
     let engine = Engine::new();
 
     assert_eq!(
@@ -219,23 +238,22 @@ fn test_map_for() -> Result<(), Box<EvalAltResult>> {
 
                     s
                 "#
-            )?
+            )
+            .unwrap()
             .len(),
         11
     );
-
-    Ok(())
 }
 
 #[test]
 /// Because a Rhai object map literal is almost the same as JSON,
 /// it is possible to convert from JSON into a Rhai object map.
-fn test_map_json() -> Result<(), Box<EvalAltResult>> {
+fn test_map_json() {
     let engine = Engine::new();
 
     let json = r#"{"a":1, "b":true, "c":41+1, "$d e f!":"hello", "z":null}"#;
 
-    let map = engine.parse_json(json, true)?;
+    let map = engine.parse_json(json, true).unwrap();
 
     assert!(!map.contains_key("x"));
 
@@ -263,13 +281,14 @@ fn test_map_json() -> Result<(), Box<EvalAltResult>> {
 
                         s
                     "#
-                )?
+                )
+                .unwrap()
                 .len(),
             11
         );
     }
 
-    engine.parse_json(json, true)?;
+    engine.parse_json(json, true).unwrap();
 
     assert!(matches!(
         *engine.parse_json("123", true).unwrap_err(),
@@ -300,28 +319,26 @@ fn test_map_json() -> Result<(), Box<EvalAltResult>> {
         *engine.parse_json("{a:`hello${world}`}", true).unwrap_err(),
         EvalAltResult::ErrorParsing(..)
     ));
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_function"))]
-fn test_map_oop() -> Result<(), Box<EvalAltResult>> {
+fn test_map_oop() {
     let engine = Engine::new();
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let obj = #{ data: 40, action: Fn("abc") };
+        engine
+            .eval::<INT>(
+                r#"
+                    let obj = #{ data: 40, action: Fn("abc") };
 
-                fn abc(x) { this.data += x; }
+                    fn abc(x) { this.data += x; }
 
-                obj.action(2);
-                obj.data
-            "#,
-        )?,
+                    obj.action(2);
+                    obj.data
+                "#,
+            )
+            .unwrap(),
         42
     );
-
-    Ok(())
 }

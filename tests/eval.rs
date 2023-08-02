@@ -1,142 +1,150 @@
-use rhai::{Engine, EvalAltResult, LexError, ParseErrorType, Scope, INT};
+use rhai::{Engine, LexError, ParseErrorType, Scope, INT};
 
 #[test]
-fn test_eval() -> Result<(), Box<EvalAltResult>> {
+fn test_eval() {
     let engine = Engine::new();
 
-    assert_eq!(engine.eval::<INT>(r#"eval("40 + 2")"#)?, 42);
+    assert_eq!(engine.eval::<INT>(r#"eval("40 + 2")"#).unwrap(), 42);
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let foo = 42;
+        engine
+            .eval::<INT>(
+                r#"
+                    let foo = 42;
 
-                eval("let foo = 123");
-                eval("let xyz = 10");
+                    eval("let foo = 123");
+                    eval("let xyz = 10");
 
-                foo + xyz
-            "#
-        )?,
+                    foo + xyz
+                "#
+            )
+            .unwrap(),
         133
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_eval_blocks() -> Result<(), Box<EvalAltResult>> {
+fn test_eval_blocks() {
     let engine = Engine::new();
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let x = 999;
+        engine
+            .eval::<INT>(
+                r#"
+                    let x = 999;
 
-                eval("let x = x - 1000");
+                    eval("let x = x - 1000");
 
-                let y = if x < 0 {
-                    eval("let x = 42");
-                    x
-                } else {
-                    0
-                };
+                    let y = if x < 0 {
+                        eval("let x = 42");
+                        x
+                    } else {
+                        0
+                    };
 
-                x + y
-            "#
-        )?,
+                    x + y
+                "#
+            )
+            .unwrap(),
         41
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let foo = 42;
+        engine
+            .eval::<INT>(
+                r#"
+                    let foo = 42;
 
-                eval("{ let foo = 123; }");
+                    eval("{ let foo = 123; }");
 
-                foo
-            "#
-        )?,
+                    foo
+                "#
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let foo = 42;
-                { { {
-                    eval("let foo = 123");
-                } } }
-                foo
-            "#
-        )?,
+        engine
+            .eval::<INT>(
+                r#"
+                    let foo = 42;
+                    { { {
+                        eval("let foo = 123");
+                    } } }
+                    foo
+                "#
+            )
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[cfg(not(feature = "no_function"))]
 #[cfg(not(feature = "no_module"))]
 #[test]
-fn test_eval_globals() -> Result<(), Box<EvalAltResult>> {
+fn test_eval_globals() {
     let engine = Engine::new();
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                const XYZ = 123;
+        engine
+            .eval::<INT>(
+                r#"
+                    const XYZ = 123;
 
-                fn foo() { global::XYZ } 
-                {
-                    eval("const XYZ = 42;");
-                }
+                    fn foo() { global::XYZ } 
+                    {
+                        eval("const XYZ = 42;");
+                    }
 
-                foo()
-            "#
-        )?,
+                    foo()
+                "#
+            )
+            .unwrap(),
         123
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                const XYZ = 123;
+        engine
+            .eval::<INT>(
+                r#"
+                    const XYZ = 123;
 
-                fn foo() { global::XYZ } 
+                    fn foo() { global::XYZ } 
 
-                eval("const XYZ = 42;");
+                    eval("const XYZ = 42;");
 
-                foo()
-            "#
-        )?,
+                    foo()
+                "#
+            )
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_function"))]
-fn test_eval_function() -> Result<(), Box<EvalAltResult>> {
+fn test_eval_function() {
     let engine = Engine::new();
     let mut scope = Scope::new();
 
     assert_eq!(
-        engine.eval_with_scope::<INT>(
-            &mut scope,
-            r#"
-                let x = 10;
+        engine
+            .eval_with_scope::<INT>(
+                &mut scope,
+                r#"
+                    let x = 10;
 
-                fn foo(x) { x += 12; x }
+                    fn foo(x) { x += 12; x }
 
-                let script = "let y = x;";      // build a script
-                script +=    "y += foo(y);";
-                script +=    "x + y";
+                    let script = "let y = x;";      // build a script
+                    script +=    "y += foo(y);";
+                    script +=    "x + y";
 
-                eval(script) + x + y
-            "#
-        )?,
+                    eval(script) + x + y
+                "#
+            )
+            .unwrap(),
         84
     );
 
@@ -156,12 +164,10 @@ fn test_eval_function() -> Result<(), Box<EvalAltResult>> {
 
     assert!(scope.contains("script"));
     assert_eq!(scope.len(), 3);
-
-    Ok(())
 }
 
 #[test]
-fn test_eval_disabled() -> Result<(), Box<EvalAltResult>> {
+fn test_eval_disabled() {
     let mut engine = Engine::new();
 
     engine.disable_symbol("eval");
@@ -173,6 +179,4 @@ fn test_eval_disabled() -> Result<(), Box<EvalAltResult>> {
             .err_type(),
         ParseErrorType::BadInput(LexError::ImproperSymbol(err, ..)) if err == "eval"
     ));
-
-    Ok(())
 }

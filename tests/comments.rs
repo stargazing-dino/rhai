@@ -1,45 +1,49 @@
-use rhai::{Engine, EvalAltResult, INT};
+use rhai::{Engine, INT};
 
 #[test]
-fn test_comments() -> Result<(), Box<EvalAltResult>> {
+fn test_comments() {
     let engine = Engine::new();
 
     assert_eq!(
-        engine.eval::<INT>("let x = 42; x // I am a single line comment, yay!")?,
+        engine
+            .eval::<INT>("let x = 42; x // I am a single line comment, yay!")
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let /* I am a
-                    multi-line
-                        comment, yay!
-                    */ x = 42; x
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let /* I am a
+                        multi-line
+                            comment, yay!
+                        */ x = 42; x
+                "
+            )
+            .unwrap(),
         42
     );
 
-    engine.run("/* Hello world */")?;
-
-    Ok(())
+    engine.run("/* Hello world */").unwrap();
 }
 
 #[cfg(not(feature = "no_function"))]
 #[cfg(feature = "metadata")]
 #[test]
-fn test_comments_doc() -> Result<(), Box<EvalAltResult>> {
+fn test_comments_doc() {
     let engine = Engine::new();
 
-    let ast = engine.compile(
-        "
-            /// Hello world
+    let ast = engine
+        .compile(
+            "
+                /// Hello world
 
 
-            fn foo() {}
-        ",
-    )?;
+                fn foo() {}
+            ",
+        )
+        .unwrap();
 
     assert_eq!(
         ast.iter_functions().next().unwrap().comments[0],
@@ -55,25 +59,29 @@ fn test_comments_doc() -> Result<(), Box<EvalAltResult>> {
         )
         .is_err());
 
-    engine.compile(
-        "
-            ///////////////
-            let x = 42;
+    engine
+        .compile(
+            "
+                ///////////////
+                let x = 42;
 
-            /***************/
-            let x = 42;
-        ",
-    )?;
+                /***************/
+                let x = 42;
+            ",
+        )
+        .unwrap();
 
-    let ast = engine.compile(
-        "
-            /** Hello world
-            ** how are you?
-            **/
+    let ast = engine
+        .compile(
+            "
+                /** Hello world
+                ** how are you?
+                **/
 
-            fn foo() {}
-        ",
-    )?;
+                fn foo() {}
+            ",
+        )
+        .unwrap();
 
     #[cfg(not(feature = "no_position"))]
     assert_eq!(
@@ -94,6 +102,4 @@ fn test_comments_doc() -> Result<(), Box<EvalAltResult>> {
             "
         )
         .is_err());
-
-    Ok(())
 }

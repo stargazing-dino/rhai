@@ -16,6 +16,7 @@ Enhancements
 ------------
 
 * [`once_cell`](https://crates.io/crates/once_cell) is used in `std` environments instead of the home-brew `SusLock` (which is still kept for `no-std`).
+* Originally, unit tests use the `?` operator liberally to simplify the code. However, this causes the loss of proper line numbers when it fails, making it difficult to identify the exact location of the failure. This is now fixed by using `unwrap()` instead.
 
 New features
 ------------

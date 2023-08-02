@@ -1,23 +1,31 @@
-use rhai::{Engine, EvalAltResult, ParseErrorType, INT};
+use rhai::{Engine, ParseErrorType, INT};
 
 #[test]
-fn test_assignments() -> Result<(), Box<EvalAltResult>> {
+fn test_assignments() {
     let engine = Engine::new();
 
-    assert_eq!(engine.eval::<INT>("let x = 42; x = 123; x")?, 123);
-    assert_eq!(engine.eval::<INT>("let x = 42; x += 123; x")?, 165);
+    assert_eq!(engine.eval::<INT>("let x = 42; x = 123; x").unwrap(), 123);
+    assert_eq!(engine.eval::<INT>("let x = 42; x += 123; x").unwrap(), 165);
 
     #[cfg(not(feature = "no_index"))]
-    assert_eq!(engine.eval::<INT>("let x = [42]; x[0] += 123; x[0]")?, 165);
+    assert_eq!(
+        engine
+            .eval::<INT>("let x = [42]; x[0] += 123; x[0]")
+            .unwrap(),
+        165
+    );
 
     #[cfg(not(feature = "no_object"))]
-    assert_eq!(engine.eval::<INT>("let x = #{a:42}; x.a += 123; x.a")?, 165);
-
-    Ok(())
+    assert_eq!(
+        engine
+            .eval::<INT>("let x = #{a:42}; x.a += 123; x.a")
+            .unwrap(),
+        165
+    );
 }
 
 #[test]
-fn test_assignments_bad_lhs() -> Result<(), Box<EvalAltResult>> {
+fn test_assignments_bad_lhs() {
     let engine = Engine::new();
 
     assert_eq!(
@@ -62,6 +70,4 @@ fn test_assignments_bad_lhs() -> Result<(), Box<EvalAltResult>> {
             ParseErrorType::AssignmentToInvalidLHS(String::new())
         );
     }
-
-    Ok(())
 }

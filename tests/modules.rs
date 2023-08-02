@@ -25,7 +25,7 @@ fn test_module_syntax() {
 }
 
 #[test]
-fn test_module_sub_module() -> Result<(), Box<EvalAltResult>> {
+fn test_module_sub_module() {
     let mut module = Module::new();
 
     let mut sub_module = Module::new();
@@ -68,39 +68,55 @@ fn test_module_sub_module() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
     engine.register_static_module("question", module.into());
 
-    assert_eq!(engine.eval::<String>("type_of(())")?, "Don't Panic");
+    assert_eq!(engine.eval::<String>("type_of(())").unwrap(), "Don't Panic");
 
-    assert_eq!(engine.eval::<INT>("question::MYSTIC_NUMBER")?, 42);
+    assert_eq!(engine.eval::<INT>("question::MYSTIC_NUMBER").unwrap(), 42);
     assert!(engine.eval::<INT>("MYSTIC_NUMBER").is_err());
-    assert_eq!(engine.eval::<INT>("question::life::universe::answer")?, 41);
     assert_eq!(
-        engine.eval::<INT>("question::life::universe::answer + 1")?,
+        engine
+            .eval::<INT>("question::life::universe::answer")
+            .unwrap(),
+        41
+    );
+    assert_eq!(
+        engine
+            .eval::<INT>("question::life::universe::answer + 1")
+            .unwrap(),
         42
     );
     assert_eq!(
-        engine.eval::<INT>("question::life::universe::inc(question::life::universe::answer)")?,
+        engine
+            .eval::<INT>("question::life::universe::inc(question::life::universe::answer)")
+            .unwrap(),
         42
     );
     assert!(engine
         .eval::<INT>("inc(question::life::universe::answer)")
         .is_err());
     #[cfg(not(feature = "no_object"))]
-    assert_eq!(engine.eval::<INT>("question::MYSTIC_NUMBER.doubled")?, 84);
+    assert_eq!(
+        engine
+            .eval::<INT>("question::MYSTIC_NUMBER.doubled")
+            .unwrap(),
+        84
+    );
     #[cfg(not(feature = "no_object"))]
     assert_eq!(
-        engine.eval::<INT>("question::life::universe::answer.doubled")?,
+        engine
+            .eval::<INT>("question::life::universe::answer.doubled")
+            .unwrap(),
         82
     );
     assert_eq!(
-        engine.eval::<INT>("super_inc(question::life::universe::answer)")?,
+        engine
+            .eval::<INT>("super_inc(question::life::universe::answer)")
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_module_resolver() -> Result<(), Box<EvalAltResult>> {
+fn test_module_resolver() {
     let mut resolver = StaticModuleResolver::new();
 
     let mut module = Module::new();
@@ -128,13 +144,15 @@ fn test_module_resolver() -> Result<(), Box<EvalAltResult>> {
     engine.set_module_resolver(resolver);
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
+        engine
+            .eval::<INT>(
+                r#"
                 import "hello" as h1;
                 import "hello" as h2;
                 h1::sum(h2::answer, -10, 3, 7)
             "#
-        )?,
+            )
+            .unwrap(),
         42
     );
 
@@ -148,63 +166,73 @@ fn test_module_resolver() -> Result<(), Box<EvalAltResult>> {
         .is_err());
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
+        engine
+            .eval::<INT>(
+                r#"
                 import "hello" as h1;
                 import "hello" as h2;
                 let x = 42;
                 h1::sum(x, -10, 3, 7)
             "#
-        )?,
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
+        engine
+            .eval::<INT>(
+                r#"
                 import "hello" as h1;
                 import "hello" as h2;
                 let x = 42;
                 h1::sum(x, 0, 0, 0);
                 x
             "#
-        )?,
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
+        engine
+            .eval::<INT>(
+                r#"
                 import "hello" as h;
                 let x = 21;
                 h::double(x);
                 x
             "#
-        )?,
+            )
+            .unwrap(),
         42
     );
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
+        engine
+            .eval::<INT>(
+                r#"
                 import "hello" as h;
                 let x = 21;
                 double(x);
                 x
             "#
-        )?,
+            )
+            .unwrap(),
         42
     );
     #[cfg(not(feature = "no_float"))]
     {
         assert_eq!(
-            engine.eval::<INT>(
-                r#"
+            engine
+                .eval::<INT>(
+                    r#"
                     import "hello" as h;
                     let x = 21;
                     h::sum_of_three_args(x, 14, 26, 2.0);
                     x
                 "#
-            )?,
+                )
+                .unwrap(),
             42
         );
     }
@@ -257,8 +285,9 @@ fn test_module_resolver() -> Result<(), Box<EvalAltResult>> {
         engine.set_max_modules(1000);
 
         #[cfg(not(feature = "no_function"))]
-        engine.run(
-            r#"
+        engine
+            .run(
+                r#"
                 fn foo() {
                     import "hello" as h;
                 }
@@ -267,7 +296,8 @@ fn test_module_resolver() -> Result<(), Box<EvalAltResult>> {
                     foo();
                 }
             "#,
-        )?;
+            )
+            .unwrap();
     }
 
     #[cfg(not(feature = "no_function"))]
@@ -281,19 +311,21 @@ fn test_module_resolver() -> Result<(), Box<EvalAltResult>> {
         "#;
         let scope = Scope::new();
 
-        let ast = engine.compile_into_self_contained(&scope, script)?;
+        let ast = engine.compile_into_self_contained(&scope, script).unwrap();
 
         engine.set_module_resolver(DummyModuleResolver::new());
 
-        assert_eq!(engine.eval_ast::<INT>(&ast)?, 84);
+        assert_eq!(engine.eval_ast::<INT>(&ast).unwrap(), 84);
 
         assert!(engine.eval::<INT>(script).is_err());
 
-        let result = engine.call_fn::<INT>(&mut Scope::new(), &ast, "foo", (2 as INT,))?;
+        let result = engine
+            .call_fn::<INT>(&mut Scope::new(), &ast, "foo", (2 as INT,))
+            .unwrap();
 
         assert_eq!(result, 84);
 
-        let mut ast2 = engine.compile("fn foo(x) { 42 }")?;
+        let mut ast2 = engine.compile("fn foo(x) { 42 }").unwrap();
 
         #[cfg(feature = "internals")]
         let len = ast.resolver().unwrap().len();
@@ -306,17 +338,17 @@ fn test_module_resolver() -> Result<(), Box<EvalAltResult>> {
             assert_eq!(ast2.resolver().unwrap().len(), len);
         }
 
-        let result = engine.call_fn::<INT>(&mut Scope::new(), &ast2, "foo", (2 as INT,))?;
+        let result = engine
+            .call_fn::<INT>(&mut Scope::new(), &ast2, "foo", (2 as INT,))
+            .unwrap();
 
         assert_eq!(result, 84);
     }
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_function"))]
-fn test_module_from_ast() -> Result<(), Box<EvalAltResult>> {
+fn test_module_from_ast() {
     let mut engine = Engine::new();
 
     let mut resolver1 = StaticModuleResolver::new();
@@ -324,8 +356,9 @@ fn test_module_from_ast() -> Result<(), Box<EvalAltResult>> {
     sub_module.set_var("foo", true);
     resolver1.insert("another module", sub_module);
 
-    let ast = engine.compile(
-        r#"
+    let ast = engine
+        .compile(
+            r#"
             // Functions become module functions
             fn calc(x) {
                 x + 1
@@ -357,47 +390,66 @@ fn test_module_from_ast() -> Result<(), Box<EvalAltResult>> {
             export foo;
             export hello;
         "#,
-    )?;
+        )
+        .unwrap();
 
     engine.set_module_resolver(resolver1);
 
-    let module = Module::eval_ast_as_new(Scope::new(), &ast, &engine)?;
+    let module = Module::eval_ast_as_new(Scope::new(), &ast, &engine).unwrap();
 
     let mut resolver2 = StaticModuleResolver::new();
     resolver2.insert("testing", module);
     engine.set_module_resolver(resolver2);
 
     assert_eq!(
-        engine.eval::<INT>(r#"import "testing" as ttt; ttt::abc"#)?,
+        engine
+            .eval::<INT>(r#"import "testing" as ttt; ttt::abc"#)
+            .unwrap(),
         123
     );
     assert_eq!(
-        engine.eval::<INT>(r#"import "testing" as ttt; ttt::x"#)?,
+        engine
+            .eval::<INT>(r#"import "testing" as ttt; ttt::x"#)
+            .unwrap(),
         123
     );
     assert_eq!(
-        engine.eval::<INT>(r#"import "testing" as ttt; ttt::xxx"#)?,
+        engine
+            .eval::<INT>(r#"import "testing" as ttt; ttt::xxx"#)
+            .unwrap(),
         123
     );
     assert_eq!(
-        engine.eval::<INT>(r#"import "testing" as ttt; ttt::foo"#)?,
+        engine
+            .eval::<INT>(r#"import "testing" as ttt; ttt::foo"#)
+            .unwrap(),
         42
     );
-    assert!(engine.eval::<bool>(r#"import "testing" as ttt; ttt::extra::foo"#)?);
+    assert!(engine
+        .eval::<bool>(r#"import "testing" as ttt; ttt::extra::foo"#)
+        .unwrap());
     assert_eq!(
-        engine.eval::<String>(r#"import "testing" as ttt; ttt::hello"#)?,
+        engine
+            .eval::<String>(r#"import "testing" as ttt; ttt::hello"#)
+            .unwrap(),
         "hello, 42 worlds!"
     );
     assert_eq!(
-        engine.eval::<INT>(r#"import "testing" as ttt; ttt::calc(999)"#)?,
+        engine
+            .eval::<INT>(r#"import "testing" as ttt; ttt::calc(999)"#)
+            .unwrap(),
         1000
     );
     assert_eq!(
-        engine.eval::<INT>(r#"import "testing" as ttt; ttt::cross_call(999)"#)?,
+        engine
+            .eval::<INT>(r#"import "testing" as ttt; ttt::cross_call(999)"#)
+            .unwrap(),
         1000
     );
     assert_eq!(
-        engine.eval::<INT>(r#"import "testing" as ttt; ttt::add_len(ttt::foo, ttt::hello)"#)?,
+        engine
+            .eval::<INT>(r#"import "testing" as ttt; ttt::add_len(ttt::foo, ttt::hello)"#)
+            .unwrap(),
         59
     );
     assert!(matches!(
@@ -406,12 +458,10 @@ fn test_module_from_ast() -> Result<(), Box<EvalAltResult>> {
             .unwrap_err(),
         EvalAltResult::ErrorFunctionNotFound(fn_name, ..) if fn_name == "ttt::hidden ()"
     ));
-
-    Ok(())
 }
 
 #[test]
-fn test_module_export() -> Result<(), Box<EvalAltResult>> {
+fn test_module_export() {
     let engine = Engine::new();
 
     assert!(matches!(
@@ -424,12 +474,10 @@ fn test_module_export() -> Result<(), Box<EvalAltResult>> {
         engine.compile("fn abc(x) { export x; }").unwrap_err(),
         ParseError(x, ..) if *x == ParseErrorType::WrongExport
     ));
-
-    Ok(())
 }
 
 #[test]
-fn test_module_str() -> Result<(), Box<EvalAltResult>> {
+fn test_module_str() {
     fn test_fn(input: ImmutableString) -> Result<INT, Box<EvalAltResult>> {
         Ok(input.len() as INT)
     }
@@ -451,24 +499,28 @@ fn test_module_str() -> Result<(), Box<EvalAltResult>> {
     engine.set_module_resolver(static_modules);
 
     assert_eq!(
-        engine.eval::<INT>(r#"import "test" as test; test::test("test");"#)?,
+        engine
+            .eval::<INT>(r#"import "test" as test; test::test("test");"#)
+            .unwrap(),
         4
     );
     assert_eq!(
-        engine.eval::<INT>(r#"import "test" as test; test::test2("test");"#)?,
+        engine
+            .eval::<INT>(r#"import "test" as test; test::test2("test");"#)
+            .unwrap(),
         4
     );
     assert_eq!(
-        engine.eval::<INT>(r#"import "test" as test; test::test3("test");"#)?,
+        engine
+            .eval::<INT>(r#"import "test" as test; test::test3("test");"#)
+            .unwrap(),
         4
     );
-
-    Ok(())
 }
 
 #[cfg(not(feature = "no_function"))]
 #[test]
-fn test_module_ast_namespace() -> Result<(), Box<EvalAltResult>> {
+fn test_module_ast_namespace() {
     let script = "
         fn foo(x) { x + 1 }
         fn bar(x) { foo(x) }
@@ -476,37 +528,43 @@ fn test_module_ast_namespace() -> Result<(), Box<EvalAltResult>> {
 
     let mut engine = Engine::new();
 
-    let ast = engine.compile(script)?;
+    let ast = engine.compile(script).unwrap();
 
-    let module = Module::eval_ast_as_new(Scope::new(), &ast, &engine)?;
+    let module = Module::eval_ast_as_new(Scope::new(), &ast, &engine).unwrap();
 
     let mut resolver = StaticModuleResolver::new();
     resolver.insert("testing", module);
     engine.set_module_resolver(resolver);
 
     assert_eq!(
-        engine.eval::<INT>(r#"import "testing" as t; t::foo(41)"#)?,
+        engine
+            .eval::<INT>(r#"import "testing" as t; t::foo(41)"#)
+            .unwrap(),
         42
     );
     assert_eq!(
-        engine.eval::<INT>(r#"import "testing" as t; t::bar(41)"#)?,
+        engine
+            .eval::<INT>(r#"import "testing" as t; t::bar(41)"#)
+            .unwrap(),
         42
     );
     assert_eq!(
-        engine.eval::<INT>(r#"fn foo(x) { x - 1 } import "testing" as t; t::foo(41)"#)?,
+        engine
+            .eval::<INT>(r#"fn foo(x) { x - 1 } import "testing" as t; t::foo(41)"#)
+            .unwrap(),
         42
     );
     assert_eq!(
-        engine.eval::<INT>(r#"fn foo(x) { x - 1 } import "testing" as t; t::bar(41)"#)?,
+        engine
+            .eval::<INT>(r#"fn foo(x) { x - 1 } import "testing" as t; t::bar(41)"#)
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[cfg(not(feature = "no_function"))]
 #[test]
-fn test_module_ast_namespace2() -> Result<(), Box<EvalAltResult>> {
+fn test_module_ast_namespace2() {
     use rhai::{Engine, Module, Scope};
 
     const MODULE_TEXT: &str = "
@@ -526,27 +584,25 @@ fn test_module_ast_namespace2() -> Result<(), Box<EvalAltResult>> {
     "#;
 
     let mut engine = Engine::new();
-    let module_ast = engine.compile(MODULE_TEXT)?;
-    let module = Module::eval_ast_as_new(Scope::new(), &module_ast, &engine)?;
+    let module_ast = engine.compile(MODULE_TEXT).unwrap();
+    let module = Module::eval_ast_as_new(Scope::new(), &module_ast, &engine).unwrap();
     let mut static_modules = rhai::module_resolvers::StaticModuleResolver::new();
     static_modules.insert("test_module", module);
     engine.set_module_resolver(static_modules);
 
-    engine.run(SCRIPT)?;
-
-    Ok(())
+    engine.run(SCRIPT).unwrap();
 }
 
 #[cfg(all(not(feature = "no_function"), feature = "internals"))]
 #[test]
-fn test_module_context() -> Result<(), Box<EvalAltResult>> {
+fn test_module_context() {
     let script = "fn bar() { calc(|x| x + 1) }";
 
     let mut engine = Engine::new();
 
-    let ast = engine.compile(script)?;
+    let ast = engine.compile(script).unwrap();
 
-    let module = Module::eval_ast_as_new(Scope::new(), &ast, &engine)?;
+    let module = Module::eval_ast_as_new(Scope::new(), &ast, &engine).unwrap();
 
     let mut resolver = StaticModuleResolver::new();
     resolver.insert("testing", module);
@@ -568,33 +624,35 @@ fn test_module_context() -> Result<(), Box<EvalAltResult>> {
     );
 
     assert_eq!(
-        engine.eval::<INT>(r#"import "testing" as t; t::bar()"#)?,
+        engine
+            .eval::<INT>(r#"import "testing" as t; t::bar()"#)
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_module_file() -> Result<(), Box<EvalAltResult>> {
+fn test_module_file() {
     let engine = Engine::new();
-    let ast = engine.compile(
-        r#"
+    let ast = engine
+        .compile(
+            r#"
             import "scripts/module";
             print("top");
         "#,
-    )?;
-    Module::eval_ast_as_new(Scope::new(), &ast, &engine)?;
-    Ok(())
+        )
+        .unwrap();
+    Module::eval_ast_as_new(Scope::new(), &ast, &engine).unwrap();
 }
 
 #[cfg(not(feature = "no_function"))]
 #[test]
-fn test_module_environ() -> Result<(), Box<EvalAltResult>> {
+fn test_module_environ() {
     let mut engine = Engine::new();
 
-    let ast = engine.compile(
-        r#"
+    let ast = engine
+        .compile(
+            r#"
             const SECRET = 42;
 
             fn foo(x) {
@@ -602,9 +660,10 @@ fn test_module_environ() -> Result<(), Box<EvalAltResult>> {
                 global::SECRET + x
             }
         "#,
-    )?;
+        )
+        .unwrap();
 
-    let mut m = Module::eval_ast_as_new(Scope::new(), &ast, &engine)?;
+    let mut m = Module::eval_ast_as_new(Scope::new(), &ast, &engine).unwrap();
 
     m.set_id("test");
     m.build_index();
@@ -612,8 +671,9 @@ fn test_module_environ() -> Result<(), Box<EvalAltResult>> {
     engine.register_static_module("test", m.into());
 
     assert_eq!(
-        engine.eval::<String>(
-            r#"
+        engine
+            .eval::<String>(
+                r#"
                 const SECRET = "hello";
 
                 fn foo(x) {
@@ -625,15 +685,14 @@ fn test_module_environ() -> Result<(), Box<EvalAltResult>> {
 
                 foo(t)
             "#
-        )?,
+            )
+            .unwrap(),
         "hello42"
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_module_dynamic() -> Result<(), Box<EvalAltResult>> {
+fn test_module_dynamic() {
     fn test_fn(input: Dynamic, x: INT) -> Result<INT, Box<EvalAltResult>> {
         let s = input.into_string().unwrap();
         Ok(s.len() as INT + x)
@@ -648,12 +707,12 @@ fn test_module_dynamic() -> Result<(), Box<EvalAltResult>> {
     engine.set_module_resolver(static_modules);
     engine.register_fn("test2", test_fn);
 
-    assert_eq!(engine.eval::<INT>(r#"test2("test", 38);"#)?, 42);
+    assert_eq!(engine.eval::<INT>(r#"test2("test", 38);"#).unwrap(), 42);
 
     assert_eq!(
-        engine.eval::<INT>(r#"import "test" as test; test::test("test", 38);"#)?,
+        engine
+            .eval::<INT>(r#"import "test" as test; test::test("test", 38);"#)
+            .unwrap(),
         42
     );
-
-    Ok(())
 }

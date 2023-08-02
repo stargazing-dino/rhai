@@ -1,4 +1,4 @@
-use rhai::{Engine, EvalAltResult, ParseErrorType, INT};
+use rhai::{Engine, ParseErrorType, INT};
 
 #[test]
 fn test_tokens_disabled() {
@@ -32,7 +32,7 @@ fn test_tokens_disabled() {
 
 #[cfg(not(feature = "no_custom_syntax"))]
 #[test]
-fn test_tokens_custom_operator_identifiers() -> Result<(), Box<EvalAltResult>> {
+fn test_tokens_custom_operator_identifiers() {
     let mut engine = Engine::new();
 
     // Register a custom operator called `foo` and give it
@@ -43,27 +43,29 @@ fn test_tokens_custom_operator_identifiers() -> Result<(), Box<EvalAltResult>> {
     engine.register_fn("foo", |x: INT, y: INT| (x * y) - (x + y));
 
     assert_eq!(
-        engine.eval_expression::<INT>("1 + 2 * 3 foo 4 - 5 / 6")?,
+        engine
+            .eval_expression::<INT>("1 + 2 * 3 foo 4 - 5 / 6")
+            .unwrap(),
         15
     );
 
     #[cfg(not(feature = "no_function"))]
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                fn foo(x, y) { y - x }
-                1 + 2 * 3 foo 4 - 5 / 6
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    fn foo(x, y) { y - x }
+                    1 + 2 * 3 foo 4 - 5 / 6
+                "
+            )
+            .unwrap(),
         -1
     );
-
-    Ok(())
 }
 
 #[cfg(not(feature = "no_custom_syntax"))]
 #[test]
-fn test_tokens_custom_operator_symbol() -> Result<(), Box<EvalAltResult>> {
+fn test_tokens_custom_operator_symbol() {
     let mut engine = Engine::new();
 
     // Register a custom operator `#` and give it
@@ -73,20 +75,28 @@ fn test_tokens_custom_operator_symbol() -> Result<(), Box<EvalAltResult>> {
     // Register a binary function named `#`
     engine.register_fn("#", |x: INT, y: INT| (x * y) - (x + y));
 
-    assert_eq!(engine.eval_expression::<INT>("1 + 2 * 3 # 4 - 5 / 6")?, 15);
+    assert_eq!(
+        engine
+            .eval_expression::<INT>("1 + 2 * 3 # 4 - 5 / 6")
+            .unwrap(),
+        15
+    );
 
     // Register a custom operator named `=>`
     assert!(engine.register_custom_operator("=>", 160).is_err());
     engine.disable_symbol("=>");
     engine.register_custom_operator("=>", 160).unwrap();
     engine.register_fn("=>", |x: INT, y: INT| (x * y) - (x + y));
-    assert_eq!(engine.eval_expression::<INT>("1 + 2 * 3 => 4 - 5 / 6")?, 15);
-
-    Ok(())
+    assert_eq!(
+        engine
+            .eval_expression::<INT>("1 + 2 * 3 => 4 - 5 / 6")
+            .unwrap(),
+        15
+    );
 }
 
 #[test]
-fn test_tokens_unicode_xid_ident() -> Result<(), Box<EvalAltResult>> {
+fn test_tokens_unicode_xid_ident() {
     let engine = Engine::new();
     let result = engine.eval::<INT>(
         "
@@ -107,6 +117,4 @@ fn test_tokens_unicode_xid_ident() -> Result<(), Box<EvalAltResult>> {
         ",
     );
     assert!(result.is_err());
-
-    Ok(())
 }

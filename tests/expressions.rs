@@ -1,19 +1,26 @@
-use rhai::{Engine, EvalAltResult, Scope, INT};
+use rhai::{Engine, Scope, INT};
 
 #[test]
-fn test_expressions() -> Result<(), Box<EvalAltResult>> {
+fn test_expressions() {
     let engine = Engine::new();
     let mut scope = Scope::new();
 
     scope.push("x", 10 as INT);
 
-    assert_eq!(engine.eval_expression::<INT>("2 + (10 + 10) * 2")?, 42);
     assert_eq!(
-        engine.eval_expression_with_scope::<INT>(&mut scope, "2 + (x + 10) * 2")?,
+        engine.eval_expression::<INT>("2 + (10 + 10) * 2").unwrap(),
         42
     );
     assert_eq!(
-        engine.eval_expression_with_scope::<INT>(&mut scope, "if x > 0 { 42 } else { 123 }")?,
+        engine
+            .eval_expression_with_scope::<INT>(&mut scope, "2 + (x + 10) * 2")
+            .unwrap(),
+        42
+    );
+    assert_eq!(
+        engine
+            .eval_expression_with_scope::<INT>(&mut scope, "if x > 0 { 42 } else { 123 }")
+            .unwrap(),
         42
     );
     #[cfg(not(feature = "no_index"))]
@@ -21,10 +28,12 @@ fn test_expressions() -> Result<(), Box<EvalAltResult>> {
     #[cfg(not(feature = "no_function"))]
     {
         assert_eq!(
-            engine.eval_expression_with_scope::<INT>(
-                &mut scope,
-                "[1, 2, 3, 4].map(|x| x * x).reduce(|a, v| a + v, 0)"
-            )?,
+            engine
+                .eval_expression_with_scope::<INT>(
+                    &mut scope,
+                    "[1, 2, 3, 4].map(|x| x * x).reduce(|a, v| a + v, 0)"
+                )
+                .unwrap(),
             30
         );
         assert!(engine
@@ -45,16 +54,18 @@ fn test_expressions() -> Result<(), Box<EvalAltResult>> {
         .is_err());
 
     assert_eq!(
-        engine.eval_expression_with_scope::<INT>(
-            &mut scope,
-            "
-                switch x {
-                    0 => 1,
-                    10 => 42,
-                    1..10 => 123,
-                }
-            "
-        )?,
+        engine
+            .eval_expression_with_scope::<INT>(
+                &mut scope,
+                "
+                    switch x {
+                        0 => 1,
+                        10 => 42,
+                        1..10 => 123,
+                    }
+                "
+            )
+            .unwrap(),
         42
     );
     assert!(engine
@@ -81,15 +92,13 @@ fn test_expressions() -> Result<(), Box<EvalAltResult>> {
         .compile_expression("do { break 42; } while true")
         .is_err());
 
-    engine.compile("40 + { let x = 2; x }")?;
-
-    Ok(())
+    engine.compile("40 + { let x = 2; x }").unwrap();
 }
 
 /// This example taken from https://github.com/rhaiscript/rhai/issues/115
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_expressions_eval() -> Result<(), Box<EvalAltResult>> {
+fn test_expressions_eval() {
     #[allow(clippy::upper_case_acronyms)]
     #[derive(Debug, Clone)]
     struct AGENT {
@@ -125,12 +134,12 @@ fn test_expressions_eval() -> Result<(), Box<EvalAltResult>> {
     scope.push_constant("agent", my_agent);
 
     // Evaluate the expression
-    assert!(engine.eval_expression_with_scope(
-        &mut scope,
-        r#"
-            agent.age > 10 && agent.gender == "male"
-        "#,
-    )?);
-
-    Ok(())
+    assert!(engine
+        .eval_expression_with_scope::<bool>(
+            &mut scope,
+            r#"
+                agent.age > 10 && agent.gender == "male"
+            "#,
+        )
+        .unwrap());
 }

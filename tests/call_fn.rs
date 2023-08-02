@@ -3,39 +3,47 @@ use rhai::{CallFnOptions, Dynamic, Engine, EvalAltResult, FnPtr, Func, FuncArgs,
 use std::any::TypeId;
 
 #[test]
-fn test_call_fn() -> Result<(), Box<EvalAltResult>> {
+fn test_call_fn() {
     let engine = Engine::new();
     let mut scope = Scope::new();
 
     scope.push("foo", 42 as INT);
 
-    let ast = engine.compile(
-        "
-            fn hello(x, y) {
-                x + y
-            }
-            fn hello(x) {
-                x *= foo;
-                foo = 1;
-                x
-            }
-            fn hello() {
-                41 + foo
-            }
-            fn define_var(scale) {
-                let bar = 21;
-                bar * scale
-            }
-        ",
-    )?;
+    let ast = engine
+        .compile(
+            "
+                fn hello(x, y) {
+                    x + y
+                }
+                fn hello(x) {
+                    x *= foo;
+                    foo = 1;
+                    x
+                }
+                fn hello() {
+                    41 + foo
+                }
+                fn define_var(scale) {
+                    let bar = 21;
+                    bar * scale
+                }
+            ",
+        )
+        .unwrap();
 
-    let r = engine.call_fn::<INT>(&mut scope, &ast, "hello", (42 as INT, 123 as INT))?;
+    let r = engine
+        .call_fn::<INT>(&mut scope, &ast, "hello", (42 as INT, 123 as INT))
+        .unwrap();
     assert_eq!(r, 165);
 
-    let r = engine.call_fn::<INT>(&mut scope, &ast, "hello", (123 as INT,))?;
+    let r = engine
+        .call_fn::<INT>(&mut scope, &ast, "hello", (123 as INT,))
+        .unwrap();
     assert_eq!(r, 5166);
 
-    let r = engine.call_fn::<INT>(&mut scope, &ast, "hello", ())?;
+    let r = engine
+        .call_fn::<INT>(&mut scope, &ast, "hello", ())
+        .unwrap();
     assert_eq!(r, 42);
 
     assert_eq!(
@@ -45,15 +53,18 @@ fn test_call_fn() -> Result<(), Box<EvalAltResult>> {
         1
     );
 
-    let r = engine.call_fn::<INT>(&mut scope, &ast, "define_var", (2 as INT,))?;
+    let r = engine
+        .call_fn::<INT>(&mut scope, &ast, "define_var", (2 as INT,))
+        .unwrap();
     assert_eq!(r, 42);
 
     assert!(!scope.contains("bar"));
 
     let options = CallFnOptions::new().eval_ast(false).rewind_scope(false);
 
-    let r =
-        engine.call_fn_with_options::<INT>(options, &mut scope, &ast, "define_var", (2 as INT,))?;
+    let r = engine
+        .call_fn_with_options::<INT>(options, &mut scope, &ast, "define_var", (2 as INT,))
+        .unwrap();
     assert_eq!(r, 42);
 
     assert_eq!(
@@ -64,42 +75,42 @@ fn test_call_fn() -> Result<(), Box<EvalAltResult>> {
     );
 
     assert!(!scope.contains("scale"));
-
-    Ok(())
 }
 
 #[test]
-fn test_call_fn_scope() -> Result<(), Box<EvalAltResult>> {
+fn test_call_fn_scope() {
     let engine = Engine::new();
     let mut scope = Scope::new();
 
-    let ast = engine.compile(
-        "
-            fn foo(x) {
-                let hello = 42;
-                bar + hello + x
-            }
+    let ast = engine
+        .compile(
+            "
+                fn foo(x) {
+                    let hello = 42;
+                    bar + hello + x
+                }
 
-            let bar = 123;
-        ",
-    )?;
+                let bar = 123;
+            ",
+        )
+        .unwrap();
 
     for _ in 0..50 {
         assert_eq!(
-            engine.call_fn_with_options::<INT>(
-                CallFnOptions::new().rewind_scope(false),
-                &mut scope,
-                &ast,
-                "foo",
-                [Dynamic::THREE],
-            )?,
+            engine
+                .call_fn_with_options::<INT>(
+                    CallFnOptions::new().rewind_scope(false),
+                    &mut scope,
+                    &ast,
+                    "foo",
+                    [Dynamic::THREE],
+                )
+                .unwrap(),
             168
         );
     }
 
     assert_eq!(scope.len(), 100);
-
-    Ok(())
 }
 
 struct Options {
@@ -117,7 +128,7 @@ impl FuncArgs for Options {
 }
 
 #[test]
-fn test_call_fn_args() -> Result<(), Box<EvalAltResult>> {
+fn test_call_fn_args() {
     let options = Options {
         foo: false,
         bar: "world".to_string(),
@@ -127,42 +138,46 @@ fn test_call_fn_args() -> Result<(), Box<EvalAltResult>> {
     let engine = Engine::new();
     let mut scope = Scope::new();
 
-    let ast = engine.compile(
-        "
-            fn hello(x, y, z) {
-                if x { `hello ${y}` } else { y + z }
-            }
-        ",
-    )?;
+    let ast = engine
+        .compile(
+            "
+                fn hello(x, y, z) {
+                    if x { `hello ${y}` } else { y + z }
+                }
+            ",
+        )
+        .unwrap();
 
-    let result = engine.call_fn::<String>(&mut scope, &ast, "hello", options)?;
+    let result = engine
+        .call_fn::<String>(&mut scope, &ast, "hello", options)
+        .unwrap();
 
     assert_eq!(result, "world42");
-
-    Ok(())
 }
 
 #[test]
-fn test_call_fn_private() -> Result<(), Box<EvalAltResult>> {
+fn test_call_fn_private() {
     let engine = Engine::new();
     let mut scope = Scope::new();
 
-    let ast = engine.compile("fn add(x, n) { x + n }")?;
+    let ast = engine.compile("fn add(x, n) { x + n }").unwrap();
 
-    let r = engine.call_fn::<INT>(&mut scope, &ast, "add", (40 as INT, 2 as INT))?;
+    let r = engine
+        .call_fn::<INT>(&mut scope, &ast, "add", (40 as INT, 2 as INT))
+        .unwrap();
     assert_eq!(r, 42);
 
-    let ast = engine.compile("private fn add(x, n, ) { x + n }")?;
+    let ast = engine.compile("private fn add(x, n, ) { x + n }").unwrap();
 
-    let r = engine.call_fn::<INT>(&mut scope, &ast, "add", (40 as INT, 2 as INT))?;
+    let r = engine
+        .call_fn::<INT>(&mut scope, &ast, "add", (40 as INT, 2 as INT))
+        .unwrap();
     assert_eq!(r, 42);
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_fn_ptr_raw() -> Result<(), Box<EvalAltResult>> {
+fn test_fn_ptr_raw() {
     let mut engine = Engine::new();
 
     engine
@@ -184,98 +199,106 @@ fn test_fn_ptr_raw() -> Result<(), Box<EvalAltResult>> {
         );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                fn foo(x) { this += x; }
+        engine
+            .eval::<INT>(
+                r#"
+                    fn foo(x) { this += x; }
 
-                let x = 41;
-                x.bar(foo, 1);
-                x
-            "#
-        )?,
+                    let x = 41;
+                    x.bar(foo, 1);
+                    x
+                "#
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                fn foo(x, y) { this += x + y; }
+        engine
+            .eval::<INT>(
+                r#"
+                    fn foo(x, y) { this += x + y; }
 
-                let x = 40;
-                let v = 1;
-                x.bar(Fn("foo").curry(v), 1);
-                x
-            "#
-        )?,
+                    let x = 40;
+                    let v = 1;
+                    x.bar(Fn("foo").curry(v), 1);
+                    x
+                "#
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                private fn foo(x) { this += x; }
+        engine
+            .eval::<INT>(
+                r#"
+                    private fn foo(x) { this += x; }
 
-                let x = 41;
-                x.bar(Fn("foo"), 1);
-                x
-            "#
-        )?,
+                    let x = 41;
+                    x.bar(Fn("foo"), 1);
+                    x
+                "#
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let x = 21;
-                x.bar(Fn("mul"), 2);
-                x
-            "#
-        )?,
+        engine
+            .eval::<INT>(
+                r#"
+                    let x = 21;
+                    x.bar(Fn("mul"), 2);
+                    x
+                "#
+            )
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_anonymous_fn() -> Result<(), Box<EvalAltResult>> {
+fn test_anonymous_fn() {
     let calc_func = Func::<(INT, INT, INT), INT>::create_from_script(
         Engine::new(),
         "fn calc(x, y, z,) { (x + y) * z }",
         "calc",
-    )?;
+    )
+    .unwrap();
 
-    assert_eq!(calc_func(42, 123, 9)?, 1485);
+    assert_eq!(calc_func(42, 123, 9).unwrap(), 1485);
 
     let calc_func = Func::<(INT, String, INT), INT>::create_from_script(
         Engine::new(),
         "fn calc(x, y, z) { (x + len(y)) * z }",
         "calc",
-    )?;
+    )
+    .unwrap();
 
-    assert_eq!(calc_func(42, "hello".to_string(), 9)?, 423);
+    assert_eq!(calc_func(42, "hello".to_string(), 9).unwrap(), 423);
 
     let calc_func = Func::<(INT, String, INT), INT>::create_from_script(
         Engine::new(),
         "private fn calc(x, y, z) { (x + len(y)) * z }",
         "calc",
-    )?;
+    )
+    .unwrap();
 
-    assert_eq!(calc_func(42, "hello".to_string(), 9)?, 423);
+    assert_eq!(calc_func(42, "hello".to_string(), 9).unwrap(), 423);
 
     let calc_func = Func::<(INT, &str, INT), INT>::create_from_script(
         Engine::new(),
         "fn calc(x, y, z) { (x + len(y)) * z }",
         "calc",
-    )?;
+    )
+    .unwrap();
 
-    assert_eq!(calc_func(42, "hello", 9)?, 423);
-
-    Ok(())
+    assert_eq!(calc_func(42, "hello", 9).unwrap(), 423);
 }
 
 #[test]
-fn test_call_fn_events() -> Result<(), Box<EvalAltResult>> {
+fn test_call_fn_events() {
     // Event handler
     struct Handler {
         // Scripting engine
@@ -355,6 +378,4 @@ fn test_call_fn_events() -> Result<(), Box<EvalAltResult>> {
     let _ = handler.on_event("update", 999);
     assert!(handler.scope.get_value::<bool>("state").unwrap());
     assert_eq!(handler.on_event("start", 999).as_int().unwrap(), 1041);
-
-    Ok(())
 }

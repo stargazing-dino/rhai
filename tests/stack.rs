@@ -3,16 +3,18 @@ use rhai::{Engine, EvalAltResult, ParseErrorType, INT};
 
 #[test]
 #[cfg(not(feature = "no_function"))]
-fn test_stack_overflow_fn_calls() -> Result<(), Box<EvalAltResult>> {
+fn test_stack_overflow_fn_calls() {
     let engine = Engine::new();
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                fn foo(n) { if n <= 1 { 0 } else { n + foo(n-1) } }
-                foo(6)
-            ",
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    fn foo(n) { if n <= 1 { 0 } else { n + foo(n-1) } }
+                    foo(6)
+                ",
+            )
+            .unwrap(),
         20
     );
 
@@ -31,12 +33,10 @@ fn test_stack_overflow_fn_calls() -> Result<(), Box<EvalAltResult>> {
             .unwrap_err(),
         EvalAltResult::ErrorStackOverflow(..)
     ));
-
-    Ok(())
 }
 
 #[test]
-fn test_stack_overflow_parsing() -> Result<(), Box<EvalAltResult>> {
+fn test_stack_overflow_parsing() {
     let mut engine = Engine::new();
 
     assert_eq!(
@@ -48,17 +48,19 @@ fn test_stack_overflow_parsing() -> Result<(), Box<EvalAltResult>> {
          ParseErrorType::ExprTooDeep
     );
 
-    engine.compile("1 + 2")?;
+    engine.compile("1 + 2").unwrap();
 
     #[cfg(debug_assertions)]
-    engine.compile(
-        "
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1
-        ",
-    )?;
+    engine
+        .compile(
+            "
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+                1
+            ",
+        )
+        .unwrap();
 
     #[cfg(debug_assertions)]
     assert_eq!(
@@ -82,20 +84,22 @@ fn test_stack_overflow_parsing() -> Result<(), Box<EvalAltResult>> {
         6,
     );
 
-    engine.compile(
-        "
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 0 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
-            1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9
-        ",
-    )?;
+    engine
+        .compile(
+            "
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 0 + 0 +
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9 + 0 +
+                1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9
+            ",
+        )
+        .unwrap();
 
     assert_eq!(
         *engine
@@ -119,7 +123,5 @@ fn test_stack_overflow_parsing() -> Result<(), Box<EvalAltResult>> {
     );
 
     #[cfg(not(feature = "no_function"))]
-    engine.compile("fn abc(x) { x + 1 }")?;
-
-    Ok(())
+    engine.compile("fn abc(x) { x + 1 }").unwrap();
 }

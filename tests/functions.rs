@@ -3,7 +3,7 @@ use rhai::{Engine, EvalAltResult, FnNamespace, Module, NativeCallContext, Shared
 
 #[cfg(not(feature = "no_object"))]
 #[test]
-fn test_functions_trait_object() -> Result<(), Box<EvalAltResult>> {
+fn test_functions_trait_object() {
     trait TestTrait {
         fn greet(&self) -> INT;
     }
@@ -32,16 +32,17 @@ fn test_functions_trait_object() -> Result<(), Box<EvalAltResult>> {
         .register_fn("greet", |x: MySharedTestTrait| x.greet());
 
     assert_eq!(
-        engine.eval::<String>("type_of(new_ts())")?,
+        engine.eval::<String>("type_of(new_ts())").unwrap(),
         "MySharedTestTrait"
     );
-    assert_eq!(engine.eval::<INT>("let x = new_ts(); greet(x)")?, 42);
-
-    Ok(())
+    assert_eq!(
+        engine.eval::<INT>("let x = new_ts(); greet(x)").unwrap(),
+        42
+    );
 }
 
 #[test]
-fn test_functions_namespaces() -> Result<(), Box<EvalAltResult>> {
+fn test_functions_namespaces() {
     let mut engine = Engine::new();
 
     #[cfg(not(feature = "no_module"))]
@@ -55,33 +56,33 @@ fn test_functions_namespaces() -> Result<(), Box<EvalAltResult>> {
         let mut m = Module::new();
         m.set_var("ANSWER", 123 as INT);
 
-        assert_eq!(engine.eval::<INT>("test()")?, 999);
+        assert_eq!(engine.eval::<INT>("test()").unwrap(), 999);
 
-        assert_eq!(engine.eval::<INT>("fn test() { 123 } test()")?, 123);
+        assert_eq!(engine.eval::<INT>("fn test() { 123 } test()").unwrap(), 123);
     }
 
     engine.register_fn("test", || 42 as INT);
 
-    assert_eq!(engine.eval::<INT>("fn test() { 123 } test()")?, 123);
+    assert_eq!(engine.eval::<INT>("fn test() { 123 } test()").unwrap(), 123);
 
-    assert_eq!(engine.eval::<INT>("test()")?, 42);
-
-    Ok(())
+    assert_eq!(engine.eval::<INT>("test()").unwrap(), 42);
 }
 
 #[cfg(not(feature = "no_module"))]
 #[test]
-fn test_functions_global_module() -> Result<(), Box<EvalAltResult>> {
+fn test_functions_global_module() {
     let mut engine = Engine::new();
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                const ANSWER = 42;
-                fn foo() { global::ANSWER }
-                foo()
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    const ANSWER = 42;
+                    fn foo() { global::ANSWER }
+                    foo()
+                "
+            )
+            .unwrap(),
         42
     );
 
@@ -119,12 +120,14 @@ fn test_functions_global_module() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_closure"))]
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                const GLOBAL_VALUE = 42;
-                do_stuff(|| global::GLOBAL_VALUE);
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    const GLOBAL_VALUE = 42;
+                    do_stuff(|| global::GLOBAL_VALUE);
+                "
+            )
+            .unwrap(),
         42
     );
 
@@ -134,13 +137,15 @@ fn test_functions_global_module() -> Result<(), Box<EvalAltResult>> {
     engine.register_static_module("global", module.into());
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                const ANSWER = 42;
-                fn foo() { global::ANSWER }
-                foo()
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    const ANSWER = 42;
+                    fn foo() { global::ANSWER }
+                    foo()
+                "
+            )
+            .unwrap(),
         123
     );
 
@@ -150,92 +155,98 @@ fn test_functions_global_module() -> Result<(), Box<EvalAltResult>> {
     engine.register_global_module(module.into());
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                fn foo() { global::ANSWER }
-                foo()
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    fn foo() { global::ANSWER }
+                    foo()
+                "
+            )
+            .unwrap(),
         123
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_functions_bang() -> Result<(), Box<EvalAltResult>> {
+fn test_functions_bang() {
     let engine = Engine::new();
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                fn foo() {
-                    hello + bar
-                }
+        engine
+            .eval::<INT>(
+                "
+                    fn foo() {
+                        hello + bar
+                    }
 
-                let hello = 42;
-                let bar = 123;
+                    let hello = 42;
+                    let bar = 123;
 
-                foo!()
-            ",
-        )?,
+                    foo!()
+                ",
+            )
+            .unwrap(),
         165
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                fn foo() {
-                    hello = 0;
-                    hello + bar
-                }
+        engine
+            .eval::<INT>(
+                "
+                    fn foo() {
+                        hello = 0;
+                        hello + bar
+                    }
 
-                let hello = 42;
-                let bar = 123;
+                    let hello = 42;
+                    let bar = 123;
 
-                foo!()
-            ",
-        )?,
+                    foo!()
+                ",
+            )
+            .unwrap(),
         123
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                fn foo() {
-                    let hello = bar + 42;
-                }
+        engine
+            .eval::<INT>(
+                "
+                    fn foo() {
+                        let hello = bar + 42;
+                    }
 
-                let bar = 999;
-                let hello = 123;
+                    let bar = 999;
+                    let hello = 123;
 
-                foo!();
+                    foo!();
 
-                hello
-            ",
-        )?,
+                    hello
+                ",
+            )
+            .unwrap(),
         123
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                fn foo(x) {
-                    let hello = bar + 42 + x;
-                }
+        engine
+            .eval::<INT>(
+                r#"
+                    fn foo(x) {
+                        let hello = bar + 42 + x;
+                    }
 
-                let bar = 999;
-                let hello = 123;
+                    let bar = 999;
+                    let hello = 123;
 
-                let f = Fn("foo");
+                    let f = Fn("foo");
 
-                call!(f, 1);
+                    call!(f, 1);
 
-                hello
-            "#,
-        )?,
+                    hello
+                "#,
+            )
+            .unwrap(),
         123
     );
-
-    Ok(())
 }

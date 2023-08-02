@@ -1,5 +1,5 @@
 ///! This test simulates an external command object that is driven by a script.
-use rhai::{Engine, EvalAltResult, Scope, INT};
+use rhai::{Engine, Scope, INT};
 use std::sync::{Arc, Mutex, RwLock};
 
 /// Simulate a command object.
@@ -24,7 +24,7 @@ type API = Arc<Mutex<Command>>;
 
 #[cfg(not(feature = "no_object"))]
 #[test]
-fn test_side_effects_command() -> Result<(), Box<EvalAltResult>> {
+fn test_side_effects_command() {
     let mut engine = Engine::new();
     let mut scope = Scope::new();
 
@@ -48,25 +48,25 @@ fn test_side_effects_command() -> Result<(), Box<EvalAltResult>> {
     engine.register_get("value", |command: &mut API| command.lock().unwrap().get());
 
     assert_eq!(
-        engine.eval_with_scope::<INT>(
-            &mut scope,
-            "
-                // Drive the command object via the wrapper
-                Command.action(30);
-                Command.value
-            "
-        )?,
+        engine
+            .eval_with_scope::<INT>(
+                &mut scope,
+                "
+                    // Drive the command object via the wrapper
+                    Command.action(30);
+                    Command.value
+                "
+            )
+            .unwrap(),
         42
     );
 
     // Make sure the actions are properly performed
     assert_eq!(command.lock().unwrap().get(), 42);
-
-    Ok(())
 }
 
 #[test]
-fn test_side_effects_print() -> Result<(), Box<EvalAltResult>> {
+fn test_side_effects_print() {
     let result = Arc::new(RwLock::new(String::new()));
 
     let mut engine = Engine::new();
@@ -75,8 +75,7 @@ fn test_side_effects_print() -> Result<(), Box<EvalAltResult>> {
     let logger = result.clone();
     engine.on_print(move |s| logger.write().unwrap().push_str(s));
 
-    engine.run("print(40 + 2);")?;
+    engine.run("print(40 + 2);").unwrap();
 
     assert_eq!(*result.read().unwrap(), "42");
-    Ok(())
 }

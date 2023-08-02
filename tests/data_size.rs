@@ -8,7 +8,7 @@ use rhai::Array;
 use rhai::Map;
 
 #[test]
-fn test_max_string_size() -> Result<(), Box<EvalAltResult>> {
+fn test_max_string_size() {
     let mut engine = Engine::new();
     engine.set_max_string_size(10);
 
@@ -58,22 +58,22 @@ fn test_max_string_size() -> Result<(), Box<EvalAltResult>> {
     engine.set_max_string_size(0);
 
     assert_eq!(
-        engine.eval::<String>(
-            r#"
-                let x = "hello, ";
-                let y = "world!";
-                x + y
-            "#
-        )?,
+        engine
+            .eval::<String>(
+                r#"
+                    let x = "hello, ";
+                    let y = "world!";
+                    x + y
+                "#
+            )
+            .unwrap(),
         "hello, world!"
     );
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_index"))]
-fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
+fn test_max_array_size() {
     let mut engine = Engine::new();
     engine.set_max_array_size(10);
 
@@ -103,8 +103,9 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_closure"))]
     assert_eq!(
-        engine.eval::<INT>(
-            "
+        engine
+            .eval::<INT>(
+                "
                     let x = 42;
                     let y = [];
                     let f = || x;
@@ -113,7 +114,8 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
                     }
                     len(y)
                 "
-        )?,
+            )
+            .unwrap(),
         10
     );
 
@@ -148,13 +150,15 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_object"))]
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let x = [1,2,3,4,5,6];
-                x.pad(10, 42);
-                len(x)
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let x = [1,2,3,4,5,6];
+                    x.pad(10, 42);
+                    len(x)
+                "
+            )
+            .unwrap(),
         10
     );
 
@@ -173,12 +177,14 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
     ));
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
+        engine
+            .eval::<INT>(
+                "
                 let x = [1,2];
                 len([x, x, x])
             "
-        )?,
+            )
+            .unwrap(),
         3
     );
 
@@ -231,7 +237,8 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
                     let y = [7,8,9,10,11,12];
                     x + y
                 "
-            )?
+            )
+            .unwrap()
             .len(),
         12
     );
@@ -243,17 +250,16 @@ fn test_max_array_size() -> Result<(), Box<EvalAltResult>> {
                     let x = [1,2,3];
                     [x, x, x, x]
                 "
-            )?
+            )
+            .unwrap()
             .len(),
         4
     );
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_max_map_size() -> Result<(), Box<EvalAltResult>> {
+fn test_max_map_size() {
     let mut engine = Engine::new();
     engine.set_max_map_size(10);
 
@@ -333,7 +339,8 @@ fn test_max_map_size() -> Result<(), Box<EvalAltResult>> {
                     let y = #{g:7,h:8,i:9,j:10,k:11,l:12};
                     x + y
                 "
-            )?
+            )
+            .unwrap()
             .len(),
         12
     );
@@ -345,10 +352,9 @@ fn test_max_map_size() -> Result<(), Box<EvalAltResult>> {
                     let x = #{a:1,b:2,c:3};
                     #{u:x, v:x, w:x, z:x}
                 "
-            )?
+            )
+            .unwrap()
             .len(),
         4
     );
-
-    Ok(())
 }
