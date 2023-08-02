@@ -105,7 +105,7 @@ fn test_tokens_unicode_xid_ident() {
         ",
     );
     #[cfg(feature = "unicode-xid-ident")]
-    assert_eq!(result?, 42);
+    assert_eq!(result.unwrap(), 42);
 
     #[cfg(not(feature = "unicode-xid-ident"))]
     assert!(result.is_err());

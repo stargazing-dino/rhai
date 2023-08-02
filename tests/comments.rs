@@ -91,7 +91,7 @@ fn test_comments_doc() {
     #[cfg(feature = "no_position")]
     assert_eq!(
         ast.iter_functions().next().unwrap().comments[0],
-        "/** Hello world\n            ** how are you?\n            **/",
+        "/** Hello world\n                ** how are you?\n                **/",
     );
 
     assert!(engine
