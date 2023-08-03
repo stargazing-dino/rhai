@@ -9,7 +9,7 @@ use std::rc::Rc;
 use rhai::Map;
 
 #[test]
-fn test_fn_ptr_curry_call() -> Result<(), Box<EvalAltResult>> {
+fn test_fn_ptr_curry_call() {
     let mut engine = Engine::new();
 
     engine.register_raw_fn(
@@ -23,24 +23,24 @@ fn test_fn_ptr_curry_call() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_object"))]
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let addition = |x, y| { x + y };
-                let curried = addition.curry(2);
+        engine
+            .eval::<INT>(
+                "
+                    let addition = |x, y| { x + y };
+                    let curried = addition.curry(2);
 
-                call_with_arg(curried, 40)
-            "
-        )?,
+                    call_with_arg(curried, 40)
+                "
+            )
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_closure"))]
 #[cfg(not(feature = "no_object"))]
-fn test_closures() -> Result<(), Box<EvalAltResult>> {
+fn test_closures() {
     let mut engine = Engine::new();
     let mut scope = Scope::new();
 
@@ -52,111 +52,129 @@ fn test_closures() -> Result<(), Box<EvalAltResult>> {
     ));
 
     assert_eq!(
-        engine.eval_with_scope::<INT>(
-            &mut scope,
-            "
-                let f = || { x };
-                f.call()
-            ",
-        )?,
+        engine
+            .eval_with_scope::<INT>(
+                &mut scope,
+                "
+                    let f = || { x };
+                    f.call()
+                ",
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let foo = #{ x: 42 };
-                let f = || { this.x };
-                foo.call(f)
-            ",
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let foo = #{ x: 42 };
+                    let f = || { this.x };
+                    foo.call(f)
+                ",
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let x = 8;
+        engine
+            .eval::<INT>(
+                "
+                    let x = 8;
 
-                let res = |y, z| {
-                    let w = 12;
+                    let res = |y, z| {
+                        let w = 12;
 
-                    return (|| x + y + z + w).call();
-                }.curry(15).call(2);
+                        return (|| x + y + z + w).call();
+                    }.curry(15).call(2);
 
-                res + (|| x - 3).call()
-            "
-        )?,
+                    res + (|| x - 3).call()
+                "
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
+        engine
+            .eval::<INT>(
+                "
+                    let a = 41;
+                    let foo = |x| { a += x };
+                    foo.call(1);
+                    a
+                "
+            )
+            .unwrap(),
+        42
+    );
+
+    assert!(engine
+        .eval::<bool>(
             "
                 let a = 41;
                 let foo = |x| { a += x };
-                foo.call(1);
-                a
+                a.is_shared()
             "
-        )?,
-        42
-    );
+        )
+        .unwrap());
 
-    assert!(engine.eval::<bool>(
-        "
-            let a = 41;
-            let foo = |x| { a += x };
-            a.is_shared()
-        "
-    )?);
-
-    assert!(engine.eval::<bool>(
-        "
-            let a = 41;
-            let foo = |x| { a += x };
-            is_shared(a)
-        "
-    )?);
+    assert!(engine
+        .eval::<bool>(
+            "
+                let a = 41;
+                let foo = |x| { a += x };
+                is_shared(a)
+            "
+        )
+        .unwrap());
 
     engine.register_fn("plus_one", |x: INT| x + 1);
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let a = 41;
-                let f = || plus_one(a);
-                f.call()
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let a = 41;
+                    let f = || plus_one(a);
+                    f.call()
+                "
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let a = 40;
-                let f = |x| {
+        engine
+            .eval::<INT>(
+                "
+                    let a = 40;
                     let f = |x| {
-                        let f = |x| plus_one(a) + x;
+                        let f = |x| {
+                            let f = |x| plus_one(a) + x;
+                            f.call(x)
+                        };
                         f.call(x)
                     };
-                    f.call(x)
-                };
-                f.call(1)
-            "
-        )?,
+                    f.call(1)
+                "
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let a = 21;
-                let f = |x| a += x;
-                f.call(a);
-                a
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let a = 21;
+                    let f = |x| a += x;
+                    f.call(a);
+                    a
+                "
+            )
+            .unwrap(),
         42
     );
 
@@ -171,60 +189,66 @@ fn test_closures() -> Result<(), Box<EvalAltResult>> {
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let a = 41;
-                let b = 0;
-                let f = || b.custom_call(|| a + 1);
-                
-                f.call()
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let a = 41;
+                    let b = 0;
+                    let f = || b.custom_call(|| a + 1);
+                    
+                    f.call()
+                "
+            )
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_closure"))]
-fn test_closures_sharing() -> Result<(), Box<EvalAltResult>> {
+fn test_closures_sharing() {
     let mut engine = Engine::new();
 
     engine.register_fn("foo", |x: INT, s: &str| s.len() as INT + x);
     engine.register_fn("bar", |x: INT, s: String| s.len() as INT + x);
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let s = "hello";
-                let f = || s;
-                foo(1, s)
-            "#
-        )?,
+        engine
+            .eval::<INT>(
+                r#"
+                    let s = "hello";
+                    let f = || s;
+                    foo(1, s)
+                "#
+            )
+            .unwrap(),
         6
     );
 
     assert_eq!(
-        engine.eval::<String>(
-            r#"
-                let s = "hello";
-                let f = || s;
-                let n = foo(1, s);
-                s
-            "#
-        )?,
+        engine
+            .eval::<String>(
+                r#"
+                    let s = "hello";
+                    let f = || s;
+                    let n = foo(1, s);
+                    s
+                "#
+            )
+            .unwrap(),
         "hello"
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            r#"
-                let s = "hello";
-                let f = || s;
-                bar(1, s)
-            "#
-        )?,
+        engine
+            .eval::<INT>(
+                r#"
+                    let s = "hello";
+                    let f = || s;
+                    bar(1, s)
+                "#
+            )
+            .unwrap(),
         6
     );
 
@@ -236,46 +260,50 @@ fn test_closures_sharing() -> Result<(), Box<EvalAltResult>> {
 
         engine.register_fn("baz", move || m.clone());
 
-        assert!(!engine.eval::<bool>(
-            "
-                let m = baz();
-                m.is_shared()
-            "
-        )?);
+        assert!(!engine
+            .eval::<bool>(
+                "
+                    let m = baz();
+                    m.is_shared()
+                "
+            )
+            .unwrap());
 
         assert_eq!(
-            engine.eval::<String>(
-                "
-                let m = baz();
-                m.hello
-            "
-            )?,
+            engine
+                .eval::<String>(
+                    "
+                        let m = baz();
+                        m.hello
+                    "
+                )
+                .unwrap(),
             "world"
         );
 
-        assert_eq!(engine.eval::<String>("baz().hello")?, "world");
+        assert_eq!(engine.eval::<String>("baz().hello").unwrap(), "world");
     }
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_closure"))]
 #[cfg(not(feature = "no_object"))]
 #[cfg(not(feature = "sync"))]
-fn test_closures_data_race() -> Result<(), Box<EvalAltResult>> {
+fn test_closures_data_race() {
     let engine = Engine::new();
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let a = 1;
-                let b = 40;
-                let foo = |x| { this += a + x };
-                b.call(foo, 1);
-                b
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let a = 1;
+                    let b = 40;
+                    let foo = |x| { this += a + x };
+                    b.call(foo, 1);
+                    b
+                "
+            )
+            .unwrap(),
         42
     );
 
@@ -292,8 +320,6 @@ fn test_closures_data_race() -> Result<(), Box<EvalAltResult>> {
             .unwrap_err(),
         EvalAltResult::ErrorDataRace(..)
     ));
-
-    Ok(())
 }
 
 type TestStruct = Rc<RefCell<INT>>;
@@ -301,7 +327,7 @@ type TestStruct = Rc<RefCell<INT>>;
 #[test]
 #[cfg(not(feature = "no_object"))]
 #[cfg(not(feature = "sync"))]
-fn test_closures_shared_obj() -> Result<(), Box<EvalAltResult>> {
+fn test_closures_shared_obj() {
     let mut engine = Engine::new();
 
     // Register API on TestStruct
@@ -331,11 +357,11 @@ fn test_closures_shared_obj() -> Result<(), Box<EvalAltResult>> {
         }
     "#;
 
-    let ast = engine.compile(code)?;
-    let res = engine.eval_ast::<Map>(&ast)?;
+    let ast = engine.compile(code).unwrap();
+    let res = engine.eval_ast::<Map>(&ast).unwrap();
 
     // Make closure
-    let f = move |p1: TestStruct, p2: TestStruct| {
+    let f = move |p1: TestStruct, p2: TestStruct| -> Result<(), _> {
         let action_ptr = res["action"].clone_cast::<FnPtr>();
         let name = action_ptr.fn_name();
         engine.call_fn(&mut Scope::new(), &ast, name, (p1, p2))
@@ -345,38 +371,36 @@ fn test_closures_shared_obj() -> Result<(), Box<EvalAltResult>> {
     let p1 = Rc::new(RefCell::new(41));
     let p2 = Rc::new(RefCell::new(1));
 
-    f(p1.clone(), p2)?;
+    f(p1.clone(), p2).unwrap();
 
     assert_eq!(*p1.borrow(), 42);
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_closure"))]
-fn test_closures_external() -> Result<(), Box<EvalAltResult>> {
+fn test_closures_external() {
     let engine = Engine::new();
 
-    let ast = engine.compile(
-        r#"
-            let test = "hello";
-            |x| test + x
-        "#,
-    )?;
+    let ast = engine
+        .compile(
+            r#"
+                let test = "hello";
+                |x| test + x
+            "#,
+        )
+        .unwrap();
 
-    let fn_ptr = engine.eval_ast::<FnPtr>(&ast)?;
+    let fn_ptr = engine.eval_ast::<FnPtr>(&ast).unwrap();
 
     let f = move |x: INT| fn_ptr.call::<String>(&engine, &ast, (x,));
 
-    assert_eq!(f(42)?, "hello42");
-
-    Ok(())
+    assert_eq!(f(42).unwrap(), "hello42");
 }
 
 #[test]
 #[cfg(not(feature = "no_closure"))]
 #[cfg(not(feature = "sync"))]
-fn test_closures_callback() -> Result<(), Box<EvalAltResult>> {
+fn test_closures_callback() {
     type SingleNode = Rc<dyn Node>;
 
     trait Node {
@@ -401,12 +425,16 @@ fn test_closures_callback() -> Result<(), Box<EvalAltResult>> {
 
     let mut engine = Engine::new();
 
-    let ast = Rc::new(engine.compile(
-        "
-            const FACTOR = 2;
-            phaser(|x| x * FACTOR)
-        ",
-    )?);
+    let ast = Rc::new(
+        engine
+            .compile(
+                "
+                    const FACTOR = 2;
+                    phaser(|x| x * FACTOR)
+                ",
+            )
+            .unwrap(),
+    );
 
     let shared_engine = Rc::new(RefCell::new(Engine::new_raw()));
     let engine2 = shared_engine.clone();
@@ -423,9 +451,7 @@ fn test_closures_callback() -> Result<(), Box<EvalAltResult>> {
 
     *shared_engine.borrow_mut() = engine;
 
-    let cb = shared_engine.borrow().eval_ast::<SingleNode>(&ast)?;
+    let cb = shared_engine.borrow().eval_ast::<SingleNode>(&ast).unwrap();
 
-    assert_eq!(cb.run(21)?, 42);
-
-    Ok(())
+    assert_eq!(cb.run(21).unwrap(), 42);
 }

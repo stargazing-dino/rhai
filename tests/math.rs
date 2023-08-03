@@ -4,29 +4,29 @@ use rhai::{Engine, EvalAltResult, INT};
 use rhai::FLOAT;
 
 #[test]
-fn test_math() -> Result<(), Box<EvalAltResult>> {
+fn test_math() {
     let engine = Engine::new();
 
-    assert_eq!(engine.eval::<INT>("1 + 2")?, 3);
-    assert_eq!(engine.eval::<INT>("1 - 2")?, -1);
-    assert_eq!(engine.eval::<INT>("2 * 3")?, 6);
-    assert_eq!(engine.eval::<INT>("1 / 2")?, 0);
-    assert_eq!(engine.eval::<INT>("3 % 2")?, 1);
+    assert_eq!(engine.eval::<INT>("1 + 2").unwrap(), 3);
+    assert_eq!(engine.eval::<INT>("1 - 2").unwrap(), -1);
+    assert_eq!(engine.eval::<INT>("2 * 3").unwrap(), 6);
+    assert_eq!(engine.eval::<INT>("1 / 2").unwrap(), 0);
+    assert_eq!(engine.eval::<INT>("3 % 2").unwrap(), 1);
 
     #[cfg(not(feature = "no_float"))]
-    assert!((engine.eval::<FLOAT>("sin(PI()/6.0)")? - 0.5).abs() < 0.001);
+    assert!((engine.eval::<FLOAT>("sin(PI()/6.0)").unwrap() - 0.5).abs() < 0.001);
 
     #[cfg(not(feature = "no_float"))]
-    assert!(engine.eval::<FLOAT>("cos(PI()/2.0)")?.abs() < 0.001);
+    assert!(engine.eval::<FLOAT>("cos(PI()/2.0)").unwrap().abs() < 0.001);
 
     #[cfg(not(feature = "only_i32"))]
     assert_eq!(
-        engine.eval::<INT>("abs(-9223372036854775807)")?,
+        engine.eval::<INT>("abs(-9223372036854775807)").unwrap(),
         9_223_372_036_854_775_807
     );
 
     #[cfg(feature = "only_i32")]
-    assert_eq!(engine.eval::<INT>("abs(-2147483647)")?, 2147483647);
+    assert_eq!(engine.eval::<INT>("abs(-2147483647)").unwrap(), 2147483647);
 
     // Overflow/underflow/division-by-zero errors
     #[cfg(not(feature = "unchecked"))]
@@ -105,17 +105,16 @@ fn test_math() -> Result<(), Box<EvalAltResult>> {
             ));
         }
     }
-
-    Ok(())
 }
 
 #[test]
-fn test_math_parse() -> Result<(), Box<EvalAltResult>> {
+fn test_math_parse() {
     let engine = Engine::new();
 
-    assert_eq!(engine.eval::<INT>(r#"parse_int("42")"#)?, 42);
-    assert_eq!(engine.eval::<INT>(r#"parse_int("42", 16)"#)?, 0x42);
-    assert_eq!(engine.eval::<INT>(r#"parse_int("abcdef", 16)"#)?, 0xabcdef);
-
-    Ok(())
+    assert_eq!(engine.eval::<INT>(r#"parse_int("42")"#).unwrap(), 42);
+    assert_eq!(engine.eval::<INT>(r#"parse_int("42", 16)"#).unwrap(), 0x42);
+    assert_eq!(
+        engine.eval::<INT>(r#"parse_int("abcdef", 16)"#).unwrap(),
+        0xabcdef
+    );
 }

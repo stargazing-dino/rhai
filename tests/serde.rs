@@ -2,7 +2,7 @@
 
 use rhai::{
     serde::{from_dynamic, to_dynamic},
-    Dynamic, Engine, EvalAltResult, ImmutableString, Scope, INT,
+    Dynamic, Engine, ImmutableString, Scope, INT,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::json;
@@ -18,60 +18,54 @@ use rhai::FLOAT;
 use rust_decimal::Decimal;
 
 #[test]
-fn test_serde_ser_primary_types() -> Result<(), Box<EvalAltResult>> {
-    assert!(to_dynamic(42_u64)?.is_int());
-    assert!(to_dynamic(42 as INT)?.is_int());
-    assert!(to_dynamic(true)?.is_bool());
-    assert!(to_dynamic(())?.is_unit());
+fn test_serde_ser_primary_types() {
+    assert!(to_dynamic(42_u64).unwrap().is_int());
+    assert!(to_dynamic(42 as INT).unwrap().is_int());
+    assert!(to_dynamic(true).unwrap().is_bool());
+    assert!(to_dynamic(()).unwrap().is_unit());
 
     #[cfg(not(feature = "no_float"))]
     {
-        assert!(to_dynamic(123.456_f64)?.is::<FLOAT>());
-        assert!(to_dynamic(123.456_f32)?.is::<FLOAT>());
+        assert!(to_dynamic(123.456_f64).unwrap().is::<FLOAT>());
+        assert!(to_dynamic(123.456_f32).unwrap().is::<FLOAT>());
     }
 
     #[cfg(feature = "no_float")]
     #[cfg(feature = "decimal")]
     {
-        assert!(to_dynamic(123.456_f64)?.is::<Decimal>());
-        assert!(to_dynamic(123.456_f32)?.is::<Decimal>());
+        assert!(to_dynamic(123.456_f64).unwrap().is::<Decimal>());
+        assert!(to_dynamic(123.456_f32).unwrap().is::<Decimal>());
     }
 
-    assert!(to_dynamic("hello".to_string())?.is::<String>());
-
-    Ok(())
+    assert!(to_dynamic("hello".to_string()).unwrap().is::<String>());
 }
 
 #[test]
-fn test_serde_ser_integer_types() -> Result<(), Box<EvalAltResult>> {
-    assert!(to_dynamic(42_i8)?.is_int());
-    assert!(to_dynamic(42_i16)?.is_int());
-    assert!(to_dynamic(42_i32)?.is_int());
-    assert!(to_dynamic(42_i64)?.is_int());
-    assert!(to_dynamic(42_u8)?.is_int());
-    assert!(to_dynamic(42_u16)?.is_int());
-    assert!(to_dynamic(42_u32)?.is_int());
-    assert!(to_dynamic(42_u64)?.is_int());
-
-    Ok(())
+fn test_serde_ser_integer_types() {
+    assert!(to_dynamic(42_i8).unwrap().is_int());
+    assert!(to_dynamic(42_i16).unwrap().is_int());
+    assert!(to_dynamic(42_i32).unwrap().is_int());
+    assert!(to_dynamic(42_i64).unwrap().is_int());
+    assert!(to_dynamic(42_u8).unwrap().is_int());
+    assert!(to_dynamic(42_u16).unwrap().is_int());
+    assert!(to_dynamic(42_u32).unwrap().is_int());
+    assert!(to_dynamic(42_u64).unwrap().is_int());
 }
 
 #[test]
 #[cfg(not(feature = "no_index"))]
-fn test_serde_ser_array() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_ser_array() {
     let arr: Vec<INT> = vec![123, 456, 42, 999];
 
-    let d = to_dynamic(arr)?;
+    let d = to_dynamic(arr).unwrap();
     assert!(d.is_array());
     assert_eq!(4, d.cast::<Array>().len());
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_index"))]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_ser_struct() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_ser_struct() {
     #[derive(Debug, Serialize, PartialEq)]
     struct Hello {
         a: INT,
@@ -91,7 +85,7 @@ fn test_serde_ser_struct() -> Result<(), Box<EvalAltResult>> {
         obj: Hello { a: 123, b: true },
     };
 
-    let d = to_dynamic(x)?;
+    let d = to_dynamic(x).unwrap();
 
     assert!(d.is_map());
 
@@ -104,30 +98,26 @@ fn test_serde_ser_struct() -> Result<(), Box<EvalAltResult>> {
     assert_eq!(Ok(42), map["int"].as_int());
     assert_eq!(seq.len(), 3);
     assert_eq!("kitty", seq.remove(1).into_string().unwrap());
-
-    Ok(())
 }
 
 #[test]
-fn test_serde_ser_unit_enum() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_ser_unit_enum() {
     #[derive(Serialize)]
     enum MyEnum {
         VariantFoo,
         VariantBar,
     }
 
-    let d = to_dynamic(MyEnum::VariantFoo)?;
+    let d = to_dynamic(MyEnum::VariantFoo).unwrap();
     assert_eq!("VariantFoo", d.into_string().unwrap());
 
-    let d = to_dynamic(MyEnum::VariantBar)?;
+    let d = to_dynamic(MyEnum::VariantBar).unwrap();
     assert_eq!("VariantBar", d.into_string().unwrap());
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_ser_externally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_ser_externally_tagged_enum() {
     #[allow(clippy::enum_variant_names)]
     #[derive(Serialize)]
     enum MyEnum {
@@ -146,7 +136,8 @@ fn test_serde_ser_externally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
     {
         assert_eq!(
             "VariantUnit",
-            to_dynamic(MyEnum::VariantUnit)?
+            to_dynamic(MyEnum::VariantUnit)
+                .unwrap()
                 .into_immutable_string()
                 .unwrap()
                 .as_str()
@@ -155,20 +146,26 @@ fn test_serde_ser_externally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_index"))]
     {
-        let mut map = to_dynamic(MyEnum::VariantUnitTuple())?.cast::<Map>();
+        let mut map = to_dynamic(MyEnum::VariantUnitTuple())
+            .unwrap()
+            .cast::<Map>();
         let content = map.remove("VariantUnitTuple").unwrap().cast::<Array>();
         assert!(map.is_empty());
         assert!(content.is_empty());
     }
 
-    let mut map = to_dynamic(MyEnum::VariantNewtype(123))?.cast::<Map>();
+    let mut map = to_dynamic(MyEnum::VariantNewtype(123))
+        .unwrap()
+        .cast::<Map>();
     let content = map.remove("VariantNewtype").unwrap();
     assert!(map.is_empty());
     assert_eq!(Ok(123), content.as_int());
 
     #[cfg(not(feature = "no_index"))]
     {
-        let mut map = to_dynamic(MyEnum::VariantTuple(123, 456))?.cast::<Map>();
+        let mut map = to_dynamic(MyEnum::VariantTuple(123, 456))
+            .unwrap()
+            .cast::<Map>();
         let content = map.remove("VariantTuple").unwrap().cast::<Array>();
         assert!(map.is_empty());
         assert_eq!(2, content.len());
@@ -176,23 +173,25 @@ fn test_serde_ser_externally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
         assert_eq!(Ok(456), content[1].as_int());
     }
 
-    let mut map = to_dynamic(MyEnum::VariantEmptyStruct {})?.cast::<Map>();
+    let mut map = to_dynamic(MyEnum::VariantEmptyStruct {})
+        .unwrap()
+        .cast::<Map>();
     let map_inner = map.remove("VariantEmptyStruct").unwrap().cast::<Map>();
     assert!(map.is_empty());
     assert!(map_inner.is_empty());
 
-    let mut map = to_dynamic(MyEnum::VariantStruct { a: 123 })?.cast::<Map>();
+    let mut map = to_dynamic(MyEnum::VariantStruct { a: 123 })
+        .unwrap()
+        .cast::<Map>();
     let mut map_inner = map.remove("VariantStruct").unwrap().cast::<Map>();
     assert!(map.is_empty());
     assert_eq!(Ok(123), map_inner.remove("a").unwrap().as_int());
     assert!(map_inner.is_empty());
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_ser_internally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_ser_internally_tagged_enum() {
     #[derive(Serialize)]
     #[serde(tag = "tag")]
     enum MyEnum {
@@ -200,7 +199,9 @@ fn test_serde_ser_internally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
         VariantStruct { a: i32 },
     }
 
-    let mut map = to_dynamic(MyEnum::VariantEmptyStruct {})?.cast::<Map>();
+    let mut map = to_dynamic(MyEnum::VariantEmptyStruct {})
+        .unwrap()
+        .cast::<Map>();
     assert_eq!(
         "VariantEmptyStruct",
         map.remove("tag")
@@ -211,7 +212,9 @@ fn test_serde_ser_internally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
     );
     assert!(map.is_empty());
 
-    let mut map = to_dynamic(MyEnum::VariantStruct { a: 123 })?.cast::<Map>();
+    let mut map = to_dynamic(MyEnum::VariantStruct { a: 123 })
+        .unwrap()
+        .cast::<Map>();
     assert_eq!(
         "VariantStruct",
         map.remove("tag")
@@ -222,13 +225,11 @@ fn test_serde_ser_internally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
     );
     assert_eq!(Ok(123), map.remove("a").unwrap().as_int());
     assert!(map.is_empty());
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_ser_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_ser_adjacently_tagged_enum() {
     #[allow(clippy::enum_variant_names)]
     #[derive(Serialize)]
     #[serde(tag = "tag", content = "content")]
@@ -245,7 +246,7 @@ fn test_serde_ser_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
         },
     }
 
-    let mut map = to_dynamic(MyEnum::VariantUnit)?.cast::<Map>();
+    let mut map = to_dynamic(MyEnum::VariantUnit).unwrap().cast::<Map>();
     assert_eq!(
         "VariantUnit",
         map.remove("tag")
@@ -258,7 +259,9 @@ fn test_serde_ser_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_index"))]
     {
-        let mut map = to_dynamic(MyEnum::VariantUnitTuple())?.cast::<Map>();
+        let mut map = to_dynamic(MyEnum::VariantUnitTuple())
+            .unwrap()
+            .cast::<Map>();
         assert_eq!(
             "VariantUnitTuple",
             map.remove("tag")
@@ -272,7 +275,9 @@ fn test_serde_ser_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
         assert!(content.is_empty());
     }
 
-    let mut map = to_dynamic(MyEnum::VariantNewtype(123))?.cast::<Map>();
+    let mut map = to_dynamic(MyEnum::VariantNewtype(123))
+        .unwrap()
+        .cast::<Map>();
     assert_eq!(
         "VariantNewtype",
         map.remove("tag")
@@ -287,7 +292,9 @@ fn test_serde_ser_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
 
     #[cfg(not(feature = "no_index"))]
     {
-        let mut map = to_dynamic(MyEnum::VariantTuple(123, 456))?.cast::<Map>();
+        let mut map = to_dynamic(MyEnum::VariantTuple(123, 456))
+            .unwrap()
+            .cast::<Map>();
         assert_eq!(
             "VariantTuple",
             map.remove("tag")
@@ -303,7 +310,9 @@ fn test_serde_ser_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
         assert_eq!(Ok(456), content[1].as_int());
     }
 
-    let mut map = to_dynamic(MyEnum::VariantEmptyStruct {})?.cast::<Map>();
+    let mut map = to_dynamic(MyEnum::VariantEmptyStruct {})
+        .unwrap()
+        .cast::<Map>();
     assert_eq!(
         "VariantEmptyStruct",
         map.remove("tag")
@@ -316,7 +325,9 @@ fn test_serde_ser_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
     assert!(map.is_empty());
     assert!(map_inner.is_empty());
 
-    let mut map = to_dynamic(MyEnum::VariantStruct { a: 123 })?.cast::<Map>();
+    let mut map = to_dynamic(MyEnum::VariantStruct { a: 123 })
+        .unwrap()
+        .cast::<Map>();
     assert_eq!(
         "VariantStruct",
         map.remove("tag").unwrap().into_string().unwrap()
@@ -325,13 +336,11 @@ fn test_serde_ser_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
     assert!(map.is_empty());
     assert_eq!(Ok(123), map_inner.remove("a").unwrap().as_int());
     assert!(map_inner.is_empty());
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_ser_untagged_enum() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_ser_untagged_enum() {
     #[derive(Serialize)]
     #[serde(untagged)]
     enum MyEnum {
@@ -340,31 +349,38 @@ fn test_serde_ser_untagged_enum() -> Result<(), Box<EvalAltResult>> {
         VariantStruct2 { b: i32 },
     }
 
-    let map = to_dynamic(MyEnum::VariantEmptyStruct {})?.cast::<Map>();
+    let map = to_dynamic(MyEnum::VariantEmptyStruct {})
+        .unwrap()
+        .cast::<Map>();
     assert!(map.is_empty());
 
-    let mut map = to_dynamic(MyEnum::VariantStruct1 { a: 123 })?.cast::<Map>();
+    let mut map = to_dynamic(MyEnum::VariantStruct1 { a: 123 })
+        .unwrap()
+        .cast::<Map>();
     assert_eq!(Ok(123), map.remove("a").unwrap().as_int());
     assert!(map.is_empty());
 
-    let mut map = to_dynamic(MyEnum::VariantStruct2 { b: 123 })?.cast::<Map>();
+    let mut map = to_dynamic(MyEnum::VariantStruct2 { b: 123 })
+        .unwrap()
+        .cast::<Map>();
     assert_eq!(Ok(123), map.remove("b").unwrap().as_int());
     assert!(map.is_empty());
-
-    Ok(())
 }
 
 #[test]
-fn test_serde_de_primary_types() -> Result<(), Box<EvalAltResult>> {
-    assert_eq!(42, from_dynamic::<u16>(&Dynamic::from(42_u16))?);
-    assert_eq!(42, from_dynamic::<INT>(&(42 as INT).into())?);
-    assert!(from_dynamic::<bool>(&true.into())?);
+fn test_serde_de_primary_types() {
+    assert_eq!(42, from_dynamic::<u16>(&Dynamic::from(42_u16)).unwrap());
+    assert_eq!(42, from_dynamic::<INT>(&(42 as INT).into()).unwrap());
+    assert!(from_dynamic::<bool>(&true.into()).unwrap());
     let _: () = from_dynamic::<()>(&().into()).unwrap();
 
     #[cfg(not(feature = "no_float"))]
     {
-        assert_eq!(123.456, from_dynamic::<FLOAT>(&123.456.into())?);
-        assert_eq!(123.456, from_dynamic::<f32>(&Dynamic::from(123.456_f32))?);
+        assert_eq!(123.456, from_dynamic::<FLOAT>(&123.456.into()).unwrap());
+        assert_eq!(
+            123.456,
+            from_dynamic::<f32>(&Dynamic::from(123.456_f32)).unwrap()
+        );
     }
 
     #[cfg(feature = "no_float")]
@@ -372,21 +388,19 @@ fn test_serde_de_primary_types() -> Result<(), Box<EvalAltResult>> {
     {
         let d: Dynamic = Decimal::from_str("123.456").unwrap().into();
 
-        assert_eq!(123.456, from_dynamic::<f64>(&d)?);
-        assert_eq!(123.456, from_dynamic::<f32>(&d)?);
+        assert_eq!(123.456, from_dynamic::<f64>(&d).unwrap());
+        assert_eq!(123.456, from_dynamic::<f32>(&d).unwrap());
     }
 
     assert_eq!(
         "hello",
-        from_dynamic::<String>(&"hello".to_string().into())?
+        from_dynamic::<String>(&"hello".to_string().into()).unwrap()
     );
-
-    Ok(())
 }
 
 #[cfg(not(feature = "no_object"))]
 #[test]
-fn test_serde_de_variants() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_de_variants() {
     #[derive(Debug)]
     struct Foo;
 
@@ -397,7 +411,7 @@ fn test_serde_de_variants() -> Result<(), Box<EvalAltResult>> {
     }
 
     fn deserialize_foo<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Arc<Foo>, D::Error> {
-        let value = <Dynamic as Deserialize>::deserialize(deserializer)?;
+        let value = <Dynamic as Deserialize>::deserialize(deserializer).unwrap();
 
         value
             .try_cast::<Arc<Foo>>()
@@ -408,39 +422,34 @@ fn test_serde_de_variants() -> Result<(), Box<EvalAltResult>> {
     let mut map = Map::new();
     map.insert("value".into(), Dynamic::from(value.clone()));
     let x = Dynamic::from(map);
-    let bar = from_dynamic::<Bar>(&x)?;
+    let bar = from_dynamic::<Bar>(&x).unwrap();
 
     assert!(Arc::ptr_eq(&bar.value, &value));
-
-    Ok(())
 }
 
 #[test]
-fn test_serde_de_integer_types() -> Result<(), Box<EvalAltResult>> {
-    assert_eq!(42, from_dynamic::<i8>(&Dynamic::from(42 as INT))?);
-    assert_eq!(42, from_dynamic::<i16>(&Dynamic::from(42 as INT))?);
-    assert_eq!(42, from_dynamic::<i32>(&Dynamic::from(42 as INT))?);
-    assert_eq!(42, from_dynamic::<i64>(&Dynamic::from(42 as INT))?);
-    assert_eq!(42, from_dynamic::<u8>(&Dynamic::from(42 as INT))?);
-    assert_eq!(42, from_dynamic::<u16>(&Dynamic::from(42 as INT))?);
-    assert_eq!(42, from_dynamic::<u32>(&Dynamic::from(42 as INT))?);
-    assert_eq!(42, from_dynamic::<u64>(&Dynamic::from(42 as INT))?);
-
-    Ok(())
+fn test_serde_de_integer_types() {
+    assert_eq!(42, from_dynamic::<i8>(&Dynamic::from(42 as INT)).unwrap());
+    assert_eq!(42, from_dynamic::<i16>(&Dynamic::from(42 as INT)).unwrap());
+    assert_eq!(42, from_dynamic::<i32>(&Dynamic::from(42 as INT)).unwrap());
+    assert_eq!(42, from_dynamic::<i64>(&Dynamic::from(42 as INT)).unwrap());
+    assert_eq!(42, from_dynamic::<u8>(&Dynamic::from(42 as INT)).unwrap());
+    assert_eq!(42, from_dynamic::<u16>(&Dynamic::from(42 as INT)).unwrap());
+    assert_eq!(42, from_dynamic::<u32>(&Dynamic::from(42 as INT)).unwrap());
+    assert_eq!(42, from_dynamic::<u64>(&Dynamic::from(42 as INT)).unwrap());
 }
 
 #[test]
 #[cfg(not(feature = "no_index"))]
-fn test_serde_de_array() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_de_array() {
     let arr: Vec<INT> = vec![123, 456, 42, 999];
-    assert_eq!(arr, from_dynamic::<Vec<INT>>(&arr.clone().into())?);
-    Ok(())
+    assert_eq!(arr, from_dynamic::<Vec<INT>>(&arr.clone().into()).unwrap());
 }
 
 #[test]
 #[cfg(not(feature = "no_index"))]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_de_struct() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_de_struct() {
     #[derive(Debug, Deserialize, PartialEq)]
     struct Hello {
         a: INT,
@@ -471,16 +480,14 @@ fn test_serde_de_struct() -> Result<(), Box<EvalAltResult>> {
         seq: vec!["hello".into(), "kitty".into(), "world".into()],
         obj: Hello { a: 123, b: true },
     };
-    assert_eq!(expected, from_dynamic(&map.into())?);
-
-    Ok(())
+    assert_eq!(expected, from_dynamic(&map.into()).unwrap());
 }
 
 #[test]
 #[cfg(not(feature = "no_index"))]
 #[cfg(not(feature = "no_object"))]
 #[cfg(not(feature = "no_float"))]
-fn test_serde_de_script() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_de_script() {
     #[allow(dead_code)]
     #[derive(Debug, Deserialize)]
     struct Point {
@@ -499,8 +506,9 @@ fn test_serde_de_script() -> Result<(), Box<EvalAltResult>> {
 
     let engine = Engine::new();
 
-    let result: Dynamic = engine.eval(
-        r#"
+    let result: Dynamic = engine
+        .eval(
+            r#"
             #{
                 a: 42,
                 b: [ "hello", "world" ],
@@ -508,16 +516,15 @@ fn test_serde_de_script() -> Result<(), Box<EvalAltResult>> {
                 d: #{ x: 123.456, y: 999.0 }
             }
         "#,
-    )?;
+        )
+        .unwrap();
 
     // Convert the 'Dynamic' object map into 'MyStruct'
-    let _: MyStruct = from_dynamic(&result)?;
-
-    Ok(())
+    let _: MyStruct = from_dynamic(&result).unwrap();
 }
 
 #[test]
-fn test_serde_de_unit_enum() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_de_unit_enum() {
     #[derive(Debug, PartialEq, Deserialize)]
     enum MyEnum {
         VariantFoo,
@@ -525,17 +532,15 @@ fn test_serde_de_unit_enum() -> Result<(), Box<EvalAltResult>> {
     }
 
     let d = Dynamic::from("VariantFoo".to_string());
-    assert_eq!(MyEnum::VariantFoo, from_dynamic(&d)?);
+    assert_eq!(MyEnum::VariantFoo, from_dynamic(&d).unwrap());
 
     let d = Dynamic::from("VariantBar".to_string());
-    assert_eq!(MyEnum::VariantBar, from_dynamic(&d)?);
-
-    Ok(())
+    assert_eq!(MyEnum::VariantBar, from_dynamic(&d).unwrap());
 }
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_de_externally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_de_externally_tagged_enum() {
     #[allow(clippy::enum_variant_names)]
     #[derive(Debug, PartialEq, Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -600,13 +605,11 @@ fn test_serde_de_externally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
         MyEnum::VariantStruct { a: 123 },
         from_dynamic(&map_outer.into()).unwrap()
     );
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_de_internally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_de_internally_tagged_enum() {
     #[derive(Debug, PartialEq, Deserialize)]
     #[serde(tag = "tag", deny_unknown_fields)]
     enum MyEnum {
@@ -628,13 +631,11 @@ fn test_serde_de_internally_tagged_enum() -> Result<(), Box<EvalAltResult>> {
         MyEnum::VariantEmptyStruct {},
         from_dynamic(&map.into()).unwrap()
     );
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_de_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_de_adjacently_tagged_enum() {
     #[allow(clippy::enum_variant_names)]
     #[derive(Debug, PartialEq, Deserialize)]
     #[serde(tag = "tag", content = "content", deny_unknown_fields)]
@@ -708,13 +709,11 @@ fn test_serde_de_adjacently_tagged_enum() -> Result<(), Box<EvalAltResult>> {
         MyEnum::VariantStruct { a: 123 },
         from_dynamic(&map_outer.into()).unwrap()
     );
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_de_untagged_enum() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_de_untagged_enum() {
     #[derive(Debug, PartialEq, Deserialize)]
     #[serde(untagged, deny_unknown_fields)]
     enum MyEnum {
@@ -742,8 +741,6 @@ fn test_serde_de_untagged_enum() -> Result<(), Box<EvalAltResult>> {
         MyEnum::VariantStruct2 { b: 123 },
         from_dynamic(&map.into()).unwrap()
     );
-
-    Ok(())
 }
 
 #[test]
@@ -752,7 +749,7 @@ fn test_serde_de_untagged_enum() -> Result<(), Box<EvalAltResult>> {
 #[cfg(not(feature = "no_index"))]
 fn test_serde_json() -> serde_json::Result<()> {
     let s: ImmutableString = "hello".into();
-    assert_eq!(serde_json::to_string(&s)?, r#""hello""#);
+    assert_eq!(serde_json::to_string(&s).unwrap(), r#""hello""#);
 
     let mut map = Map::new();
     map.insert("a".into(), (123 as INT).into());
@@ -762,13 +759,13 @@ fn test_serde_json() -> serde_json::Result<()> {
     map.insert("c".into(), true.into());
     let d: Dynamic = map.into();
 
-    let json = serde_json::to_string(&d)?;
+    let json = serde_json::to_string(&d).unwrap();
 
     assert!(json.contains("\"a\":123"));
     assert!(json.contains("\"b\":[1,2,3]"));
     assert!(json.contains("\"c\":true"));
 
-    let d2: Dynamic = serde_json::from_str(&json)?;
+    let d2: Dynamic = serde_json::from_str(&json).unwrap();
 
     assert!(d2.is_map());
 
@@ -792,18 +789,18 @@ fn test_serde_json() -> serde_json::Result<()> {
 fn test_serde_json_numbers() -> serde_json::Result<()> {
     use std::str::FromStr;
 
-    let d: Dynamic = serde_json::from_str("100000000000")?;
+    let d: Dynamic = serde_json::from_str("100000000000").unwrap();
     assert!(d.is::<INT>());
     assert_eq!(d.as_int().unwrap(), 100000000000);
 
-    let d: Dynamic = serde_json::from_str("10000000000000000000")?;
+    let d: Dynamic = serde_json::from_str("10000000000000000000").unwrap();
     assert!(d.is::<Decimal>());
     assert_eq!(
         d.as_decimal().unwrap(),
         Decimal::from_str("10000000000000000000").unwrap()
     );
 
-    let d: Dynamic = serde_json::from_str("10000000000000000000000000")?;
+    let d: Dynamic = serde_json::from_str("10000000000000000000000000").unwrap();
     assert!(d.is::<FLOAT>());
     assert_eq!(d.as_float().unwrap(), 10000000000000000000000000.0);
 
@@ -812,7 +809,7 @@ fn test_serde_json_numbers() -> serde_json::Result<()> {
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_optional() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_optional() {
     #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
     struct TestStruct {
         foo: Option<char>,
@@ -821,24 +818,30 @@ fn test_serde_optional() -> Result<(), Box<EvalAltResult>> {
     let mut engine = Engine::new();
     engine.register_type_with_name::<TestStruct>("TestStruct");
 
-    let r = engine.eval::<Dynamic>("#{ foo: 'a' }")?;
+    let r = engine.eval::<Dynamic>("#{ foo: 'a' }").unwrap();
 
     assert_eq!(
-        from_dynamic::<TestStruct>(&r)?,
+        from_dynamic::<TestStruct>(&r).unwrap(),
         TestStruct { foo: Some('a') }
     );
 
-    let r = engine.eval::<Dynamic>("#{ foo: () }")?;
+    let r = engine.eval::<Dynamic>("#{ foo: () }").unwrap();
 
-    assert_eq!(from_dynamic::<TestStruct>(&r)?, TestStruct { foo: None });
+    assert_eq!(
+        from_dynamic::<TestStruct>(&r).unwrap(),
+        TestStruct { foo: None }
+    );
 
-    let r = engine.eval::<Dynamic>("#{ }")?;
+    let r = engine.eval::<Dynamic>("#{ }").unwrap();
 
-    assert_eq!(from_dynamic::<TestStruct>(&r)?, TestStruct { foo: None });
+    assert_eq!(
+        from_dynamic::<TestStruct>(&r).unwrap(),
+        TestStruct { foo: None }
+    );
 
     let ts = TestStruct { foo: Some('a') };
 
-    let r = to_dynamic(&ts)?;
+    let r = to_dynamic(&ts).unwrap();
 
     let map = r.cast::<Map>();
 
@@ -847,29 +850,29 @@ fn test_serde_optional() -> Result<(), Box<EvalAltResult>> {
 
     let ts = TestStruct { foo: None };
 
-    let r = to_dynamic(&ts)?;
+    let r = to_dynamic(&ts).unwrap();
 
     let map = r.cast::<Map>();
 
     assert_eq!(map.len(), 1);
     let _: () = map.get("foo").unwrap().as_unit().unwrap();
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_index"))]
 #[cfg(not(feature = "no_object"))]
-fn test_serde_blob() -> Result<(), Box<EvalAltResult>> {
+fn test_serde_blob() {
     let engine = Engine::new();
 
-    let r = engine.eval::<Dynamic>(
-        "
+    let r = engine
+        .eval::<Dynamic>(
+            "
             let x = blob(10);
             for i in 0..10 { x[i] = i; }
             #{ x: x }
         ",
-    )?;
+        )
+        .unwrap();
 
     let data = format!("{r:?}");
 
@@ -877,8 +880,6 @@ fn test_serde_blob() -> Result<(), Box<EvalAltResult>> {
     let decoded: Dynamic = rmp_serde::from_slice(&encoded).unwrap();
 
     assert_eq!(format!("{decoded:?}"), data);
-
-    Ok(())
 }
 
 #[test]

@@ -1,10 +1,10 @@
 use rhai::{Engine, EvalAltResult, ParseErrorType, Scope, INT};
 
 #[test]
-fn test_constant() -> Result<(), Box<EvalAltResult>> {
+fn test_constant() {
     let engine = Engine::new();
 
-    assert_eq!(engine.eval::<INT>("const x = 123; x")?, 123);
+    assert_eq!(engine.eval::<INT>("const x = 123; x").unwrap(), 123);
 
     assert!(matches!(
         *engine
@@ -18,12 +18,10 @@ fn test_constant() -> Result<(), Box<EvalAltResult>> {
         *engine.run("const x = [1, 2, 3, 4, 5]; x[2] = 42;").expect_err("expects error"),
         EvalAltResult::ErrorAssignmentToConstant(x, ..) if x == "x"
     ));
-
-    Ok(())
 }
 
 #[test]
-fn test_constant_scope() -> Result<(), Box<EvalAltResult>> {
+fn test_constant_scope() {
     let engine = Engine::new();
 
     let mut scope = Scope::new();
@@ -33,13 +31,11 @@ fn test_constant_scope() -> Result<(), Box<EvalAltResult>> {
         *engine.run_with_scope(&mut scope, "x = 1").expect_err("expects error"),
         EvalAltResult::ErrorAssignmentToConstant(x, ..) if x == "x"
     ));
-
-    Ok(())
 }
 
 #[cfg(not(feature = "no_object"))]
 #[test]
-fn test_constant_mut() -> Result<(), Box<EvalAltResult>> {
+fn test_constant_mut() {
     #[derive(Debug, Clone)]
     struct TestStruct(INT); // custom type
 
@@ -57,24 +53,28 @@ fn test_constant_mut() -> Result<(), Box<EvalAltResult>> {
         .register_fn("update_value", set_value);
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                const MY_NUMBER = new_ts();
-                MY_NUMBER.update_value(42);
-                MY_NUMBER.value
-            ",
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    const MY_NUMBER = new_ts();
+                    MY_NUMBER.update_value(42);
+                    MY_NUMBER.value
+                ",
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                const MY_NUMBER = new_ts();
-                update_value(MY_NUMBER, 42);
-                MY_NUMBER.value
-            ",
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    const MY_NUMBER = new_ts();
+                    update_value(MY_NUMBER, 42);
+                    MY_NUMBER.value
+                ",
+            )
+            .unwrap(),
         123
     );
 
@@ -95,24 +95,28 @@ fn test_constant_mut() -> Result<(), Box<EvalAltResult>> {
     scope.push_constant("MY_NUMBER", TestStruct(123));
 
     assert_eq!(
-        engine.eval_with_scope::<INT>(
-            &mut scope,
-            "
-                update_value(MY_NUMBER, 42);
-                MY_NUMBER.value
-            ",
-        )?,
+        engine
+            .eval_with_scope::<INT>(
+                &mut scope,
+                "
+                    update_value(MY_NUMBER, 42);
+                    MY_NUMBER.value
+                ",
+            )
+            .unwrap(),
         123
     );
 
     assert_eq!(
-        engine.eval_with_scope::<INT>(
-            &mut scope,
-            "
-                MY_NUMBER.update_value(42);
-                MY_NUMBER.value
-            ",
-        )?,
+        engine
+            .eval_with_scope::<INT>(
+                &mut scope,
+                "
+                    MY_NUMBER.update_value(42);
+                    MY_NUMBER.value
+                ",
+            )
+            .unwrap(),
         42
     );
 
@@ -122,6 +126,4 @@ fn test_constant_mut() -> Result<(), Box<EvalAltResult>> {
             .unwrap_err(),
         EvalAltResult::ErrorNonPureMethodCallOnConstant(..)
     ));
-
-    Ok(())
 }

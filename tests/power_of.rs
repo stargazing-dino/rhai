@@ -1,4 +1,4 @@
-use rhai::{Engine, EvalAltResult, INT};
+use rhai::{Engine, INT};
 
 #[cfg(not(feature = "no_float"))]
 use rhai::FLOAT;
@@ -7,53 +7,53 @@ use rhai::FLOAT;
 const EPSILON: FLOAT = 0.000_001;
 
 #[test]
-fn test_power_of() -> Result<(), Box<EvalAltResult>> {
+fn test_power_of() {
     let engine = Engine::new();
 
-    assert_eq!(engine.eval::<INT>("2 ** 3")?, 8);
-    assert_eq!(engine.eval::<INT>("(-2 ** 3)")?, -8);
-    assert_eq!(engine.eval::<INT>("2 ** 3 ** 2")?, 512);
+    assert_eq!(engine.eval::<INT>("2 ** 3").unwrap(), 8);
+    assert_eq!(engine.eval::<INT>("(-2 ** 3)").unwrap(), -8);
+    assert_eq!(engine.eval::<INT>("2 ** 3 ** 2").unwrap(), 512);
 
     #[cfg(not(feature = "no_float"))]
     {
         assert!(
-            (engine.eval::<FLOAT>("2.2 ** 3.3")? - 13.489_468_760_533_386 as FLOAT).abs()
+            (engine.eval::<FLOAT>("2.2 ** 3.3").unwrap() - 13.489_468_760_533_386 as FLOAT).abs()
                 <= EPSILON
         );
-        assert!((engine.eval::<FLOAT>("2.0**-2.0")? - 0.25 as FLOAT).abs() < EPSILON);
-        assert!((engine.eval::<FLOAT>("(-2.0**-2.0)")? - 0.25 as FLOAT).abs() < EPSILON);
-        assert!((engine.eval::<FLOAT>("(-2.0**-2)")? - 0.25 as FLOAT).abs() < EPSILON);
-        assert_eq!(engine.eval::<INT>("4**3")?, 64);
+        assert!((engine.eval::<FLOAT>("2.0**-2.0").unwrap() - 0.25 as FLOAT).abs() < EPSILON);
+        assert!((engine.eval::<FLOAT>("(-2.0**-2.0)").unwrap() - 0.25 as FLOAT).abs() < EPSILON);
+        assert!((engine.eval::<FLOAT>("(-2.0**-2)").unwrap() - 0.25 as FLOAT).abs() < EPSILON);
+        assert_eq!(engine.eval::<INT>("4**3").unwrap(), 64);
     }
-
-    Ok(())
 }
 
 #[test]
-fn test_power_of_equals() -> Result<(), Box<EvalAltResult>> {
+fn test_power_of_equals() {
     let engine = Engine::new();
 
-    assert_eq!(engine.eval::<INT>("let x = 2; x **= 3; x")?, 8);
-    assert_eq!(engine.eval::<INT>("let x = -2; x **= 3; x")?, -8);
+    assert_eq!(engine.eval::<INT>("let x = 2; x **= 3; x").unwrap(), 8);
+    assert_eq!(engine.eval::<INT>("let x = -2; x **= 3; x").unwrap(), -8);
 
     #[cfg(not(feature = "no_float"))]
     {
         assert!(
-            (engine.eval::<FLOAT>("let x = 2.2; x **= 3.3; x")? - 13.489_468_760_533_386 as FLOAT)
+            (engine.eval::<FLOAT>("let x = 2.2; x **= 3.3; x").unwrap()
+                - 13.489_468_760_533_386 as FLOAT)
                 .abs()
                 <= EPSILON
         );
         assert!(
-            (engine.eval::<FLOAT>("let x = 2.0; x **= -2.0; x")? - 0.25 as FLOAT).abs() < EPSILON
+            (engine.eval::<FLOAT>("let x = 2.0; x **= -2.0; x").unwrap() - 0.25 as FLOAT).abs()
+                < EPSILON
         );
         assert!(
-            (engine.eval::<FLOAT>("let x = -2.0; x **= -2.0; x")? - 0.25 as FLOAT).abs() < EPSILON
+            (engine.eval::<FLOAT>("let x = -2.0; x **= -2.0; x").unwrap() - 0.25 as FLOAT).abs()
+                < EPSILON
         );
         assert!(
-            (engine.eval::<FLOAT>("let x = -2.0; x **= -2; x")? - 0.25 as FLOAT).abs() < EPSILON
+            (engine.eval::<FLOAT>("let x = -2.0; x **= -2; x").unwrap() - 0.25 as FLOAT).abs()
+                < EPSILON
         );
-        assert_eq!(engine.eval::<INT>("let x =4; x **= 3; x")?, 64);
+        assert_eq!(engine.eval::<INT>("let x =4; x **= 3; x").unwrap(), 64);
     }
-
-    Ok(())
 }

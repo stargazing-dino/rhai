@@ -1,8 +1,7 @@
 #![cfg(not(feature = "no_index"))]
 #![cfg(not(feature = "no_module"))]
-
 use rhai::plugin::*;
-use rhai::{Engine, EvalAltResult, Module, INT};
+use rhai::{Engine, Module, INT};
 
 pub fn add_generic<T: std::ops::Add<Output = T>>(x: T, y: T) -> T {
     x + y
@@ -46,7 +45,7 @@ generate_ops!(add, add_generic, i8, i16, i32, i64);
 generate_ops!(mul, mul_generic, i8, i16, i32, i64);
 
 #[test]
-fn test_generated_ops() -> Result<(), Box<EvalAltResult>> {
+fn test_generated_ops() {
     let mut engine = Engine::new();
 
     let mut m = Module::new();
@@ -56,14 +55,12 @@ fn test_generated_ops() -> Result<(), Box<EvalAltResult>> {
     engine.register_global_module(m.into());
 
     #[cfg(feature = "only_i32")]
-    assert_eq!(engine.eval::<INT>("let a = 0; add_i32(a, 1)")?, 1);
+    assert_eq!(engine.eval::<INT>("let a = 0; add_i32(a, 1)").unwrap(), 1);
     #[cfg(not(feature = "only_i32"))]
-    assert_eq!(engine.eval::<INT>("let a = 0; add_i64(a, 1)")?, 1);
+    assert_eq!(engine.eval::<INT>("let a = 0; add_i64(a, 1)").unwrap(), 1);
 
     #[cfg(feature = "only_i32")]
-    assert_eq!(engine.eval::<INT>("let a = 1; mul_i32(a, 2)")?, 2);
+    assert_eq!(engine.eval::<INT>("let a = 1; mul_i32(a, 2)").unwrap(), 2);
     #[cfg(not(feature = "only_i32"))]
-    assert_eq!(engine.eval::<INT>("let a = 1; mul_i64(a, 2)")?, 2);
-
-    Ok(())
+    assert_eq!(engine.eval::<INT>("let a = 1; mul_i64(a, 2)").unwrap(), 2);
 }

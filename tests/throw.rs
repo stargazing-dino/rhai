@@ -16,78 +16,94 @@ fn test_throw() {
 }
 
 #[test]
-fn test_try_catch() -> Result<(), Box<EvalAltResult>> {
+fn test_try_catch() {
     let engine = Engine::new();
 
     assert_eq!(
-        engine.eval::<INT>("try { throw 42; } catch (x) { return x; }")?,
+        engine
+            .eval::<INT>("try { throw 42; } catch (x) { return x; }")
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>("try { throw 42; } catch { return 123; }")?,
+        engine
+            .eval::<INT>("try { throw 42; } catch { return 123; }")
+            .unwrap(),
         123
     );
 
     #[cfg(not(feature = "unchecked"))]
     assert_eq!(
-        engine.eval::<INT>("let x = 42; try { let y = 123; print(x/0); } catch { x = 0 } x")?,
+        engine
+            .eval::<INT>("let x = 42; try { let y = 123; print(x/0); } catch { x = 0 } x")
+            .unwrap(),
         0
     );
 
     #[cfg(not(feature = "no_function"))]
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                fn foo(x) { try { throw 42; } catch (x) { return x; } }
-                foo(0)
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    fn foo(x) { try { throw 42; } catch (x) { return x; } }
+                    foo(0)
+                "
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let err = 123;
-                let x = 0;
-                try { throw 42; } catch(err) { return err; }
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let err = 123;
+                    let x = 0;
+                    try { throw 42; } catch(err) { return err; }
+                "
+            )
+            .unwrap(),
         42
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let err = 123;
-                let x = 0;
-                try { throw 42; } catch(err) { print(err); }
-                err
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let err = 123;
+                    let x = 0;
+                    try { throw 42; } catch(err) { print(err); }
+                    err
+                "
+            )
+            .unwrap(),
         123
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let foo = 123;
-                let x = 0;
-                try { throw 42; } catch(err) { return foo; }
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let foo = 123;
+                    let x = 0;
+                    try { throw 42; } catch(err) { return foo; }
+                "
+            )
+            .unwrap(),
         123
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let foo = 123;
-                let x = 0;
-                try { throw 42; } catch(err) { return err; }
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let foo = 123;
+                    let x = 0;
+                    try { throw 42; } catch(err) { return err; }
+                "
+            )
+            .unwrap(),
         42
     );
 
@@ -98,6 +114,4 @@ fn test_try_catch() -> Result<(), Box<EvalAltResult>> {
             .expect_err("expects error"),
         EvalAltResult::ErrorArithmetic(..)
     ));
-
-    Ok(())
 }

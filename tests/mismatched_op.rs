@@ -27,7 +27,7 @@ fn test_mismatched_op_name() {
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_mismatched_op_custom_type() -> Result<(), Box<EvalAltResult>> {
+fn test_mismatched_op_custom_type() {
     #[allow(dead_code)] // used inside `register_type_with_name`
     #[derive(Debug, Clone)]
     struct TestStruct {
@@ -46,9 +46,9 @@ fn test_mismatched_op_custom_type() -> Result<(), Box<EvalAltResult>> {
         .register_type_with_name::<TestStruct>("TestStruct")
         .register_fn("new_ts", TestStruct::new);
 
-    assert!(!engine.eval::<bool>("new_ts() == 42")?);
+    assert!(!engine.eval::<bool>("new_ts() == 42").unwrap());
 
-    assert!(engine.eval::<bool>("new_ts() != ()")?);
+    assert!(engine.eval::<bool>("new_ts() != ()").unwrap());
 
     assert!(matches!(*engine.eval::<bool>(
         "
@@ -68,6 +68,4 @@ fn test_mismatched_op_custom_type() -> Result<(), Box<EvalAltResult>> {
         EvalAltResult::ErrorMismatchOutputType(need, actual, ..)
             if need == "TestStruct" && actual == std::any::type_name::<INT>()
     ));
-
-    Ok(())
 }

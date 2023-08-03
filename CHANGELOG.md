@@ -16,11 +16,13 @@ Enhancements
 ------------
 
 * [`once_cell`](https://crates.io/crates/once_cell) is used in `std` environments instead of the home-brew `SusLock` (which is still kept for `no-std`).
+* Originally, unit tests use the `?` operator liberally to simplify the code. However, this causes the loss of proper line numbers when it fails, making it difficult to identify the exact location of the failure. This is now fixed by using `unwrap()` instead.
 
 New features
 ------------
 
 * Added `Engine::max_variables` and `Engine::set_max_variables` to limit the maximum number of variables allowed within a scope at any time. This is to guard against defining a huge number of variables containing large data just beyond individual data size limits. When `max_variables` is exceeded a new error, `ErrorTooManyVariables`, is returned.
+* Added `zip` function for arrays.
 
 
 Version 1.15.1

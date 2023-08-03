@@ -5,10 +5,10 @@ use rhai::{
 };
 
 #[test]
-fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
+fn test_custom_syntax() {
     let mut engine = Engine::new();
 
-    engine.run("while false {}")?;
+    engine.run("while false {}").unwrap();
 
     // Disable 'while' and make sure it still works with custom syntax
     engine.disable_symbol("while");
@@ -22,107 +22,118 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
     ));
 
     // Implement ternary operator
-    engine.register_custom_syntax(
-        ["iff", "$expr$", "?", "$expr$", ":", "$expr$"],
-        false,
-        |context, inputs| match context.eval_expression_tree(&inputs[0])?.as_bool() {
-            Ok(true) => context.eval_expression_tree(&inputs[1]),
-            Ok(false) => context.eval_expression_tree(&inputs[2]),
-            Err(typ) => Err(Box::new(EvalAltResult::ErrorMismatchDataType(
-                "bool".to_string(),
-                typ.to_string(),
-                inputs[0].position(),
-            ))),
-        },
-    )?;
+    engine
+        .register_custom_syntax(
+            ["iff", "$expr$", "?", "$expr$", ":", "$expr$"],
+            false,
+            |context, inputs| match context.eval_expression_tree(&inputs[0]).unwrap().as_bool() {
+                Ok(true) => context.eval_expression_tree(&inputs[1]),
+                Ok(false) => context.eval_expression_tree(&inputs[2]),
+                Err(typ) => Err(Box::new(EvalAltResult::ErrorMismatchDataType(
+                    "bool".to_string(),
+                    typ.to_string(),
+                    inputs[0].position(),
+                ))),
+            },
+        )
+        .unwrap();
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let x = 42;
-                let y = iff x > 40 ? 0 : 123;
-                y
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let x = 42;
+                    let y = iff x > 40 ? 0 : 123;
+                    y
+                "
+            )
+            .unwrap(),
         0
     );
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let x = 42;
-                let y = iff x == 0 ? 0 : 123;
-                y
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let x = 42;
+                    let y = iff x == 0 ? 0 : 123;
+                    y
+                "
+            )
+            .unwrap(),
         123
     );
 
     // Custom syntax
-    engine.register_custom_syntax(
-        [
-            "exec", "[", "$ident$", "$symbol$", "$int$", "]", "->", "$block$", "while", "$expr$",
-        ],
-        true,
-        |context, inputs| {
-            let var_name = inputs[0].get_string_value().unwrap();
-            let op = inputs[1].get_literal_value::<ImmutableString>().unwrap();
-            let max = inputs[2].get_literal_value::<INT>().unwrap();
-            let stmt = &inputs[3];
-            let condition = &inputs[4];
+    engine
+        .register_custom_syntax(
+            [
+                "exec", "[", "$ident$", "$symbol$", "$int$", "]", "->", "$block$", "while",
+                "$expr$",
+            ],
+            true,
+            |context, inputs| {
+                let var_name = inputs[0].get_string_value().unwrap();
+                let op = inputs[1].get_literal_value::<ImmutableString>().unwrap();
+                let max = inputs[2].get_literal_value::<INT>().unwrap();
+                let stmt = &inputs[3];
+                let condition = &inputs[4];
 
-            context.scope_mut().push(var_name.to_string(), 0 as INT);
+                context.scope_mut().push(var_name.to_string(), 0 as INT);
 
-            let mut count: INT = 0;
+                let mut count: INT = 0;
 
-            loop {
-                let done = match op.as_str() {
-                    "<" => count >= max,
-                    "<=" => count > max,
-                    ">" => count <= max,
-                    ">=" => count < max,
-                    "==" => count != max,
-                    "!=" => count == max,
-                    _ => return Err(format!("Unsupported operator: {op}").into()),
-                };
+                loop {
+                    let done = match op.as_str() {
+                        "<" => count >= max,
+                        "<=" => count > max,
+                        ">" => count <= max,
+                        ">=" => count < max,
+                        "==" => count != max,
+                        "!=" => count == max,
+                        _ => return Err(format!("Unsupported operator: {op}").into()),
+                    };
 
-                if done {
-                    break;
+                    if done {
+                        break;
+                    }
+
+                    // Do not rewind if the variable is upper-case
+                    let _: Dynamic = if var_name.to_uppercase() == var_name {
+                        #[allow(deprecated)] // not deprecated but unstable
+                        context.eval_expression_tree_raw(stmt, false)
+                    } else {
+                        context.eval_expression_tree(stmt)
+                    }?;
+
+                    count += 1;
+
+                    context
+                        .scope_mut()
+                        .push(format!("{var_name}{count}"), count);
+
+                    let stop = !context
+                        .eval_expression_tree(condition)
+                        .unwrap()
+                        .as_bool()
+                        .map_err(|err| {
+                            Box::new(EvalAltResult::ErrorMismatchDataType(
+                                "bool".to_string(),
+                                err.to_string(),
+                                condition.position(),
+                            ))
+                        })
+                        .unwrap();
+
+                    if stop {
+                        break;
+                    }
                 }
 
-                // Do not rewind if the variable is upper-case
-                let _: Dynamic = if var_name.to_uppercase() == var_name {
-                    #[allow(deprecated)] // not deprecated but unstable
-                    context.eval_expression_tree_raw(stmt, false)
-                } else {
-                    context.eval_expression_tree(stmt)
-                }?;
-
-                count += 1;
-
-                context
-                    .scope_mut()
-                    .push(format!("{var_name}{count}"), count);
-
-                let stop = !context
-                    .eval_expression_tree(condition)?
-                    .as_bool()
-                    .map_err(|err| {
-                        Box::new(EvalAltResult::ErrorMismatchDataType(
-                            "bool".to_string(),
-                            err.to_string(),
-                            condition.position(),
-                        ))
-                    })?;
-
-                if stop {
-                    break;
-                }
-            }
-
-            Ok(count.into())
-        },
-    )?;
+                Ok(count.into())
+            },
+        )
+        .unwrap();
 
     assert!(matches!(
         *engine
@@ -132,62 +143,74 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
     ));
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let x = 0;
-                let foo = (exec [x<15] -> { x += 2 } while x < 42) * 10;
-                foo
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let x = 0;
+                    let foo = (exec [x<15] -> { x += 2 } while x < 42) * 10;
+                    foo
+                "
+            )
+            .unwrap(),
         150
     );
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let x = 0;
-                exec [x<100] -> { x += 1 } while x < 42;
-                x
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let x = 0;
+                    exec [x<100] -> { x += 1 } while x < 42;
+                    x
+                "
+            )
+            .unwrap(),
         42
     );
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                exec [x<100] -> { x += 1 } while x < 42;
-                x
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    exec [x<100] -> { x += 1 } while x < 42;
+                    x
+                "
+            )
+            .unwrap(),
         42
     );
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let foo = 123;
-                exec [x<15] -> { x += 1 } while x < 42;
-                foo + x + x1 + x2 + x3
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let foo = 123;
+                    exec [x<15] -> { x += 1 } while x < 42;
+                    foo + x + x1 + x2 + x3
+                "
+            )
+            .unwrap(),
         144
     );
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let foo = 123;
-                exec [x<15] -> { let foo = x; x += 1; } while x < 42;
-                foo
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let foo = 123;
+                    exec [x<15] -> { let foo = x; x += 1; } while x < 42;
+                    foo
+                "
+            )
+            .unwrap(),
         123
     );
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let foo = 123;
-                exec [ABC<15] -> { let foo = ABC; ABC += 1; } while ABC < 42;
-                foo
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let foo = 123;
+                    exec [ABC<15] -> { let foo = ABC; ABC += 1; } while ABC < 42;
+                    foo
+                "
+            )
+            .unwrap(),
         14
     );
 
@@ -205,169 +228,188 @@ fn test_custom_syntax() -> Result<(), Box<EvalAltResult>> {
 
     // Check self-termination
     engine
-        .register_custom_syntax(["test1", "$block$"], true, |_, _| Ok(Dynamic::UNIT))?
-        .register_custom_syntax(["test2", "}"], true, |_, _| Ok(Dynamic::UNIT))?
-        .register_custom_syntax(["test3", ";"], true, |_, _| Ok(Dynamic::UNIT))?;
+        .register_custom_syntax(["test1", "$block$"], true, |_, _| Ok(Dynamic::UNIT))
+        .unwrap()
+        .register_custom_syntax(["test2", "}"], true, |_, _| Ok(Dynamic::UNIT))
+        .unwrap()
+        .register_custom_syntax(["test3", ";"], true, |_, _| Ok(Dynamic::UNIT))
+        .unwrap();
 
-    assert_eq!(engine.eval::<INT>("test1 { x = y + z; } 42")?, 42);
-    assert_eq!(engine.eval::<INT>("test2 } 42")?, 42);
-    assert_eq!(engine.eval::<INT>("test3; 42")?, 42);
+    assert_eq!(engine.eval::<INT>("test1 { x = y + z; } 42").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("test2 } 42").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("test3; 42").unwrap(), 42);
 
     // Register the custom syntax: var x = ???
-    engine.register_custom_syntax(
-        ["var", "$ident$", "=", "$expr$"],
-        true,
-        |context, inputs| {
-            let var_name = inputs[0].get_string_value().unwrap();
-            let expr = &inputs[1];
+    engine
+        .register_custom_syntax(
+            ["var", "$ident$", "=", "$expr$"],
+            true,
+            |context, inputs| {
+                let var_name = inputs[0].get_string_value().unwrap();
+                let expr = &inputs[1];
 
-            // Evaluate the expression
-            let value = context.eval_expression_tree(expr)?;
+                // Evaluate the expression
+                let value = context.eval_expression_tree(expr).unwrap();
 
-            if !context.scope().is_constant(var_name).unwrap_or(false) {
-                context.scope_mut().set_value(var_name.to_string(), value);
-                Ok(Dynamic::UNIT)
-            } else {
-                Err(format!("variable {var_name} is constant").into())
-            }
-        },
-    )?;
+                if !context.scope().is_constant(var_name).unwrap_or(false) {
+                    context.scope_mut().set_value(var_name.to_string(), value);
+                    Ok(Dynamic::UNIT)
+                } else {
+                    Err(format!("variable {var_name} is constant").into())
+                }
+            },
+        )
+        .unwrap();
 
     let mut scope = Scope::new();
 
     assert_eq!(
-        engine.eval_with_scope::<INT>(&mut scope, "var foo = 42; foo")?,
+        engine
+            .eval_with_scope::<INT>(&mut scope, "var foo = 42; foo")
+            .unwrap(),
         42
     );
     assert_eq!(scope.get_value::<INT>("foo"), Some(42));
     assert_eq!(scope.len(), 1);
     assert_eq!(
-        engine.eval_with_scope::<INT>(&mut scope, "var foo = 123; foo")?,
+        engine
+            .eval_with_scope::<INT>(&mut scope, "var foo = 123; foo")
+            .unwrap(),
         123
     );
     assert_eq!(scope.get_value::<INT>("foo"), Some(123));
     assert_eq!(scope.len(), 1);
-
-    Ok(())
 }
 
 #[test]
-fn test_custom_syntax_scope() -> Result<(), Box<EvalAltResult>> {
+fn test_custom_syntax_scope() {
     let mut engine = Engine::new();
 
-    engine.register_custom_syntax(
-        [
-            "with", "offset", "(", "$expr$", ",", "$expr$", ")", "$block$",
-        ],
-        true,
-        |context, inputs| {
-            let x = context
-                .eval_expression_tree(&inputs[0])?
-                .as_int()
-                .map_err(|typ| {
-                    Box::new(EvalAltResult::ErrorMismatchDataType(
-                        "integer".to_string(),
-                        typ.to_string(),
-                        inputs[0].position(),
-                    ))
-                })?;
+    engine
+        .register_custom_syntax(
+            [
+                "with", "offset", "(", "$expr$", ",", "$expr$", ")", "$block$",
+            ],
+            true,
+            |context, inputs| {
+                let x = context
+                    .eval_expression_tree(&inputs[0])
+                    .unwrap()
+                    .as_int()
+                    .map_err(|typ| {
+                        Box::new(EvalAltResult::ErrorMismatchDataType(
+                            "integer".to_string(),
+                            typ.to_string(),
+                            inputs[0].position(),
+                        ))
+                    })
+                    .unwrap();
 
-            let y = context
-                .eval_expression_tree(&inputs[1])?
-                .as_int()
-                .map_err(|typ| {
-                    Box::new(EvalAltResult::ErrorMismatchDataType(
-                        "integer".to_string(),
-                        typ.to_string(),
-                        inputs[1].position(),
-                    ))
-                })?;
+                let y = context
+                    .eval_expression_tree(&inputs[1])
+                    .unwrap()
+                    .as_int()
+                    .map_err(|typ| {
+                        Box::new(EvalAltResult::ErrorMismatchDataType(
+                            "integer".to_string(),
+                            typ.to_string(),
+                            inputs[1].position(),
+                        ))
+                    })
+                    .unwrap();
 
-            let orig_len = context.scope().len();
+                let orig_len = context.scope().len();
 
-            context.scope_mut().push_constant("x", x);
-            context.scope_mut().push_constant("y", y);
+                context.scope_mut().push_constant("x", x);
+                context.scope_mut().push_constant("y", y);
 
-            let result = context.eval_expression_tree(&inputs[2]);
+                let result = context.eval_expression_tree(&inputs[2]);
 
-            context.scope_mut().rewind(orig_len);
+                context.scope_mut().rewind(orig_len);
 
-            result
-        },
-    )?;
+                result
+            },
+        )
+        .unwrap();
 
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let y = 1;
-                let x = 0;
-                with offset(44, 2) { x - y }
-            "
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let y = 1;
+                    let x = 0;
+                    with offset(44, 2) { x - y }
+                "
+            )
+            .unwrap(),
         42
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_custom_syntax_matrix() -> Result<(), Box<EvalAltResult>> {
+fn test_custom_syntax_matrix() {
     let mut engine = Engine::new();
 
     engine.disable_symbol("|");
 
-    engine.register_custom_syntax(
-        [
-            "@", //
-            "|", "$expr$", "$expr$", "$expr$", "|", //
-            "|", "$expr$", "$expr$", "$expr$", "|", //
-            "|", "$expr$", "$expr$", "$expr$", "|",
-        ],
-        false,
-        |context, inputs| {
-            let mut values = [[0; 3]; 3];
+    engine
+        .register_custom_syntax(
+            [
+                "@", //
+                "|", "$expr$", "$expr$", "$expr$", "|", //
+                "|", "$expr$", "$expr$", "$expr$", "|", //
+                "|", "$expr$", "$expr$", "$expr$", "|",
+            ],
+            false,
+            |context, inputs| {
+                let mut values = [[0; 3]; 3];
 
-            for y in 0..3 {
-                for x in 0..3 {
-                    let offset = y * 3 + x;
+                for y in 0..3 {
+                    for x in 0..3 {
+                        let offset = y * 3 + x;
 
-                    match context.eval_expression_tree(&inputs[offset])?.as_int() {
-                        Ok(v) => values[y][x] = v,
-                        Err(typ) => {
-                            return Err(Box::new(EvalAltResult::ErrorMismatchDataType(
-                                "integer".to_string(),
-                                typ.to_string(),
-                                inputs[offset].position(),
-                            )))
+                        match context
+                            .eval_expression_tree(&inputs[offset])
+                            .unwrap()
+                            .as_int()
+                        {
+                            Ok(v) => values[y][x] = v,
+                            Err(typ) => {
+                                return Err(Box::new(EvalAltResult::ErrorMismatchDataType(
+                                    "integer".to_string(),
+                                    typ.to_string(),
+                                    inputs[offset].position(),
+                                )))
+                            }
                         }
                     }
                 }
-            }
 
-            Ok(Dynamic::from(values))
-        },
-    )?;
+                Ok(Dynamic::from(values))
+            },
+        )
+        .unwrap();
 
-    let r = engine.eval::<[[INT; 3]; 3]>(
-        "
-            let a = 42;
-            let b = 123;
-            let c = 1;
-            let d = 99;
+    let r = engine
+        .eval::<[[INT; 3]; 3]>(
+            "
+                let a = 42;
+                let b = 123;
+                let c = 1;
+                let d = 99;
 
-            @|  a   b   0  |
-             | -b   a   0  |
-             |  0   0  c*d |
-        ",
-    )?;
+                @|  a   b   0  |
+                | -b   a   0  |
+                |  0   0  c*d |
+            ",
+        )
+        .unwrap();
 
     assert_eq!(r, [[42, 123, 0], [-123, 42, 0], [0, 0, 99]]);
-
-    Ok(())
 }
 
 #[test]
-fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
+fn test_custom_syntax_raw() {
     let mut engine = Engine::new();
 
     engine.register_custom_syntax_with_state_raw(
@@ -414,24 +456,24 @@ fn test_custom_syntax_raw() -> Result<(), Box<EvalAltResult>> {
         },
     );
 
-    assert_eq!(engine.eval::<INT>(r#"hello "world""#)?, 123456);
-    assert_eq!(engine.eval::<INT>("hello world")?, 0);
-    assert_eq!(engine.eval::<INT>("hello kitty")?, 42);
+    assert_eq!(engine.eval::<INT>(r#"hello "world""#).unwrap(), 123456);
+    assert_eq!(engine.eval::<INT>("hello world").unwrap(), 0);
+    assert_eq!(engine.eval::<INT>("hello kitty").unwrap(), 42);
     assert_eq!(
-        engine.eval::<INT>("let foo = 0; (hello kitty) + foo")?,
+        engine
+            .eval::<INT>("let foo = 0; (hello kitty) + foo")
+            .unwrap(),
         1041
     );
-    assert_eq!(engine.eval::<INT>("(hello kitty) + foo")?, 1041);
+    assert_eq!(engine.eval::<INT>("(hello kitty) + foo").unwrap(), 1041);
     assert_eq!(
         *engine.compile("hello hey").unwrap_err().err_type(),
         ParseErrorType::BadInput(LexError::ImproperSymbol("hey".to_string(), String::new()))
     );
-
-    Ok(())
 }
 
 #[test]
-fn test_custom_syntax_raw2() -> Result<(), Box<EvalAltResult>> {
+fn test_custom_syntax_raw2() {
     let mut engine = Engine::new();
 
     engine.register_custom_syntax_with_state_raw(
@@ -455,12 +497,10 @@ fn test_custom_syntax_raw2() -> Result<(), Box<EvalAltResult>> {
         },
     );
 
-    assert_eq!(engine.eval::<INT>("#-1")?, -1);
-    assert_eq!(engine.eval::<INT>("let x = 41; x + #1")?, 42);
+    assert_eq!(engine.eval::<INT>("#-1").unwrap(), -1);
+    assert_eq!(engine.eval::<INT>("let x = 41; x + #1").unwrap(), 42);
     #[cfg(not(feature = "no_object"))]
-    assert_eq!(engine.eval::<INT>("#-42.abs()")?, 42);
-    assert_eq!(engine.eval::<INT>("#42/2")?, 21);
-    assert_eq!(engine.eval::<INT>("sign(#1)")?, 1);
-
-    Ok(())
+    assert_eq!(engine.eval::<INT>("#-42.abs()").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("#42/2").unwrap(), 21);
+    assert_eq!(engine.eval::<INT>("sign(#1)").unwrap(), 1);
 }

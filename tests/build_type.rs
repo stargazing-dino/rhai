@@ -2,7 +2,7 @@
 use rhai::{CustomType, Engine, EvalAltResult, Position, TypeBuilder, INT};
 
 #[test]
-fn build_type() -> Result<(), Box<EvalAltResult>> {
+fn build_type() {
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct Vec3 {
         x: INT,
@@ -77,73 +77,85 @@ fn build_type() -> Result<(), Box<EvalAltResult>> {
     engine.build_type::<Vec3>();
 
     assert_eq!(
-        engine.eval::<Vec3>(
-            "
-                let v = vec3(1, 2, 3);
-                v
-            ",
-        )?,
+        engine
+            .eval::<Vec3>(
+                "
+                    let v = vec3(1, 2, 3);
+                    v
+                ",
+            )
+            .unwrap(),
         Vec3::new(1, 2, 3),
     );
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let v = vec3(1, 2, 3);
-                v.x
-            ",
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let v = vec3(1, 2, 3);
+                    v.x
+                ",
+            )
+            .unwrap(),
         1,
     );
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let v = vec3(1, 2, 3);
-                v.y
-            ",
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let v = vec3(1, 2, 3);
+                    v.y
+                ",
+            )
+            .unwrap(),
         2,
     );
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let v = vec3(1, 2, 3);
-                v.z
-            ",
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let v = vec3(1, 2, 3);
+                    v.z
+                ",
+            )
+            .unwrap(),
         3,
     );
     #[cfg(not(feature = "no_index"))]
-    assert!(engine.eval::<bool>(
-        "
-            let v = vec3(1, 2, 3);
-            v.x == v[0] && v.y == v[1] && v.z == v[2]
-        ",
-    )?);
-    assert_eq!(
-        engine.eval::<Vec3>(
+    assert!(engine
+        .eval::<bool>(
             "
                 let v = vec3(1, 2, 3);
-                v.x = 5;
-                v.y = 6;
-                v.z = 7;
-                v
+                v.x == v[0] && v.y == v[1] && v.z == v[2]
             ",
-        )?,
+        )
+        .unwrap());
+    assert_eq!(
+        engine
+            .eval::<Vec3>(
+                "
+                    let v = vec3(1, 2, 3);
+                    v.x = 5;
+                    v.y = 6;
+                    v.z = 7;
+                    v
+                ",
+            )
+            .unwrap(),
         Vec3::new(5, 6, 7),
     );
     assert_eq!(
-        engine.eval::<INT>(
-            "
-                let sum = 0;
-                let v = vec3(1, 2, 3);
-                for i in v {
-                    sum += i;
-                }
-                sum
-            ",
-        )?,
+        engine
+            .eval::<INT>(
+                "
+                    let sum = 0;
+                    let v = vec3(1, 2, 3);
+                    for i in v {
+                        sum += i;
+                    }
+                    sum
+                ",
+            )
+            .unwrap(),
         6,
     );
-
-    Ok(())
 }

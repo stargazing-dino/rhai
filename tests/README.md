@@ -8,5 +8,5 @@ How to Run
 ----------
 
 ```bash
-cargo test
+cargo test --features bin-features
 ```

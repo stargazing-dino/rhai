@@ -1,8 +1,7 @@
 #![cfg(not(feature = "no_index"))]
 #![cfg(not(feature = "no_module"))]
-
 use rhai::plugin::*;
-use rhai::{Engine, EvalAltResult, Scope, INT};
+use rhai::{Engine, Scope, INT};
 
 mod test {
     use super::*;
@@ -99,7 +98,7 @@ pub enum MyEnum {
 expand_enum! { my_enum_module: MyEnum => Foo, Bar, Baz, Hello, World }
 
 #[test]
-fn test_plugins_package() -> Result<(), Box<EvalAltResult>> {
+fn test_plugins_package() {
     let mut engine = Engine::new();
 
     let mut m = Module::new();
@@ -109,13 +108,15 @@ fn test_plugins_package() -> Result<(), Box<EvalAltResult>> {
 
     reg_functions!(engine += greet::single(INT, bool, char));
 
-    assert_eq!(engine.eval::<INT>("MYSTIC_NUMBER")?, 42);
+    assert_eq!(engine.eval::<INT>("MYSTIC_NUMBER").unwrap(), 42);
 
     #[cfg(not(feature = "no_object"))]
     {
-        assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; a.foo")?, 1);
-        engine.run("const A = [1, 2, 3]; A.no_effect(42);")?;
-        engine.run("const A = [1, 2, 3]; A.no_effect = 42;")?;
+        assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; a.foo").unwrap(), 1);
+        engine.run("const A = [1, 2, 3]; A.no_effect(42);").unwrap();
+        engine
+            .run("const A = [1, 2, 3]; A.no_effect = 42;")
+            .unwrap();
 
         assert!(
             matches!(*engine.run("const A = [1, 2, 3]; A.test(42);").unwrap_err(),
@@ -123,29 +124,38 @@ fn test_plugins_package() -> Result<(), Box<EvalAltResult>> {
         )
     }
 
-    assert_eq!(engine.eval::<INT>(r#"hash("hello")"#)?, 42);
-    assert_eq!(engine.eval::<INT>(r#"hash2("hello")"#)?, 42);
-    assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)")?, 6);
-    assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; hi(a, 2)")?, 6);
-    assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)")?, 6);
+    assert_eq!(engine.eval::<INT>(r#"hash("hello")"#).unwrap(), 42);
+    assert_eq!(engine.eval::<INT>(r#"hash2("hello")"#).unwrap(), 42);
     assert_eq!(
-        engine.eval::<String>("let a = [1, 2, 3]; greet(test(a, 2))")?,
+        engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)").unwrap(),
+        6
+    );
+    assert_eq!(
+        engine.eval::<INT>("let a = [1, 2, 3]; hi(a, 2)").unwrap(),
+        6
+    );
+    assert_eq!(
+        engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)").unwrap(),
+        6
+    );
+    assert_eq!(
+        engine
+            .eval::<String>("let a = [1, 2, 3]; greet(test(a, 2))")
+            .unwrap(),
         "6 kitties"
     );
-    assert_eq!(engine.eval::<INT>("2 + 2")?, 4);
+    assert_eq!(engine.eval::<INT>("2 + 2").unwrap(), 4);
 
     engine.set_fast_operators(false);
-    assert_eq!(engine.eval::<INT>("2 + 2")?, 5);
+    assert_eq!(engine.eval::<INT>("2 + 2").unwrap(), 5);
 
     engine.register_static_module("test", exported_module!(test::special_array_package).into());
 
-    assert_eq!(engine.eval::<INT>("test::MYSTIC_NUMBER")?, 42);
-
-    Ok(())
+    assert_eq!(engine.eval::<INT>("test::MYSTIC_NUMBER").unwrap(), 42);
 }
 
 #[test]
-fn test_plugins_parameters() -> Result<(), Box<EvalAltResult>> {
+fn test_plugins_parameters() {
     #[export_module]
     mod rhai_std {
         pub fn noop(_: &str) {}
@@ -158,17 +168,17 @@ fn test_plugins_parameters() -> Result<(), Box<EvalAltResult>> {
     engine.register_static_module("std", std.into());
 
     assert_eq!(
-        engine.eval::<String>(
-            r#"
-                let s = "hello";
-                std::noop(s);
-                s
-            "#
-        )?,
+        engine
+            .eval::<String>(
+                r#"
+                    let s = "hello";
+                    std::noop(s);
+                    s
+                "#
+            )
+            .unwrap(),
         "hello"
     );
-
-    Ok(())
 }
 
 #[cfg(target_pointer_width = "64")]
@@ -208,7 +218,7 @@ mod handle {
     }
 
     #[test]
-    fn test_module_handle() -> Result<(), Box<EvalAltResult>> {
+    fn test_module_handle() {
         let mut engine = Engine::new();
 
         engine.register_global_module(exported_module!(handle_module).into());
@@ -219,8 +229,11 @@ mod handle {
         scope.push("world", WorldHandle::from(world));
 
         #[cfg(not(feature = "no_object"))]
-        assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "world.len")?, 1);
-
-        Ok(())
+        assert_eq!(
+            engine
+                .eval_with_scope::<INT>(&mut scope, "world.len")
+                .unwrap(),
+            1
+        );
     }
 }

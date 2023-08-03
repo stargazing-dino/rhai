@@ -1,5 +1,5 @@
 #![cfg(feature = "debugging")]
-use rhai::{Dynamic, Engine, EvalAltResult, INT};
+use rhai::{Engine, INT};
 
 #[cfg(not(feature = "no_index"))]
 use rhai::Array;
@@ -8,7 +8,7 @@ use rhai::Array;
 use rhai::Map;
 
 #[test]
-fn test_debugging() -> Result<(), Box<EvalAltResult>> {
+fn test_debugging() {
     let mut engine = Engine::new();
 
     engine.register_debugger(
@@ -19,31 +19,31 @@ fn test_debugging() -> Result<(), Box<EvalAltResult>> {
     #[cfg(not(feature = "no_function"))]
     #[cfg(not(feature = "no_index"))]
     {
-        let r = engine.eval::<Array>(
-            "
-                fn foo(x) {
-                    if x >= 5 {
-                        back_trace()
-                    } else {
-                        foo(x+1)
+        let r = engine
+            .eval::<Array>(
+                "
+                    fn foo(x) {
+                        if x >= 5 {
+                            back_trace()
+                        } else {
+                            foo(x+1)
+                        }
                     }
-                }
 
-                foo(0)
-            ",
-        )?;
+                    foo(0)
+                ",
+            )
+            .unwrap();
 
         assert_eq!(r.len(), 6);
 
-        assert_eq!(engine.eval::<INT>("len(back_trace())")?, 0);
+        assert_eq!(engine.eval::<INT>("len(back_trace())").unwrap(), 0);
     }
-
-    Ok(())
 }
 
 #[test]
 #[cfg(not(feature = "no_object"))]
-fn test_debugger_state() -> Result<(), Box<EvalAltResult>> {
+fn test_debugger_state() {
     let mut engine = Engine::new();
 
     engine.register_debugger(
@@ -80,7 +80,5 @@ fn test_debugger_state() -> Result<(), Box<EvalAltResult>> {
         },
     );
 
-    engine.run("let x = 42;")?;
-
-    Ok(())
+    engine.run("let x = 42;").unwrap();
 }
