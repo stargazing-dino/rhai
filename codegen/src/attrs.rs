@@ -4,12 +4,17 @@ use syn::{
     spanned::Spanned,
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Default, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ExportScope {
-    #[default]
     PubOnly,
     Prefix(String),
     All,
+}
+
+impl Default for ExportScope {
+    fn default() -> Self {
+        Self::PubOnly
+    }
 }
 
 pub trait ExportedParams: Sized {
@@ -137,35 +142,37 @@ pub fn doc_attributes(attrs: &[syn::Attribute]) -> syn::Result<Vec<String>> {
     let mut buf = String::new();
 
     for attr in attrs {
-        if attr.path().is_ident("doc") {
-            if let syn::Meta::NameValue(syn::MetaNameValue {
-                value:
-                    syn::Expr::Lit(syn::ExprLit {
-                        lit: syn::Lit::Str(ref s),
-                        ..
-                    }),
-                ..
-            }) = attr.meta
-            {
-                let mut line = s.value();
+        if !attr.path().is_ident("doc") {
+            continue;
+        }
 
-                if line.contains('\n') {
-                    // Must be a block comment `/** ... */`
-                    if !buf.is_empty() {
-                        comments.push(buf.clone());
-                        buf.clear();
-                    }
-                    line.insert_str(0, "/**");
-                    line.push_str("*/");
-                    comments.push(line);
-                } else {
-                    // Single line - assume it is `///`
-                    if !buf.is_empty() {
-                        buf.push('\n');
-                    }
-                    buf.push_str("///");
-                    buf.push_str(&line);
+        if let syn::Meta::NameValue(syn::MetaNameValue {
+            value:
+                syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(ref s),
+                    ..
+                }),
+            ..
+        }) = attr.meta
+        {
+            let mut line = s.value();
+
+            if line.contains('\n') {
+                // Must be a block comment `/** ... */`
+                if !buf.is_empty() {
+                    comments.push(buf.clone());
+                    buf.clear();
                 }
+                line.insert_str(0, "/**");
+                line.push_str("*/");
+                comments.push(line);
+            } else {
+                // Single line - assume it is `///`
+                if !buf.is_empty() {
+                    buf.push('\n');
+                }
+                buf.push_str("///");
+                buf.push_str(&line);
             }
         }
     }
