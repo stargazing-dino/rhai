@@ -14,12 +14,17 @@ use std::borrow::Cow;
 
 use crate::attrs::{ExportInfo, ExportScope, ExportedParams};
 
-#[derive(Clone, Debug, Eq, PartialEq, Copy, Default, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
 pub enum FnNamespaceAccess {
-    #[default]
     Unset,
     Global,
     Internal,
+}
+
+impl Default for FnNamespaceAccess {
+    fn default() -> Self {
+        Self::Unset
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
@@ -34,12 +39,17 @@ pub enum Property {
     Set(syn::Ident),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Default, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum FnSpecialAccess {
-    #[default]
     None,
     Index(Index),
     Property(Property),
+}
+
+impl Default for FnSpecialAccess {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 impl FnSpecialAccess {

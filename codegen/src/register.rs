@@ -37,13 +37,14 @@ pub fn parse_register_macro(
         syn::Expr::Lit(lit_str) => quote_spanned!(items[1].span() => #lit_str),
         expr => quote! { #expr },
     };
-    let rust_mod_path = if let syn::Expr::Path(ref path) = &items[2] {
-        path.path.clone()
-    } else {
-        return Err(syn::Error::new(
-            items[2].span(),
-            "third argument must be a function name",
-        ));
+    let rust_mod_path = match &items[2] {
+        syn::Expr::Path(ref path) => path.path.clone(),
+        _ => {
+            return Err(syn::Error::new(
+                items[2].span(),
+                "third argument must be a function name",
+            ))
+        }
     };
     let module = items.remove(0);
     Ok((module, export_name, rust_mod_path))
