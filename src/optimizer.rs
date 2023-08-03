@@ -30,24 +30,17 @@ use std::{
 };
 
 /// Level of optimization performed.
-#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Default, Copy)]
 #[non_exhaustive]
 pub enum OptimizationLevel {
     /// No optimization performed.
     None,
     /// Only perform simple optimizations without evaluating functions.
+    #[default]
     Simple,
     /// Full optimizations performed, including evaluating functions.
     /// Take care that this may cause side effects as it essentially assumes that all functions are pure.
     Full,
-}
-
-impl Default for OptimizationLevel {
-    #[inline(always)]
-    #[must_use]
-    fn default() -> Self {
-        Self::Simple
-    }
 }
 
 /// Mutable state throughout an optimization pass.
