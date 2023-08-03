@@ -577,19 +577,18 @@ impl AST {
             lib
         };
 
-        let mut _ast = if let Some(ref source) = other.source {
-            Self::new_with_source(
+        let mut _ast = match other.source {
+            Some(ref source) => Self::new_with_source(
                 merged,
                 #[cfg(not(feature = "no_function"))]
                 lib,
                 source.clone(),
-            )
-        } else {
-            Self::new(
+            ),
+            None => Self::new(
                 merged,
                 #[cfg(not(feature = "no_function"))]
                 lib,
-            )
+            ),
         };
 
         #[cfg(not(feature = "no_module"))]

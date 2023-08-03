@@ -2561,10 +2561,9 @@ impl<'a> Iterator for TokenIterator<'a> {
         };
 
         // Run the mapper, if any
-        let token = if let Some(func) = self.token_mapper {
-            func(token, pos, &self.state)
-        } else {
-            token
+        let token = match self.token_mapper {
+            Some(func) => func(token, pos, &self.state),
+            None => token,
         };
 
         // Collect the compressed script, if needed

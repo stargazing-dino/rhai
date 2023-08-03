@@ -736,11 +736,12 @@ impl Module {
         let num_params = fn_def.params.len();
         let hash_script = crate::calc_fn_hash(None, &fn_def.name, num_params);
         #[cfg(not(feature = "no_object"))]
-        let (hash_script, namespace) = if let Some(ref this_type) = fn_def.this_type {
-            let hash = crate::calc_typed_method_hash(hash_script, this_type);
-            (hash, FnNamespace::Global)
-        } else {
-            (hash_script, namespace)
+        let (hash_script, namespace) = match fn_def.this_type {
+            Some(ref this_type) => {
+                let hash = crate::calc_typed_method_hash(hash_script, this_type);
+                (hash, FnNamespace::Global)
+            }
+            None => (hash_script, namespace),
         };
 
         // Catch hash collisions in testing environment only.

@@ -642,11 +642,12 @@ impl Engine {
                 }
 
                 let mut empty_scope;
-                let scope = if let Some(scope) = _scope {
-                    scope
-                } else {
-                    empty_scope = Scope::new();
-                    &mut empty_scope
+                let scope = match _scope {
+                    Some(scope) => scope,
+                    None => {
+                        empty_scope = Scope::new();
+                        &mut empty_scope
+                    }
                 };
 
                 let orig_source = mem::replace(&mut global.source, source);

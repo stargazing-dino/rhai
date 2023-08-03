@@ -2140,10 +2140,9 @@ impl Engine {
             }
         }
 
-        let op_info = if let Some(op) = op {
-            OpAssignment::new_op_assignment_from_token(op, op_pos)
-        } else {
-            OpAssignment::new_assignment(op_pos)
+        let op_info = match op {
+            Some(op) => OpAssignment::new_op_assignment_from_token(op, op_pos),
+            None => OpAssignment::new_assignment(op_pos),
         };
 
         match lhs {
@@ -3070,12 +3069,15 @@ impl Engine {
             None
         };
 
-        let idx = if let Some(n) = existing {
-            stack.get_mut_by_index(n).set_access_mode(access);
-            Some(NonZeroUsize::new(stack.len() - n).unwrap())
-        } else {
-            stack.push_entry(name.as_str(), access, Dynamic::UNIT);
-            None
+        let idx = match existing {
+            Some(n) => {
+                stack.get_mut_by_index(n).set_access_mode(access);
+                Some(NonZeroUsize::new(stack.len() - n).unwrap())
+            }
+            None => {
+                stack.push_entry(name.as_str(), access, Dynamic::UNIT);
+                None
+            }
         };
 
         #[cfg(not(feature = "no_module"))]
@@ -3492,10 +3494,9 @@ impl Engine {
                         let hash = calc_fn_hash(None, &f.name, f.params.len());
 
                         #[cfg(not(feature = "no_object"))]
-                        let hash = if let Some(ref this_type) = f.this_type {
-                            crate::calc_typed_method_hash(hash, this_type)
-                        } else {
-                            hash
+                        let hash = match f.this_type {
+                            Some(ref this_type) => crate::calc_typed_method_hash(hash, this_type),
+                            None => hash,
                         };
 
                         if !lib.is_empty() && lib.contains_key(&hash) {
@@ -3951,18 +3952,20 @@ impl Engine {
         // External variables may need to be processed in a consistent order,
         // so extract them into a list.
         #[cfg(not(feature = "no_closure"))]
-        let (mut params, externals) = if let Some(ref external_vars) = state.external_vars {
-            let externals: crate::FnArgsVec<_> = external_vars.iter().cloned().collect();
+        let (mut params, externals) = match state.external_vars {
+            Some(ref external_vars) => {
+                let externals: crate::FnArgsVec<_> = external_vars.iter().cloned().collect();
 
-            let mut params = crate::FnArgsVec::with_capacity(params_list.len() + externals.len());
-            params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));
+                let mut params =
+                    crate::FnArgsVec::with_capacity(params_list.len() + externals.len());
+                params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));
 
-            (params, externals)
-        } else {
-            (
+                (params, externals)
+            }
+            None => (
                 crate::FnArgsVec::with_capacity(params_list.len()),
                 crate::FnArgsVec::new_const(),
-            )
+            ),
         };
         #[cfg(feature = "no_closure")]
         let mut params = crate::FnArgsVec::with_capacity(params_list.len());

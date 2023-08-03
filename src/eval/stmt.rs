@@ -782,10 +782,9 @@ impl Engine {
             Stmt::BreakLoop(expr, options, pos) => {
                 let is_break = options.contains(ASTFlags::BREAK);
 
-                let value = if let Some(ref expr) = expr {
-                    self.eval_expr(global, caches, scope, this_ptr, expr)?
-                } else {
-                    Dynamic::UNIT
+                let value = match expr {
+                    Some(ref expr) => self.eval_expr(global, caches, scope, this_ptr, expr)?,
+                    None => Dynamic::UNIT,
                 };
 
                 Err(ERR::LoopBreak(is_break, value, *pos).into())
