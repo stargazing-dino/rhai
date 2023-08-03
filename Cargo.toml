@@ -18,29 +18,29 @@ keywords = ["scripting", "scripting-engine", "scripting-language", "embedded"]
 categories = ["no-std", "embedded", "wasm", "parser-implementations"]
 
 [dependencies]
-smallvec = { version = "1.7", default-features = false, features = ["union", "const_new", "const_generics"] }
+smallvec = { version = "1.7.0", default-features = false, features = ["union", "const_new", "const_generics"] }
 ahash = { version = "0.8.2", default-features = false, features = ["compile-time-rng"] }
-num-traits = { version = "0.2", default-features = false }
-once_cell = { version = "1", default-features = false, features = ["race"] }
-bitflags = { version = "2", default-features = false }
-smartstring = { version = "1", default-features = false }
+num-traits = { version = "0.2.0", default-features = false }
+once_cell = { version = "1.7.0", default-features = false, features = ["race"] }
+bitflags = { version = "2.0.0", default-features = false }
+smartstring = { version = "1.0.0", default-features = false }
 rhai_codegen = { version = "1.5.0", path = "codegen", default-features = false }
 
 no-std-compat = { git = "https://gitlab.com/jD91mZM2/no-std-compat", version = "0.4.1", default-features = false, features = ["alloc"], optional = true }
-libm = { version = "0.2", default-features = false, optional = true }
-hashbrown = { version = "0.13", optional = true }
-core-error = { version = "0.0", default-features = false, features = ["alloc"], optional = true }
-serde = { version = "1.0", default-features = false, features = ["derive", "alloc"], optional = true }
-serde_json = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
-unicode-xid = { version = "0.2", default-features = false, optional = true }
-rust_decimal = { version = "1.16", default-features = false, features = ["maths"], optional = true }
-getrandom = { version = "0.2", optional = true }
-rustyline = { version = "12", optional = true }
-document-features = { version = "0.2", optional = true }
+libm = { version = "0.2.0", default-features = false, optional = true }
+hashbrown = { version = "0.13.1", optional = true }
+core-error = { version = "0.0.0", default-features = false, features = ["alloc"], optional = true }
+serde = { version = "1.0.96", default-features = false, features = ["derive", "alloc"], optional = true }
+serde_json = { version = "1.0.45", default-features = false, features = ["alloc"], optional = true }
+unicode-xid = { version = "0.2.0", default-features = false, optional = true }
+rust_decimal = { version = "1.16.0", default-features = false, features = ["maths"], optional = true }
+getrandom = { version = "0.2.0", optional = true }
+rustyline = { version = "12.0.0", optional = true }
+document-features = { version = "0.2.0", optional = true }
 
 [dev-dependencies]
-rmp-serde = "1.1"
-serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+rmp-serde = "1.1.0"
+serde_json = { version = "1.0.45", default-features = false, features = ["alloc"] }
 
 [features]
 
