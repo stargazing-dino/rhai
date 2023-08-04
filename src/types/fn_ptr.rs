@@ -296,6 +296,7 @@ impl FnPtr {
         args.extend(arg_values.iter_mut());
 
         // Linked to scripted function?
+        #[cfg(not(feature = "no_function"))]
         match self.fn_def {
             Some(ref fn_def) if fn_def.params.len() == args.len() => {
                 let global = &mut context.global_runtime_state().clone();

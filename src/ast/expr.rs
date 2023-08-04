@@ -112,11 +112,15 @@ impl fmt::Debug for FnCallHashes {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.script {
+        #[cfg(not(feature = "no_function"))]
+        return match self.script {
             Some(script) if script == self.native => fmt::Debug::fmt(&self.native, f),
             Some(script) => write!(f, "({script}, {})", self.native),
             None => write!(f, "{} (native only)", self.native),
-        }
+        };
+
+        #[cfg(feature = "no_function")]
+        return write!(f, "{}", self.native);
     }
 }
 
