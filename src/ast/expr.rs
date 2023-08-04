@@ -113,15 +113,14 @@ impl fmt::Debug for FnCallHashes {
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         #[cfg(not(feature = "no_function"))]
-        if let Some(script) = self.script {
-            return if script == self.native {
-                fmt::Debug::fmt(&self.native, f)
-            } else {
-                write!(f, "({script}, {})", self.native)
-            };
-        }
+        return match self.script {
+            Some(script) if script == self.native => fmt::Debug::fmt(&self.native, f),
+            Some(script) => write!(f, "({script}, {})", self.native),
+            None => write!(f, "{} (native only)", self.native),
+        };
 
-        write!(f, "{} (native only)", self.native)
+        #[cfg(feature = "no_function")]
+        return write!(f, "{}", self.native);
     }
 }
 
@@ -510,10 +509,9 @@ impl Expr {
             Self::FnCall(ref x, ..)
                 if !x.is_qualified() && x.args.len() == 1 && x.name == KEYWORD_FN_PTR =>
             {
-                if let Self::StringConstant(ref s, ..) = x.args[0] {
-                    FnPtr::new(s.clone()).ok()?.into()
-                } else {
-                    return None;
+                match x.args[0] {
+                    Self::StringConstant(ref s, ..) => FnPtr::new(s.clone()).ok()?.into(),
+                    _ => return None,
                 }
             }
 
@@ -521,29 +519,21 @@ impl Expr {
             Self::FnCall(x, ..) if !x.is_qualified() && x.args.len() == 2 => {
                 match x.name.as_str() {
                     // x..y
-                    OP_EXCLUSIVE_RANGE => {
-                        if let Self::IntegerConstant(ref start, ..) = x.args[0] {
-                            if let Self::IntegerConstant(ref end, ..) = x.args[1] {
-                                (*start..*end).into()
-                            } else {
-                                return None;
-                            }
-                        } else {
-                            return None;
-                        }
-                    }
+                    OP_EXCLUSIVE_RANGE => match (&x.args[0], &x.args[1]) {
+                        (
+                            Self::IntegerConstant(ref start, ..),
+                            Self::IntegerConstant(ref end, ..),
+                        ) => (*start..*end).into(),
+                        _ => return None,
+                    },
                     // x..=y
-                    OP_INCLUSIVE_RANGE => {
-                        if let Self::IntegerConstant(ref start, ..) = x.args[0] {
-                            if let Self::IntegerConstant(ref end, ..) = x.args[1] {
-                                (*start..=*end).into()
-                            } else {
-                                return None;
-                            }
-                        } else {
-                            return None;
-                        }
-                    }
+                    OP_INCLUSIVE_RANGE => match (&x.args[0], &x.args[1]) {
+                        (
+                            Self::IntegerConstant(ref start, ..),
+                            Self::IntegerConstant(ref end, ..),
+                        ) => (*start..=*end).into(),
+                        _ => return None,
+                    },
                     _ => return None,
                 }
             }

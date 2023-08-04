@@ -315,10 +315,9 @@ pub mod array_functions {
     /// print(x);               // prints "[3]"
     /// ```
     pub fn remove(array: &mut Array, index: INT) -> Dynamic {
-        let index = if let Ok(n) = calc_index(array.len(), index, true, || Err(())) {
-            n
-        } else {
-            return Dynamic::UNIT;
+        let index = match calc_index(array.len(), index, true, || Err(())) {
+            Ok(n) => n,
+            _ => return Dynamic::UNIT,
         };
 
         array.remove(index)

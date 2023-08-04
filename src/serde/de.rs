@@ -186,108 +186,105 @@ impl<'de> Deserializer<'de> for DynamicDeserializer<'de> {
     }
 
     fn deserialize_i8<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        if let Ok(v) = self.0.as_int() {
-            Self::deserialize_int(v, visitor)
-        } else {
-            self.0
+        match self.0.as_int() {
+            Ok(v) => Self::deserialize_int(v, visitor),
+            Err(_) => self
+                .0
                 .downcast_ref::<i8>()
-                .map_or_else(|| self.type_error(), |&x| visitor.visit_i8(x))
+                .map_or_else(|| self.type_error(), |&x| visitor.visit_i8(x)),
         }
     }
 
     fn deserialize_i16<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        if let Ok(v) = self.0.as_int() {
-            Self::deserialize_int(v, visitor)
-        } else {
-            self.0
+        match self.0.as_int() {
+            Ok(v) => Self::deserialize_int(v, visitor),
+            Err(_) => self
+                .0
                 .downcast_ref::<i16>()
-                .map_or_else(|| self.type_error(), |&x| visitor.visit_i16(x))
+                .map_or_else(|| self.type_error(), |&x| visitor.visit_i16(x)),
         }
     }
 
     fn deserialize_i32<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        if let Ok(v) = self.0.as_int() {
-            Self::deserialize_int(v, visitor)
-        } else if cfg!(feature = "only_i32") {
-            self.type_error()
-        } else {
-            self.0
+        match self.0.as_int() {
+            Ok(v) => Self::deserialize_int(v, visitor),
+            _ if cfg!(feature = "only_i32") => self.type_error(),
+            _ => self
+                .0
                 .downcast_ref::<i32>()
-                .map_or_else(|| self.type_error(), |&x| visitor.visit_i32(x))
+                .map_or_else(|| self.type_error(), |&x| visitor.visit_i32(x)),
         }
     }
 
     fn deserialize_i64<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        if let Ok(v) = self.0.as_int() {
-            Self::deserialize_int(v, visitor)
-        } else if cfg!(not(feature = "only_i32")) {
-            self.type_error()
-        } else {
-            self.0
+        match self.0.as_int() {
+            Ok(v) => Self::deserialize_int(v, visitor),
+            _ if cfg!(not(feature = "only_i32")) => self.type_error(),
+            _ => self
+                .0
                 .downcast_ref::<i64>()
-                .map_or_else(|| self.type_error(), |&x| visitor.visit_i64(x))
+                .map_or_else(|| self.type_error(), |&x| visitor.visit_i64(x)),
         }
     }
 
     fn deserialize_i128<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        if let Ok(v) = self.0.as_int() {
-            Self::deserialize_int(v, visitor)
-        } else if cfg!(not(feature = "only_i32")) {
-            self.type_error()
-        } else {
-            self.0
+        match self.0.as_int() {
+            Ok(v) => Self::deserialize_int(v, visitor),
+            _ if cfg!(not(feature = "only_i32")) => self.type_error(),
+            _ => self
+                .0
                 .downcast_ref::<i128>()
-                .map_or_else(|| self.type_error(), |&x| visitor.visit_i128(x))
+                .map_or_else(|| self.type_error(), |&x| visitor.visit_i128(x)),
         }
     }
 
     fn deserialize_u8<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        if let Ok(v) = self.0.as_int() {
-            Self::deserialize_int(v, visitor)
-        } else {
-            self.0
+        match self.0.as_int() {
+            Ok(v) => Self::deserialize_int(v, visitor),
+            Err(_) => self
+                .0
                 .downcast_ref::<u8>()
-                .map_or_else(|| self.type_error(), |&x| visitor.visit_u8(x))
+                .map_or_else(|| self.type_error(), |&x| visitor.visit_u8(x)),
         }
     }
 
     fn deserialize_u16<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        if let Ok(v) = self.0.as_int() {
-            Self::deserialize_int(v, visitor)
-        } else {
-            self.0
+        match self.0.as_int() {
+            Ok(v) => Self::deserialize_int(v, visitor),
+            Err(_) => self
+                .0
                 .downcast_ref::<u16>()
-                .map_or_else(|| self.type_error(), |&x| visitor.visit_u16(x))
+                .map_or_else(|| self.type_error(), |&x| visitor.visit_u16(x)),
         }
     }
 
     fn deserialize_u32<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        if let Ok(v) = self.0.as_int() {
-            Self::deserialize_int(v, visitor)
-        } else {
-            self.0
+        match self.0.as_int() {
+            Ok(v) => Self::deserialize_int(v, visitor),
+            Err(_) => self
+                .0
                 .downcast_ref::<u32>()
-                .map_or_else(|| self.type_error(), |&x| visitor.visit_u32(x))
+                .map_or_else(|| self.type_error(), |&x| visitor.visit_u32(x)),
         }
     }
 
     fn deserialize_u64<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        if let Ok(v) = self.0.as_int() {
-            Self::deserialize_int(v, visitor)
-        } else {
-            self.0
+        match self.0.as_int() {
+            Ok(v) => Self::deserialize_int(v, visitor),
+            Err(_) => self
+                .0
                 .downcast_ref::<u64>()
-                .map_or_else(|| self.type_error(), |&x| visitor.visit_u64(x))
+                .map_or_else(|| self.type_error(), |&x| visitor.visit_u64(x)),
         }
     }
 
     fn deserialize_u128<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        if let Ok(v) = self.0.as_int() {
-            Self::deserialize_int(v, visitor)
-        } else {
-            self.0
+        match self.0.as_int() {
+            Ok(v) => Self::deserialize_int(v, visitor),
+            Err(_) => self
+                .0
                 .downcast_ref::<u128>()
-                .map_or_else(|| self.type_error(), |&x| visitor.visit_u128(x))
+                .map_or_else(|| self.type_error(), |&x| visitor.visit_u128(x)),
         }
     }
 
@@ -456,28 +453,28 @@ impl<'de> Deserializer<'de> for DynamicDeserializer<'de> {
         _variants: &'static [&'static str],
         visitor: V,
     ) -> RhaiResultOf<V::Value> {
-        if let Some(s) = self.0.read_lock::<ImmutableString>() {
-            visitor.visit_enum(s.as_str().into_deserializer())
-        } else {
-            #[cfg(not(feature = "no_object"))]
-            return self.0.downcast_ref::<crate::Map>().map_or_else(
-                || self.type_error(),
-                |map| {
-                    let mut iter = map.iter();
-                    let first = iter.next();
-                    let second = iter.next();
-                    if let (Some((key, value)), None) = (first, second) {
-                        visitor.visit_enum(EnumDeserializer {
-                            tag: key,
-                            content: DynamicDeserializer::new(value),
-                        })
-                    } else {
-                        self.type_error()
-                    }
-                },
-            );
-            #[cfg(feature = "no_object")]
-            return self.type_error();
+        match self.0.read_lock::<ImmutableString>() {
+            Some(s) => visitor.visit_enum(s.as_str().into_deserializer()),
+            None => {
+                #[cfg(not(feature = "no_object"))]
+                return self.0.downcast_ref::<crate::Map>().map_or_else(
+                    || self.type_error(),
+                    |map| {
+                        let mut iter = map.iter();
+                        let first = iter.next();
+                        let second = iter.next();
+                        match (first, second) {
+                            (Some((key, value)), None) => visitor.visit_enum(EnumDeserializer {
+                                tag: key,
+                                content: DynamicDeserializer::new(value),
+                            }),
+                            _ => self.type_error(),
+                        }
+                    },
+                );
+                #[cfg(feature = "no_object")]
+                return self.type_error();
+            }
         }
     }
 

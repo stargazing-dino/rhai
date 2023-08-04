@@ -577,19 +577,18 @@ impl AST {
             lib
         };
 
-        let mut _ast = if let Some(ref source) = other.source {
-            Self::new_with_source(
+        let mut _ast = match other.source {
+            Some(ref source) => Self::new_with_source(
                 merged,
                 #[cfg(not(feature = "no_function"))]
                 lib,
                 source.clone(),
-            )
-        } else {
-            Self::new(
+            ),
+            None => Self::new(
                 merged,
                 #[cfg(not(feature = "no_function"))]
                 lib,
-            )
+            ),
         };
 
         #[cfg(not(feature = "no_module"))]
@@ -615,13 +614,13 @@ impl AST {
         }
 
         #[cfg(feature = "metadata")]
-        if let Some(ref other_doc) = other.doc {
-            if let Some(ref mut ast_doc) = _ast.doc {
+        match (&other.doc, &mut _ast.doc) {
+            (Some(other_doc), Some(ast_doc)) => {
                 ast_doc.push('\n');
                 ast_doc.push_str(other_doc);
-            } else {
-                _ast.doc = Some(other_doc.clone());
             }
+            (Some(other_doc), None) => _ast.doc = Some(other_doc.clone()),
+            _ => (),
         }
 
         _ast
@@ -722,13 +721,13 @@ impl AST {
         }
 
         #[cfg(feature = "metadata")]
-        if let Some(other_doc) = other.doc {
-            if let Some(ref mut self_doc) = self.doc {
+        match (other.doc, &mut self.doc) {
+            (Some(ref other_doc), Some(self_doc)) => {
                 self_doc.push('\n');
-                self_doc.push_str(&other_doc);
-            } else {
-                self.doc = Some(other_doc);
+                self_doc.push_str(other_doc);
             }
+            (Some(other_doc), None) => self.doc = Some(other_doc),
+            _ => (),
         }
 
         self

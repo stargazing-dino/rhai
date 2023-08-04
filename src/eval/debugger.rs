@@ -48,7 +48,6 @@ pub enum DebuggerCommand {
 
 impl Default for DebuggerCommand {
     #[inline(always)]
-    #[must_use]
     fn default() -> Self {
         Self::Continue
     }
@@ -465,27 +464,28 @@ impl Engine {
             _ => (),
         }
 
-        if let Some(ref dbg) = global.debugger {
-            let event = match dbg.status {
-                DebuggerStatus::Init => Some(DebuggerEvent::Start),
-                DebuggerStatus::NEXT if node.is_stmt() => Some(DebuggerEvent::Step),
-                DebuggerStatus::INTO if node.is_expr() => Some(DebuggerEvent::Step),
-                DebuggerStatus::STEP => Some(DebuggerEvent::Step),
-                DebuggerStatus::Terminate => Some(DebuggerEvent::End),
-                _ => None,
-            };
+        match global.debugger {
+            Some(ref dbg) => {
+                let event = match dbg.status {
+                    DebuggerStatus::Init => Some(DebuggerEvent::Start),
+                    DebuggerStatus::NEXT if node.is_stmt() => Some(DebuggerEvent::Step),
+                    DebuggerStatus::INTO if node.is_expr() => Some(DebuggerEvent::Step),
+                    DebuggerStatus::STEP => Some(DebuggerEvent::Step),
+                    DebuggerStatus::Terminate => Some(DebuggerEvent::End),
+                    _ => None,
+                };
 
-            let event = match event {
-                Some(e) => e,
-                None => match dbg.is_break_point(global.source(), node) {
-                    Some(bp) => DebuggerEvent::BreakPoint(bp),
-                    None => return Ok(None),
-                },
-            };
+                let event = match event {
+                    Some(e) => e,
+                    None => match dbg.is_break_point(global.source(), node) {
+                        Some(bp) => DebuggerEvent::BreakPoint(bp),
+                        None => return Ok(None),
+                    },
+                };
 
-            self.run_debugger_raw(global, caches, scope, this_ptr, node, event)
-        } else {
-            Ok(None)
+                self.run_debugger_raw(global, caches, scope, this_ptr, node, event)
+            }
+            None => Ok(None),
         }
     }
     /// Run the debugger callback unconditionally.
@@ -504,55 +504,56 @@ impl Engine {
         node: ASTNode,
         event: DebuggerEvent,
     ) -> Result<Option<DebuggerStatus>, Box<crate::EvalAltResult>> {
-        if let Some(ref x) = self.debugger_interface {
-            let orig_scope_len = scope.len();
+        match self.debugger_interface {
+            Some(ref x) => {
+                let orig_scope_len = scope.len();
 
-            let src = global.source_raw().cloned();
-            let src = src.as_ref().map(|s| s.as_str());
-            let context = EvalContext::new(self, global, caches, scope, this_ptr);
-            let (.., ref on_debugger) = *x;
+                let src = global.source_raw().cloned();
+                let src = src.as_ref().map(|s| s.as_str());
+                let context = EvalContext::new(self, global, caches, scope, this_ptr);
+                let (.., ref on_debugger) = *x;
 
-            let command = on_debugger(context, event, node, src, node.position());
+                let command = on_debugger(context, event, node, src, node.position());
 
-            if orig_scope_len != scope.len() {
-                // The scope is changed, always search from now on
-                global.always_search_scope = true;
+                if orig_scope_len != scope.len() {
+                    // The scope is changed, always search from now on
+                    global.always_search_scope = true;
+                }
+
+                match command? {
+                    DebuggerCommand::Continue => {
+                        global.debugger_mut().status = DebuggerStatus::CONTINUE;
+                        Ok(None)
+                    }
+                    DebuggerCommand::Next => {
+                        global.debugger_mut().status = DebuggerStatus::CONTINUE;
+                        Ok(Some(DebuggerStatus::NEXT))
+                    }
+                    DebuggerCommand::StepOver => {
+                        global.debugger_mut().status = DebuggerStatus::CONTINUE;
+                        Ok(Some(DebuggerStatus::STEP))
+                    }
+                    DebuggerCommand::StepInto => {
+                        global.debugger_mut().status = DebuggerStatus::STEP;
+                        Ok(None)
+                    }
+                    DebuggerCommand::FunctionExit => {
+                        // Bump a level if it is a function call
+                        let level = match node {
+                            ASTNode::Expr(Expr::FnCall(..)) | ASTNode::Stmt(Stmt::FnCall(..)) => {
+                                global.level + 1
+                            }
+                            ASTNode::Stmt(Stmt::Expr(e)) if matches!(**e, Expr::FnCall(..)) => {
+                                global.level + 1
+                            }
+                            _ => global.level,
+                        };
+                        global.debugger_mut().status = DebuggerStatus::FunctionExit(level);
+                        Ok(None)
+                    }
+                }
             }
-
-            match command? {
-                DebuggerCommand::Continue => {
-                    global.debugger_mut().status = DebuggerStatus::CONTINUE;
-                    Ok(None)
-                }
-                DebuggerCommand::Next => {
-                    global.debugger_mut().status = DebuggerStatus::CONTINUE;
-                    Ok(Some(DebuggerStatus::NEXT))
-                }
-                DebuggerCommand::StepOver => {
-                    global.debugger_mut().status = DebuggerStatus::CONTINUE;
-                    Ok(Some(DebuggerStatus::STEP))
-                }
-                DebuggerCommand::StepInto => {
-                    global.debugger_mut().status = DebuggerStatus::STEP;
-                    Ok(None)
-                }
-                DebuggerCommand::FunctionExit => {
-                    // Bump a level if it is a function call
-                    let level = match node {
-                        ASTNode::Expr(Expr::FnCall(..)) | ASTNode::Stmt(Stmt::FnCall(..)) => {
-                            global.level + 1
-                        }
-                        ASTNode::Stmt(Stmt::Expr(e)) if matches!(**e, Expr::FnCall(..)) => {
-                            global.level + 1
-                        }
-                        _ => global.level,
-                    };
-                    global.debugger_mut().status = DebuggerStatus::FunctionExit(level);
-                    Ok(None)
-                }
-            }
-        } else {
-            Ok(None)
+            None => Ok(None),
         }
     }
 }

@@ -251,10 +251,9 @@ mod string_functions {
             return;
         }
 
-        if let Some(s) = string.get_mut() {
-            s.clear();
-        } else {
-            *string = ImmutableString::new();
+        match string.get_mut() {
+            Some(s) => s.clear(),
+            _ => *string = ImmutableString::new(),
         }
     }
     /// Cut off the string at the specified number of characters.
@@ -300,17 +299,20 @@ mod string_functions {
     /// print(text);    // prints "hello"
     /// ```
     pub fn trim(string: &mut ImmutableString) {
-        if let Some(s) = string.get_mut() {
-            let trimmed = s.trim();
+        match string.get_mut() {
+            Some(s) => {
+                let trimmed = s.trim();
 
-            if trimmed != s {
-                *s = trimmed.into();
+                if trimmed != s {
+                    *s = trimmed.into();
+                }
             }
-        } else {
-            let trimmed = string.trim();
+            None => {
+                let trimmed = string.trim();
 
-            if trimmed != string {
-                *string = trimmed.into();
+                if trimmed != string {
+                    *string = trimmed.into();
+                }
             }
         }
     }

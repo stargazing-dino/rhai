@@ -219,17 +219,18 @@ mod map_functions {
             let mut map2 = map2;
 
             for (m1, v1) in map1 {
-                if let Some(v2) = map2.get_mut(m1) {
-                    let equals = ctx
-                        .call_native_fn_raw(OP_EQUALS, true, &mut [v1, v2])?
-                        .as_bool()
-                        .unwrap_or(false);
+                match map2.get_mut(m1) {
+                    Some(v2) => {
+                        let equals = ctx
+                            .call_native_fn_raw(OP_EQUALS, true, &mut [v1, v2])?
+                            .as_bool()
+                            .unwrap_or(false);
 
-                    if !equals {
-                        return Ok(false);
+                        if !equals {
+                            return Ok(false);
+                        }
                     }
-                } else {
-                    return Ok(false);
+                    _ => return Ok(false),
                 }
             }
         }

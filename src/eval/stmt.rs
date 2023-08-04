@@ -469,11 +469,14 @@ impl Engine {
                     None
                 };
 
-                if let Some(index) = index {
-                    value.set_access_mode(access);
-                    *scope.get_mut_by_index(scope.len() - index.get()) = value;
-                } else {
-                    scope.push_entry(var_name.name.clone(), access, value);
+                match index {
+                    Some(index) => {
+                        value.set_access_mode(access);
+                        *scope.get_mut_by_index(scope.len() - index.get()) = value;
+                    }
+                    _ => {
+                        scope.push_entry(var_name.name.clone(), access, value);
+                    }
                 }
 
                 #[cfg(not(feature = "no_module"))]
@@ -782,10 +785,9 @@ impl Engine {
             Stmt::BreakLoop(expr, options, pos) => {
                 let is_break = options.contains(ASTFlags::BREAK);
 
-                let value = if let Some(ref expr) = expr {
-                    self.eval_expr(global, caches, scope, this_ptr, expr)?
-                } else {
-                    Dynamic::UNIT
+                let value = match expr {
+                    Some(ref expr) => self.eval_expr(global, caches, scope, this_ptr, expr)?,
+                    None => Dynamic::UNIT,
                 };
 
                 Err(ERR::LoopBreak(is_break, value, *pos).into())

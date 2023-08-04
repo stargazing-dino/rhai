@@ -44,7 +44,6 @@ pub enum OptimizationLevel {
 
 impl Default for OptimizationLevel {
     #[inline(always)]
-    #[must_use]
     fn default() -> Self {
         Self::Simple
     }
@@ -439,11 +438,12 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         Stmt::If(x, ..)
             if matches!(x.expr, Expr::BoolConstant(false, ..)) && x.branch.is_empty() =>
         {
-            if let Expr::BoolConstant(false, pos) = x.expr {
-                state.set_dirty();
-                *stmt = Stmt::Noop(pos);
-            } else {
-                unreachable!("`Expr::BoolConstant`");
+            match x.expr {
+                Expr::BoolConstant(false, pos) => {
+                    state.set_dirty();
+                    *stmt = Stmt::Noop(pos);
+                }
+                _ => unreachable!("`Expr::BoolConstant`"),
             }
         }
         // if false { if_block } else { else_block } -> else_block
@@ -810,18 +810,17 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         Stmt::Expr(expr) => optimize_expr(expr, state, false),
 
         // func(...)
-        Stmt::FnCall(..) => {
-            if let Stmt::FnCall(x, pos) = stmt.take() {
+        Stmt::FnCall(..) => match stmt.take() {
+            Stmt::FnCall(x, pos) => {
                 let mut expr = Expr::FnCall(x, pos);
                 optimize_expr(&mut expr, state, false);
                 *stmt = match expr {
                     Expr::FnCall(x, pos) => Stmt::FnCall(x, pos),
                     _ => Stmt::Expr(expr.into()),
                 }
-            } else {
-                unreachable!();
             }
-        }
+            _ => unreachable!(),
+        },
 
         // break expr;
         Stmt::BreakLoop(Some(ref mut expr), ..) => optimize_expr(expr, state, false),
@@ -1083,10 +1082,9 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             && matches!(x.args[0], Expr::BoolConstant(..))
         => {
             state.set_dirty();
-            if let Expr::BoolConstant(b, pos) = x.args[0] {
-                *expr = Expr::BoolConstant(!b, pos)
-            } else {
-                unreachable!()
+            match x.args[0] {
+                Expr::BoolConstant(b, pos) => *expr = Expr::BoolConstant(!b, pos),
+                _ => unreachable!(),
             }
         }
 
@@ -1156,16 +1154,16 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 }
                 // Overloaded operators can override built-in.
                 _ if x.args.len() == 2 && x.op_token.is_some() && (state.engine.fast_operators() || !state.engine.has_native_fn_override(x.hashes.native(), &arg_types)) => {
-                    if let Some(result) = get_builtin_binary_op_fn(x.op_token.as_ref().unwrap(), &arg_values[0], &arg_values[1])
-                        .and_then(|(f, ctx)| {
-                            let context = ctx.then(|| (state.engine, x.name.as_str(), None, &state.global, *pos).into());
-                            let (first, second) = arg_values.split_first_mut().unwrap();
-                            f(context, &mut [ first, &mut second[0] ]).ok()
-                        }) {
+                    if let Some((f, ctx)) = get_builtin_binary_op_fn(x.op_token.as_ref().unwrap(), &arg_values[0], &arg_values[1]) {
+                        let context = ctx.then(|| (state.engine, x.name.as_str(), None, &state.global, *pos).into());
+                        let (first, second) = arg_values.split_first_mut().unwrap();
+
+                        if let Ok(result) = f(context, &mut [ first, &mut second[0] ]) {
                             state.set_dirty();
                             *expr = Expr::from_dynamic(result, *pos);
                             return;
                         }
+                    }
                 }
                 _ => ()
             }

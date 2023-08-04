@@ -501,13 +501,10 @@ impl fmt::Display for Dynamic {
 
             #[cfg(not(feature = "no_closure"))]
             #[cfg(not(feature = "sync"))]
-            Union::Shared(ref cell, ..) => {
-                if let Ok(v) = cell.try_borrow() {
-                    fmt::Display::fmt(&*v, f)
-                } else {
-                    f.write_str("<shared>")
-                }
-            }
+            Union::Shared(ref cell, ..) => match cell.try_borrow() {
+                Ok(v) => fmt::Display::fmt(&*v, f),
+                Err(_) => f.write_str("<shared>"),
+            },
             #[cfg(not(feature = "no_closure"))]
             #[cfg(feature = "sync")]
             Union::Shared(ref cell, ..) => fmt::Display::fmt(&*cell.read().unwrap(), f),
@@ -606,13 +603,10 @@ impl fmt::Debug for Dynamic {
 
             #[cfg(not(feature = "no_closure"))]
             #[cfg(not(feature = "sync"))]
-            Union::Shared(ref cell, ..) => {
-                if let Ok(v) = cell.try_borrow() {
-                    write!(f, "{:?} (shared)", *v)
-                } else {
-                    f.write_str("<shared>")
-                }
-            }
+            Union::Shared(ref cell, ..) => match cell.try_borrow() {
+                Ok(v) => write!(f, "{:?} (shared)", *v),
+                Err(_) => f.write_str("<shared>"),
+            },
             #[cfg(not(feature = "no_closure"))]
             #[cfg(feature = "sync")]
             Union::Shared(ref cell, ..) => fmt::Debug::fmt(&*cell.read().unwrap(), f),

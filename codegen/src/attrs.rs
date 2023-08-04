@@ -12,8 +12,8 @@ pub enum ExportScope {
 }
 
 impl Default for ExportScope {
-    fn default() -> ExportScope {
-        ExportScope::PubOnly
+    fn default() -> Self {
+        Self::PubOnly
     }
 }
 
@@ -118,17 +118,11 @@ pub fn inner_item_attributes<T: ExportedParams>(
     attr_name: &str,
 ) -> syn::Result<T> {
     // Find the #[rhai_fn] attribute which will turn be read for function parameters.
-    if let Some(index) = attrs
-        .iter()
-        .position(|a| a.path.get_ident().map_or(false, |i| *i == attr_name))
-    {
+    if let Some(index) = attrs.iter().position(|a| a.path().is_ident(attr_name)) {
         let rhai_fn_attr = attrs.remove(index);
 
         // Cannot have more than one #[rhai_fn]
-        if let Some(duplicate) = attrs
-            .iter()
-            .find(|a| a.path.get_ident().map_or(false, |i| *i == attr_name))
-        {
+        if let Some(duplicate) = attrs.iter().find(|&a| a.path().is_ident(attr_name)) {
             return Err(syn::Error::new(
                 duplicate.span(),
                 format!("duplicated attribute '{attr_name}'"),
@@ -148,33 +142,37 @@ pub fn doc_attributes(attrs: &[syn::Attribute]) -> syn::Result<Vec<String>> {
     let mut buf = String::new();
 
     for attr in attrs {
-        if let Some(i) = attr.path.get_ident() {
-            if *i == "doc" {
-                if let syn::Meta::NameValue(syn::MetaNameValue {
-                    lit: syn::Lit::Str(s),
-                    ..
-                }) = attr.parse_meta()?
-                {
-                    let mut line = s.value();
+        if !attr.path().is_ident("doc") {
+            continue;
+        }
 
-                    if line.contains('\n') {
-                        // Must be a block comment `/** ... */`
-                        if !buf.is_empty() {
-                            comments.push(buf.clone());
-                            buf.clear();
-                        }
-                        line.insert_str(0, "/**");
-                        line.push_str("*/");
-                        comments.push(line);
-                    } else {
-                        // Single line - assume it is `///`
-                        if !buf.is_empty() {
-                            buf.push('\n');
-                        }
-                        buf.push_str("///");
-                        buf.push_str(&line);
-                    }
+        if let syn::Meta::NameValue(syn::MetaNameValue {
+            value:
+                syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(ref s),
+                    ..
+                }),
+            ..
+        }) = attr.meta
+        {
+            let mut line = s.value();
+
+            if line.contains('\n') {
+                // Must be a block comment `/** ... */`
+                if !buf.is_empty() {
+                    comments.push(buf.clone());
+                    buf.clear();
                 }
+                line.insert_str(0, "/**");
+                line.push_str("*/");
+                comments.push(line);
+            } else {
+                // Single line - assume it is `///`
+                if !buf.is_empty() {
+                    buf.push('\n');
+                }
+                buf.push_str("///");
+                buf.push_str(&line);
             }
         }
     }
@@ -189,7 +187,7 @@ pub fn doc_attributes(attrs: &[syn::Attribute]) -> syn::Result<Vec<String>> {
 pub fn collect_cfg_attr(attrs: &[syn::Attribute]) -> Vec<syn::Attribute> {
     attrs
         .iter()
-        .filter(|&a| a.path.get_ident().map_or(false, |i| *i == "cfg"))
+        .filter(|&a| a.path().is_ident("cfg"))
         .cloned()
         .collect()
 }

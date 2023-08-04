@@ -118,12 +118,15 @@ impl Engine {
         let ast = {
             let mut interner;
             let mut guard;
-            let interned_strings = if let Some(ref interner) = self.interned_strings {
-                guard = locked_write(interner);
-                &mut *guard
-            } else {
-                interner = StringsInterner::new();
-                &mut interner
+            let interned_strings = match self.interned_strings {
+                Some(ref interner) => {
+                    guard = locked_write(interner);
+                    &mut *guard
+                }
+                None => {
+                    interner = StringsInterner::new();
+                    &mut interner
+                }
             };
 
             let state = &mut ParseState::new(None, interned_strings, tokenizer_control);
@@ -174,12 +177,10 @@ pub fn format_map_as_json(map: &Map) -> String {
         write!(result, "{key:?}").unwrap();
         result.push(':');
 
-        if let Some(val) = value.read_lock::<Map>() {
-            result.push_str(&format_map_as_json(&val));
-        } else if value.is_unit() {
-            result.push_str("null");
-        } else {
-            write!(result, "{value:?}").unwrap();
+        match value.read_lock::<Map>() {
+            Some(val) => result.push_str(&format_map_as_json(&val)),
+            None if value.is_unit() => result.push_str("null"),
+            None => write!(result, "{value:?}").unwrap(),
         }
     }
 

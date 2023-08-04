@@ -326,10 +326,9 @@ impl Engine {
         &self,
         string: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        if let Some(ref interner) = self.interned_strings {
-            locked_write(interner).get(string)
-        } else {
-            string.into()
+        match self.interned_strings {
+            Some(ref interner) => locked_write(interner).get(string),
+            _ => string.into(),
         }
     }
 
@@ -345,10 +344,9 @@ impl Engine {
         &self,
         string: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        if let Some(ref interner) = self.interned_strings {
-            locked_write(interner).get(string)
-        } else {
-            string.into()
+        match self.interned_strings {
+            Some(ref interner) => locked_write(interner).get(string),
+            None => string.into(),
         }
     }
 

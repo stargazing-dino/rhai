@@ -109,20 +109,19 @@ impl Drop for ArgBackup<'_> {
 #[cfg(not(feature = "no_closure"))]
 #[inline]
 pub fn ensure_no_data_race(fn_name: &str, args: &FnCallArgs, is_ref_mut: bool) -> RhaiResultOf<()> {
-    if let Some((n, ..)) = args
+    match args
         .iter()
         .enumerate()
         .skip(usize::from(is_ref_mut))
         .find(|(.., a)| a.is_locked())
     {
-        return Err(ERR::ErrorDataRace(
+        Some((n, ..)) => Err(ERR::ErrorDataRace(
             format!("argument #{} of function '{fn_name}'", n + 1),
             Position::NONE,
         )
-        .into());
+        .into()),
+        _ => Ok(()),
     }
-
-    Ok(())
 }
 
 /// Is a function name an anonymous function?
@@ -457,28 +456,26 @@ impl Engine {
 
             // See if the function match print/debug (which requires special processing)
             return Ok(match name {
-                KEYWORD_PRINT => {
-                    if let Some(ref print) = self.print {
+                KEYWORD_PRINT => match self.print {
+                    Some(ref print) => {
                         let text = result.into_immutable_string().map_err(|typ| {
                             let t = self.map_type_name(type_name::<ImmutableString>()).into();
                             ERR::ErrorMismatchOutputType(t, typ.into(), pos)
                         })?;
                         (print(&text).into(), false)
-                    } else {
-                        (Dynamic::UNIT, false)
                     }
-                }
-                KEYWORD_DEBUG => {
-                    if let Some(ref debug) = self.debug {
+                    None => (Dynamic::UNIT, false),
+                },
+                KEYWORD_DEBUG => match self.debug {
+                    Some(ref debug) => {
                         let text = result.into_immutable_string().map_err(|typ| {
                             let t = self.map_type_name(type_name::<ImmutableString>()).into();
                             ERR::ErrorMismatchOutputType(t, typ.into(), pos)
                         })?;
                         (debug(&text, global.source(), pos).into(), false)
-                    } else {
-                        (Dynamic::UNIT, false)
                     }
-                }
+                    None => (Dynamic::UNIT, false),
+                },
                 _ => (result, is_method),
             });
         }
@@ -642,11 +639,12 @@ impl Engine {
                 }
 
                 let mut empty_scope;
-                let scope = if let Some(scope) = _scope {
-                    scope
-                } else {
-                    empty_scope = Scope::new();
-                    &mut empty_scope
+                let scope = match _scope {
+                    Some(scope) => scope,
+                    None => {
+                        empty_scope = Scope::new();
+                        &mut empty_scope
+                    }
                 };
 
                 let orig_source = mem::replace(&mut global.source, source);
