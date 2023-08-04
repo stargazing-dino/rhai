@@ -62,6 +62,7 @@ impl Engine {
             optimization_level,
         );
 
+        #[cfg(feature = "metadata")]
         match ast.doc_mut() {
             Some(doc) => _new_ast.set_doc(std::mem::take(doc)),
             None => {

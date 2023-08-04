@@ -613,6 +613,7 @@ impl AST {
             }
         }
 
+        #[cfg(feature = "metadata")]
         match (&other.doc, &mut _ast.doc) {
             (Some(other_doc), Some(ast_doc)) => {
                 ast_doc.push('\n');
