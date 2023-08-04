@@ -31,11 +31,10 @@ pub type OnDebuggerCallback = dyn Fn(EvalContext, DebuggerEvent, ASTNode, Option
     + Sync;
 
 /// A command for the debugger on the next iteration.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Default, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub enum DebuggerCommand {
     /// Continue normal execution.
-    #[default]
     Continue,
     /// Step into the next expression, diving into functions.
     StepInto,
@@ -45,6 +44,13 @@ pub enum DebuggerCommand {
     Next,
     /// Run to the end of the current function call.
     FunctionExit,
+}
+
+impl Default for DebuggerCommand {
+    #[inline(always)]
+    fn default() -> Self {
+        Self::Continue
+    }
 }
 
 /// The debugger status.
