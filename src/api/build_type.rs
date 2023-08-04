@@ -262,10 +262,9 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
 impl<'a, T: Variant + Clone> Drop for TypeBuilder<'a, T> {
     #[inline]
     fn drop(&mut self) {
-        if let Some(name) = self.name {
-            self.engine.register_type_with_name::<T>(name);
-        } else {
-            self.engine.register_type::<T>();
-        }
+        match self.name {
+            Some(name) => self.engine.register_type_with_name::<T>(name),
+            None => self.engine.register_type::<T>(),
+        };
     }
 }

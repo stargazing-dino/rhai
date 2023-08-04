@@ -469,11 +469,14 @@ impl Engine {
                     None
                 };
 
-                if let Some(index) = index {
-                    value.set_access_mode(access);
-                    *scope.get_mut_by_index(scope.len() - index.get()) = value;
-                } else {
-                    scope.push_entry(var_name.name.clone(), access, value);
+                match index {
+                    Some(index) => {
+                        value.set_access_mode(access);
+                        *scope.get_mut_by_index(scope.len() - index.get()) = value;
+                    }
+                    _ => {
+                        scope.push_entry(var_name.name.clone(), access, value);
+                    }
                 }
 
                 #[cfg(not(feature = "no_module"))]

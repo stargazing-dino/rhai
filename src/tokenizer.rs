@@ -1182,13 +1182,10 @@ pub trait InputStream {
 /// Return error if the string is longer than the maximum length.
 #[inline]
 fn ensure_string_len_within_limit(max: Option<NonZeroUsize>, value: &str) -> Result<(), LexError> {
-    if let Some(max) = max {
-        if value.len() > max.get() {
-            return Err(LexError::StringTooLong(max.get()));
-        }
+    match max {
+        Some(max) if value.len() > max.get() => Err(LexError::StringTooLong(max.get())),
+        _ => Ok(()),
     }
-
-    Ok(())
 }
 
 /// _(internals)_ Parse a string literal ended by a specified termination character.
@@ -1415,7 +1412,7 @@ pub fn parse_string_literal(
 
             // Whitespace to skip
             #[cfg(not(feature = "no_position"))]
-            _ if next_char.is_whitespace() && pos.position().unwrap() < skip_whitespace_until => {}
+            _ if next_char.is_whitespace() && pos.position().unwrap() < skip_whitespace_until => (),
 
             // All other characters
             _ => {
@@ -1963,18 +1960,17 @@ fn get_next_token_inner(
                     pos.advance();
                 }
 
-                if let Some(comment) = comment {
-                    match comment {
-                        #[cfg(feature = "metadata")]
-                        _ if comment.starts_with("//!") => {
-                            let g = &mut state.tokenizer_control.borrow_mut().global_comments;
-                            if !g.is_empty() {
-                                g.push('\n');
-                            }
-                            g.push_str(&comment);
+                match comment {
+                    #[cfg(feature = "metadata")]
+                    Some(comment) if comment.starts_with("//!") => {
+                        let g = &mut state.tokenizer_control.borrow_mut().global_comments;
+                        if !g.is_empty() {
+                            g.push('\n');
                         }
-                        _ => return Some((Token::Comment(comment.into()), start_pos)),
+                        g.push_str(&comment);
                     }
+                    Some(comment) => return Some((Token::Comment(comment.into()), start_pos)),
+                    None => (),
                 }
             }
             ('/', '*') => {
@@ -2570,8 +2566,8 @@ impl<'a> Iterator for TokenIterator<'a> {
         if compress_script {
             let control = &mut *self.state.tokenizer_control.borrow_mut();
 
-            if let Some(ref mut compressed) = control.compressed {
-                if token != Token::EOF {
+            if token != Token::EOF {
+                if let Some(ref mut compressed) = control.compressed {
                     use std::fmt::Write;
 
                     let last_token = self.state.last_token.as_ref().unwrap();

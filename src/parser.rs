@@ -1299,8 +1299,7 @@ impl Engine {
 
                     let mut range_value: Option<RangeCase> = None;
 
-                    let guard = value.read_lock::<ExclusiveRange>();
-                    if let Some(range) = guard {
+                    if let Some(range) = value.read_lock::<ExclusiveRange>() {
                         range_value = Some(range.clone().into());
                     } else if let Some(range) = value.read_lock::<InclusiveRange>() {
                         range_value = Some(range.clone().into());
@@ -2780,12 +2779,11 @@ impl Engine {
 
         // if guard { if_body } else ...
         let branch = if match_token(input, Token::Else).0 {
-            if let (Token::If, ..) = input.peek().expect(NEVER_ENDS) {
+            match input.peek().expect(NEVER_ENDS) {
                 // if guard { if_body } else if ...
-                self.parse_if(input, state, lib, settings)?
-            } else {
+                (Token::If, ..) => self.parse_if(input, state, lib, settings)?,
                 // if guard { if_body } else { else-body }
-                self.parse_block(input, state, lib, settings)?
+                _ => self.parse_block(input, state, lib, settings)?,
             }
         } else {
             Stmt::Noop(Position::NONE)
@@ -3028,10 +3026,12 @@ impl Engine {
                 match filter(false, info, context) {
                     Ok(true) => (),
                     Ok(false) => return Err(PERR::ForbiddenVariable(name.into()).into_err(pos)),
-                    Err(err) => match *err {
-                        EvalAltResult::ErrorParsing(e, pos) => return Err(e.into_err(pos)),
-                        _ => return Err(PERR::ForbiddenVariable(name.into()).into_err(pos)),
-                    },
+                    Err(err) => {
+                        return Err(match *err {
+                            EvalAltResult::ErrorParsing(e, pos) => e.into_err(pos),
+                            _ => PERR::ForbiddenVariable(name.into()).into_err(pos),
+                        })
+                    }
                 }
             }
         }

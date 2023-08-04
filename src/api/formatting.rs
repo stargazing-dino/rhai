@@ -227,12 +227,9 @@ impl Engine {
     #[must_use]
     pub(crate) fn format_type_name<'a>(&'a self, name: &'a str) -> std::borrow::Cow<'a, str> {
         if let Some(x) = name.strip_prefix("&mut ") {
-            let r = self.format_type_name(x);
-
-            return if x == r {
-                name.into()
-            } else {
-                format!("&mut {r}").into()
+            return match self.format_type_name(x) {
+                r if r == x => name.into(),
+                r => format!("&mut {r}").into(),
             };
         }
 

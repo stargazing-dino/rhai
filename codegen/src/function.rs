@@ -309,7 +309,7 @@ impl Parse for ExportedFn {
                 {
                     pass_context = true;
                 }
-                _ => {}
+                _ => (),
             }
         }
 
@@ -389,7 +389,7 @@ impl Parse for ExportedFn {
                         "Rhai functions cannot return references",
                     ))
                 }
-                _ => {}
+                _ => (),
             }
         }
         Ok(ExportedFn {
@@ -597,7 +597,7 @@ impl ExportedFn {
                     "index setter cannot return any value",
                 ))
             }
-            _ => {}
+            _ => (),
         }
 
         self.params = params;

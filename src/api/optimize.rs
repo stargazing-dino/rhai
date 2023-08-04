@@ -62,11 +62,11 @@ impl Engine {
             optimization_level,
         );
 
-        #[cfg(feature = "metadata")]
-        if let Some(doc) = ast.doc_mut() {
-            _new_ast.set_doc(std::mem::take(doc));
-        } else {
-            _new_ast.clear_doc();
+        match ast.doc_mut() {
+            Some(doc) => _new_ast.set_doc(std::mem::take(doc)),
+            None => {
+                _new_ast.clear_doc();
+            }
         }
 
         _new_ast

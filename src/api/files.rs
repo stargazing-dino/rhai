@@ -35,10 +35,11 @@ impl Engine {
 
         if contents.starts_with("#!") {
             // Remove shebang
-            if let Some(n) = contents.find('\n') {
-                contents.drain(0..n).count();
-            } else {
-                contents.clear();
+            match contents.find('\n') {
+                Some(n) => {
+                    contents.drain(0..n).count();
+                }
+                None => contents.clear(),
             }
         };
 

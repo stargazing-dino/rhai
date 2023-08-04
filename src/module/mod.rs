@@ -2405,12 +2405,12 @@ impl Module {
                             f.metadata.num_params,
                         );
                         #[cfg(not(feature = "no_object"))]
-                        let hash_qualified_script =
-                            if let Some(ref this_type) = f.metadata.this_type {
+                        let hash_qualified_script = match f.metadata.this_type {
+                            Some(ref this_type) => {
                                 crate::calc_typed_method_hash(hash_qualified_script, this_type)
-                            } else {
-                                hash_qualified_script
-                            };
+                            }
+                            None => hash_qualified_script,
+                        };
 
                         // Catch hash collisions in testing environment only.
                         #[cfg(feature = "testing-environ")]

@@ -177,12 +177,10 @@ pub fn format_map_as_json(map: &Map) -> String {
         write!(result, "{key:?}").unwrap();
         result.push(':');
 
-        if let Some(val) = value.read_lock::<Map>() {
-            result.push_str(&format_map_as_json(&val));
-        } else if value.is_unit() {
-            result.push_str("null");
-        } else {
-            write!(result, "{value:?}").unwrap();
+        match value.read_lock::<Map>() {
+            Some(val) => result.push_str(&format_map_as_json(&val)),
+            None if value.is_unit() => result.push_str("null"),
+            None => write!(result, "{value:?}").unwrap(),
         }
     }
 
