@@ -12,11 +12,18 @@ Bug fixes
 * `max` and `min` for integers, strings and characters were missing from the standard library. They are now added.
 * O/S features such as file access and time are no longer disabled when using `wasm32-wasi` (or any WASM target other than `wasm32-unknown`).
 
+Dependencies
+------------
+
+* Minimal version numbers for dependencies are now specified in `Cargo.toml` to avoid breaking changes in future versions.
+* `bitflags` is bumped to version 2.
+* `syn` in `rhai_codegen` is bumped to version 2.
+
 Enhancements
 ------------
 
-* [`once_cell`](https://crates.io/crates/once_cell) is used in `std` environments instead of the home-brew `SusLock` (which is still kept for `no-std`).
-* Originally, unit tests use the `?` operator liberally to simplify the code. However, this causes the loss of proper line numbers when it fails, making it difficult to identify the exact location of the failure. This is now fixed by using `unwrap()` instead.
+* [`once_cell`](https://crates.io/crates/once_cell) is used in `std` environments instead of the home-brew `SusLock`.
+* Originally, unit tests use the `?` operator liberally to simplify code. However, this causes the loss of proper line numbers when a test fails, making it difficult to identify the exact location of the failure. This is now fixed by changing to `unwrap()`.
 
 New features
 ------------
