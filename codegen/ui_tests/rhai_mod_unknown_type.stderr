@@ -17,5 +17,3 @@ help: consider importing one of these items
    |
 11 +     use std::fmt::Pointer;
    |
-11 +     use syn::__private::fmt::Pointer;
-   |
