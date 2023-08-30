@@ -8,7 +8,7 @@ use crate::plugin::*;
 
 use crate::{
     def_package, Array, Dynamic, ExclusiveRange, FnPtr, InclusiveRange, NativeCallContext,
-    Position, RhaiResultOf, StaticVec, ERR, INT, MAX_USIZE_INT,
+    Position, RhaiResultOf, ERR, INT, MAX_USIZE_INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -1271,7 +1271,7 @@ pub mod array_functions {
     /// print(x);       // prints "[1, 2, 3, 4, 3, 2, 1]"
     /// ```
     pub fn dedup(ctx: NativeCallContext, array: &mut Array) {
-        let comparer = FnPtr::new_unchecked(OP_EQUALS, StaticVec::new_const());
+        let comparer = FnPtr::new_unchecked(OP_EQUALS, Vec::new());
         dedup_by_comparer(ctx, array, comparer);
     }
     /// Remove duplicated _consecutive_ elements from the array that return `true` when applied the

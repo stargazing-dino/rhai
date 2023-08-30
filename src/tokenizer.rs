@@ -2,7 +2,7 @@
 
 use crate::engine::Precedence;
 use crate::func::native::OnParseTokenCallback;
-use crate::{Engine, Identifier, LexError, Position, SmartString, StaticVec, INT, UNSIGNED_INT};
+use crate::{Engine, Identifier, LexError, Position, SmartString, INT, UNSIGNED_INT};
 use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -2387,21 +2387,33 @@ pub fn is_reserved_keyword_or_symbol(syntax: &str) -> (bool, bool, bool) {
 /// Multiple character streams are jointed together to form one single stream.
 pub struct MultiInputsStream<'a> {
     /// Buffered characters, if any.
-    pub buf: SmallVec<[char; 2]>,
+    pub buf: [Option<char>; 2],
     /// The current stream index.
     pub index: usize,
     /// The input character streams.
-    pub streams: StaticVec<Peekable<Chars<'a>>>,
+    pub streams: SmallVec<[Peekable<Chars<'a>>; 1]>,
 }
 
 impl InputStream for MultiInputsStream<'_> {
     #[inline]
     fn unget(&mut self, ch: char) {
-        self.buf.push(ch);
+        match self.buf {
+            [None, ..] => self.buf[0] = Some(ch),
+            [_, None] => self.buf[1] = Some(ch),
+            _ => unreachable!("cannot unget more than 2 characters!"),
+        }
     }
     fn get_next(&mut self) -> Option<char> {
-        if let ch @ Some(..) = self.buf.pop() {
-            return ch;
+        match self.buf {
+            [None, ..] => (),
+            [ch @ Some(_), None] => {
+                self.buf[0] = None;
+                return ch;
+            }
+            [_, ch @ Some(_)] => {
+                self.buf[1] = None;
+                return ch;
+            }
         }
 
         loop {
@@ -2418,8 +2430,10 @@ impl InputStream for MultiInputsStream<'_> {
         }
     }
     fn peek_next(&mut self) -> Option<char> {
-        if let ch @ Some(..) = self.buf.last() {
-            return ch.copied();
+        match self.buf {
+            [None, ..] => (),
+            [ch @ Some(_), None] => return ch,
+            [_, ch @ Some(_)] => return ch,
         }
 
         loop {
@@ -2658,7 +2672,7 @@ impl Engine {
                 },
                 pos: Position::new(1, 0),
                 stream: MultiInputsStream {
-                    buf: SmallVec::new_const(),
+                    buf: [None, None],
                     streams: input
                         .into_iter()
                         .map(|s| s.as_ref().chars().peekable())

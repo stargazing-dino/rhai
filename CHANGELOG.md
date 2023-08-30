@@ -16,9 +16,9 @@ Dependencies
 ------------
 
 * Minimal version numbers for dependencies are now specified in `Cargo.toml` to avoid breaking changes in future versions.
-* `bitflags` is bumped to version 2.
-* `syn` in `rhai_codegen` is bumped to version 2.
-* `hashbrown` (used in `no-std` builds) is bumped to version 0.14.
+* [`bitflags`](https://crates.io/crates/bitflags) is bumped to version 2.
+* [`syn`](https://crates.io/crates/syn) in [`rhai_codegen`](https://crates.io/crates/rhai_codegen) is bumped to version 2.
+* [`hashbrown`](https://crates.io/crates/hashbrown) (used in `no-std` builds) is bumped to version 0.14.
 
 Enhancements
 ------------

@@ -2,7 +2,7 @@ use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
     def_package, Dynamic, ExclusiveRange, ImmutableString, InclusiveRange, Position, RhaiResultOf,
-    SmartString, StaticVec, ERR, INT, MAX_USIZE_INT,
+    SmartString, ERR, INT, MAX_USIZE_INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -366,7 +366,7 @@ mod string_functions {
         #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let len = len.min(MAX_USIZE_INT) as usize;
 
-        let mut chars = StaticVec::<char>::with_capacity(len);
+        let mut chars = Vec::<char>::with_capacity(len);
 
         for _ in 0..len {
             match string.make_mut().pop() {
@@ -930,7 +930,7 @@ mod string_functions {
             return ctx.engine().const_empty_string();
         }
 
-        let mut chars = StaticVec::with_capacity(string.len());
+        let mut chars = Vec::with_capacity(string.len());
 
         if string.is_empty() || len <= 0 {
             return ctx.engine().const_empty_string();
@@ -1080,7 +1080,7 @@ mod string_functions {
             return;
         }
 
-        let mut chars = StaticVec::with_capacity(string.len());
+        let mut chars = Vec::with_capacity(string.len());
 
         if string.is_empty() || len <= 0 {
             string.make_mut().clear();

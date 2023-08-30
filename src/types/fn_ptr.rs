@@ -24,7 +24,7 @@ use std::{
 #[derive(Clone)]
 pub struct FnPtr {
     name: ImmutableString,
-    curry: StaticVec<Dynamic>,
+    curry: Vec<Dynamic>,
     environ: Option<Shared<EncapsulatedEnviron>>,
     #[cfg(not(feature = "no_function"))]
     fn_def: Option<Shared<crate::ast::ScriptFnDef>>,
@@ -75,10 +75,7 @@ impl FnPtr {
     #[inline(always)]
     #[must_use]
     #[allow(dead_code)]
-    pub(crate) fn new_unchecked(
-        name: impl Into<ImmutableString>,
-        curry: StaticVec<Dynamic>,
-    ) -> Self {
+    pub(crate) fn new_unchecked(name: impl Into<ImmutableString>, curry: Vec<Dynamic>) -> Self {
         Self {
             name: name.into(),
             curry,
@@ -107,7 +104,7 @@ impl FnPtr {
         self,
     ) -> (
         ImmutableString,
-        StaticVec<Dynamic>,
+        Vec<Dynamic>,
         Option<Shared<EncapsulatedEnviron>>,
         Option<Shared<crate::ast::ScriptFnDef>>,
     ) {
@@ -121,7 +118,7 @@ impl FnPtr {
         self,
     ) -> (
         ImmutableString,
-        StaticVec<Dynamic>,
+        Vec<Dynamic>,
         Option<Shared<EncapsulatedEnviron>>,
     ) {
         (self.name, self.curry, self.environ)
@@ -544,7 +541,7 @@ impl TryFrom<ImmutableString> for FnPtr {
         if is_valid_function_name(&value) {
             Ok(Self {
                 name: value,
-                curry: StaticVec::new_const(),
+                curry: Vec::new(),
                 environ: None,
                 #[cfg(not(feature = "no_function"))]
                 fn_def: None,
@@ -570,7 +567,7 @@ impl<T: Into<Shared<crate::ast::ScriptFnDef>>> From<T> for FnPtr {
 
         Self {
             name: fn_def.name.clone(),
-            curry: StaticVec::new_const(),
+            curry: Vec::new(),
             environ: None,
             fn_def: Some(fn_def),
         }

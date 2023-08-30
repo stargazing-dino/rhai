@@ -150,8 +150,7 @@ impl Engine {
                 if let Some(fn_def) = global.lib.iter().flat_map(|m| m.iter_script_fn()).find_map(
                     |(_, _, f, _, func)| if f == v.3.as_str() { Some(func) } else { None },
                 ) {
-                    let mut fn_ptr =
-                        crate::FnPtr::new_unchecked(v.3.clone(), crate::StaticVec::new_const());
+                    let mut fn_ptr = crate::FnPtr::new_unchecked(v.3.clone(), Vec::new());
                     fn_ptr.set_fn_def(Some(fn_def.clone()));
                     let val: Dynamic = fn_ptr.into();
                     return Ok(val.into());

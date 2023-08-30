@@ -6,7 +6,7 @@ use crate::func::StraightHashMap;
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
 use crate::types::Span;
-use crate::{calc_fn_hash, Dynamic, Position, StaticVec, INT};
+use crate::{calc_fn_hash, Dynamic, Position, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -372,11 +372,11 @@ pub type CaseBlocksList = smallvec::SmallVec<[usize; 1]>;
 #[derive(Debug, Clone)]
 pub struct SwitchCasesCollection {
     /// List of [`ConditionalExpr`]'s.
-    pub expressions: StaticVec<ConditionalExpr>,
+    pub expressions: Vec<ConditionalExpr>,
     /// Dictionary mapping value hashes to [`ConditionalExpr`]'s.
     pub cases: StraightHashMap<CaseBlocksList>,
     /// List of range cases.
-    pub ranges: StaticVec<RangeCase>,
+    pub ranges: Vec<RangeCase>,
     /// Statements block for the default case (there can be no condition for the default case).
     pub def_case: Option<usize>,
 }
@@ -410,7 +410,7 @@ pub type StmtBlockContainer = smallvec::SmallVec<[Stmt; STMT_BLOCK_INLINE_SIZE]>
 /// _(internals)_ The underlying container type for [`StmtBlock`].
 /// Exported under the `internals` feature only.
 #[cfg(feature = "no_std")]
-pub type StmtBlockContainer = StaticVec<Stmt>;
+pub type StmtBlockContainer = crate::StaticVec<Stmt>;
 
 /// _(internals)_ A scoped block of statements.
 /// Exported under the `internals` feature only.
@@ -1139,7 +1139,7 @@ impl Stmt {
                 }
             }
             Self::FnCall(x, ..) => {
-                for s in &x.args {
+                for s in x.args.iter() {
                     if !s.walk(path, on_node) {
                         return false;
                     }

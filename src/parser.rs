@@ -60,7 +60,7 @@ pub struct ParseState<'e, 's> {
     pub block_stack_len: usize,
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
     #[cfg(not(feature = "no_closure"))]
-    pub external_vars: Option<Box<crate::FnArgsVec<Ident>>>,
+    pub external_vars: Option<Vec<Ident>>,
     /// An indicator that, when set to `false`, disables variable capturing into externals one
     /// single time up until the nearest consumed Identifier token.
     ///
@@ -71,10 +71,10 @@ pub struct ParseState<'e, 's> {
     pub allow_capture: bool,
     /// Encapsulates a local stack with imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
-    pub imports: Option<Box<StaticVec<ImmutableString>>>,
+    pub imports: Option<Vec<ImmutableString>>,
     /// List of globally-imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
-    pub global_imports: Option<Box<StaticVec<ImmutableString>>>,
+    pub global_imports: Option<Vec<ImmutableString>>,
 }
 
 impl fmt::Debug for ParseState<'_, '_> {
@@ -636,7 +636,7 @@ impl Engine {
         };
 
         let mut _namespace = namespace;
-        let mut args = FnArgsVec::new_const();
+        let mut args = Vec::new();
 
         match token {
             // id( <EOF>
@@ -707,7 +707,7 @@ impl Engine {
                     op_token: None,
                     namespace: _namespace,
                     hashes,
-                    args,
+                    args: args.into_boxed_slice(),
                 }
                 .into_fn_call_expr(settings.pos));
             }
@@ -782,7 +782,7 @@ impl Engine {
                         op_token: None,
                         namespace: _namespace,
                         hashes,
-                        args,
+                        args: args.into_boxed_slice(),
                     }
                     .into_fn_call_expr(settings.pos));
                 }
@@ -1189,9 +1189,9 @@ impl Engine {
             }
         }
 
-        let mut expressions = StaticVec::<ConditionalExpr>::new();
+        let mut expressions = Vec::<ConditionalExpr>::new();
         let mut cases = StraightHashMap::<CaseBlocksList>::default();
-        let mut ranges = StaticVec::<RangeCase>::new();
+        let mut ranges = Vec::<RangeCase>::new();
         let mut def_case = None;
         let mut def_case_pos = Position::NONE;
 
@@ -1220,7 +1220,7 @@ impl Engine {
                     }
 
                     (
-                        StaticVec::default(),
+                        StaticVec::new_const(),
                         Expr::BoolConstant(true, Position::NONE),
                     )
                 }
@@ -1229,7 +1229,7 @@ impl Engine {
                 }
 
                 _ => {
-                    let mut case_expr_list = StaticVec::new();
+                    let mut case_expr_list = StaticVec::new_const();
 
                     loop {
                         let filter = state.expr_filter;
@@ -2034,15 +2034,14 @@ impl Engine {
 
                     // Call negative function
                     expr => {
-                        let mut args = FnArgsVec::new_const();
+                        let mut args = Vec::with_capacity(1);
                         args.push(expr);
-                        args.shrink_to_fit();
 
                         Ok(FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string("-"),
                             hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "-", 1)),
-                            args,
+                            args: args.into_boxed_slice(),
                             op_token: Some(token),
                             capture_parent_scope: false,
                         }
@@ -2062,15 +2061,14 @@ impl Engine {
 
                     // Call plus function
                     expr => {
-                        let mut args = FnArgsVec::new_const();
+                        let mut args = Vec::with_capacity(1);
                         args.push(expr);
-                        args.shrink_to_fit();
 
                         Ok(FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string("+"),
                             hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "+", 1)),
-                            args,
+                            args: args.into_boxed_slice(),
                             op_token: Some(token),
                             capture_parent_scope: false,
                         }
@@ -2083,15 +2081,14 @@ impl Engine {
                 let token = token.clone();
                 let pos = eat_token(input, Token::Bang);
 
-                let mut args = FnArgsVec::new_const();
+                let mut args = Vec::with_capacity(1);
                 args.push(self.parse_unary(input, state, lib, settings.level_up()?)?);
-                args.shrink_to_fit();
 
                 Ok(FnCallExpr {
                     namespace: Namespace::NONE,
                     name: state.get_interned_string("!"),
                     hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "!", 1)),
-                    args,
+                    args: args.into_boxed_slice(),
                     op_token: Some(token),
                     capture_parent_scope: false,
                 }
@@ -2444,16 +2441,15 @@ impl Engine {
             let hash = calc_fn_hash(None, &op, 2);
             let native_only = !is_valid_function_name(&op);
 
-            let mut args = FnArgsVec::new_const();
+            let mut args = Vec::with_capacity(2);
             args.push(root);
             args.push(rhs);
-            args.shrink_to_fit();
 
             let mut op_base = FnCallExpr {
                 namespace: Namespace::NONE,
                 name: state.get_interned_string(&op),
                 hashes: FnCallHashes::from_native_only(hash),
-                args,
+                args: args.into_boxed_slice(),
                 op_token: native_only.then(|| op_token.clone()),
                 capture_parent_scope: false,
             };
@@ -2473,26 +2469,25 @@ impl Engine {
                 }
 
                 Token::Or => {
-                    let rhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
-                    let lhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
+                    let rhs = op_base.args[1].take().ensure_bool_expr()?;
+                    let lhs = op_base.args[0].take().ensure_bool_expr()?;
                     Expr::Or(BinaryExpr { lhs, rhs }.into(), pos)
                 }
                 Token::And => {
-                    let rhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
-                    let lhs = op_base.args.pop().unwrap().ensure_bool_expr()?;
+                    let rhs = op_base.args[1].take().ensure_bool_expr()?;
+                    let lhs = op_base.args[0].take().ensure_bool_expr()?;
                     Expr::And(BinaryExpr { lhs, rhs }.into(), pos)
                 }
                 Token::DoubleQuestion => {
-                    let rhs = op_base.args.pop().unwrap();
-                    let lhs = op_base.args.pop().unwrap();
+                    let rhs = op_base.args[1].take();
+                    let lhs = op_base.args[0].take();
                     Expr::Coalesce(BinaryExpr { lhs, rhs }.into(), pos)
                 }
                 Token::In | Token::NotIn => {
                     // Swap the arguments
-                    let lhs = op_base.args.remove(0);
+                    let (lhs, rhs) = op_base.args.split_first_mut().unwrap();
                     let pos = lhs.start_position();
-                    op_base.args.push(lhs);
-                    op_base.args.shrink_to_fit();
+                    std::mem::swap(lhs, &mut rhs[0]);
 
                     // Convert into a call to `contains`
                     op_base.hashes = FnCallHashes::from_hash(calc_fn_hash(None, OP_CONTAINS, 2));
@@ -2503,14 +2498,14 @@ impl Engine {
                         fn_call
                     } else {
                         // Put a `!` call in front
-                        let mut args = FnArgsVec::new_const();
+                        let mut args = Vec::with_capacity(1);
                         args.push(fn_call);
 
                         let not_base = FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string(OP_NOT),
                             hashes: FnCallHashes::from_native_only(calc_fn_hash(None, OP_NOT, 1)),
-                            args,
+                            args: args.into_boxed_slice(),
                             op_token: Some(Token::Bang),
                             capture_parent_scope: false,
                         };
@@ -2555,9 +2550,9 @@ impl Engine {
         const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
 
         let mut settings = settings;
-        let mut inputs = StaticVec::new_const();
-        let mut segments = StaticVec::new_const();
-        let mut tokens = StaticVec::new_const();
+        let mut inputs = Vec::new();
+        let mut segments = Vec::new();
+        let mut tokens = Vec::new();
 
         // Adjust the variables stack
         if syntax.scope_may_be_changed {
@@ -2728,8 +2723,8 @@ impl Engine {
 
         Ok(Expr::Custom(
             crate::ast::CustomExpr {
-                inputs,
-                tokens,
+                inputs: inputs.into_boxed_slice(),
+                tokens: tokens.into_boxed_slice(),
                 state: user_state,
                 scope_may_be_changed: syntax.scope_may_be_changed,
                 self_terminated,
@@ -3239,7 +3234,7 @@ impl Engine {
         state.block_stack_len = state.stack.as_ref().map_or(0, Scope::len);
 
         #[cfg(not(feature = "no_module"))]
-        let orig_imports_len = state.imports.as_deref().map_or(0, StaticVec::len);
+        let orig_imports_len = state.imports.as_ref().map_or(0, Vec::len);
 
         let end_pos = loop {
             // Terminated?
@@ -3356,9 +3351,9 @@ impl Engine {
         #[cfg(not(feature = "no_function"))]
         #[cfg(feature = "metadata")]
         let comments = {
-            let mut comments = StaticVec::<Identifier>::new();
+            let mut comments = StaticVec::<SmartString>::new_const();
             let mut comments_pos = Position::NONE;
-            let mut buf = Identifier::new();
+            let mut buf = SmartString::new_const();
 
             // Handle doc-comments.
             while let (Token::Comment(ref comment), pos) = input.peek().expect(NEVER_ENDS) {
@@ -3813,7 +3808,7 @@ impl Engine {
         }
         .into();
 
-        let mut params: crate::FnArgsVec<_> = params.into_iter().map(|(p, ..)| p).collect();
+        let mut params: FnArgsVec<_> = params.into_iter().map(|(p, ..)| p).collect();
         params.shrink_to_fit();
 
         Ok(ScriptFnDef {
@@ -3836,7 +3831,7 @@ impl Engine {
         parent: &mut ParseState,
         lib: &FnLib,
         fn_expr: Expr,
-        externals: crate::FnArgsVec<Ident>,
+        externals: FnArgsVec<Ident>,
         pos: Position,
     ) -> Expr {
         // If there are no captured variables, no need to curry
@@ -3845,7 +3840,7 @@ impl Engine {
         }
 
         let num_externals = externals.len();
-        let mut args = FnArgsVec::with_capacity(externals.len() + 1);
+        let mut args = Vec::with_capacity(externals.len() + 1);
 
         args.push(fn_expr);
 
@@ -3867,7 +3862,7 @@ impl Engine {
                 crate::engine::KEYWORD_FN_PTR_CURRY,
                 num_externals + 1,
             )),
-            args,
+            args: args.into_boxed_slice(),
             op_token: None,
             capture_parent_scope: false,
         }
@@ -3883,7 +3878,7 @@ impl Engine {
                     let (index, _) = parent.access_var(&var.name, lib, var.pos);
                     (var, index)
                 })
-                .collect::<crate::FnArgsVec<_>>()
+                .collect::<FnArgsVec<_>>()
                 .into(),
         ));
         statements.push(Stmt::Expr(expr.into()));
@@ -3954,21 +3949,20 @@ impl Engine {
         #[cfg(not(feature = "no_closure"))]
         let (mut params, externals) = match state.external_vars {
             Some(ref external_vars) => {
-                let externals: crate::FnArgsVec<_> = external_vars.iter().cloned().collect();
+                let externals: FnArgsVec<_> = external_vars.iter().cloned().collect();
 
-                let mut params =
-                    crate::FnArgsVec::with_capacity(params_list.len() + externals.len());
+                let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
                 params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));
 
                 (params, externals)
             }
             None => (
-                crate::FnArgsVec::with_capacity(params_list.len()),
-                crate::FnArgsVec::new_const(),
+                FnArgsVec::with_capacity(params_list.len()),
+                FnArgsVec::new_const(),
             ),
         };
         #[cfg(feature = "no_closure")]
-        let mut params = crate::FnArgsVec::with_capacity(params_list.len());
+        let mut params = FnArgsVec::with_capacity(params_list.len());
 
         params.append(&mut params_list);
 
@@ -3992,7 +3986,7 @@ impl Engine {
             comments: Box::default(),
         });
 
-        let mut fn_ptr = crate::FnPtr::new_unchecked(fn_name, StaticVec::new_const());
+        let mut fn_ptr = crate::FnPtr::new_unchecked(fn_name, Vec::new());
         fn_ptr.set_fn_def(Some(script.clone()));
         let expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), settings.pos);
 
@@ -4063,7 +4057,7 @@ impl Engine {
         mut input: TokenStream,
         state: &mut ParseState,
         process_settings: impl FnOnce(&mut ParseSettings),
-    ) -> ParseResult<(StmtBlockContainer, StaticVec<Shared<ScriptFnDef>>)> {
+    ) -> ParseResult<(StmtBlockContainer, Vec<Shared<ScriptFnDef>>)> {
         let mut statements = StmtBlockContainer::new_const();
         let mut functions = StraightHashMap::default();
 

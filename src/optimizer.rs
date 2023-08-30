@@ -1335,9 +1335,7 @@ impl Engine {
         &self,
         scope: Option<&Scope>,
         statements: StmtBlockContainer,
-        #[cfg(not(feature = "no_function"))] functions: crate::StaticVec<
-            crate::Shared<crate::ast::ScriptFnDef>,
-        >,
+        #[cfg(not(feature = "no_function"))] functions: Vec<crate::Shared<crate::ast::ScriptFnDef>>,
         optimization_level: OptimizationLevel,
     ) -> AST {
         let mut statements = statements;

@@ -8,7 +8,6 @@ use crate::tokenizer::{is_reserved_keyword_or_symbol, is_valid_identifier, Token
 use crate::types::dynamic::Variant;
 use crate::{
     Dynamic, Engine, EvalContext, Identifier, ImmutableString, LexError, Position, RhaiResult,
-    StaticVec,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -223,7 +222,7 @@ impl Engine {
         #[allow(clippy::wildcard_imports)]
         use markers::*;
 
-        let mut segments = StaticVec::<ImmutableString>::new();
+        let mut segments = Vec::<ImmutableString>::new();
 
         for s in symbols.as_ref() {
             let s = s.as_ref().trim();

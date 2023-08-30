@@ -2179,7 +2179,7 @@ impl Module {
         let mut module = Module::new();
 
         // Extra modules left become sub-modules
-        let mut imports = crate::StaticVec::new_const();
+        let mut imports = Vec::new();
 
         if result.is_ok() {
             global

@@ -48,9 +48,9 @@ impl From<(Expr, Expr)> for BinaryExpr {
 #[derive(Debug, Clone, Hash)]
 pub struct CustomExpr {
     /// List of keywords.
-    pub inputs: StaticVec<Expr>,
+    pub inputs: Box<[Expr]>,
     /// List of tokens actually parsed.
-    pub tokens: StaticVec<ImmutableString>,
+    pub tokens: Box<[ImmutableString]>,
     /// State value.
     pub state: Dynamic,
     /// Is the current [`Scope`][crate::Scope] possibly modified by this custom statement
@@ -201,7 +201,7 @@ pub struct FnCallExpr {
     /// Pre-calculated hashes.
     pub hashes: FnCallHashes,
     /// List of function call argument expressions.
-    pub args: FnArgsVec<Expr>,
+    pub args: Box<[Expr]>,
     /// Does this function call capture the parent scope?
     pub capture_parent_scope: bool,
     /// Is this function call a native operator?
@@ -885,7 +885,7 @@ impl Expr {
                 }
             }
             Self::FnCall(x, ..) => {
-                for e in &x.args {
+                for e in x.args.iter() {
                     if !e.walk(path, on_node) {
                         return false;
                     }
@@ -893,7 +893,7 @@ impl Expr {
             }
             #[cfg(not(feature = "no_custom_syntax"))]
             Self::Custom(x, ..) => {
-                for e in &x.inputs {
+                for e in x.inputs.iter() {
                     if !e.walk(path, on_node) {
                         return false;
                     }

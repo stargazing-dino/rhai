@@ -3,7 +3,7 @@
 
 use crate::api::formatting::format_type;
 use crate::module::{calc_native_fn_hash, FuncInfo, ModuleFlags};
-use crate::{calc_fn_hash, Engine, FnAccess, SmartString, StaticVec, AST};
+use crate::{calc_fn_hash, Engine, FnAccess, SmartString, AST};
 use serde::Serialize;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -42,16 +42,16 @@ struct FnMetadata<'a> {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub this_type: Option<&'a str>,
     pub num_params: usize,
-    #[serde(default, skip_serializing_if = "StaticVec::is_empty")]
-    pub params: StaticVec<FnParam<'a>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub params: Vec<FnParam<'a>>,
     // No idea why the following is needed otherwise serde comes back with a lifetime error
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub _dummy: Option<&'a str>,
     #[serde(default, skip_serializing_if = "str::is_empty")]
     pub return_type: Cow<'a, str>,
     pub signature: SmartString,
-    #[serde(default, skip_serializing_if = "StaticVec::is_empty")]
-    pub doc_comments: StaticVec<&'a str>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub doc_comments: Vec<&'a str>,
 }
 
 impl PartialOrd for FnMetadata<'_> {
@@ -138,8 +138,8 @@ struct ModuleMetadata<'a> {
     pub doc: &'a str,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub modules: BTreeMap<&'a str, Self>,
-    #[serde(skip_serializing_if = "StaticVec::is_empty")]
-    pub functions: StaticVec<FnMetadata<'a>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub functions: Vec<FnMetadata<'a>>,
 }
 
 impl ModuleMetadata<'_> {
@@ -149,14 +149,14 @@ impl ModuleMetadata<'_> {
             #[cfg(feature = "metadata")]
             doc: "",
             modules: BTreeMap::new(),
-            functions: StaticVec::new_const(),
+            functions: Vec::new(),
         }
     }
 }
 
 impl<'a> From<&'a crate::Module> for ModuleMetadata<'a> {
     fn from(module: &'a crate::Module) -> Self {
-        let mut functions = module.iter_fn().map(Into::into).collect::<StaticVec<_>>();
+        let mut functions = module.iter_fn().map(Into::into).collect::<Vec<_>>();
         functions.sort();
 
         Self {

@@ -8,9 +8,7 @@ use crate::func::native::{
 use crate::packages::{Package, StandardPackage};
 use crate::tokenizer::Token;
 use crate::types::StringsInterner;
-use crate::{
-    Dynamic, Identifier, ImmutableString, Locked, OptimizationLevel, SharedModule, StaticVec,
-};
+use crate::{Dynamic, Identifier, ImmutableString, Locked, OptimizationLevel, SharedModule};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{collections::BTreeSet, fmt, num::NonZeroU8};
@@ -94,7 +92,7 @@ pub const NAMESPACE_SEPARATOR: &str = Token::DoubleColon.literal_syntax();
 /// ```
 pub struct Engine {
     /// A collection of all modules loaded into the global namespace of the Engine.
-    pub(crate) global_modules: StaticVec<SharedModule>,
+    pub(crate) global_modules: Vec<SharedModule>,
     /// A collection of all sub-modules directly loaded into the Engine.
     #[cfg(not(feature = "no_module"))]
     pub(crate) global_sub_modules: Option<std::collections::BTreeMap<Identifier, SharedModule>>,
@@ -228,7 +226,7 @@ pub fn make_setter(id: &str) -> Identifier {
 impl Engine {
     /// An empty raw [`Engine`].
     pub const RAW: Self = Self {
-        global_modules: StaticVec::new_const(),
+        global_modules: Vec::new(),
 
         #[cfg(not(feature = "no_module"))]
         global_sub_modules: None,
