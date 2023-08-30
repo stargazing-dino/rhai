@@ -1608,24 +1608,24 @@ fn get_next_token_inner(
                             stream.get_next().unwrap();
 
                             // Check if followed by digits or something that cannot start a property name
-                            match stream.peek_next().unwrap_or('\0') {
+                            match stream.peek_next() {
                                 // digits after period - accept the period
-                                '0'..='9' => {
+                                Some('0'..='9') => {
                                     result.push(next_char);
                                     pos.advance();
                                 }
                                 // _ - cannot follow a decimal point
-                                NUMBER_SEPARATOR => {
+                                Some(NUMBER_SEPARATOR) => {
                                     stream.unget(next_char);
                                     break;
                                 }
                                 // .. - reserved symbol, not a floating-point number
-                                '.' => {
+                                Some('.') => {
                                     stream.unget(next_char);
                                     break;
                                 }
                                 // symbol after period - probably a float
-                                ch if !is_id_first_alphabetic(ch) => {
+                                Some(ch) if !is_id_first_alphabetic(ch) => {
                                     result.push(next_char);
                                     pos.advance();
                                     result.push('0');
@@ -1642,14 +1642,14 @@ fn get_next_token_inner(
                             stream.get_next().expect("`e`");
 
                             // Check if followed by digits or +/-
-                            match stream.peek_next().unwrap_or('\0') {
+                            match stream.peek_next() {
                                 // digits after e - accept the e
-                                '0'..='9' => {
+                                Some('0'..='9') => {
                                     result.push(next_char);
                                     pos.advance();
                                 }
                                 // +/- after e - accept the e and the sign
-                                '+' | '-' => {
+                                Some('+' | '-') => {
                                     result.push(next_char);
                                     pos.advance();
                                     result.push(stream.get_next().unwrap());
