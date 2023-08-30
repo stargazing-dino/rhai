@@ -3930,7 +3930,7 @@ impl Engine {
         #[cfg(not(feature = "no_closure"))]
         let (mut params, externals) = match state.external_vars {
             Some(ref external_vars) => {
-                let externals: FnArgsVec<_> = external_vars.iter().cloned().collect();
+                let externals = external_vars.iter().cloned().collect::<FnArgsVec<_>>();
 
                 let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
                 params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));

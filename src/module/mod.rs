@@ -79,10 +79,10 @@ pub struct FuncInfoMetadata {
     /// Number of parameters.
     pub num_params: usize,
     /// Parameter types (if applicable).
-    pub param_types: FnArgsVec<TypeId>,
+    pub param_types: Box<[TypeId]>,
     /// Parameter names and types (if available).
     #[cfg(feature = "metadata")]
-    pub params_info: FnArgsVec<Identifier>,
+    pub params_info: Box<[Identifier]>,
     /// Return type name.
     #[cfg(feature = "metadata")]
     pub return_type: Identifier,
@@ -768,7 +768,7 @@ impl Module {
                         #[cfg(not(feature = "no_object"))]
                         this_type: fn_def.this_type.clone(),
                         num_params,
-                        param_types: FnArgsVec::new_const(),
+                        param_types: Default::default(),
                         #[cfg(feature = "metadata")]
                         params_info,
                         #[cfg(feature = "metadata")]
@@ -934,10 +934,7 @@ impl Module {
         hash_fn: u64,
         arg_names: impl IntoIterator<Item = S>,
     ) -> &mut Self {
-        let mut param_names = arg_names
-            .into_iter()
-            .map(Into::into)
-            .collect::<FnArgsVec<_>>();
+        let mut param_names = arg_names.into_iter().map(Into::into).collect::<Vec<_>>();
 
         if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
             let (param_names, return_type_name) = if param_names.len() > f.metadata.num_params {
@@ -946,7 +943,7 @@ impl Module {
             } else {
                 (param_names, crate::SmartString::new_const())
             };
-            f.metadata.params_info = param_names;
+            f.metadata.params_info = param_names.into_boxed_slice();
             f.metadata.return_type = return_type_name;
         }
 
@@ -1063,7 +1060,7 @@ impl Module {
             .iter()
             .enumerate()
             .map(|(i, &type_id)| Self::map_type(!is_method || i > 0, type_id))
-            .collect::<FnArgsVec<_>>();
+            .collect::<Vec<_>>();
 
         let is_dynamic = param_types
             .iter()
@@ -1075,7 +1072,7 @@ impl Module {
                 .into_iter()
                 .flatten()
                 .map(|&s| s.into())
-                .collect::<FnArgsVec<_>>();
+                .collect::<Vec<_>>();
             let return_type = if names.len() > param_types.len() {
                 names.pop().unwrap()
             } else {
@@ -1117,9 +1114,9 @@ impl Module {
                         #[cfg(not(feature = "no_object"))]
                         this_type: None,
                         num_params: param_types.len(),
-                        param_types,
+                        param_types: param_types.into_boxed_slice(),
                         #[cfg(feature = "metadata")]
-                        params_info: param_names,
+                        params_info: param_names.into_boxed_slice(),
                         #[cfg(feature = "metadata")]
                         return_type: return_type_name,
                         #[cfg(feature = "metadata")]

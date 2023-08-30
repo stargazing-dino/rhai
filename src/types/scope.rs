@@ -2,7 +2,6 @@
 
 use super::dynamic::{AccessMode, Variant};
 use crate::{Dynamic, Identifier, ImmutableString};
-use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -10,9 +9,6 @@ use std::{
     iter::{Extend, FromIterator},
     marker::PhantomData,
 };
-
-/// Keep a number of entries inline (since [`Dynamic`] is usually small enough).
-pub const SCOPE_ENTRIES_INLINED: usize = 8;
 
 /// Type containing information about the current scope. Useful for keeping state between
 /// [`Engine`][crate::Engine] evaluation runs.
@@ -69,13 +65,13 @@ pub const SCOPE_ENTRIES_INLINED: usize = 8;
 //
 // [`Dynamic`] is reasonably small so packing it tightly improves cache performance.
 #[derive(Debug, Hash, Default)]
-pub struct Scope<'a, const N: usize = SCOPE_ENTRIES_INLINED> {
+pub struct Scope<'a> {
     /// Current value of the entry.
-    values: SmallVec<[Dynamic; SCOPE_ENTRIES_INLINED]>,
+    values: Vec<Dynamic>,
     /// Name of the entry.
-    names: SmallVec<[Identifier; SCOPE_ENTRIES_INLINED]>,
+    names: Vec<Identifier>,
     /// Aliases of the entry.
-    aliases: SmallVec<[Vec<ImmutableString>; SCOPE_ENTRIES_INLINED]>,
+    aliases: Vec<Vec<ImmutableString>>,
     /// Phantom to keep the lifetime parameter in order not to break existing code.
     dummy: PhantomData<&'a ()>,
 }
@@ -171,9 +167,9 @@ impl Scope<'_> {
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            values: SmallVec::new_const(),
-            names: SmallVec::new_const(),
-            aliases: SmallVec::new_const(),
+            values: Vec::new(),
+            names: Vec::new(),
+            aliases: Vec::new(),
             dummy: PhantomData,
         }
     }
@@ -193,9 +189,9 @@ impl Scope<'_> {
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            values: SmallVec::with_capacity(capacity),
-            names: SmallVec::with_capacity(capacity),
-            aliases: SmallVec::with_capacity(capacity),
+            values: Vec::with_capacity(capacity),
+            names: Vec::with_capacity(capacity),
+            aliases: Vec::with_capacity(capacity),
             dummy: PhantomData,
         }
     }
