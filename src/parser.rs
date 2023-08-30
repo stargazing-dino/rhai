@@ -2033,20 +2033,15 @@ impl Engine {
                     Expr::FloatConstant(x, ..) => Ok(Expr::FloatConstant((-(*x)).into(), pos)),
 
                     // Call negative function
-                    expr => {
-                        let mut args = Vec::with_capacity(1);
-                        args.push(expr);
-
-                        Ok(FnCallExpr {
-                            namespace: Namespace::NONE,
-                            name: state.get_interned_string("-"),
-                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "-", 1)),
-                            args: args.into_boxed_slice(),
-                            op_token: Some(token),
-                            capture_parent_scope: false,
-                        }
-                        .into_fn_call_expr(pos))
+                    expr => Ok(FnCallExpr {
+                        namespace: Namespace::NONE,
+                        name: state.get_interned_string("-"),
+                        hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "-", 1)),
+                        args: vec![expr].into_boxed_slice(),
+                        op_token: Some(token),
+                        capture_parent_scope: false,
                     }
+                    .into_fn_call_expr(pos)),
                 }
             }
             // +expr
@@ -2060,20 +2055,15 @@ impl Engine {
                     expr @ Expr::FloatConstant(..) => Ok(expr),
 
                     // Call plus function
-                    expr => {
-                        let mut args = Vec::with_capacity(1);
-                        args.push(expr);
-
-                        Ok(FnCallExpr {
-                            namespace: Namespace::NONE,
-                            name: state.get_interned_string("+"),
-                            hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "+", 1)),
-                            args: args.into_boxed_slice(),
-                            op_token: Some(token),
-                            capture_parent_scope: false,
-                        }
-                        .into_fn_call_expr(pos))
+                    expr => Ok(FnCallExpr {
+                        namespace: Namespace::NONE,
+                        name: state.get_interned_string("+"),
+                        hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "+", 1)),
+                        args: vec![expr].into_boxed_slice(),
+                        op_token: Some(token),
+                        capture_parent_scope: false,
                     }
+                    .into_fn_call_expr(pos)),
                 }
             }
             // !expr
@@ -2081,14 +2071,12 @@ impl Engine {
                 let token = token.clone();
                 let pos = eat_token(input, Token::Bang);
 
-                let mut args = Vec::with_capacity(1);
-                args.push(self.parse_unary(input, state, lib, settings.level_up()?)?);
-
                 Ok(FnCallExpr {
                     namespace: Namespace::NONE,
                     name: state.get_interned_string("!"),
                     hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "!", 1)),
-                    args: args.into_boxed_slice(),
+                    args: vec![self.parse_unary(input, state, lib, settings.level_up()?)?]
+                        .into_boxed_slice(),
                     op_token: Some(token),
                     capture_parent_scope: false,
                 }
@@ -2441,15 +2429,11 @@ impl Engine {
             let hash = calc_fn_hash(None, &op, 2);
             let native_only = !is_valid_function_name(&op);
 
-            let mut args = Vec::with_capacity(2);
-            args.push(root);
-            args.push(rhs);
-
             let mut op_base = FnCallExpr {
                 namespace: Namespace::NONE,
                 name: state.get_interned_string(&op),
                 hashes: FnCallHashes::from_native_only(hash),
-                args: args.into_boxed_slice(),
+                args: vec![root, rhs].into_boxed_slice(),
                 op_token: native_only.then(|| op_token.clone()),
                 capture_parent_scope: false,
             };
@@ -2498,14 +2482,11 @@ impl Engine {
                         fn_call
                     } else {
                         // Put a `!` call in front
-                        let mut args = Vec::with_capacity(1);
-                        args.push(fn_call);
-
                         let not_base = FnCallExpr {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string(OP_NOT),
                             hashes: FnCallHashes::from_native_only(calc_fn_hash(None, OP_NOT, 1)),
-                            args: args.into_boxed_slice(),
+                            args: vec![fn_call].into_boxed_slice(),
                             op_token: Some(Token::Bang),
                             capture_parent_scope: false,
                         };

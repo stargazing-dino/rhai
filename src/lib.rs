@@ -81,7 +81,7 @@
 #![allow(clippy::match_same_arms)]
 // The lints below can be turned off to reduce signal/noise ratio
 #![allow(clippy::too_many_lines)]
-#![allow(clippy::let_underscore_drop)]
+#![allow(let_underscore_drop)]
 #![allow(clippy::absurd_extreme_comparisons)]
 #![allow(clippy::unnecessary_cast)]
 #![allow(clippy::wildcard_imports)]
