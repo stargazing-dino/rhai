@@ -433,12 +433,12 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
 
     // char op string
     if (type1, type2) == (TypeId::of::<char>(), TypeId::of::<ImmutableString>()) {
-        fn get_s1s2(args: &FnCallArgs) -> ([char; 2], [char; 2]) {
+        fn get_s1s2(args: &FnCallArgs) -> ([Option<char>; 2], [Option<char>; 2]) {
             let x = args[0].as_char().unwrap();
             let y = &*args[1].read_lock::<ImmutableString>().unwrap();
-            let s1 = [x, '\0'];
+            let s1 = [Some(x), None];
             let mut y = y.chars();
-            let s2 = [y.next().unwrap_or('\0'), y.next().unwrap_or('\0')];
+            let s2 = [y.next(), y.next()];
             (s1, s2)
         }
 
@@ -470,12 +470,12 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
     }
     // string op char
     if (type1, type2) == (TypeId::of::<ImmutableString>(), TypeId::of::<char>()) {
-        fn get_s1s2(args: &FnCallArgs) -> ([char; 2], [char; 2]) {
+        fn get_s1s2(args: &FnCallArgs) -> ([Option<char>; 2], [Option<char>; 2]) {
             let x = &*args[0].read_lock::<ImmutableString>().unwrap();
             let y = args[1].as_char().unwrap();
             let mut x = x.chars();
-            let s1 = [x.next().unwrap_or('\0'), x.next().unwrap_or('\0')];
-            let s2 = [y, '\0'];
+            let s1 = [x.next(), x.next()];
+            let s2 = [Some(y), None];
             (s1, s2)
         }
 

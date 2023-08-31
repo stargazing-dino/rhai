@@ -7,7 +7,7 @@ use crate::func::{
     shared_take_or_clone, CallableFunction, FnCallArgs, IteratorFn, RegisterNativeFunction,
     SendSync, StraightHashMap,
 };
-use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypesCollection};
+use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypeInfo, CustomTypesCollection};
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, FnArgsVec, Identifier, ImmutableString,
     NativeCallContext, RhaiResultOf, Shared, SharedModule, SmartString,
@@ -79,10 +79,10 @@ pub struct FuncInfoMetadata {
     /// Number of parameters.
     pub num_params: usize,
     /// Parameter types (if applicable).
-    pub param_types: FnArgsVec<TypeId>,
+    pub param_types: Box<[TypeId]>,
     /// Parameter names and types (if available).
     #[cfg(feature = "metadata")]
-    pub params_info: FnArgsVec<Identifier>,
+    pub params_info: Box<[Identifier]>,
     /// Return type name.
     #[cfg(feature = "metadata")]
     pub return_type: Identifier,
@@ -494,6 +494,27 @@ impl Module {
         self
     }
     /// Map a custom type to a friendly display name.
+    /// Exported under the `metadata` feature only.
+    ///
+    /// ## Comments
+    ///
+    /// Block doc-comments should be kept in a separate string slice.
+    ///
+    /// Line doc-comments should be merged, with line-breaks, into a single string slice without a final termination line-break.
+    ///
+    /// Leading white-spaces should be stripped, and each string slice always starts with the corresponding
+    /// doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments should start with `///`.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn set_custom_type_with_comments<T>(&mut self, name: &str, comments: &[&str]) -> &mut Self {
+        self.custom_types
+            .get_or_insert_with(Default::default)
+            .add_type_with_comments::<T>(name, comments);
+        self
+    }
+    /// Map a custom type to a friendly display name.
     ///
     /// ```
     /// # use rhai::Module;
@@ -517,6 +538,32 @@ impl Module {
         self.custom_types
             .get_or_insert_with(Default::default)
             .add(type_path, name);
+        self
+    }
+    /// Map a custom type to a friendly display name.
+    /// Exported under the `metadata` feature only.
+    ///
+    /// ## Comments
+    ///
+    /// Block doc-comments should be kept in a separate string slice.
+    ///
+    /// Line doc-comments should be merged, with line-breaks, into a single string slice without a final termination line-break.
+    ///
+    /// Leading white-spaces should be stripped, and each string slice always starts with the corresponding
+    /// doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments should start with `///`.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn set_custom_type_with_comments_raw<C: Into<Identifier>>(
+        &mut self,
+        type_path: impl Into<Identifier>,
+        name: impl Into<Identifier>,
+        comments: impl IntoIterator<Item = C>,
+    ) -> &mut Self {
+        self.custom_types
+            .get_or_insert_with(Default::default)
+            .add_with_comments(type_path, name, comments);
         self
     }
     /// Get the display name of a registered custom type.
@@ -543,6 +590,18 @@ impl Module {
             .as_ref()
             .and_then(|c| c.get(key))
             .map(|t| t.display_name.as_str())
+    }
+    /// Get the doc-comments of a registered custom type.
+    /// Exported under the `metadata` feature only.
+    #[cfg(feature = "metadata")]
+    #[inline]
+    #[must_use]
+    pub fn get_custom_type_comments(&self, key: &str) -> impl Iterator<Item = &str> {
+        self.custom_types
+            .as_ref()
+            .and_then(|c| c.get(key))
+            .into_iter()
+            .flat_map(|t| t.comments.iter().map(<_>::as_ref))
     }
 
     /// Returns `true` if this [`Module`] contains no items.
@@ -768,7 +827,7 @@ impl Module {
                         #[cfg(not(feature = "no_object"))]
                         this_type: fn_def.this_type.clone(),
                         num_params,
-                        param_types: FnArgsVec::new_const(),
+                        param_types: Default::default(),
                         #[cfg(feature = "metadata")]
                         params_info,
                         #[cfg(feature = "metadata")]
@@ -934,10 +993,7 @@ impl Module {
         hash_fn: u64,
         arg_names: impl IntoIterator<Item = S>,
     ) -> &mut Self {
-        let mut param_names = arg_names
-            .into_iter()
-            .map(Into::into)
-            .collect::<FnArgsVec<_>>();
+        let mut param_names = arg_names.into_iter().map(Into::into).collect::<Vec<_>>();
 
         if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
             let (param_names, return_type_name) = if param_names.len() > f.metadata.num_params {
@@ -946,7 +1002,7 @@ impl Module {
             } else {
                 (param_names, crate::SmartString::new_const())
             };
-            f.metadata.params_info = param_names;
+            f.metadata.params_info = param_names.into_boxed_slice();
             f.metadata.return_type = return_type_name;
         }
 
@@ -1063,7 +1119,7 @@ impl Module {
             .iter()
             .enumerate()
             .map(|(i, &type_id)| Self::map_type(!is_method || i > 0, type_id))
-            .collect::<FnArgsVec<_>>();
+            .collect::<Vec<_>>();
 
         let is_dynamic = param_types
             .iter()
@@ -1075,7 +1131,7 @@ impl Module {
                 .into_iter()
                 .flatten()
                 .map(|&s| s.into())
-                .collect::<FnArgsVec<_>>();
+                .collect::<Vec<_>>();
             let return_type = if names.len() > param_types.len() {
                 names.pop().unwrap()
             } else {
@@ -1117,9 +1173,9 @@ impl Module {
                         #[cfg(not(feature = "no_object"))]
                         this_type: None,
                         num_params: param_types.len(),
-                        param_types,
+                        param_types: param_types.into_boxed_slice(),
                         #[cfg(feature = "metadata")]
-                        params_info: param_names,
+                        params_info: param_names.into_boxed_slice(),
                         #[cfg(feature = "metadata")]
                         return_type: return_type_name,
                         #[cfg(feature = "metadata")]
@@ -2022,6 +2078,13 @@ impl Module {
             .map(|(k, v)| (k, v))
     }
 
+    /// Get an iterator to the custom types in the [`Module`].
+    #[inline]
+    #[allow(dead_code)]
+    pub(crate) fn iter_custom_types(&self) -> impl Iterator<Item = (&str, &CustomTypeInfo)> {
+        self.custom_types.iter().flat_map(|custom| custom.iter())
+    }
+
     /// Get an iterator to the functions in the [`Module`].
     #[inline]
     #[allow(dead_code)]
@@ -2179,7 +2242,7 @@ impl Module {
         let mut module = Module::new();
 
         // Extra modules left become sub-modules
-        let mut imports = crate::StaticVec::new_const();
+        let mut imports = Vec::new();
 
         if result.is_ok() {
             global

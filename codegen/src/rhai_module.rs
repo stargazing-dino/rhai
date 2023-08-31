@@ -23,6 +23,8 @@ pub struct ExportedType {
     pub name: String,
     pub typ: Box<syn::Type>,
     pub cfg_attrs: Vec<syn::Attribute>,
+    #[cfg(feature = "metadata")]
+    pub comments: Vec<String>,
 }
 
 pub fn generate_body(
@@ -67,6 +69,8 @@ pub fn generate_body(
         name,
         typ,
         cfg_attrs,
+        #[cfg(feature = "metadata")]
+        comments,
         ..
     } in custom_types
     {
@@ -77,13 +81,27 @@ pub fn generate_body(
             .map(syn::Attribute::to_token_stream)
             .collect();
 
-        set_const_statements.push(
+        #[cfg(feature = "metadata")]
+        let comments = comments
+            .iter()
+            .map(|s| syn::LitStr::new(s, Span::call_site()))
+            .collect::<Vec<_>>();
+        #[cfg(not(feature = "metadata"))]
+        let comments = Vec::<syn::LitStr>::new();
+
+        set_const_statements.push(if comments.is_empty() {
             syn::parse2::<syn::Stmt>(quote! {
                 #(#cfg_attrs)*
                 m.set_custom_type::<#typ>(#const_literal);
             })
-            .unwrap(),
-        );
+            .unwrap()
+        } else {
+            syn::parse2::<syn::Stmt>(quote! {
+                #(#cfg_attrs)*
+                m.set_custom_type_with_comments::<#typ>(#const_literal, &[#(#comments),*]);
+            })
+            .unwrap()
+        });
     }
 
     for item_mod in sub_modules {
@@ -231,7 +249,7 @@ pub fn generate_body(
                 syn::parse2::<syn::Stmt>(quote! {
                     #(#cfg_attrs)*
                     m.set_fn_with_comments(#fn_literal, FnNamespace::#ns_str, FnAccess::Public,
-                             #param_names, [#(#fn_input_types),*], [#(#comments),*], #fn_token_name().into());
+                             #param_names, &[#(#fn_input_types),*], &[#(#comments),*], #fn_token_name().into());
                 })
                 .unwrap()
             });

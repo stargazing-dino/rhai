@@ -14,12 +14,10 @@ use crate::func::builtin::get_builtin_binary_op_fn;
 use crate::func::hashing::get_hasher;
 use crate::module::ModuleFlags;
 use crate::tokenizer::Token;
-use crate::types::scope::SCOPE_ENTRIES_INLINED;
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString, Position,
     Scope, AST,
 };
-use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -55,7 +53,7 @@ struct OptimizerState<'a> {
     /// Has the [`AST`] been changed during this pass?
     is_dirty: bool,
     /// Stack of variables/constants for constants propagation.
-    variables: SmallVec<[(ImmutableString, Option<Dynamic>); SCOPE_ENTRIES_INLINED]>,
+    variables: Vec<(ImmutableString, Option<Dynamic>)>,
     /// Activate constants propagation?
     propagate_constants: bool,
     /// [`Engine`] instance for eager function evaluation.
@@ -86,7 +84,7 @@ impl<'a> OptimizerState<'a> {
 
         Self {
             is_dirty: false,
-            variables: SmallVec::new_const(),
+            variables: Vec::new(),
             propagate_constants: true,
             engine,
             global: _global,
@@ -1335,9 +1333,7 @@ impl Engine {
         &self,
         scope: Option<&Scope>,
         statements: StmtBlockContainer,
-        #[cfg(not(feature = "no_function"))] functions: crate::StaticVec<
-            crate::Shared<crate::ast::ScriptFnDef>,
-        >,
+        #[cfg(not(feature = "no_function"))] functions: Vec<crate::Shared<crate::ast::ScriptFnDef>>,
         optimization_level: OptimizationLevel,
     ) -> AST {
         let mut statements = statements;

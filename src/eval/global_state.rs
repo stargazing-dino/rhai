@@ -25,14 +25,14 @@ pub type SharedGlobalConstants =
 pub struct GlobalRuntimeState {
     /// Names of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    imports: Option<Box<crate::StaticVec<ImmutableString>>>,
+    imports: Option<Vec<ImmutableString>>,
     /// Stack of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    modules: Option<Box<crate::StaticVec<crate::SharedModule>>>,
+    modules: Option<Vec<crate::SharedModule>>,
 
     /// The current stack of loaded [modules][crate::Module] containing script-defined functions.
     #[cfg(not(feature = "no_function"))]
-    pub lib: crate::StaticVec<crate::SharedModule>,
+    pub lib: Vec<crate::SharedModule>,
     /// Source of the current context.
     ///
     /// No source if the string is empty.
@@ -86,7 +86,7 @@ impl GlobalRuntimeState {
             #[cfg(not(feature = "no_module"))]
             modules: None,
             #[cfg(not(feature = "no_function"))]
-            lib: crate::StaticVec::new_const(),
+            lib: Vec::new(),
             source: None,
             num_operations: 0,
             #[cfg(not(feature = "no_module"))]
@@ -116,7 +116,7 @@ impl GlobalRuntimeState {
     #[inline]
     #[must_use]
     pub fn num_imports(&self) -> usize {
-        self.modules.as_deref().map_or(0, crate::StaticVec::len)
+        self.modules.as_ref().map_or(0, Vec::len)
     }
     /// Get the globally-imported [module][crate::Module] at a particular index.
     ///
@@ -153,11 +153,11 @@ impl GlobalRuntimeState {
         module: impl Into<crate::SharedModule>,
     ) {
         self.imports
-            .get_or_insert_with(|| crate::StaticVec::new_const().into())
+            .get_or_insert_with(|| Vec::new().into())
             .push(name.into());
 
         self.modules
-            .get_or_insert_with(|| crate::StaticVec::new_const().into())
+            .get_or_insert_with(|| Vec::new().into())
             .push(module.into());
     }
     /// Truncate the stack of globally-imported [modules][crate::Module] to a particular length.
@@ -170,8 +170,8 @@ impl GlobalRuntimeState {
             self.imports = None;
             self.modules = None;
         } else if self.imports.is_some() {
-            self.imports.as_deref_mut().unwrap().truncate(size);
-            self.modules.as_deref_mut().unwrap().truncate(size);
+            self.imports.as_mut().unwrap().truncate(size);
+            self.modules.as_mut().unwrap().truncate(size);
         }
     }
     /// Get an iterator to the stack of globally-imported [modules][crate::Module] in reverse order.
@@ -333,12 +333,8 @@ impl GlobalRuntimeState {
 impl<K: Into<ImmutableString>, M: Into<crate::SharedModule>> Extend<(K, M)> for GlobalRuntimeState {
     #[inline]
     fn extend<T: IntoIterator<Item = (K, M)>>(&mut self, iter: T) {
-        let imports = self
-            .imports
-            .get_or_insert_with(|| crate::StaticVec::new_const().into());
-        let modules = self
-            .modules
-            .get_or_insert_with(|| crate::StaticVec::new_const().into());
+        let imports = self.imports.get_or_insert_with(|| Vec::new().into());
+        let modules = self.modules.get_or_insert_with(|| Vec::new().into());
 
         for (k, m) in iter {
             imports.push(k.into());

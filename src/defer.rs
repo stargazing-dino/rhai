@@ -41,11 +41,9 @@ macro_rules! defer {
     };
     ($var:ident = ( $value:expr ) if Some($guard:ident) => $restore:expr) => {
         let mut __rx__;
-        let $var = if let Some($guard) = $guard {
-            __rx__ = crate::Deferred::lock($value, $restore);
-            &mut *__rx__
-        } else {
-            &mut *$value
+        let $var = match $guard {
+            Some($guard) => { __rx__ = crate::Deferred::lock($value, $restore); &mut *__rx__ }
+            _ => &mut *$value
         };
     };
     ($var:ident if $guard:expr => $restore:expr) => {

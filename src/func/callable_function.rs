@@ -21,7 +21,7 @@ pub struct EncapsulatedEnviron {
     pub lib: crate::SharedModule,
     /// Imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    pub imports: Box<crate::StaticVec<(crate::ImmutableString, crate::SharedModule)>>,
+    pub imports: Vec<(crate::ImmutableString, crate::SharedModule)>,
     /// Globally-defined constants.
     #[cfg(not(feature = "no_module"))]
     #[cfg(not(feature = "no_function"))]
