@@ -43,6 +43,9 @@ mod module_tests {
             pub mod one_fn {
                 pub type Hello = ();
 
+                /// We are the world!
+                pub type World = String;
+
                 pub fn get_mystic_number() -> INT {
                     42
                 }
@@ -51,8 +54,14 @@ mod module_tests {
 
         let item_mod = syn::parse2::<Module>(input_tokens).unwrap();
         assert!(item_mod.consts().is_empty());
-        assert_eq!(item_mod.custom_types().len(), 1);
+        assert_eq!(item_mod.custom_types().len(), 2);
         assert_eq!(item_mod.custom_types()[0].name.to_string(), "Hello");
+        assert_eq!(item_mod.custom_types()[1].name.to_string(), "World");
+        #[cfg(feature = "metadata")]
+        assert_eq!(
+            item_mod.custom_types()[1].comments[0],
+            "/// We are the world!"
+        );
         assert_eq!(item_mod.fns().len(), 1);
         assert_eq!(item_mod.fns()[0].name().to_string(), "get_mystic_number");
         assert_eq!(item_mod.fns()[0].arg_count(), 0);
@@ -409,6 +418,9 @@ mod generate_tests {
             /// Another line!
             /// Final line!
             pub mod one_fn {
+                /// We are the world!
+                pub type World = String;
+
                 /// This is a doc-comment.
                 /// Another line.
                 /** block doc-comment */
@@ -432,6 +444,9 @@ mod generate_tests {
             /// Final line!
             #[allow(clippy::needless_pass_by_value)]
             pub mod one_fn {
+                /// We are the world!
+                pub type World = String;
+
                 /// This is a doc-comment.
                 /// Another line.
                 /** block doc-comment */
@@ -458,10 +473,11 @@ mod generate_tests {
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
                     m.set_fn_with_comments("get_mystic_number", FnNamespace::Internal, FnAccess::Public,
-                             Some(get_mystic_number_token::PARAM_NAMES), [], [
+                             Some(get_mystic_number_token::PARAM_NAMES), &[], &[
                                  "/// This is a doc-comment.\n/// Another line.\n/// block doc-comment \n/// Final line.",
                                  "/** doc-comment\n                    in multiple lines\n                 */"
                              ], get_mystic_number_token().into());
+                    m.set_custom_type_with_comments::<String>("World", &["/// We are the world!"]);
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]

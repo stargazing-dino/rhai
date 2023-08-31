@@ -20,17 +20,19 @@ Dependencies
 * [`syn`](https://crates.io/crates/syn) in [`rhai_codegen`](https://crates.io/crates/rhai_codegen) is bumped to version 2.
 * [`hashbrown`](https://crates.io/crates/hashbrown) (used in `no-std` builds) is bumped to version 0.14.
 
-Enhancements
-------------
-
-* [`once_cell`](https://crates.io/crates/once_cell) is used in `std` environments instead of the home-brew `SusLock`.
-* Originally, unit tests use the `?` operator liberally to simplify code. However, this causes the loss of proper line numbers when a test fails, making it difficult to identify the exact location of the failure. This is now fixed by changing to `unwrap()`.
-
 New features
 ------------
 
 * Added `Engine::max_variables` and `Engine::set_max_variables` to limit the maximum number of variables allowed within a scope at any time. This is to guard against defining a huge number of variables containing large data just beyond individual data size limits. When `max_variables` is exceeded a new error, `ErrorTooManyVariables`, is returned.
 * Added `zip` function for arrays.
+* Doc-comments are now included in custom type definitions within plugin modules. They can be accessed via `Module::get_custom_type_comments`. These doc-comments for custom types are also exported in JSON via `Engine::gen_fn_metadata_to_json`.
+
+Enhancements
+------------
+
+* [`once_cell`](https://crates.io/crates/once_cell) is used in `std` environments instead of the home-brew `SusLock` which is removed.
+* Originally, unit tests use the `?` operator liberally to simplify code. However, this causes the loss of proper line numbers when a test fails, making it difficult to identify the exact location of the failure. This is now fixed by changing to `unwrap()`.
+* Many inlined collections are turned back into `Vec` because they are not transient and do not appear to improve performance.  Using `Vec` seems to be yield better performance as it probably enables more compiler optimizations.
 
 
 Version 1.15.1

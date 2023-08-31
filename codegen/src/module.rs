@@ -170,6 +170,8 @@ impl Parse for Module {
                         name: ident.to_string(),
                         typ: ty.clone(),
                         cfg_attrs: crate::attrs::collect_cfg_attr(attrs),
+                        #[cfg(feature = "metadata")]
+                        comments: crate::attrs::doc_attributes(attrs)?,
                     })
                 }
             }

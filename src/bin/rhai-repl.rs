@@ -251,6 +251,9 @@ fn setup_editor() -> DefaultEditor {
 /// Module containing sample functions.
 #[export_module]
 mod sample_functions {
+    /// My super-string type.
+    pub type MyType = String;
+
     /// This is a sample function.
     ///
     /// It takes two numbers and prints them to a string.
@@ -262,7 +265,7 @@ mod sample_functions {
     ///
     /// print(result);      // prints "42 123"
     /// ```
-    pub fn test(x: INT, y: INT) -> String {
+    pub fn test(x: INT, y: INT) -> MyType {
         format!("{x} {y}")
     }
 

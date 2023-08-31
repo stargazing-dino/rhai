@@ -3,6 +3,7 @@
 
 use crate::api::formatting::format_type;
 use crate::module::{calc_native_fn_hash, FuncInfo, ModuleFlags};
+use crate::types::custom_types::CustomTypeInfo;
 use crate::{calc_fn_hash, Engine, FnAccess, SmartString, AST};
 use serde::Serialize;
 #[cfg(feature = "no_std")]
@@ -23,6 +24,40 @@ struct FnParam<'a> {
     pub name: Option<&'a str>,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub typ: Option<Cow<'a, str>>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CustomTypeMetadata<'a> {
+    pub type_name: &'a str,
+    pub display_name: &'a str,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub doc_comments: Vec<&'a str>,
+}
+
+impl PartialOrd for CustomTypeMetadata<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for CustomTypeMetadata<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.display_name.cmp(other.display_name) {
+            Ordering::Equal => self.display_name.cmp(&other.display_name),
+            cmp => cmp,
+        }
+    }
+}
+
+impl<'a> From<(&'a str, &'a CustomTypeInfo)> for CustomTypeMetadata<'a> {
+    fn from(value: (&'a str, &'a CustomTypeInfo)) -> Self {
+        Self {
+            type_name: value.0,
+            display_name: value.1.display_name.as_str(),
+            doc_comments: value.1.comments.iter().map(<_>::as_ref).collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
@@ -133,11 +168,12 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ModuleMetadata<'a> {
-    #[cfg(feature = "metadata")]
     #[serde(skip_serializing_if = "str::is_empty")]
     pub doc: &'a str,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub modules: BTreeMap<&'a str, Self>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub custom_types: Vec<CustomTypeMetadata<'a>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub functions: Vec<FnMetadata<'a>>,
 }
@@ -146,9 +182,9 @@ impl ModuleMetadata<'_> {
     #[inline(always)]
     pub fn new() -> Self {
         Self {
-            #[cfg(feature = "metadata")]
             doc: "",
             modules: BTreeMap::new(),
+            custom_types: Vec::new(),
             functions: Vec::new(),
         }
     }
@@ -156,15 +192,24 @@ impl ModuleMetadata<'_> {
 
 impl<'a> From<&'a crate::Module> for ModuleMetadata<'a> {
     fn from(module: &'a crate::Module) -> Self {
+        let modules = module
+            .iter_sub_modules()
+            .map(|(name, m)| (name, m.as_ref().into()))
+            .collect();
+
+        let mut custom_types = module
+            .iter_custom_types()
+            .map(Into::into)
+            .collect::<Vec<_>>();
+        custom_types.sort();
+
         let mut functions = module.iter_fn().map(Into::into).collect::<Vec<_>>();
         functions.sort();
 
         Self {
             doc: module.doc(),
-            modules: module
-                .iter_sub_modules()
-                .map(|(name, m)| (name, m.as_ref().into()))
-                .collect(),
+            modules,
+            custom_types,
             functions,
         }
     }
@@ -177,7 +222,6 @@ pub fn gen_metadata_to_json(
     include_standard_packages: bool,
 ) -> serde_json::Result<String> {
     let _ast = ast;
-    #[cfg(feature = "metadata")]
     let mut global_doc = String::new();
     let mut global = ModuleMetadata::new();
 
@@ -196,17 +240,35 @@ pub fn gen_metadata_to_json(
         .global_modules
         .iter()
         .filter(|m| !m.flags.contains(exclude_flags))
-        .flat_map(|m| {
-            #[cfg(feature = "metadata")]
+        .for_each(|m| {
             if !m.doc().is_empty() {
                 if !global_doc.is_empty() {
                     global_doc.push('\n');
                 }
                 global_doc.push_str(m.doc());
             }
-            m.iter_fn()
-        })
-        .for_each(|f| {
+
+            m.iter_custom_types()
+                .for_each(|c| global.custom_types.push(c.into()));
+
+            m.iter_fn().for_each(|f| {
+                #[allow(unused_mut)]
+                let mut meta: FnMetadata = f.into();
+                #[cfg(not(feature = "no_module"))]
+                {
+                    meta.namespace = crate::FnNamespace::Global;
+                }
+                global.functions.push(meta);
+            })
+        });
+
+    #[cfg(not(feature = "no_function"))]
+    if let Some(ast) = _ast {
+        ast.shared_lib()
+            .iter_custom_types()
+            .for_each(|c| global.custom_types.push(c.into()));
+
+        ast.shared_lib().iter_fn().for_each(|f| {
             #[allow(unused_mut)]
             let mut meta: FnMetadata = f.into();
             #[cfg(not(feature = "no_module"))]
@@ -215,23 +277,11 @@ pub fn gen_metadata_to_json(
             }
             global.functions.push(meta);
         });
-
-    #[cfg(not(feature = "no_function"))]
-    if let Some(ast) = _ast {
-        for f in ast.shared_lib().iter_fn() {
-            #[allow(unused_mut)]
-            let mut meta: FnMetadata = f.into();
-            #[cfg(not(feature = "no_module"))]
-            {
-                meta.namespace = crate::FnNamespace::Global;
-            }
-            global.functions.push(meta);
-        }
     }
 
+    global.custom_types.sort();
     global.functions.sort();
 
-    #[cfg(feature = "metadata")]
     if let Some(ast) = _ast {
         if !ast.doc().is_empty() {
             if !global_doc.is_empty() {
@@ -241,10 +291,7 @@ pub fn gen_metadata_to_json(
         }
     }
 
-    #[cfg(feature = "metadata")]
-    {
-        global.doc = &global_doc;
-    }
+    global.doc = &global_doc;
 
     serde_json::to_string_pretty(&global)
 }
