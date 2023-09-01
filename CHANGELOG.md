@@ -4,6 +4,11 @@ Rhai Release Notes
 Version 1.16.0
 ==============
 
+Compiler version
+----------------
+
+The minimum Rust compiler version is raised to `1.66.0`.
+
 Bug fixes
 ---------
 
