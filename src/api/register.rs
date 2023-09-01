@@ -760,11 +760,7 @@ impl Engine {
             }
         }
 
-        register_static_module_raw(
-            self.global_sub_modules.get_or_insert_with(Default::default),
-            name.as_ref(),
-            module,
-        );
+        register_static_module_raw(&mut self.global_sub_modules, name.as_ref(), module);
         self
     }
     /// _(metadata)_ Generate a list of all registered functions.
@@ -786,7 +782,7 @@ impl Engine {
         }
 
         #[cfg(not(feature = "no_module"))]
-        for (name, m) in self.global_sub_modules.as_ref().into_iter().flatten() {
+        for (name, m) in self.global_sub_modules.iter() {
             signatures.extend(m.gen_fn_signatures().map(|f| format!("{name}::{f}")));
         }
 

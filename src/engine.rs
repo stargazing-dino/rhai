@@ -95,7 +95,7 @@ pub struct Engine {
     pub(crate) global_modules: Vec<SharedModule>,
     /// A collection of all sub-modules directly loaded into the Engine.
     #[cfg(not(feature = "no_module"))]
-    pub(crate) global_sub_modules: Option<std::collections::BTreeMap<Identifier, SharedModule>>,
+    pub(crate) global_sub_modules: std::collections::BTreeMap<Identifier, SharedModule>,
 
     /// A module resolution service.
     #[cfg(not(feature = "no_module"))]
@@ -105,15 +105,15 @@ pub struct Engine {
     pub(crate) interned_strings: Option<Box<Locked<StringsInterner>>>,
 
     /// A set of symbols to disable.
-    pub(crate) disabled_symbols: Option<BTreeSet<Identifier>>,
+    pub(crate) disabled_symbols: BTreeSet<Identifier>,
     /// A map containing custom keywords and precedence to recognize.
     #[cfg(not(feature = "no_custom_syntax"))]
-    pub(crate) custom_keywords: Option<std::collections::BTreeMap<Identifier, Option<Precedence>>>,
+    pub(crate) custom_keywords: std::collections::BTreeMap<Identifier, Option<Precedence>>,
     /// Custom syntax.
     #[cfg(not(feature = "no_custom_syntax"))]
-    pub(crate) custom_syntax: Option<
+    pub(crate) custom_syntax:
         std::collections::BTreeMap<Identifier, Box<crate::api::custom_syntax::CustomSyntax>>,
-    >,
+
     /// Callback closure for filtering variable definition.
     pub(crate) def_var_filter: Option<Box<OnDefVarCallback>>,
     /// Callback closure for resolving variable access.
@@ -168,8 +168,7 @@ impl fmt::Debug for Engine {
             "custom_syntax",
             &self
                 .custom_syntax
-                .iter()
-                .flat_map(|m| m.keys())
+                .keys()
                 .map(crate::SmartString::as_str)
                 .collect::<String>(),
         );
@@ -229,17 +228,17 @@ impl Engine {
         global_modules: Vec::new(),
 
         #[cfg(not(feature = "no_module"))]
-        global_sub_modules: None,
+        global_sub_modules: std::collections::BTreeMap::new(),
 
         #[cfg(not(feature = "no_module"))]
         module_resolver: None,
 
         interned_strings: None,
-        disabled_symbols: None,
+        disabled_symbols: BTreeSet::new(),
         #[cfg(not(feature = "no_custom_syntax"))]
-        custom_keywords: None,
+        custom_keywords: std::collections::BTreeMap::new(),
         #[cfg(not(feature = "no_custom_syntax"))]
-        custom_syntax: None,
+        custom_syntax: std::collections::BTreeMap::new(),
 
         def_var_filter: None,
         resolve_var: None,

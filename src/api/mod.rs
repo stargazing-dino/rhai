@@ -111,9 +111,7 @@ impl Engine {
     /// ```
     #[inline]
     pub fn disable_symbol(&mut self, symbol: impl Into<Identifier>) -> &mut Self {
-        self.disabled_symbols
-            .get_or_insert_with(Default::default)
-            .insert(symbol.into());
+        self.disabled_symbols.insert(symbol.into());
         self
     }
 
@@ -130,11 +128,9 @@ impl Engine {
     ///
     /// assert!(engine.is_symbol_disabled("if"));
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn is_symbol_disabled(&self, symbol: &str) -> bool {
-        self.disabled_symbols
-            .as_ref()
-            .map_or(false, |m| m.contains(symbol))
+        self.disabled_symbols.contains(symbol)
     }
 
     /// Register a custom operator with a precedence into the language.
@@ -211,7 +207,6 @@ impl Engine {
 
         // Add to custom keywords
         self.custom_keywords
-            .get_or_insert_with(Default::default)
             .insert(keyword.into(), Some(precedence));
 
         Ok(self)
@@ -220,11 +215,9 @@ impl Engine {
     ///
     /// Not available under `no_custom_syntax`.
     #[cfg(not(feature = "no_custom_syntax"))]
-    #[inline]
+    #[inline(always)]
     pub(crate) fn is_custom_keyword(&self, keyword: &str) -> bool {
-        self.custom_keywords
-            .as_ref()
-            .map_or(false, |m| m.contains_key(keyword))
+        self.custom_keywords.contains_key(keyword)
     }
 
     /// Get the default value of the custom state for each evaluation run.

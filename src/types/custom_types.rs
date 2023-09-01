@@ -29,8 +29,13 @@ impl Default for CustomTypesCollection {
 impl CustomTypesCollection {
     /// Create a new [`CustomTypesCollection`].
     #[inline(always)]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self(BTreeMap::new())
+    }
+    /// Clear the [`CustomTypesCollection`].
+    #[inline(always)]
+    pub fn clear(&mut self) {
+        self.0.clear();
     }
     /// Register a custom type.
     #[inline(always)]

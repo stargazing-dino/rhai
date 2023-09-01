@@ -706,10 +706,8 @@ impl Engine {
                     .or_else(|| global.get_iter(iter_type))
                     .or_else(|| {
                         self.global_sub_modules
-                            .as_ref()
-                            .into_iter()
-                            .flatten()
-                            .find_map(|(_, m)| m.get_qualified_iter(iter_type))
+                            .values()
+                            .find_map(|m| m.get_qualified_iter(iter_type))
                     });
 
                 let iter_func = iter_func.ok_or_else(|| ERR::ErrorFor(expr.start_position()))?;

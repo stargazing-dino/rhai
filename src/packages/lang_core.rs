@@ -320,10 +320,8 @@ fn collect_fn_metadata(
     #[cfg(not(feature = "no_module"))]
     ctx.engine()
         .global_sub_modules
-        .as_ref()
-        .into_iter()
-        .flatten()
-        .flat_map(|(_, m)| m.iter_script_fn())
+        .values()
+        .flat_map(|m| m.iter_script_fn())
         .filter(|(ns, a, n, p, f)| filter(*ns, *a, n, *p, f))
         .for_each(|(.., f)| {
             list.push(
