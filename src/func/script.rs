@@ -127,6 +127,11 @@ impl Engine {
             .or_else(|err| match *err {
                 // Convert return statement to return value
                 ERR::Return(x, ..) => Ok(x),
+                // Exit value is passed straight-through
+                mut err @ ERR::Exit(..) => {
+                    err.set_position(pos);
+                    Err(err.into())
+                }
                 // System errors are passed straight-through
                 mut err if err.is_system_exception() => {
                     err.set_position(pos);

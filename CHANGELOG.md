@@ -23,6 +23,7 @@ Dependencies
 New features
 ------------
 
+* New `exit` function that terminates script evaluation regardless of where it is called, even inside deeply-nested function calls.
 * Added `Engine::max_variables` and `Engine::set_max_variables` to limit the maximum number of variables allowed within a scope at any time. This is to guard against defining a huge number of variables containing large data just beyond individual data size limits. When `max_variables` is exceeded a new error, `ErrorTooManyVariables`, is returned.
 * Added `zip` function for arrays.
 * Doc-comments are now included in custom type definitions within plugin modules. They can be accessed via `Module::get_custom_type_comments`. These doc-comments for custom types are also exported in JSON via `Engine::gen_fn_metadata_to_json`.

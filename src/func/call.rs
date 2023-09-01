@@ -1252,14 +1252,15 @@ impl Engine {
                 }
                 global.level = orig_level;
 
-                return result.map_err(|err| {
-                    ERR::ErrorInFunctionCall(
+                return result.map_err(|err| match *err {
+                    ERR::Exit(..) => err,
+                    _ => ERR::ErrorInFunctionCall(
                         KEYWORD_EVAL.to_string(),
                         global.source().unwrap_or("").to_string(),
                         err,
                         pos,
                     )
-                    .into()
+                    .into(),
                 });
             }
 
@@ -1612,7 +1613,7 @@ impl Engine {
         }
 
         // Evaluate the AST
-        self.eval_global_statements(global, caches, scope, statements)
+        self.eval_global_statements(global, caches, scope, statements, false)
     }
 
     /// # Main Entry-Point (`FnCallExpr`)

@@ -226,17 +226,18 @@ impl Engine {
 
         let rewind_scope = options.rewind_scope;
 
-        let result = if options.eval_ast && !statements.is_empty() {
+        let global_result = if options.eval_ast && !statements.is_empty() {
             defer! {
                 scope if rewind_scope => rewind;
                 let orig_scope_len = scope.len();
             }
 
-            self.eval_global_statements(global, caches, scope, statements)
+            self.eval_global_statements(global, caches, scope, statements, true)
         } else {
             Ok(Dynamic::UNIT)
-        }
-        .and_then(|_| {
+        };
+
+        let result = global_result.and_then(|_| {
             let args = &mut arg_values.iter_mut().collect::<StaticVec<_>>();
 
             // Check for data race.
@@ -261,6 +262,10 @@ impl Engine {
                         )
                     },
                 )
+                .or_else(|err| match *err {
+                    ERR::Exit(out, ..) => Ok(out),
+                    _ => Err(err),
+                })
         });
 
         #[cfg(feature = "debugging")]

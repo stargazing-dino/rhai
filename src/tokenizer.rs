@@ -596,7 +596,7 @@ static RESERVED_LIST: [(&str, bool, bool, bool); 150] = [
     ("import", cfg!(feature = "no_module"), false, false),
     ("--", true, false, false),
     ("nil", true, false, false),
-    ("exit", true, false, false),
+    ("exit", false, false, false),
     ("", false, false, false),
     ("export", cfg!(feature = "no_module"), false, false),
     ("<|", true, false, false),
@@ -1458,7 +1458,7 @@ fn scan_block_comment(
 
         match c {
             '/' => {
-                if let Some(c2) = stream.peek_next().filter(|&c2| c2 == '*') {
+                if let Some(c2) = stream.peek_next().filter(|&ch| ch == '*') {
                     eat_next_and_advance(stream, pos);
                     if let Some(comment) = comment.as_mut() {
                         comment.push(c2);
@@ -1467,7 +1467,7 @@ fn scan_block_comment(
                 }
             }
             '*' => {
-                if let Some(c2) = stream.peek_next().filter(|&c2| c2 == '/') {
+                if let Some(c2) = stream.peek_next().filter(|&ch| ch == '/') {
                     eat_next_and_advance(stream, pos);
                     if let Some(comment) = comment.as_mut() {
                         comment.push(c2);

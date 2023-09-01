@@ -336,7 +336,7 @@ impl Engine {
         scope: &mut Scope,
         statements: &[crate::ast::Stmt],
     ) -> RhaiResult {
-        self.eval_global_statements(global, caches, scope, statements)
+        self.eval_global_statements(global, caches, scope, statements, true)
     }
 }
 

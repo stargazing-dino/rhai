@@ -1011,10 +1011,12 @@ impl Engine {
         caches: &mut Caches,
         scope: &mut Scope,
         statements: &[Stmt],
+        map_exit_to_return_value: bool,
     ) -> RhaiResult {
         self.eval_stmt_block(global, caches, scope, None, statements, false)
             .or_else(|err| match *err {
                 ERR::Return(out, ..) => Ok(out),
+                ERR::Exit(out, ..) if map_exit_to_return_value => Ok(out),
                 ERR::LoopBreak(..) => {
                     unreachable!("no outer loop scope to break out of")
                 }
