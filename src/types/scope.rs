@@ -10,6 +10,9 @@ use std::{
     marker::PhantomData,
 };
 
+/// Minimum number of entries in the [`Scope`] to avoid reallocations.
+pub const MIN_SCOPE_ENTRIES: usize = 8;
+
 /// Type containing information about the current scope. Useful for keeping state between
 /// [`Engine`][crate::Engine] evaluation runs.
 ///
@@ -343,6 +346,11 @@ impl Scope<'_> {
         access: AccessMode,
         mut value: Dynamic,
     ) -> &mut Self {
+        if self.is_empty() {
+            self.names.reserve(MIN_SCOPE_ENTRIES);
+            self.values.reserve(MIN_SCOPE_ENTRIES);
+            self.aliases.reserve(MIN_SCOPE_ENTRIES);
+        }
         self.names.push(name.into());
         self.aliases.push(Vec::new());
         value.set_access_mode(access);
@@ -783,6 +791,11 @@ impl Scope<'_> {
             let mut v2 = v1.clone();
             v2.set_access_mode(v1.access_mode());
 
+            if self.is_empty() {
+                scope.names.reserve(MIN_SCOPE_ENTRIES);
+                scope.values.reserve(MIN_SCOPE_ENTRIES);
+                scope.aliases.reserve(MIN_SCOPE_ENTRIES);
+            }
             scope.names.push(name.clone());
             scope.values.push(v2);
             scope.aliases.push(alias.clone());
