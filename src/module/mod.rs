@@ -1073,7 +1073,7 @@ impl Module {
     #[inline]
     pub fn set_fn(
         &mut self,
-        name: impl AsRef<str>,
+        name: impl Into<Identifier>,
         namespace: FnNamespace,
         access: FnAccess,
         arg_names: Option<&[&str]>,
@@ -1110,8 +1110,8 @@ impl Module {
             (names, return_type)
         };
 
-        let name = name.as_ref();
-        let hash_base = calc_fn_hash(None, name, param_types.len());
+        let name = name.into();
+        let hash_base = calc_fn_hash(None, &name, param_types.len());
         let hash_fn = calc_fn_hash_full(hash_base, param_types.iter().copied());
 
         // Catch hash collisions in testing environment only.
@@ -1134,7 +1134,7 @@ impl Module {
                 FuncInfo {
                     func,
                     metadata: FuncInfoMetadata {
-                        name: name.into(),
+                        name,
                         namespace,
                         access,
                         #[cfg(not(feature = "no_object"))]
@@ -1190,7 +1190,7 @@ impl Module {
     #[inline]
     pub fn set_fn_with_comments<S: AsRef<str>>(
         &mut self,
-        name: impl AsRef<str>,
+        name: impl Into<Identifier>,
         namespace: FnNamespace,
         access: FnAccess,
         arg_names: Option<&[&str]>,
@@ -1274,7 +1274,7 @@ impl Module {
     #[inline(always)]
     pub fn set_raw_fn<T: Variant + Clone>(
         &mut self,
-        name: impl AsRef<str>,
+        name: impl Into<Identifier>,
         namespace: FnNamespace,
         access: FnAccess,
         arg_types: impl AsRef<[TypeId]>,
@@ -1323,7 +1323,7 @@ impl Module {
     #[inline(always)]
     pub fn set_native_fn<A: 'static, const N: usize, const C: bool, T, F>(
         &mut self,
-        name: impl AsRef<str> + Into<Identifier>,
+        name: impl Into<Identifier>,
         func: F,
     ) -> u64
     where

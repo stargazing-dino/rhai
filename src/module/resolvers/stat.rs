@@ -145,6 +145,13 @@ impl<'a> IntoIterator for &'a StaticModuleResolver {
     }
 }
 
+impl AddAssign<Self> for StaticModuleResolver {
+    #[inline(always)]
+    fn add_assign(&mut self, rhs: Self) {
+        self.merge(rhs);
+    }
+}
+
 impl ModuleResolver for StaticModuleResolver {
     #[inline]
     fn resolve(
@@ -158,12 +165,5 @@ impl ModuleResolver for StaticModuleResolver {
             .get(path)
             .cloned()
             .ok_or_else(|| ERR::ErrorModuleNotFound(path.into(), pos).into())
-    }
-}
-
-impl AddAssign<Self> for StaticModuleResolver {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        self.merge(rhs);
     }
 }

@@ -79,7 +79,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         if self.is_debugger_registered() {
             let fn_name = fn_def.name.clone();
-            let args = scope.iter().skip(orig_scope_len).map(|(.., v)| v).collect();
+            let args = scope.iter().skip(orig_scope_len).map(|(.., v)| v);
             let source = global.source.clone();
 
             global

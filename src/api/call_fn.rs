@@ -4,7 +4,8 @@
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, StaticVec, AST, ERR,
+    Dynamic, Engine, FnArgsVec, FuncArgs, Position, RhaiResult, RhaiResultOf, Scope, StaticVec,
+    AST, ERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -238,7 +239,7 @@ impl Engine {
         };
 
         let result = global_result.and_then(|_| {
-            let args = &mut arg_values.iter_mut().collect::<StaticVec<_>>();
+            let args = &mut arg_values.iter_mut().collect::<FnArgsVec<_>>();
 
             // Check for data race.
             #[cfg(not(feature = "no_closure"))]

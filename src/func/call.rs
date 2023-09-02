@@ -384,7 +384,7 @@ impl Engine {
 
                 global.debugger_mut().push_call_stack_frame(
                     self.get_interned_string(name),
-                    args.iter().map(|v| (*v).clone()).collect(),
+                    args.iter().map(|v| (*v).clone()),
                     source,
                     pos,
                 );

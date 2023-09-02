@@ -70,10 +70,10 @@ impl Engine {
         let param_types = F::param_types();
 
         #[cfg(feature = "metadata")]
-        let mut param_type_names: crate::StaticVec<_> = F::param_names()
+        let mut param_type_names = F::param_names()
             .iter()
             .map(|ty| format!("_: {}", self.format_type_name(ty)))
-            .collect();
+            .collect::<crate::FnArgsVec<_>>();
 
         #[cfg(feature = "metadata")]
         if F::return_type() != TypeId::of::<()>() {
@@ -81,8 +81,10 @@ impl Engine {
         }
 
         #[cfg(feature = "metadata")]
-        let param_type_names: crate::StaticVec<_> =
-            param_type_names.iter().map(String::as_str).collect();
+        let param_type_names = param_type_names
+            .iter()
+            .map(String::as_str)
+            .collect::<crate::FnArgsVec<_>>();
         #[cfg(feature = "metadata")]
         let param_type_names = Some(param_type_names.as_ref());
 

@@ -131,6 +131,20 @@ impl<'a> IntoIterator for &'a ModuleResolversCollection {
     }
 }
 
+impl Extend<Box<dyn ModuleResolver>> for ModuleResolversCollection {
+    #[inline(always)]
+    fn extend<T: IntoIterator<Item = Box<dyn ModuleResolver>>>(&mut self, iter: T) {
+        self.0.extend(iter);
+    }
+}
+
+impl<M: ModuleResolver + 'static> AddAssign<M> for ModuleResolversCollection {
+    #[inline(always)]
+    fn add_assign(&mut self, rhs: M) {
+        self.push(rhs);
+    }
+}
+
 impl ModuleResolver for ModuleResolversCollection {
     fn resolve(
         &self,
@@ -151,12 +165,5 @@ impl ModuleResolver for ModuleResolversCollection {
         }
 
         Err(ERR::ErrorModuleNotFound(path.into(), pos).into())
-    }
-}
-
-impl<M: ModuleResolver + 'static> AddAssign<M> for ModuleResolversCollection {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: M) {
-        self.push(rhs);
     }
 }
