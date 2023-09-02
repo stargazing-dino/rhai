@@ -412,8 +412,8 @@ impl Scope<'_> {
     #[inline(always)]
     pub fn pop(&mut self) -> &mut Self {
         self.names.pop().expect("not empty");
-        self.values.truncate(self.len());
-        self.aliases.truncate(self.len());
+        self.values.truncate(self.names.len());
+        self.aliases.truncate(self.names.len());
         self
     }
     /// Remove the last entry from the [`Scope`] and return it.
