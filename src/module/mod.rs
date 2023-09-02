@@ -9,8 +9,8 @@ use crate::func::{
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypeInfo, CustomTypesCollection};
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, FnArgsVec, Identifier, ImmutableString,
-    NativeCallContext, RhaiResultOf, Shared, SharedModule, SmartString,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Identifier, ImmutableString, NativeCallContext,
+    RhaiResultOf, Shared, SharedModule, SmartString,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -134,7 +134,7 @@ impl FuncInfo {
                     };
                     result
                 })
-                .collect::<FnArgsVec<_>>();
+                .collect::<crate::FnArgsVec<_>>();
             signature.push_str(&params.join(", "));
         }
         signature.push(')');

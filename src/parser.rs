@@ -2990,7 +2990,7 @@ impl Engine {
                 Some(NonZeroUsize::new(state.stack.len() - n).unwrap())
             }
             None => {
-                state.stack.push_entry(name.as_str(), access, Dynamic::UNIT);
+                state.stack.push_entry(name.clone(), access, Dynamic::UNIT);
                 None
             }
         };
