@@ -3,7 +3,6 @@
 use crate::engine::Precedence;
 use crate::func::native::OnParseTokenCallback;
 use crate::{Engine, Identifier, LexError, Position, SmartString, INT, UNSIGNED_INT};
-use smallvec::SmallVec;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -2390,8 +2389,10 @@ pub struct MultiInputsStream<'a> {
     pub buf: [Option<char>; 2],
     /// The current stream index.
     pub index: usize,
-    /// The input character streams.
-    pub streams: SmallVec<[Peekable<Chars<'a>>; 1]>,
+    /// The first input character stream.
+    pub stream: Peekable<Chars<'a>>,
+    /// Extra input character streams.
+    pub extra_streams: Box<[Peekable<Chars<'a>>]>,
 }
 
 impl InputStream for MultiInputsStream<'_> {
@@ -2417,11 +2418,16 @@ impl InputStream for MultiInputsStream<'_> {
         }
 
         loop {
-            if self.index >= self.streams.len() {
+            if self.index >= self.extra_streams.len() + 1 {
                 // No more streams
                 return None;
             }
-            if let Some(ch) = self.streams[self.index].next() {
+            if self.index == 0 {
+                if let Some(ch) = self.stream.next() {
+                    // Next character in main stream
+                    return Some(ch);
+                }
+            } else if let Some(ch) = self.extra_streams[self.index - 1].next() {
                 // Next character in current stream
                 return Some(ch);
             }
@@ -2437,11 +2443,16 @@ impl InputStream for MultiInputsStream<'_> {
         }
 
         loop {
-            if self.index >= self.streams.len() {
+            if self.index >= self.extra_streams.len() + 1 {
                 // No more streams
                 return None;
             }
-            if let Some(&ch) = self.streams[self.index].peek() {
+            if self.index == 0 {
+                if let Some(&ch) = self.stream.peek() {
+                    // Next character in main stream
+                    return Some(ch);
+                }
+            } else if let Some(&ch) = self.extra_streams[self.index - 1].peek() {
                 // Next character in current stream
                 return Some(ch);
             }
@@ -2626,37 +2637,51 @@ impl FusedIterator for TokenIterator<'_> {}
 impl Engine {
     /// _(internals)_ Tokenize an input text stream.
     /// Exported under the `internals` feature only.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no input streams.
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
     pub fn lex<'a>(
         &'a self,
-        input: impl IntoIterator<Item = &'a (impl AsRef<str> + 'a)>,
+        inputs: impl IntoIterator<Item = &'a (impl AsRef<str> + 'a)>,
     ) -> (TokenIterator<'a>, TokenizerControl) {
-        self.lex_raw(input, None)
+        self.lex_raw(inputs, None)
     }
     /// _(internals)_ Tokenize an input text stream with a mapping function.
     /// Exported under the `internals` feature only.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no input streams.
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
     pub fn lex_with_map<'a>(
         &'a self,
-        input: impl IntoIterator<Item = &'a (impl AsRef<str> + 'a)>,
+        inputs: impl IntoIterator<Item = &'a (impl AsRef<str> + 'a)>,
         token_mapper: &'a OnParseTokenCallback,
     ) -> (TokenIterator<'a>, TokenizerControl) {
-        self.lex_raw(input, Some(token_mapper))
+        self.lex_raw(inputs, Some(token_mapper))
     }
     /// Tokenize an input text stream with an optional mapping function.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no input streams.
     #[inline]
     #[must_use]
     pub(crate) fn lex_raw<'a>(
         &'a self,
-        input: impl IntoIterator<Item = &'a (impl AsRef<str> + 'a)>,
+        inputs: impl IntoIterator<Item = &'a (impl AsRef<str> + 'a)>,
         token_mapper: Option<&'a OnParseTokenCallback>,
     ) -> (TokenIterator<'a>, TokenizerControl) {
         let buffer: TokenizerControl = RefCell::new(TokenizerControlBlock::new()).into();
         let buffer2 = buffer.clone();
+
+        let mut input_streams = inputs.into_iter().map(|s| s.as_ref().chars().peekable());
 
         (
             TokenIterator {
@@ -2673,10 +2698,8 @@ impl Engine {
                 pos: Position::new(1, 0),
                 stream: MultiInputsStream {
                     buf: [None, None],
-                    streams: input
-                        .into_iter()
-                        .map(|s| s.as_ref().chars().peekable())
-                        .collect(),
+                    stream: input_streams.next().unwrap(),
+                    extra_streams: input_streams.collect(),
                     index: 0,
                 },
                 token_mapper,
