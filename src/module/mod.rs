@@ -14,10 +14,14 @@ use crate::{
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
+use hashbrown::hash_map::Entry;
+#[cfg(not(feature = "no_std"))]
+use std::collections::hash_map::Entry;
+#[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
     any::TypeId,
-    collections::{hash_map::Entry, BTreeMap},
+    collections::BTreeMap,
     fmt,
     ops::{Add, AddAssign},
 };
