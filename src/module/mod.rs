@@ -17,7 +17,7 @@ use bitflags::bitflags;
 use std::prelude::v1::*;
 use std::{
     any::TypeId,
-    collections::BTreeMap,
+    collections::{hash_map::Entry, BTreeMap},
     fmt,
     ops::{Add, AddAssign},
 };
@@ -1154,6 +1154,7 @@ impl Module {
         func: CallableFunction,
     ) -> &mut FuncInfo {
         let _arg_names = arg_names;
+        let _comments = comments;
         let is_method = func.is_method();
 
         let param_types = arg_types
@@ -1202,29 +1203,38 @@ impl Module {
         self.flags
             .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
 
-        self.functions
+        let f = FuncInfo {
+            func,
+            metadata: FuncInfoMetadata {
+                hash: hash_fn,
+                name,
+                namespace,
+                access,
+                #[cfg(not(feature = "no_object"))]
+                this_type: None,
+                num_params: param_types.len(),
+                param_types: param_types.into_boxed_slice(),
+                #[cfg(feature = "metadata")]
+                params_info: param_names.into_boxed_slice(),
+                #[cfg(feature = "metadata")]
+                return_type: return_type_name,
+                #[cfg(feature = "metadata")]
+                comments: _comments.into_iter().map(|s| s.as_ref().into()).collect(),
+            }
+            .into(),
+        };
+
+        match self
+            .functions
             .get_or_insert_with(|| new_hash_map(FN_MAP_SIZE))
             .entry(hash_fn)
-            .or_insert_with(|| FuncInfo {
-                func,
-                metadata: FuncInfoMetadata {
-                    hash: hash_fn,
-                    name,
-                    namespace,
-                    access,
-                    #[cfg(not(feature = "no_object"))]
-                    this_type: None,
-                    num_params: param_types.len(),
-                    param_types: param_types.into_boxed_slice(),
-                    #[cfg(feature = "metadata")]
-                    params_info: param_names.into_boxed_slice(),
-                    #[cfg(feature = "metadata")]
-                    return_type: return_type_name,
-                    #[cfg(feature = "metadata")]
-                    comments: comments.into_iter().map(|s| s.as_ref().into()).collect(),
-                }
-                .into(),
-            })
+        {
+            Entry::Occupied(mut entry) => {
+                entry.insert(f);
+                entry.into_mut()
+            }
+            Entry::Vacant(entry) => entry.insert(f),
+        }
     }
 
     /// Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
