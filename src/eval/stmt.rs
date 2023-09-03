@@ -966,8 +966,8 @@ impl Engine {
                 scope.search(name).map_or_else(
                     || Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into()),
                     |index| {
-                        let alias = if alias.is_empty() { name } else { alias }.clone();
-                        scope.add_alias_by_index(index, alias);
+                        let alias = if alias.is_empty() { name } else { alias };
+                        scope.add_alias_by_index(index, alias.clone());
                         Ok(Dynamic::UNIT)
                     },
                 )

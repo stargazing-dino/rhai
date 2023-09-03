@@ -67,6 +67,8 @@ impl FnNamespace {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct FuncInfoMetadata {
+    /// Hash value.
+    pub hash: u64,
     /// Function namespace.
     pub namespace: FnNamespace,
     /// Function access mode.
@@ -797,6 +799,7 @@ impl Module {
                 hash_script,
                 FuncInfo {
                     metadata: FuncInfoMetadata {
+                        hash: hash_script,
                         name: fn_def.name.as_str().into(),
                         namespace,
                         access: fn_def.access,
@@ -1070,7 +1073,7 @@ impl Module {
     ///
     /// The _last entry_ in the list should be the _return type_ of the function.
     /// In other words, the number of entries should be one larger than the number of parameters.
-    #[inline]
+    #[inline(always)]
     pub fn set_fn(
         &mut self,
         name: impl Into<Identifier>,
@@ -1080,82 +1083,12 @@ impl Module {
         arg_types: impl AsRef<[TypeId]>,
         func: CallableFunction,
     ) -> u64 {
-        let _arg_names = arg_names;
-        let is_method = func.is_method();
+        const EMPTY: &[&str] = &[];
+        let arg_names = arg_names.unwrap_or(EMPTY);
 
-        let param_types = arg_types
-            .as_ref()
-            .iter()
-            .enumerate()
-            .map(|(i, &type_id)| Self::map_type(!is_method || i > 0, type_id))
-            .collect::<Vec<_>>();
-
-        let is_dynamic = param_types
-            .iter()
-            .any(|&type_id| type_id == TypeId::of::<Dynamic>());
-
-        #[cfg(feature = "metadata")]
-        let (param_names, return_type_name) = {
-            let mut names = _arg_names
-                .into_iter()
-                .flatten()
-                .map(|&s| s.into())
-                .collect::<Vec<_>>();
-            let return_type = if names.len() > param_types.len() {
-                names.pop().unwrap()
-            } else {
-                crate::SmartString::new_const()
-            };
-            names.shrink_to_fit();
-            (names, return_type)
-        };
-
-        let name = name.into();
-        let hash_base = calc_fn_hash(None, &name, param_types.len());
-        let hash_fn = calc_fn_hash_full(hash_base, param_types.iter().copied());
-
-        // Catch hash collisions in testing environment only.
-        #[cfg(feature = "testing-environ")]
-        if let Some(f) = self.functions.as_ref().and_then(|f| f.get(&hash_base)) {
-            panic!(
-                "Hash {} already exists when registering function {}:\n{:#?}",
-                hash_base, name, f
-            );
-        }
-
-        if is_dynamic {
-            self.dynamic_functions_filter.mark(hash_base);
-        }
-
-        self.functions
-            .get_or_insert_with(|| new_hash_map(FN_MAP_SIZE))
-            .insert(
-                hash_fn,
-                FuncInfo {
-                    func,
-                    metadata: FuncInfoMetadata {
-                        name,
-                        namespace,
-                        access,
-                        #[cfg(not(feature = "no_object"))]
-                        this_type: None,
-                        num_params: param_types.len(),
-                        param_types: param_types.into_boxed_slice(),
-                        #[cfg(feature = "metadata")]
-                        params_info: param_names.into_boxed_slice(),
-                        #[cfg(feature = "metadata")]
-                        return_type: return_type_name,
-                        #[cfg(feature = "metadata")]
-                        comments: Box::default(),
-                    }
-                    .into(),
-                },
-            );
-
-        self.flags
-            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
-
-        hash_fn
+        self._set_fn(name, namespace, access, arg_names, arg_types, EMPTY, func)
+            .metadata
+            .hash
     }
 
     /// _(metadata)_ Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
@@ -1187,7 +1120,7 @@ impl Module {
     ///
     /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
-    #[inline]
+    #[inline(always)]
     pub fn set_fn_with_comments<S: AsRef<str>>(
         &mut self,
         name: impl Into<Identifier>,
@@ -1198,17 +1131,100 @@ impl Module {
         comments: impl IntoIterator<Item = S>,
         func: CallableFunction,
     ) -> u64 {
-        let hash = self.set_fn(name, namespace, access, arg_names, arg_types, func);
+        let arg_names = arg_names.unwrap_or(&[]);
+        self._set_fn(
+            name, namespace, access, arg_names, arg_types, comments, func,
+        )
+        .metadata
+        .hash
+    }
+
+    /// Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
+    ///
+    /// If there is an existing Rust function of the same hash, it is replaced.
+    #[inline]
+    fn _set_fn<A: AsRef<str>, S: AsRef<str>>(
+        &mut self,
+        name: impl Into<Identifier>,
+        namespace: FnNamespace,
+        access: FnAccess,
+        arg_names: impl IntoIterator<Item = A>,
+        arg_types: impl AsRef<[TypeId]>,
+        comments: impl IntoIterator<Item = S>,
+        func: CallableFunction,
+    ) -> &mut FuncInfo {
+        let _arg_names = arg_names;
+        let is_method = func.is_method();
+
+        let param_types = arg_types
+            .as_ref()
+            .iter()
+            .enumerate()
+            .map(|(i, &type_id)| Self::map_type(!is_method || i > 0, type_id))
+            .collect::<Vec<_>>();
+
+        let is_dynamic = param_types
+            .iter()
+            .any(|&type_id| type_id == TypeId::of::<Dynamic>());
+
+        #[cfg(feature = "metadata")]
+        let (param_names, return_type_name) = {
+            let mut names = _arg_names
+                .into_iter()
+                .map(|a| a.as_ref().into())
+                .collect::<Vec<_>>();
+            let return_type = if names.len() > param_types.len() {
+                names.pop().unwrap()
+            } else {
+                crate::SmartString::new_const()
+            };
+            names.shrink_to_fit();
+            (names, return_type)
+        };
+
+        let name = name.into();
+        let hash_base = calc_fn_hash(None, &name, param_types.len());
+        let hash_fn = calc_fn_hash_full(hash_base, param_types.iter().copied());
+
+        // Catch hash collisions in testing environment only.
+        #[cfg(feature = "testing-environ")]
+        if let Some(f) = self.functions.as_ref().and_then(|f| f.get(&hash_base)) {
+            panic!(
+                "Hash {} already exists when registering function {}:\n{:#?}",
+                hash_base, name, f
+            );
+        }
+
+        if is_dynamic {
+            self.dynamic_functions_filter.mark(hash_base);
+        }
+
+        self.flags
+            .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
 
         self.functions
-            .as_mut()
-            .unwrap()
-            .get_mut(&hash)
-            .unwrap()
-            .metadata
-            .comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
-
-        hash
+            .get_or_insert_with(|| new_hash_map(FN_MAP_SIZE))
+            .entry(hash_fn)
+            .or_insert_with(|| FuncInfo {
+                func,
+                metadata: FuncInfoMetadata {
+                    hash: hash_fn,
+                    name,
+                    namespace,
+                    access,
+                    #[cfg(not(feature = "no_object"))]
+                    this_type: None,
+                    num_params: param_types.len(),
+                    param_types: param_types.into_boxed_slice(),
+                    #[cfg(feature = "metadata")]
+                    params_info: param_names.into_boxed_slice(),
+                    #[cfg(feature = "metadata")]
+                    return_type: return_type_name,
+                    #[cfg(feature = "metadata")]
+                    comments: comments.into_iter().map(|s| s.as_ref().into()).collect(),
+                }
+                .into(),
+            })
     }
 
     /// Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
@@ -1320,7 +1336,7 @@ impl Module {
     /// let hash = module.set_native_fn("calc", || Ok(42_i64));
     /// assert!(module.contains_fn(hash));
     /// ```
-    #[inline(always)]
+    #[inline]
     pub fn set_native_fn<A: 'static, const N: usize, const C: bool, T, F>(
         &mut self,
         name: impl Into<Identifier>,
