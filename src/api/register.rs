@@ -61,7 +61,7 @@ impl Engine {
         const C: bool,
         R: Variant + Clone,
         const L: bool,
-        F: RegisterNativeFunction<A, N, C, R, L>,
+        F: RegisterNativeFunction<A, N, C, R, L> + SendSync + 'static,
     >(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,

@@ -1358,7 +1358,7 @@ impl Module {
     ) -> u64
     where
         T: Variant + Clone,
-        F: RegisterNativeFunction<A, N, C, T, true>,
+        F: RegisterNativeFunction<A, N, C, T, true> + SendSync + 'static,
     {
         let fn_name = name.into();
         let is_pure = true;
