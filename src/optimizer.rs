@@ -375,11 +375,22 @@ fn optimize_stmt_block(
 
 /// Optimize a [statement][Stmt].
 fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: bool) {
+    #[inline(always)]
+    #[must_use]
+    fn is_variable_access(expr: &Expr, _non_qualified: bool) -> bool {
+        match expr {
+            #[cfg(not(feature = "no_module"))]
+            Expr::Variable(x, ..) if _non_qualified && !x.1.is_empty() => false,
+            Expr::Variable(..) => true,
+            _ => false,
+        }
+    }
+
     match stmt {
         // var = var op expr => var op= expr
         Stmt::Assignment(x, ..)
             if !x.0.is_op_assignment()
-                && x.1.lhs.is_variable_access(true)
+                && is_variable_access(&x.1.lhs, true)
                 && matches!(&x.1.rhs, Expr::FnCall(x2, ..)
                         if Token::lookup_symbol_from_syntax(&x2.name).map_or(false, |t| t.has_op_assignment())
                         && x2.args.len() == 2
@@ -398,7 +409,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
 
         // expr op= expr
         Stmt::Assignment(x, ..) => {
-            if !x.1.lhs.is_variable_access(false) {
+            if !is_variable_access(&x.1.lhs, false) {
                 optimize_expr(&mut x.1.lhs, state, false);
             }
             optimize_expr(&mut x.1.rhs, state, false);
