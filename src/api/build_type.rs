@@ -127,14 +127,20 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
 
     /// Pretty-print this custom type.
     #[inline(always)]
-    pub fn on_print(&mut self, on_print: impl Fn(&mut T) -> String + 'static) -> &mut Self {
+    pub fn on_print(
+        &mut self,
+        on_print: impl Fn(&mut T) -> String + SendSync + 'static,
+    ) -> &mut Self {
         self.engine.register_fn(FUNC_TO_STRING, on_print);
         self
     }
 
     /// Debug-print this custom type.
     #[inline(always)]
-    pub fn on_debug(&mut self, on_print: impl Fn(&mut T) -> String + 'static) -> &mut Self {
+    pub fn on_debug(
+        &mut self,
+        on_print: impl Fn(&mut T) -> String + SendSync + 'static,
+    ) -> &mut Self {
         self.engine.register_fn(FUNC_TO_DEBUG, on_print);
         self
     }
