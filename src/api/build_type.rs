@@ -1,4 +1,6 @@
 //! Trait to build a custom type for use with [`Engine`].
+use crate::func::SendSync;
+use crate::packages::string_basic::{FUNC_TO_DEBUG, FUNC_TO_STRING};
 use crate::{types::dynamic::Variant, Engine, Identifier, RegisterNativeFunction};
 use std::marker::PhantomData;
 #[cfg(feature = "no_std")]
@@ -13,6 +15,8 @@ use crate::func::register::Mut;
 /// # Example
 ///
 /// ```
+/// # #[cfg(not(feature = "no_object"))]
+/// # {
 /// use rhai::{CustomType, TypeBuilder, Engine};
 ///
 /// #[derive(Debug, Clone, Eq, PartialEq)]
@@ -38,26 +42,32 @@ use crate::func::register::Mut;
 /// impl CustomType for TestStruct {
 ///     fn build(mut builder: TypeBuilder<Self>) {
 ///         builder
+///             // Register pretty-print name of the type
 ///             .with_name("TestStruct")
+///             // Register display functions
+///             .on_print(|v| format!("TestStruct({})", v.field))
+///             .on_debug(|v| format!("{v:?}"))
+///             // Register a constructor function
 ///             .with_fn("new_ts", Self::new)
-///             .with_fn("update", Self::update);
+///             // Register the 'update' method
+///             .with_fn("update", Self::update)
+///             // Register the 'value' property
+///             .with_get_set("value", Self::get_value, Self::set_value);
 ///     }
 /// }
 ///
 /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
-///
 /// let mut engine = Engine::new();
 ///
 /// // Register API for the custom type.
 /// engine.build_type::<TestStruct>();
 ///
-///
-/// # #[cfg(not(feature = "no_object"))]
 /// assert_eq!(
-///     engine.eval::<TestStruct>("let x = new_ts(); x.update(41); x")?,
+///     engine.eval::<TestStruct>("let x = new_ts(); x.update(41); print(x); x")?,
 ///     TestStruct { field: 42 }
 /// );
 /// # Ok(())
+/// # }
 /// # }
 /// ```
 pub trait CustomType: Variant + Clone {
@@ -115,12 +125,26 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
         self
     }
 
+    /// Pretty-print this custom type.
+    #[inline(always)]
+    pub fn on_print(&mut self, on_print: impl Fn(&mut T) -> String + 'static) -> &mut Self {
+        self.engine.register_fn(FUNC_TO_STRING, on_print);
+        self
+    }
+
+    /// Debug-print this custom type.
+    #[inline(always)]
+    pub fn on_debug(&mut self, on_print: impl Fn(&mut T) -> String + 'static) -> &mut Self {
+        self.engine.register_fn(FUNC_TO_DEBUG, on_print);
+        self
+    }
+
     /// Register a custom function.
     #[inline(always)]
     pub fn with_fn<A: 'static, const N: usize, const C: bool, R: Variant + Clone, const L: bool>(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
-        method: impl RegisterNativeFunction<A, N, C, R, L>,
+        method: impl RegisterNativeFunction<A, N, C, R, L> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_fn(name, method);
         self
@@ -152,7 +176,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     pub fn with_get<const C: bool, V: Variant + Clone, const L: bool>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, C, V, L> + crate::func::SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, C, V, L> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_get(name, get_fn);
         self
@@ -165,7 +189,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     pub fn with_set<const C: bool, V: Variant + Clone, const L: bool>(
         &mut self,
         name: impl AsRef<str>,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, V), 2, C, (), L> + crate::func::SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, V), 2, C, (), L> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_set(name, set_fn);
         self
@@ -186,10 +210,8 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     >(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, C1, V, L1> + crate::func::SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, V), 2, C2, (), L2>
-            + crate::func::SendSync
-            + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, C1, V, L1> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, V), 2, C2, (), L2> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_get_set(name, get_fn, set_fn);
         self
@@ -211,7 +233,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
         const L: bool,
     >(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<T>, X), 2, C, V, L> + crate::func::SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>, X), 2, C, V, L> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_get(get_fn);
         self
@@ -228,9 +250,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
         const L: bool,
     >(
         &mut self,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), 3, C, (), L>
-            + crate::func::SendSync
-            + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), 3, C, (), L> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_set(set_fn);
         self
@@ -249,10 +269,8 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
         const L2: bool,
     >(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<T>, X), 2, C1, V, L1> + crate::func::SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), 3, C2, (), L2>
-            + crate::func::SendSync
-            + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>, X), 2, C1, V, L1> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), 3, C2, (), L2> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_get_set(get_fn, set_fn);
         self
