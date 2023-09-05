@@ -19,7 +19,6 @@ pub mod options;
 pub mod optimize;
 
 pub mod limits;
-pub mod limits_unchecked;
 
 pub mod events;
 

@@ -429,10 +429,8 @@ impl Engine {
                 }
 
                 // Guard against too many variables
-                if !cfg!(feature = "unchecked")
-                    && index.is_none()
-                    && scope.len() >= self.max_variables()
-                {
+                #[cfg(not(feature = "unchecked"))]
+                if index.is_none() && scope.len() >= self.max_variables() {
                     return Err(ERR::ErrorTooManyVariables(*pos).into());
                 }
 
@@ -676,11 +674,10 @@ impl Engine {
                 let (var_name, counter, FlowControl { expr, body, .. }) = &**x;
 
                 // Guard against too many variables
-                if !cfg!(feature = "unchecked") {
-                    let max = self.max_variables() - counter.as_ref().map_or(0, |_| 1);
-                    if scope.len() >= max {
-                        return Err(ERR::ErrorTooManyVariables(var_name.pos).into());
-                    }
+                #[cfg(not(feature = "unchecked"))]
+                if scope.len() >= self.max_variables() - counter.is_some().then_some(1).unwrap_or(0)
+                {
+                    return Err(ERR::ErrorTooManyVariables(var_name.pos).into());
                 }
 
                 let iter_obj = self
@@ -854,7 +851,8 @@ impl Engine {
 
                         if let Expr::Variable(x, ..) = catch_var {
                             // Guard against too many variables
-                            if !cfg!(feature = "unchecked") && scope.len() >= self.max_variables() {
+                            #[cfg(not(feature = "unchecked"))]
+                            if scope.len() >= self.max_variables() {
                                 return Err(ERR::ErrorTooManyVariables(catch_var.position()).into());
                             }
                             scope.push(x.3.clone(), err_value);
@@ -902,7 +900,8 @@ impl Engine {
                 let (expr, export) = &**x;
 
                 // Guard against too many modules
-                if !cfg!(feature = "unchecked") && global.num_modules_loaded >= self.max_modules() {
+                #[cfg(not(feature = "unchecked"))]
+                if global.num_modules_loaded >= self.max_modules() {
                     return Err(ERR::ErrorTooManyModules(*_pos).into());
                 }
 

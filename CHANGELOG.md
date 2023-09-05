@@ -9,13 +9,19 @@ Compiler version
 
 The minimum Rust compiler version is raised to `1.66.0`.
 
+Potentially-breaking changes
+----------------------------
+
+* Limit functions (e.g. `max_operations`, `max_array_size` etc.) as well as `Engine::ensure_data_size_within_limits` are no longer exported under `unchecked`. This should be the correct behavior instead of returning `None` or zero.
+* The type `OptimizationLevel` is no longer exported under `no_optimize`. Originally it was mapped to `()` under `no_optimize`.
+* O/S features such as file access and time are no longer disabled when using `wasm32-wasi` (or any WASM target other than `wasm32-unknown`).
+
 Bug fixes
 ---------
 
 * Fixes a panic when using `this` as the first parameter in a namespace-qualified function call.
 * Comparing two different data types (e.g. a custom type and a standard type) now correctly defaults to `false` (except for `!=` which defaults to `true`).
 * `max` and `min` for integers, strings and characters were missing from the standard library. They are now added.
-* O/S features such as file access and time are no longer disabled when using `wasm32-wasi` (or any WASM target other than `wasm32-unknown`).
 
 Dependencies
 ------------

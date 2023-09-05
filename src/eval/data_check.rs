@@ -126,6 +126,7 @@ impl Engine {
     ///
     /// [`Position`] in [`EvalAltResult`][crate::EvalAltResult] is always [`NONE`][Position::NONE]
     /// and should be set afterwards.
+    #[cfg(not(feature = "unchecked"))]
     pub(crate) fn throw_on_size(&self, (_arr, _map, s): (usize, usize, usize)) -> RhaiResultOf<()> {
         if self
             .limits
@@ -163,6 +164,7 @@ impl Engine {
     }
 
     /// Check whether the size of a [`Dynamic`] is within limits.
+    #[cfg(not(feature = "unchecked"))]
     #[inline]
     pub(crate) fn check_data_size<T: Borrow<Dynamic>>(
         &self,
@@ -185,6 +187,7 @@ impl Engine {
     /// Raise an error if the size of a [`Dynamic`] is out of limits (if any).
     ///
     /// Not available under `unchecked`.
+    #[cfg(not(feature = "unchecked"))]
     #[inline(always)]
     pub fn ensure_data_size_within_limits(&self, value: &Dynamic) -> RhaiResultOf<()> {
         self.check_data_size(value, Position::NONE).map(|_| ())
@@ -200,16 +203,17 @@ impl Engine {
         global.num_operations += 1;
 
         // Guard against too many operations
+        #[cfg(not(feature = "unchecked"))]
         if self.max_operations() > 0 && global.num_operations > self.max_operations() {
-            Err(ERR::ErrorTooManyOperations(pos).into())
-        } else {
-            self.progress
-                .as_ref()
-                .and_then(|progress| {
-                    progress(global.num_operations)
-                        .map(|token| Err(ERR::ErrorTerminated(token, pos).into()))
-                })
-                .unwrap_or(Ok(()))
+            return Err(ERR::ErrorTooManyOperations(pos).into());
         }
+
+        self.progress
+            .as_ref()
+            .and_then(|progress| {
+                progress(global.num_operations)
+                    .map(|token| Err(ERR::ErrorTerminated(token, pos).into()))
+            })
+            .unwrap_or(Ok(()))
     }
 }

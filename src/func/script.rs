@@ -39,6 +39,7 @@ impl Engine {
         self.track_operation(global, pos)?;
 
         // Check for stack overflow
+        #[cfg(not(feature = "unchecked"))]
         if global.level > self.max_call_levels() {
             return Err(ERR::ErrorStackOverflow(pos).into());
         }
@@ -64,8 +65,8 @@ impl Engine {
             .map_or(0, |dbg| dbg.call_stack().len());
 
         // Guard against too many variables
-        if !cfg!(feature = "unchecked") && scope.len() + fn_def.params.len() > self.max_variables()
-        {
+        #[cfg(not(feature = "unchecked"))]
+        if scope.len() + fn_def.params.len() > self.max_variables() {
             return Err(ERR::ErrorTooManyVariables(pos).into());
         }
 

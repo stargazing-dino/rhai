@@ -2687,7 +2687,10 @@ impl Engine {
             TokenIterator {
                 engine: self,
                 state: TokenizeState {
+                    #[cfg(not(feature = "unchecked"))]
                     max_string_len: NonZeroUsize::new(self.max_string_size()),
+                    #[cfg(feature = "unchecked")]
+                    max_string_len: None,
                     next_token_cannot_be_unary: false,
                     tokenizer_control: buffer,
                     comment_level: 0,

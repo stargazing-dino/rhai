@@ -958,6 +958,7 @@ impl Engine {
         loop {
             const MISSING_RBRACKET: &str = "to end this array literal";
 
+            #[cfg(not(feature = "unchecked"))]
             if self.max_array_size() > 0 && array.len() >= self.max_array_size() {
                 return Err(PERR::LiteralTooLarge(
                     "Size of array literal".into(),
@@ -1090,6 +1091,7 @@ impl Engine {
                 }
             };
 
+            #[cfg(not(feature = "unchecked"))]
             if self.max_map_size() > 0 && map.len() >= self.max_map_size() {
                 return Err(PERR::LiteralTooLarge(
                     "Number of properties in object map literal".into(),
