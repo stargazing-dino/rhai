@@ -224,6 +224,8 @@ mod float_functions {
 #[export_module]
 mod f32_functions {
     use crate::{FLOAT, INT};
+    #[cfg(feature = "no_std")]
+    use num_traits::Float;
 
     #[rhai_fn(name = "==")]
     pub fn eq_if(x: INT, y: f32) -> bool {

@@ -27,6 +27,10 @@ use std::{
 };
 
 #[cfg(not(feature = "no_float"))]
+#[cfg(feature = "no_std")]
+use num_traits::Float;
+
+#[cfg(not(feature = "no_float"))]
 use crate::FLOAT;
 
 /// Arguments to a function call, which is a list of [`&mut Dynamic`][Dynamic].

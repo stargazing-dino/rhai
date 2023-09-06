@@ -316,7 +316,7 @@ pub mod array_functions {
     /// ```
     pub fn remove(array: &mut Array, index: INT) -> Dynamic {
         let Ok(index) = calc_index(array.len(), index, true, || Err(())) else {
-             return Dynamic::UNIT;
+            return Dynamic::UNIT;
         };
 
         array.remove(index)
