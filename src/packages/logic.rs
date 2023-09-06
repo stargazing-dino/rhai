@@ -14,6 +14,7 @@ macro_rules! gen_cmp_functions {
             use super::super::*;
 
             #[export_module]
+            #[allow(clippy::missing_const_for_fn)]
             pub mod functions {
                 #[rhai_fn(name = "<")] pub fn lt(x: $arg_type, y: $arg_type) -> bool { x < y }
                 #[rhai_fn(name = "<=")] pub fn lte(x: $arg_type, y: $arg_type) -> bool { x <= y }
@@ -98,7 +99,7 @@ gen_cmp_functions!(float => f64);
 #[export_module]
 mod logic_functions {
     #[rhai_fn(name = "!")]
-    pub fn not(x: bool) -> bool {
+    pub const fn not(x: bool) -> bool {
         !x
     }
 }
@@ -114,7 +115,7 @@ mod min_max_functions {
     /// ```rhai
     /// max(42, 123);   // returns 132
     /// ```
-    pub fn max(x: INT, y: INT) -> INT {
+    pub const fn max(x: INT, y: INT) -> INT {
         if x >= y {
             x
         } else {
@@ -128,7 +129,7 @@ mod min_max_functions {
     /// ```rhai
     /// min(42, 123);   // returns 42
     /// ```
-    pub fn min(x: INT, y: INT) -> INT {
+    pub const fn min(x: INT, y: INT) -> INT {
         if x <= y {
             x
         } else {
@@ -234,11 +235,19 @@ mod f32_functions {
     }
     #[rhai_fn(name = "!=")]
     pub fn neq_if(x: INT, y: f32) -> bool {
-        (x as f32) != (y as f32)
+        #[cfg(feature = "unchecked")]
+        return (x as f32) != (y as f32);
+
+        #[cfg(not(feature = "unchecked"))]
+        return (x as f32 - y as f32).abs() > f32::EPSILON;
     }
     #[rhai_fn(name = "!=")]
     pub fn neq_fi(x: f32, y: INT) -> bool {
-        (x as f32) != (y as f32)
+        #[cfg(feature = "unchecked")]
+        return (x as f32) != (y as f32);
+
+        #[cfg(not(feature = "unchecked"))]
+        return (x as f32 - y as f32).abs() > f32::EPSILON;
     }
     #[rhai_fn(name = ">")]
     pub fn gt_if(x: INT, y: f32) -> bool {

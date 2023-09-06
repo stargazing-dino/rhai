@@ -134,10 +134,10 @@ impl FuncInfo {
                         "" => "_",
                         s => s,
                     };
-                    let result: std::borrow::Cow<str> = match segment.next() {
-                        Some(typ) => format!("{name}: {}", format_type(typ, false)).into(),
-                        None => name.into(),
-                    };
+                    let result: std::borrow::Cow<str> = segment.next().map_or_else(
+                        || name.into(),
+                        |typ| format!("{name}: {}", format_type(typ, false)).into(),
+                    );
                     result
                 })
                 .collect::<crate::FnArgsVec<_>>();
@@ -283,7 +283,7 @@ impl<M: AsRef<Module>> Add<M> for &Module {
     }
 }
 
-impl<M: AsRef<Module>> Add<M> for Module {
+impl<M: AsRef<Self>> Add<M> for Module {
     type Output = Self;
 
     #[inline(always)]
@@ -293,7 +293,7 @@ impl<M: AsRef<Module>> Add<M> for Module {
     }
 }
 
-impl<M: Into<Module>> AddAssign<M> for Module {
+impl<M: Into<Self>> AddAssign<M> for Module {
     #[inline(always)]
     fn add_assign(&mut self, rhs: M) {
         self.combine(rhs.into());
@@ -374,7 +374,7 @@ impl Module {
     #[inline(always)]
     pub fn set_id(&mut self, id: impl Into<ImmutableString>) -> &mut Self {
         let id = id.into();
-        self.id = (!id.is_empty()).then(|| id);
+        self.id = (!id.is_empty()).then_some(id);
         self
     }
 
@@ -588,7 +588,6 @@ impl Module {
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[inline]
-    #[must_use]
     pub fn get_custom_type_comments(&self, key: &str) -> impl Iterator<Item = &str> {
         self.custom_types
             .get(key)
@@ -740,7 +739,11 @@ impl Module {
 
             // Catch hash collisions in testing environment only.
             #[cfg(feature = "testing-environ")]
-            if let Some(_) = self.all_variables.as_ref().and_then(|f| f.get(&hash_var)) {
+            if self
+                .all_variables
+                .as_ref()
+                .map_or(false, |f| f.contains_key(&hash_var))
+            {
                 panic!(
                     "Hash {} already exists when registering variable {}",
                     hash_var, ident
@@ -777,13 +780,16 @@ impl Module {
         let num_params = fn_def.params.len();
         let hash_script = crate::calc_fn_hash(None, &fn_def.name, num_params);
         #[cfg(not(feature = "no_object"))]
-        let (hash_script, namespace) = match fn_def.this_type {
-            Some(ref this_type) => {
-                let hash = crate::calc_typed_method_hash(hash_script, this_type);
-                (hash, FnNamespace::Global)
-            }
-            None => (hash_script, namespace),
-        };
+        let (hash_script, namespace) =
+            fn_def
+                .this_type
+                .as_ref()
+                .map_or((hash_script, namespace), |this_type| {
+                    (
+                        crate::calc_typed_method_hash(hash_script, this_type),
+                        FnNamespace::Global,
+                    )
+                });
 
         // Catch hash collisions in testing environment only.
         #[cfg(feature = "testing-environ")]
@@ -810,7 +816,7 @@ impl Module {
                         #[cfg(not(feature = "no_object"))]
                         this_type: fn_def.this_type.clone(),
                         num_params,
-                        param_types: Default::default(),
+                        param_types: <_>::default(),
                         #[cfg(feature = "metadata")]
                         params_info,
                         #[cfg(feature = "metadata")]
@@ -900,7 +906,7 @@ impl Module {
     /// ```
     #[inline]
     #[must_use]
-    pub fn get_sub_module(&self, name: &str) -> Option<&Module> {
+    pub fn get_sub_module(&self, name: &str) -> Option<&Self> {
         self.modules.get(name).map(|m| &**m)
     }
 
@@ -1548,19 +1554,22 @@ impl Module {
         F: RegisterNativeFunction<(Mut<A>, B), 2, C, T, true> + SendSync + 'static,
     {
         #[cfg(not(feature = "no_index"))]
-        if TypeId::of::<A>() == TypeId::of::<crate::Array>() {
-            panic!("Cannot register indexer for arrays.");
-        }
+        assert!(
+            TypeId::of::<A>() != TypeId::of::<crate::Array>(),
+            "Cannot register indexer for arrays."
+        );
         #[cfg(not(feature = "no_object"))]
-        if TypeId::of::<A>() == TypeId::of::<crate::Map>() {
-            panic!("Cannot register indexer for object maps.");
-        }
-        if TypeId::of::<A>() == TypeId::of::<String>()
-            || TypeId::of::<A>() == TypeId::of::<&str>()
-            || TypeId::of::<A>() == TypeId::of::<ImmutableString>()
-        {
-            panic!("Cannot register indexer for strings.");
-        }
+        assert!(
+            TypeId::of::<A>() != TypeId::of::<crate::Map>(),
+            "Cannot register indexer for object maps."
+        );
+
+        assert!(
+            TypeId::of::<A>() != TypeId::of::<String>()
+                && TypeId::of::<A>() != TypeId::of::<&str>()
+                && TypeId::of::<A>() != TypeId::of::<ImmutableString>(),
+            "Cannot register indexer for strings."
+        );
 
         self.set_fn(
             crate::engine::FN_IDX_GET,
@@ -1609,19 +1618,22 @@ impl Module {
         F: RegisterNativeFunction<(Mut<A>, B, T), 3, C, (), true> + SendSync + 'static,
     {
         #[cfg(not(feature = "no_index"))]
-        if TypeId::of::<A>() == TypeId::of::<crate::Array>() {
-            panic!("Cannot register indexer for arrays.");
-        }
+        assert!(
+            TypeId::of::<A>() != TypeId::of::<crate::Array>(),
+            "Cannot register indexer for arrays."
+        );
         #[cfg(not(feature = "no_object"))]
-        if TypeId::of::<A>() == TypeId::of::<crate::Map>() {
-            panic!("Cannot register indexer for object maps.");
-        }
-        if TypeId::of::<A>() == TypeId::of::<String>()
-            || TypeId::of::<A>() == TypeId::of::<&str>()
-            || TypeId::of::<A>() == TypeId::of::<ImmutableString>()
-        {
-            panic!("Cannot register indexer for strings.");
-        }
+        assert!(
+            TypeId::of::<A>() != TypeId::of::<crate::Map>(),
+            "Cannot register indexer for object maps."
+        );
+
+        assert!(
+            TypeId::of::<A>() != TypeId::of::<String>()
+                && TypeId::of::<A>() != TypeId::of::<&str>()
+                && TypeId::of::<A>() != TypeId::of::<ImmutableString>(),
+            "Cannot register indexer for strings."
+        );
 
         self.set_fn(
             crate::engine::FN_IDX_SET,
@@ -1704,7 +1716,7 @@ impl Module {
     /// A `true` return value does not automatically imply that the function _must_ exist.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn may_contain_dynamic_fn(&self, hash_script: u64) -> bool {
+    pub(crate) const fn may_contain_dynamic_fn(&self, hash_script: u64) -> bool {
         !self.dynamic_functions_filter.is_absent(hash_script)
     }
 
@@ -1802,12 +1814,12 @@ impl Module {
     /// Only items not existing in this [`Module`] are added.
     #[inline]
     pub fn fill_with(&mut self, other: &Self) -> &mut Self {
-        for (k, v) in other.modules.iter() {
+        for (k, v) in &other.modules {
             if !self.modules.contains_key(k) {
                 self.modules.insert(k.clone(), v.clone());
             }
         }
-        for (k, v) in other.variables.iter() {
+        for (k, v) in &other.variables {
             if !self.variables.contains_key(k) {
                 self.variables.insert(k.clone(), v.clone());
             }
@@ -1824,7 +1836,7 @@ impl Module {
             }
         }
         self.dynamic_functions_filter += &other.dynamic_functions_filter;
-        for (&k, v) in other.type_iterators.iter() {
+        for (&k, v) in &other.type_iterators {
             self.type_iterators.entry(k).or_insert_with(|| v.clone());
         }
 
@@ -1857,7 +1869,7 @@ impl Module {
         other: &Self,
         _filter: impl Fn(FnNamespace, FnAccess, bool, &str, usize) -> bool + Copy,
     ) -> &mut Self {
-        for (k, v) in other.modules.iter() {
+        for (k, v) in &other.modules {
             let mut m = Self::new();
             m.merge_filtered(v, _filter);
             self.set_sub_module(k.clone(), m);
@@ -2135,7 +2147,7 @@ impl Module {
         let result = engine.eval_ast_with_scope_raw(global, caches, scope, ast);
 
         // Create new module
-        let mut module = Module::new();
+        let mut module = Self::new();
 
         // Extra modules left become sub-modules
         let mut imports = Vec::new();
@@ -2168,7 +2180,7 @@ impl Module {
         let environ = Shared::new(crate::func::EncapsulatedEnviron {
             #[cfg(not(feature = "no_function"))]
             lib: ast.shared_lib().clone(),
-            imports: imports.into(),
+            imports,
             #[cfg(not(feature = "no_function"))]
             constants,
         });
@@ -2259,7 +2271,7 @@ impl Module {
     /// Panics if the [`Module`] is not yet indexed via [`build_index`][Module::build_index].
     #[inline(always)]
     #[must_use]
-    pub fn contains_indexed_global_functions(&self) -> bool {
+    pub const fn contains_indexed_global_functions(&self) -> bool {
         self.flags.contains(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS)
     }
 
@@ -2278,7 +2290,7 @@ impl Module {
         ) -> bool {
             let mut contains_indexed_global_functions = false;
 
-            for (name, m) in module.modules.iter() {
+            for (name, m) in &module.modules {
                 // Index all the sub-modules first.
                 path.push(name);
                 if index_module(m, path, variables, functions, type_iterators) {
@@ -2288,23 +2300,23 @@ impl Module {
             }
 
             // Index all variables
-            for (var_name, value) in module.variables.iter() {
+            for (var_name, value) in &module.variables {
                 let hash_var = crate::calc_var_hash(path.iter().copied(), var_name);
 
                 // Catch hash collisions in testing environment only.
                 #[cfg(feature = "testing-environ")]
-                if variables.get(&hash_var).is_some() {
-                    panic!(
-                        "Hash {} already exists when indexing variable {}",
-                        hash_var, var_name
-                    );
-                }
+                assert!(
+                    !variables.contains_key(&hash_var),
+                    "Hash {} already exists when indexing variable {}",
+                    hash_var,
+                    var_name
+                );
 
                 variables.insert(hash_var, value.clone());
             }
 
             // Index all type iterators
-            for (&type_id, func) in module.type_iterators.iter() {
+            for (&type_id, func) in &module.type_iterators {
                 type_iterators.insert(type_id, func.clone());
             }
 
@@ -2332,8 +2344,36 @@ impl Module {
                     FnAccess::Private => continue, // Do not index private functions
                 }
 
-                if !f.func.is_script() {
-                    let hash_qualified_fn = calc_native_fn_hash(
+                if f.func.is_script() {
+                    #[cfg(not(feature = "no_function"))]
+                    {
+                        let hash_script = crate::calc_fn_hash(
+                            path.iter().copied(),
+                            &f.metadata.name,
+                            f.metadata.num_params,
+                        );
+                        #[cfg(not(feature = "no_object"))]
+                        let hash_script = f
+                            .metadata
+                            .this_type
+                            .as_ref()
+                            .map_or(hash_script, |this_type| {
+                                crate::calc_typed_method_hash(hash_script, this_type)
+                            });
+
+                        // Catch hash collisions in testing environment only.
+                        #[cfg(feature = "testing-environ")]
+                        if let Some(fx) = functions.get(&hash_script) {
+                            panic!(
+                                "Hash {} already exists when indexing function {:#?}:\n{:#?}",
+                                hash_script, f.func, fx
+                            );
+                        }
+
+                        functions.insert(hash_script, f.func.clone());
+                    }
+                } else {
+                    let hash_fn = calc_native_fn_hash(
                         path.iter().copied(),
                         f.metadata.name.as_str(),
                         &f.metadata.param_types,
@@ -2341,41 +2381,14 @@ impl Module {
 
                     // Catch hash collisions in testing environment only.
                     #[cfg(feature = "testing-environ")]
-                    if let Some(fx) = functions.get(&hash_qualified_fn) {
+                    if let Some(fx) = functions.get(&hash_fn) {
                         panic!(
                             "Hash {} already exists when indexing function {:#?}:\n{:#?}",
-                            hash_qualified_fn, f.func, fx
+                            hash_fn, f.func, fx
                         );
                     }
 
-                    functions.insert(hash_qualified_fn, f.func.clone());
-                } else {
-                    #[cfg(not(feature = "no_function"))]
-                    {
-                        let hash_qualified_script = crate::calc_fn_hash(
-                            path.iter().copied(),
-                            &f.metadata.name,
-                            f.metadata.num_params,
-                        );
-                        #[cfg(not(feature = "no_object"))]
-                        let hash_qualified_script = match f.metadata.this_type {
-                            Some(ref this_type) => {
-                                crate::calc_typed_method_hash(hash_qualified_script, this_type)
-                            }
-                            None => hash_qualified_script,
-                        };
-
-                        // Catch hash collisions in testing environment only.
-                        #[cfg(feature = "testing-environ")]
-                        if let Some(fx) = functions.get(&hash_qualified_script) {
-                            panic!(
-                                "Hash {} already exists when indexing function {:#?}:\n{:#?}",
-                                hash_qualified_script, f.func, fx
-                            );
-                        }
-
-                        functions.insert(hash_qualified_script, f.func.clone());
-                    }
+                    functions.insert(hash_fn, f.func.clone());
                 }
             }
 
@@ -2402,8 +2415,8 @@ impl Module {
             self.flags
                 .set(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS, has_global_functions);
 
-            self.all_variables = (!variables.is_empty()).then(|| variables.into());
-            self.all_functions = (!functions.is_empty()).then(|| functions.into());
+            self.all_variables = (!variables.is_empty()).then_some(variables);
+            self.all_functions = (!functions.is_empty()).then_some(functions);
             self.all_type_iterators = type_iterators;
 
             self.flags |= ModuleFlags::INDEXED;

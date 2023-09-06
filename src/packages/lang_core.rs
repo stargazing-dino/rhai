@@ -356,7 +356,7 @@ fn collect_fn_metadata(
                 use std::fmt::Write;
 
                 let mut ns = SmartString::new_const();
-                write!(&mut ns, "{namespace}{}{name}", NAMESPACE_SEPARATOR).unwrap();
+                write!(&mut ns, "{namespace}{NAMESPACE_SEPARATOR}{name}").unwrap();
                 scan_module(engine, list, &ns, m, filter);
             }
         }

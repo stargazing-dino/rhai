@@ -929,7 +929,7 @@ impl Token {
         }
 
         match KEYWORDS_LIST[hash_val] {
-            (_, Token::EOF) => None,
+            (_, Self::EOF) => None,
             // Fail early to avoid calling memcmp().
             // Since we are already working with bytes, mind as well check the first one.
             (s, ref t) if s.len() == len && s.as_bytes()[0] == utf8[0] && s == syntax => {
@@ -1180,7 +1180,10 @@ pub trait InputStream {
 
 /// Return error if the string is longer than the maximum length.
 #[inline]
-fn ensure_string_len_within_limit(max: Option<NonZeroUsize>, value: &str) -> Result<(), LexError> {
+const fn ensure_string_len_within_limit(
+    max: Option<NonZeroUsize>,
+    value: &str,
+) -> Result<(), LexError> {
     match max {
         Some(max) if value.len() > max.get() => Err(LexError::StringTooLong(max.get())),
         _ => Ok(()),
@@ -1258,7 +1261,7 @@ pub fn parse_string_literal(
                 break;
             }
             None if allow_line_continuation && !escape.is_empty() => {
-                debug_assert_eq!(escape, "\\", "unexpected escape {} at end of line", escape);
+                debug_assert_eq!(escape, "\\", "unexpected escape {escape} at end of line");
                 pos.advance();
                 break;
             }
@@ -1384,7 +1387,7 @@ pub fn parse_string_literal(
 
             // Line continuation
             '\n' if allow_line_continuation && !escape.is_empty() => {
-                debug_assert_eq!(escape, "\\", "unexpected escape {} at end of line", escape);
+                debug_assert_eq!(escape, "\\", "unexpected escape {escape} at end of line");
                 escape.clear();
                 pos.new_line();
 
@@ -1539,7 +1542,7 @@ fn get_next_token_inner(
     // Still inside a comment?
     if state.comment_level > 0 {
         let start_pos = *pos;
-        let mut comment = state.include_comments.then(|| String::new());
+        let mut comment = state.include_comments.then(String::new);
 
         state.comment_level =
             scan_block_comment(stream, state.comment_level, pos, comment.as_mut());
@@ -2315,6 +2318,7 @@ pub fn is_valid_function_name(name: &str) -> bool {
 /// Is a character valid to start an identifier?
 #[inline(always)]
 #[must_use]
+#[allow(clippy::missing_const_for_fn)]
 pub fn is_id_first_alphabetic(x: char) -> bool {
     #[cfg(feature = "unicode-xid-ident")]
     return unicode_xid::UnicodeXID::is_xid_start(x);
@@ -2325,6 +2329,7 @@ pub fn is_id_first_alphabetic(x: char) -> bool {
 /// Is a character valid for an identifier?
 #[inline(always)]
 #[must_use]
+#[allow(clippy::missing_const_for_fn)]
 pub fn is_id_continue(x: char) -> bool {
     #[cfg(feature = "unicode-xid-ident")]
     return unicode_xid::UnicodeXID::is_xid_continue(x);
@@ -2418,7 +2423,7 @@ impl InputStream for MultiInputsStream<'_> {
         }
 
         loop {
-            if self.index >= self.extra_streams.len() + 1 {
+            if self.index > self.extra_streams.len() {
                 // No more streams
                 return None;
             }
@@ -2443,7 +2448,7 @@ impl InputStream for MultiInputsStream<'_> {
         }
 
         loop {
-            if self.index >= self.extra_streams.len() + 1 {
+            if self.index > self.extra_streams.len() {
                 // No more streams
                 return None;
             }
@@ -2513,7 +2518,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             Some((Token::Reserved(s), pos)) => (match
                 (s.as_str(),
                     #[cfg(not(feature = "no_custom_syntax"))]
-                    self.engine.is_custom_keyword(&*s),
+                    self.engine.is_custom_keyword(&s),
                     #[cfg(feature = "no_custom_syntax")]
                     false
                 )
@@ -2559,7 +2564,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             }, pos),
             // Custom keyword
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((Token::Identifier(s), pos)) if self.engine.is_custom_keyword(&*s) => {
+            Some((Token::Identifier(s), pos)) if self.engine.is_custom_keyword(&s) => {
                 (Token::Custom(s), pos)
             }
             // Custom keyword/symbol - must be disabled

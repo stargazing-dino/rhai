@@ -87,12 +87,12 @@ mod string_functions {
 
     #[allow(unused_variables)]
     #[rhai_fn(name = "+")]
-    pub fn add_append_unit(string: ImmutableString, item: ()) -> ImmutableString {
+    pub const fn add_append_unit(string: ImmutableString, item: ()) -> ImmutableString {
         string
     }
     #[allow(unused_variables)]
     #[rhai_fn(name = "+")]
-    pub fn add_prepend_unit(item: (), string: ImmutableString) -> ImmutableString {
+    pub const fn add_prepend_unit(item: (), string: ImmutableString) -> ImmutableString {
         string
     }
 
@@ -196,7 +196,7 @@ mod string_functions {
     }
     /// Return true if the string is empty.
     #[rhai_fn(name = "is_empty", get = "is_empty")]
-    pub fn is_empty(string: &str) -> bool {
+    pub const fn is_empty(string: &str) -> bool {
         string.len() == 0
     }
     /// Return the length of the string, in number of bytes used to store it in UTF-8 encoding.
@@ -209,7 +209,7 @@ mod string_functions {
     /// print(text.bytes);      // prints 51
     /// ```
     #[rhai_fn(name = "bytes", get = "bytes")]
-    pub fn bytes(string: &str) -> INT {
+    pub const fn bytes(string: &str) -> INT {
         if string.is_empty() {
             return 0;
         }
@@ -299,20 +299,17 @@ mod string_functions {
     /// print(text);    // prints "hello"
     /// ```
     pub fn trim(string: &mut ImmutableString) {
-        match string.get_mut() {
-            Some(s) => {
-                let trimmed = s.trim();
+        if let Some(s) = string.get_mut() {
+            let trimmed = s.trim();
 
-                if trimmed != s {
-                    *s = trimmed.into();
-                }
+            if trimmed != s {
+                *s = trimmed.into();
             }
-            None => {
-                let trimmed = string.trim();
+        } else {
+            let trimmed = string.trim();
 
-                if trimmed != string {
-                    *string = trimmed.into();
-                }
+            if trimmed != string {
+                *string = trimmed.into();
             }
         }
     }
@@ -334,10 +331,7 @@ mod string_functions {
             return Dynamic::UNIT;
         }
 
-        match string.make_mut().pop() {
-            Some(c) => c.into(),
-            None => Dynamic::UNIT,
-        }
+        string.make_mut().pop().map_or(Dynamic::UNIT, Into::into)
     }
     /// Remove a specified number of characters from the end of the string and return it as a
     /// new string.
@@ -409,7 +403,7 @@ mod string_functions {
     /// print(text);        // prints "HELLO, WORLD!";
     /// ```
     pub fn make_upper(string: &mut ImmutableString) {
-        if string.is_empty() || string.chars().all(|ch| ch.is_uppercase()) {
+        if string.is_empty() || string.chars().all(char::is_uppercase) {
             return;
         }
 
@@ -446,7 +440,7 @@ mod string_functions {
     /// print(text);        // prints "hello, world!";
     /// ```
     pub fn make_lower(string: &mut ImmutableString) {
-        if string.is_empty() || string.chars().all(|ch| ch.is_lowercase()) {
+        if string.is_empty() || string.chars().all(char::is_lowercase) {
             return;
         }
 
@@ -1425,7 +1419,7 @@ mod string_functions {
     /// max('h', 'w');      // returns 'w'
     /// ```
     #[rhai_fn(name = "max")]
-    pub fn max_char(char1: char, char2: char) -> char {
+    pub const fn max_char(char1: char, char2: char) -> char {
         if char1 >= char2 {
             char1
         } else {
@@ -1440,7 +1434,7 @@ mod string_functions {
     /// max('h', 'w');      // returns 'h'
     /// ```
     #[rhai_fn(name = "min")]
-    pub fn min_char(char1: char, char2: char) -> char {
+    pub const fn min_char(char1: char, char2: char) -> char {
         if char1 <= char2 {
             char1
         } else {

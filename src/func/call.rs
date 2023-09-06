@@ -26,6 +26,9 @@ use std::{
     mem,
 };
 
+#[cfg(not(feature = "no_float"))]
+use crate::FLOAT;
+
 /// Arguments to a function call, which is a list of [`&mut Dynamic`][Dynamic].
 pub type FnCallArgs<'a> = [&'a mut Dynamic];
 
@@ -569,34 +572,32 @@ impl Engine {
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
         // These may be redirected from method style calls.
-        if hashes.is_native_only() {
-            loop {
-                match fn_name {
-                    // Handle type_of()
-                    KEYWORD_TYPE_OF if args.len() == 1 => {
-                        let typ = self.get_interned_string(self.map_type_name(args[0].type_name()));
-                        return Ok((typ.into(), false));
-                    }
-
-                    #[cfg(not(feature = "no_closure"))]
-                    crate::engine::KEYWORD_IS_SHARED if args.len() == 1 => {
-                        return Ok((args[0].is_shared().into(), false))
-                    }
-                    #[cfg(not(feature = "no_closure"))]
-                    crate::engine::KEYWORD_IS_SHARED => (),
-
-                    #[cfg(not(feature = "no_function"))]
-                    crate::engine::KEYWORD_IS_DEF_FN => (),
-
-                    KEYWORD_TYPE_OF | KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR
-                    | KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY => (),
-
-                    _ => break,
+        if hashes.is_native_only()
+            && match fn_name {
+                // Handle type_of()
+                KEYWORD_TYPE_OF if args.len() == 1 => {
+                    let typ = self.get_interned_string(self.map_type_name(args[0].type_name()));
+                    return Ok((typ.into(), false));
                 }
 
-                let sig = self.gen_fn_call_signature(fn_name, args);
-                return Err(ERR::ErrorFunctionNotFound(sig, pos).into());
+                #[cfg(not(feature = "no_closure"))]
+                crate::engine::KEYWORD_IS_SHARED if args.len() == 1 => {
+                    return Ok((args[0].is_shared().into(), false))
+                }
+                #[cfg(not(feature = "no_closure"))]
+                crate::engine::KEYWORD_IS_SHARED => true,
+
+                #[cfg(not(feature = "no_function"))]
+                crate::engine::KEYWORD_IS_DEF_FN => true,
+
+                KEYWORD_TYPE_OF | KEYWORD_FN_PTR | KEYWORD_EVAL | KEYWORD_IS_DEF_VAR
+                | KEYWORD_FN_PTR_CALL | KEYWORD_FN_PTR_CURRY => true,
+
+                _ => false,
             }
+        {
+            let sig = self.gen_fn_call_signature(fn_name, args);
+            return Err(ERR::ErrorFunctionNotFound(sig, pos).into());
         }
 
         // Check for data race.
@@ -610,8 +611,8 @@ impl Engine {
         if !hashes.is_native_only() {
             let hash = hashes.script();
             let local_entry = &mut None;
-
             let mut resolved = None;
+
             #[cfg(not(feature = "no_object"))]
             if _is_method_call && !args.is_empty() {
                 let typed_hash =
@@ -636,23 +637,20 @@ impl Engine {
                 }
 
                 let mut empty_scope;
-                let scope = match _scope {
-                    Some(scope) => scope,
-                    None => {
-                        empty_scope = Scope::new();
-                        &mut empty_scope
-                    }
+                let scope = if let Some(scope) = _scope {
+                    scope
+                } else {
+                    empty_scope = Scope::new();
+                    &mut empty_scope
                 };
 
                 let orig_source = mem::replace(&mut global.source, source);
                 defer! { global => move |g| g.source = orig_source }
 
                 return if _is_method_call {
-                    use std::ops::DerefMut;
-
                     // Method call of script function - map first argument to `this`
                     let (first_arg, args) = args.split_first_mut().unwrap();
-                    let this_ptr = Some(first_arg.deref_mut());
+                    let this_ptr = Some(&mut **first_arg);
                     self.call_script_fn(
                         global, caches, scope, this_ptr, environ, func, args, true, pos,
                     )
@@ -751,7 +749,7 @@ impl Engine {
                     #[cfg(not(feature = "no_function"))]
                     Some(fn_def) if fn_def.params.len() == args.len() => {
                         let scope = &mut Scope::new();
-                        let environ = fn_ptr.encapsulated_environ().map(|r| r.as_ref());
+                        let environ = fn_ptr.encapsulated_environ().map(<_>::as_ref);
 
                         self.call_script_fn(
                             global, caches, scope, None, environ, fn_def, args, true, pos,
@@ -966,7 +964,7 @@ impl Engine {
                         let args = &mut call_args.iter_mut().collect::<FnArgsVec<_>>();
 
                         self.call_script_fn(
-                            global, caches, scope, this_ptr, environ, &*fn_def, args, true, pos,
+                            global, caches, scope, this_ptr, environ, &fn_def, args, true, pos,
                         )
                         .map(|v| (v, false))
                     }
@@ -1648,15 +1646,14 @@ impl Engine {
                 .0
                 .flatten();
 
-            return match value.0 {
-                Union::Bool(b, ..) => Ok((!b).into()),
-                _ => {
-                    let operand = &mut [&mut value];
-                    self.exec_fn_call(
-                        global, caches, None, name, op_token, *hashes, operand, false, false, pos,
-                    )
-                    .map(|(v, ..)| v)
-                }
+            return if let Union::Bool(b, ..) = value.0 {
+                Ok((!b).into())
+            } else {
+                let operand = &mut [&mut value];
+                self.exec_fn_call(
+                    global, caches, None, name, op_token, *hashes, operand, false, false, pos,
+                )
+                .map(|(v, ..)| v)
             };
         }
 
@@ -1675,16 +1672,19 @@ impl Engine {
                 .0
                 .flatten();
 
+            #[allow(clippy::unnecessary_unwrap)]
+            let op_token = op_token.unwrap();
+
             // For extremely simple primary data operations, do it directly
             // to avoid the overhead of calling a function.
             match (&lhs.0, &rhs.0) {
-                (Union::Unit(..), Union::Unit(..)) => match op_token.unwrap() {
+                (Union::Unit(..), Union::Unit(..)) => match op_token {
                     EqualsTo => return Ok(Dynamic::TRUE),
                     NotEqualsTo | GreaterThan | GreaterThanEqualsTo | LessThan
                     | LessThanEqualsTo => return Ok(Dynamic::FALSE),
                     _ => (),
                 },
-                (Union::Bool(b1, ..), Union::Bool(b2, ..)) => match op_token.unwrap() {
+                (Union::Bool(b1, ..), Union::Bool(b2, ..)) => match op_token {
                     EqualsTo => return Ok((b1 == b2).into()),
                     NotEqualsTo => return Ok((b1 != b2).into()),
                     GreaterThan | GreaterThanEqualsTo | LessThan | LessThanEqualsTo => {
@@ -1700,7 +1700,7 @@ impl Engine {
                     use crate::packages::arithmetic::arith_basic::INT::functions::*;
 
                     #[cfg(not(feature = "unchecked"))]
-                    match op_token.unwrap() {
+                    match op_token {
                         EqualsTo => return Ok((n1 == n2).into()),
                         NotEqualsTo => return Ok((n1 != n2).into()),
                         GreaterThan => return Ok((n1 > n2).into()),
@@ -1715,7 +1715,7 @@ impl Engine {
                         _ => (),
                     }
                     #[cfg(feature = "unchecked")]
-                    match op_token.unwrap() {
+                    match op_token {
                         EqualsTo => return Ok((n1 == n2).into()),
                         NotEqualsTo => return Ok((n1 != n2).into()),
                         GreaterThan => return Ok((n1 > n2).into()),
@@ -1731,9 +1731,15 @@ impl Engine {
                     }
                 }
                 #[cfg(not(feature = "no_float"))]
-                (Union::Float(f1, ..), Union::Float(f2, ..)) => match op_token.unwrap() {
+                (Union::Float(f1, ..), Union::Float(f2, ..)) => match op_token {
+                    #[cfg(feature = "unchecked")]
                     EqualsTo => return Ok((**f1 == **f2).into()),
+                    #[cfg(not(feature = "unchecked"))]
+                    EqualsTo => return Ok(((**f1 - **f2).abs() <= FLOAT::EPSILON).into()),
+                    #[cfg(feature = "unchecked")]
                     NotEqualsTo => return Ok((**f1 != **f2).into()),
+                    #[cfg(not(feature = "unchecked"))]
+                    NotEqualsTo => return Ok(((**f1 - **f2).abs() > FLOAT::EPSILON).into()),
                     GreaterThan => return Ok((**f1 > **f2).into()),
                     GreaterThanEqualsTo => return Ok((**f1 >= **f2).into()),
                     LessThan => return Ok((**f1 < **f2).into()),
@@ -1746,36 +1752,52 @@ impl Engine {
                     _ => (),
                 },
                 #[cfg(not(feature = "no_float"))]
-                (Union::Float(f1, ..), Union::Int(n2, ..)) => match op_token.unwrap() {
-                    EqualsTo => return Ok((**f1 == (*n2 as crate::FLOAT)).into()),
-                    NotEqualsTo => return Ok((**f1 != (*n2 as crate::FLOAT)).into()),
-                    GreaterThan => return Ok((**f1 > (*n2 as crate::FLOAT)).into()),
-                    GreaterThanEqualsTo => return Ok((**f1 >= (*n2 as crate::FLOAT)).into()),
-                    LessThan => return Ok((**f1 < (*n2 as crate::FLOAT)).into()),
-                    LessThanEqualsTo => return Ok((**f1 <= (*n2 as crate::FLOAT)).into()),
-                    Plus => return Ok((**f1 + (*n2 as crate::FLOAT)).into()),
-                    Minus => return Ok((**f1 - (*n2 as crate::FLOAT)).into()),
-                    Multiply => return Ok((**f1 * (*n2 as crate::FLOAT)).into()),
-                    Divide => return Ok((**f1 / (*n2 as crate::FLOAT)).into()),
-                    Modulo => return Ok((**f1 % (*n2 as crate::FLOAT)).into()),
+                (Union::Float(f1, ..), Union::Int(n2, ..)) => match op_token {
+                    #[cfg(feature = "unchecked")]
+                    EqualsTo => return Ok((**f1 == (*n2 as FLOAT)).into()),
+                    #[cfg(not(feature = "unchecked"))]
+                    EqualsTo => return Ok(((**f1 - (*n2 as FLOAT)).abs() <= FLOAT::EPSILON).into()),
+                    #[cfg(feature = "unchecked")]
+                    NotEqualsTo => return Ok((**f1 != (*n2 as FLOAT)).into()),
+                    #[cfg(not(feature = "unchecked"))]
+                    NotEqualsTo => {
+                        return Ok(((**f1 - (*n2 as FLOAT)).abs() > FLOAT::EPSILON).into())
+                    }
+                    GreaterThan => return Ok((**f1 > (*n2 as FLOAT)).into()),
+                    GreaterThanEqualsTo => return Ok((**f1 >= (*n2 as FLOAT)).into()),
+                    LessThan => return Ok((**f1 < (*n2 as FLOAT)).into()),
+                    LessThanEqualsTo => return Ok((**f1 <= (*n2 as FLOAT)).into()),
+                    Plus => return Ok((**f1 + (*n2 as FLOAT)).into()),
+                    Minus => return Ok((**f1 - (*n2 as FLOAT)).into()),
+                    Multiply => return Ok((**f1 * (*n2 as FLOAT)).into()),
+                    Divide => return Ok((**f1 / (*n2 as FLOAT)).into()),
+                    Modulo => return Ok((**f1 % (*n2 as FLOAT)).into()),
                     _ => (),
                 },
                 #[cfg(not(feature = "no_float"))]
-                (Union::Int(n1, ..), Union::Float(f2, ..)) => match op_token.unwrap() {
-                    EqualsTo => return Ok(((*n1 as crate::FLOAT) == **f2).into()),
-                    NotEqualsTo => return Ok(((*n1 as crate::FLOAT) != **f2).into()),
-                    GreaterThan => return Ok(((*n1 as crate::FLOAT) > **f2).into()),
-                    GreaterThanEqualsTo => return Ok(((*n1 as crate::FLOAT) >= **f2).into()),
-                    LessThan => return Ok(((*n1 as crate::FLOAT) < **f2).into()),
-                    LessThanEqualsTo => return Ok(((*n1 as crate::FLOAT) <= **f2).into()),
-                    Plus => return Ok(((*n1 as crate::FLOAT) + **f2).into()),
-                    Minus => return Ok(((*n1 as crate::FLOAT) - **f2).into()),
-                    Multiply => return Ok(((*n1 as crate::FLOAT) * **f2).into()),
-                    Divide => return Ok(((*n1 as crate::FLOAT) / **f2).into()),
-                    Modulo => return Ok(((*n1 as crate::FLOAT) % **f2).into()),
+                (Union::Int(n1, ..), Union::Float(f2, ..)) => match op_token {
+                    #[cfg(feature = "unchecked")]
+                    EqualsTo => return Ok(((*n1 as FLOAT) == **f2).into()),
+                    #[cfg(not(feature = "unchecked"))]
+                    EqualsTo => return Ok((((*n1 as FLOAT) - **f2).abs() <= FLOAT::EPSILON).into()),
+                    #[cfg(feature = "unchecked")]
+                    NotEqualsTo => return Ok(((*n1 as FLOAT) != **f2).into()),
+                    #[cfg(not(feature = "unchecked"))]
+                    NotEqualsTo => {
+                        return Ok((((*n1 as FLOAT) - **f2).abs() > FLOAT::EPSILON).into())
+                    }
+                    GreaterThan => return Ok(((*n1 as FLOAT) > **f2).into()),
+                    GreaterThanEqualsTo => return Ok(((*n1 as FLOAT) >= **f2).into()),
+                    LessThan => return Ok(((*n1 as FLOAT) < **f2).into()),
+                    LessThanEqualsTo => return Ok(((*n1 as FLOAT) <= **f2).into()),
+                    Plus => return Ok(((*n1 as FLOAT) + **f2).into()),
+                    Minus => return Ok(((*n1 as FLOAT) - **f2).into()),
+                    Multiply => return Ok(((*n1 as FLOAT) * **f2).into()),
+                    Divide => return Ok(((*n1 as FLOAT) / **f2).into()),
+                    Modulo => return Ok(((*n1 as FLOAT) % **f2).into()),
                     _ => (),
                 },
-                (Union::Str(s1, ..), Union::Str(s2, ..)) => match op_token.unwrap() {
+                (Union::Str(s1, ..), Union::Str(s2, ..)) => match op_token {
                     EqualsTo => return Ok((s1 == s2).into()),
                     NotEqualsTo => return Ok((s1 != s2).into()),
                     GreaterThan => return Ok((s1 > s2).into()),
@@ -1790,7 +1812,7 @@ impl Engine {
                     Minus => return Ok((s1 - s2).into()),
                     _ => (),
                 },
-                (Union::Char(c1, ..), Union::Char(c2, ..)) => match op_token.unwrap() {
+                (Union::Char(c1, ..), Union::Char(c2, ..)) => match op_token {
                     EqualsTo => return Ok((c1 == c2).into()),
                     NotEqualsTo => return Ok((c1 != c2).into()),
                     GreaterThan => return Ok((c1 > c2).into()),
@@ -1812,7 +1834,7 @@ impl Engine {
                 (Union::Variant(..), _) | (_, Union::Variant(..)) => (),
                 _ => {
                     if let Some((func, need_context)) =
-                        get_builtin_binary_op_fn(op_token.as_ref().unwrap(), &mut lhs, &mut rhs)
+                        get_builtin_binary_op_fn(op_token, &lhs, &rhs)
                     {
                         // We may not need to bump the level because built-in's do not need it.
                         //defer! { let orig_level = global.level; global.level += 1 }
@@ -1825,6 +1847,7 @@ impl Engine {
             }
 
             let operands = &mut [&mut lhs, &mut rhs];
+            let op_token = Some(op_token);
 
             return self
                 .exec_fn_call(

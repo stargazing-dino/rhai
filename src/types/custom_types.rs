@@ -45,7 +45,7 @@ impl CustomTypesCollection {
             CustomTypeInfo {
                 display_name: name.into(),
                 #[cfg(feature = "metadata")]
-                comments: Default::default(),
+                comments: <_>::default(),
             },
         );
     }
@@ -75,7 +75,7 @@ impl CustomTypesCollection {
             CustomTypeInfo {
                 display_name: name.into(),
                 #[cfg(feature = "metadata")]
-                comments: Default::default(),
+                comments: <_>::default(),
             },
         );
     }
@@ -106,7 +106,6 @@ impl CustomTypesCollection {
     }
     /// Iterate all the custom types.
     #[inline(always)]
-    #[must_use]
     pub fn iter(&self) -> impl Iterator<Item = (&str, &CustomTypeInfo)> {
         self.0.iter().map(|(k, v)| (k.as_str(), v))
     }

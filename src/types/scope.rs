@@ -671,14 +671,13 @@ impl Scope<'_> {
     ///
     /// Panics if the index is out of bounds.
     #[inline(always)]
-    #[must_use]
     #[allow(dead_code)]
     pub(crate) fn get_entry_by_index(
         &mut self,
         index: usize,
     ) -> (&Identifier, &Dynamic, &[ImmutableString]) {
         if self.aliases.len() <= index {
-            self.aliases.resize(index + 1, Default::default());
+            self.aliases.resize(index + 1, <_>::default());
         }
 
         (
@@ -774,7 +773,7 @@ impl Scope<'_> {
     #[inline]
     pub(crate) fn add_alias_by_index(&mut self, index: usize, alias: ImmutableString) -> &mut Self {
         if self.aliases.len() <= index {
-            self.aliases.resize(index + 1, Default::default());
+            self.aliases.resize(index + 1, <_>::default());
         }
         let aliases = self.aliases.get_mut(index).unwrap();
         if aliases.is_empty() || !aliases.contains(&alias) {
@@ -829,7 +828,7 @@ impl Scope<'_> {
             scope.push_entry(name.clone(), v1.access_mode(), v1.clone());
 
             if self.aliases.len() > index {
-                scope.aliases.resize(scope.len() - 1, Default::default());
+                scope.aliases.resize(scope.len() - 1, <_>::default());
                 scope.aliases.push(self.aliases[index].clone());
             }
         });

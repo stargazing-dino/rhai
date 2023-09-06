@@ -44,7 +44,7 @@ impl PartialOrd for CustomTypeMetadata<'_> {
 impl Ord for CustomTypeMetadata<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         match self.display_name.cmp(other.display_name) {
-            Ordering::Equal => self.display_name.cmp(&other.display_name),
+            Ordering::Equal => self.display_name.cmp(other.display_name),
             cmp => cmp,
         }
     }
@@ -180,7 +180,7 @@ struct ModuleMetadata<'a> {
 
 impl ModuleMetadata<'_> {
     #[inline(always)]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             doc: "",
             modules: BTreeMap::new(),
@@ -226,7 +226,7 @@ pub fn gen_metadata_to_json(
     let mut global = ModuleMetadata::new();
 
     #[cfg(not(feature = "no_module"))]
-    for (name, m) in engine.global_sub_modules.iter() {
+    for (name, m) in &engine.global_sub_modules {
         global.modules.insert(name, m.as_ref().into());
     }
 

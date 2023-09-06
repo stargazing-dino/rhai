@@ -228,9 +228,9 @@ impl Span {
     /// Is this [`Span`] non-existent?
     ///
     /// Always returns `true` under `no_position`.
-    #[inline]
+    #[inline(always)]
     #[must_use]
-    pub const fn is_none(&self) -> bool {
+    pub const fn is_none(self) -> bool {
         self.start.is_none() && self.end.is_none()
     }
     /// Get the [`Span`]'s starting [position][Position].
@@ -238,7 +238,7 @@ impl Span {
     /// Always returns [`Position::NONE`] under `no_position`.
     #[inline(always)]
     #[must_use]
-    pub const fn start(&self) -> Position {
+    pub const fn start(self) -> Position {
         self.start
     }
     /// Get the [`Span`]'s ending [position][Position].
@@ -246,7 +246,7 @@ impl Span {
     /// Always returns [`Position::NONE`] under `no_position`.
     #[inline(always)]
     #[must_use]
-    pub const fn end(&self) -> Position {
+    pub const fn end(self) -> Position {
         self.end
     }
 }

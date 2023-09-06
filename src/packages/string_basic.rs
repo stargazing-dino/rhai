@@ -90,7 +90,7 @@ mod print_debug_functions {
 
     /// Return the `string`.
     #[rhai_fn(name = "print", name = "to_string")]
-    pub fn print_string(string: ImmutableString) -> ImmutableString {
+    pub const fn print_string(string: ImmutableString) -> ImmutableString {
         string
     }
     /// Convert the string into debug format.

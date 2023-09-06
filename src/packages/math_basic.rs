@@ -25,6 +25,7 @@ macro_rules! gen_conversion_as_functions {
             use super::super::*;
 
             #[export_fn]
+            #[allow(clippy::missing_const_for_fn)]
             pub fn $func_name(x: $arg_type) -> $result_type {
                 x as $result_type
             }
@@ -223,7 +224,7 @@ mod trig_functions {
 mod float_functions {
     /// Return the natural number _e_.
     #[rhai_fn(name = "E")]
-    pub fn e() -> FLOAT {
+    pub const fn e() -> FLOAT {
         #[cfg(not(feature = "f32_float"))]
         return std::f64::consts::E;
         #[cfg(feature = "f32_float")]
@@ -231,7 +232,7 @@ mod float_functions {
     }
     /// Return the number π.
     #[rhai_fn(name = "PI")]
-    pub fn pi() -> FLOAT {
+    pub const fn pi() -> FLOAT {
         #[cfg(not(feature = "f32_float"))]
         return std::f64::consts::PI;
         #[cfg(feature = "f32_float")]
@@ -557,6 +558,7 @@ mod decimal_functions {
     /// Convert the decimal number into an integer.
     #[rhai_fn(return_raw)]
     pub fn to_int(x: Decimal) -> RhaiResultOf<INT> {
+        #[allow(clippy::bind_instead_of_map)]
         x.to_i64()
             .and_then(|n| {
                 #[cfg(feature = "only_i32")]

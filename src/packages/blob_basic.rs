@@ -457,9 +457,8 @@ pub mod blob_functions {
     /// print(x);               // prints "[010305]"
     /// ```
     pub fn remove(blob: &mut Blob, index: INT) -> INT {
-        let index = match calc_index(blob.len(), index, true, || Err(())) {
-            Ok(n) => n,
-            _ => return 0,
+        let Ok(index) = calc_index(blob.len(), index, true, || Err(())) else {
+            return 0;
         };
 
         blob.remove(index) as INT

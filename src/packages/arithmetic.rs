@@ -116,30 +116,30 @@ macro_rules! gen_arithmetic_functions {
                     }
                 }
                 #[rhai_fn(name = "&")]
-                pub fn binary_and(x: $arg_type, y: $arg_type) -> $arg_type {
+                pub const fn binary_and(x: $arg_type, y: $arg_type) -> $arg_type {
                     x & y
                 }
                 #[rhai_fn(name = "|")]
-                pub fn binary_or(x: $arg_type, y: $arg_type) -> $arg_type {
+                pub const fn binary_or(x: $arg_type, y: $arg_type) -> $arg_type {
                     x | y
                 }
                 #[rhai_fn(name = "^")]
-                pub fn binary_xor(x: $arg_type, y: $arg_type) -> $arg_type {
+                pub const fn binary_xor(x: $arg_type, y: $arg_type) -> $arg_type {
                     x ^ y
                 }
                 /// Return true if the number is zero.
                 #[rhai_fn(get = "is_zero", name = "is_zero")]
-                pub fn is_zero(x: $arg_type) -> bool {
+                pub const fn is_zero(x: $arg_type) -> bool {
                     x == 0
                 }
                 /// Return true if the number is odd.
                 #[rhai_fn(get = "is_odd", name = "is_odd")]
-                pub fn is_odd(x: $arg_type) -> bool {
+                pub const fn is_odd(x: $arg_type) -> bool {
                     x % 2 != 0
                 }
                 /// Return true if the number is even.
                 #[rhai_fn(get = "is_even", name = "is_even")]
-                pub fn is_even(x: $arg_type) -> bool {
+                pub const fn is_even(x: $arg_type) -> bool {
                     x % 2 == 0
                 }
             }
@@ -163,7 +163,7 @@ macro_rules! gen_signed_functions {
                     }
                 }
                 #[rhai_fn(name = "+")]
-                pub fn plus(x: $arg_type) -> $arg_type {
+                pub const fn plus(x: $arg_type) -> $arg_type {
                     x
                 }
                 /// Return the absolute value of the number.
@@ -180,7 +180,7 @@ macro_rules! gen_signed_functions {
                 /// * `0` if the number is zero
                 /// * `1` if the number is positive
                 /// * `-1` if the number is negative
-                pub fn sign(x: $arg_type) -> INT {
+                pub const fn sign(x: $arg_type) -> INT {
                     x.signum() as INT
                 }
             }
@@ -232,17 +232,17 @@ def_package! {
 mod int_functions {
     /// Return true if the number is zero.
     #[rhai_fn(get = "is_zero", name = "is_zero")]
-    pub fn is_zero(x: INT) -> bool {
+    pub const fn is_zero(x: INT) -> bool {
         x == 0
     }
     /// Return true if the number is odd.
     #[rhai_fn(get = "is_odd", name = "is_odd")]
-    pub fn is_odd(x: INT) -> bool {
+    pub const fn is_odd(x: INT) -> bool {
         x % 2 != 0
     }
     /// Return true if the number is even.
     #[rhai_fn(get = "is_even", name = "is_even")]
-    pub fn is_even(x: INT) -> bool {
+    pub const fn is_even(x: INT) -> bool {
         x % 2 == 0
     }
 }
@@ -349,7 +349,7 @@ mod f32_functions {
         -x
     }
     #[rhai_fn(name = "+")]
-    pub fn plus(x: f32) -> f32 {
+    pub const fn plus(x: f32) -> f32 {
         x
     }
     /// Return the absolute value of the floating-point number.
@@ -464,7 +464,7 @@ mod f64_functions {
         -x
     }
     #[rhai_fn(name = "+")]
-    pub fn plus(x: f64) -> f64 {
+    pub const fn plus(x: f64) -> f64 {
         x
     }
     /// Return the absolute value of the floating-point number.
@@ -541,7 +541,7 @@ pub mod decimal_functions {
         -x
     }
     #[rhai_fn(name = "+")]
-    pub fn plus(x: Decimal) -> Decimal {
+    pub const fn plus(x: Decimal) -> Decimal {
         x
     }
     /// Return the absolute value of the decimal number.
@@ -564,7 +564,7 @@ pub mod decimal_functions {
     }
     /// Return true if the decimal number is zero.
     #[rhai_fn(get = "is_zero", name = "is_zero")]
-    pub fn is_zero(x: Decimal) -> bool {
+    pub const fn is_zero(x: Decimal) -> bool {
         x.is_zero()
     }
 }

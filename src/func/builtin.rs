@@ -359,8 +359,25 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
                     Divide              => impl_op!(FLOAT => $xx / $yy),
                     Modulo              => impl_op!(FLOAT => $xx % $yy),
                     PowerOf             => impl_op!(FLOAT => $xx.powf($yy as FLOAT)),
+
+                    #[cfg(feature = "unchecked")]
                     EqualsTo            => impl_op!(FLOAT => $xx == $yy),
+                    #[cfg(not(feature = "unchecked"))]
+                    EqualsTo            => Some((|_, args| {
+                        let x = args[0].$xx().unwrap() as FLOAT;
+                        let y = args[1].$yy().unwrap() as FLOAT;
+                        Ok(((x - y).abs() <= FLOAT::EPSILON).into())
+                    }, false)),
+
+                    #[cfg(feature = "unchecked")]
                     NotEqualsTo         => impl_op!(FLOAT => $xx != $yy),
+                    #[cfg(not(feature = "unchecked"))]
+                    NotEqualsTo         => Some((|_, args| {
+                        let x = args[0].$xx().unwrap() as FLOAT;
+                        let y = args[1].$yy().unwrap() as FLOAT;
+                        Ok(((x - y).abs() > FLOAT::EPSILON).into())
+                    }, false)),
+
                     GreaterThan         => impl_op!(FLOAT => $xx > $yy),
                     GreaterThanEqualsTo => impl_op!(FLOAT => $xx >= $yy),
                     LessThan            => impl_op!(FLOAT => $xx < $yy),
