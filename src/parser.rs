@@ -3585,7 +3585,7 @@ impl Engine {
             state.stack.pop();
 
             Expr::Variable(
-                (None, Namespace::default(), 0, catch_var.name).into(),
+                (None, <_>::default(), 0, catch_var.name).into(),
                 None,
                 catch_var.pos,
             )
@@ -3756,7 +3756,7 @@ impl Engine {
                 Some(n) if !is_func => u8::try_from(n.get()).ok().and_then(NonZeroU8::new),
                 _ => None,
             };
-            Expr::Variable((index, Namespace::default(), 0, name).into(), idx, pos)
+            Expr::Variable((index, <_>::default(), 0, name).into(), idx, pos)
         }));
 
         let expr = FnCallExpr {
@@ -3910,7 +3910,7 @@ impl Engine {
         process_settings: impl FnOnce(&mut ParseSettings),
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
-        let mut functions = StraightHashMap::default();
+        let mut functions = <_>::default();
 
         let options = self.options & !LangOptions::STMT_EXPR & !LangOptions::LOOP_EXPR;
 
@@ -3964,7 +3964,7 @@ impl Engine {
         process_settings: impl FnOnce(&mut ParseSettings),
     ) -> ParseResult<(StmtBlockContainer, Vec<Shared<ScriptFnDef>>)> {
         let mut statements = StmtBlockContainer::new_const();
-        let mut functions = StraightHashMap::default();
+        let mut functions = <_>::default();
 
         let mut settings = ParseSettings {
             level: 0,

@@ -302,7 +302,7 @@ impl<M: Into<Self>> AddAssign<M> for Module {
 
 #[inline(always)]
 fn new_hash_map<T>(size: usize) -> StraightHashMap<T> {
-    StraightHashMap::with_capacity_and_hasher(size, Default::default())
+    StraightHashMap::with_capacity_and_hasher(size, <_>::default())
 }
 
 impl Module {

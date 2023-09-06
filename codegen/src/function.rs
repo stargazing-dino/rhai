@@ -105,7 +105,7 @@ pub const FN_IDX_SET: &str = "index$set$";
 impl Parse for ExportedFnParams {
     fn parse(args: ParseStream) -> syn::Result<Self> {
         if args.is_empty() {
-            return Ok(ExportedFnParams::default());
+            return Ok(<_>::default());
         }
 
         let info = crate::attrs::parse_attr_items(args)?;
@@ -119,7 +119,7 @@ impl ExportedParams for ExportedFnParams {
     }
 
     fn no_attrs() -> Self {
-        Default::default()
+        Self::default()
     }
 
     fn from_info(info: crate::attrs::ExportInfo) -> syn::Result<Self> {
@@ -388,7 +388,7 @@ impl Parse for ExportedFn {
             visibility,
             pass_context,
             mut_receiver,
-            params: Default::default(),
+            params: <_>::default(),
             cfg_attrs,
             #[cfg(feature = "metadata")]
             comments: Vec::new(),

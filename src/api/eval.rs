@@ -145,7 +145,7 @@ impl Engine {
                 #[cfg(not(feature = "no_optimize"))]
                 OptimizationLevel::None,
                 #[cfg(feature = "no_optimize")]
-                OptimizationLevel::default(),
+                <_>::default(),
             )?
         };
 

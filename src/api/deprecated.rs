@@ -164,7 +164,7 @@ impl Engine {
             this_ptr,
             eval_ast,
             rewind_scope,
-            ..Default::default()
+            ..<_>::default()
         };
 
         self._call_fn(

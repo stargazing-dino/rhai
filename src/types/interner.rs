@@ -53,7 +53,7 @@ impl StringsInterner {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            cache: StraightHashMap::default(),
+            cache: <_>::default(),
             bloom_filter: BloomFilterU64::new(),
         }
     }

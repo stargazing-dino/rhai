@@ -117,7 +117,7 @@ impl Engine {
         name: impl AsRef<str>,
         args: impl FuncArgs,
     ) -> RhaiResultOf<T> {
-        self.call_fn_with_options(CallFnOptions::default(), scope, ast, name, args)
+        self.call_fn_with_options(<_>::default(), scope, ast, name, args)
     }
     /// Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
     ///
