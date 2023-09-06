@@ -20,7 +20,7 @@ use std::collections::hash_map::Entry;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
-    any::TypeId,
+    any::{type_name, TypeId},
     collections::BTreeMap,
     fmt,
     ops::{Add, AddAssign},
@@ -552,7 +552,7 @@ impl Module {
     /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
     #[inline(always)]
-    pub fn set_custom_type_with_comments_raw<C: Into<Identifier>>(
+    pub fn set_custom_type_with_comments_raw<C: Into<SmartString>>(
         &mut self,
         type_path: impl Into<Identifier>,
         name: impl Into<Identifier>,
@@ -582,17 +582,35 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn get_custom_type(&self, key: &str) -> Option<&str> {
-        self.custom_types.get(key).map(|t| t.display_name.as_str())
+        self.get_custom_type_raw(key)
+            .map(|t| t.display_name.as_str())
     }
-    /// Get the doc-comments of a registered custom type.
-    /// Exported under the `metadata` feature only.
-    #[cfg(feature = "metadata")]
-    #[inline]
-    pub fn get_custom_type_comments(&self, key: &str) -> impl Iterator<Item = &str> {
-        self.custom_types
-            .get(key)
-            .into_iter()
-            .flat_map(|t| t.comments.iter().map(<_>::as_ref))
+    /// Get the display name of a registered custom type.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use rhai::Module;
+    /// #[derive(Clone)]
+    /// struct TestStruct;
+    ///
+    /// let name = std::any::type_name::<TestStruct>();
+    ///
+    /// let mut module = Module::new();
+    ///
+    /// module.set_custom_type::<TestStruct>("MyType");
+    ///
+    /// assert_eq!(module.get_custom_type_display_name::<TestStruct>(), Some("MyType"));
+    /// ```
+    #[inline(always)]
+    #[must_use]
+    pub fn get_custom_type_display_name<T>(&self) -> Option<&str> {
+        self.get_custom_type(type_name::<T>())
+    }
+    /// Get a registered custom type by its type name.
+    #[inline(always)]
+    pub fn get_custom_type_raw(&self, key: &str) -> Option<&CustomTypeInfo> {
+        self.custom_types.get(key)
     }
 
     /// Returns `true` if this [`Module`] contains no items.
@@ -822,7 +840,7 @@ impl Module {
                         #[cfg(feature = "metadata")]
                         return_type: "".into(),
                         #[cfg(feature = "metadata")]
-                        comments: Box::default(),
+                        comments: <_>::default(),
                     }
                     .into(),
                     func: fn_def.into(),
@@ -1017,7 +1035,7 @@ impl Module {
     /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
     #[inline]
-    pub fn update_fn_metadata_with_comments<A: Into<Identifier>, C: Into<Identifier>>(
+    pub fn update_fn_metadata_with_comments<A: Into<Identifier>, C: Into<SmartString>>(
         &mut self,
         hash_fn: u64,
         arg_names: impl IntoIterator<Item = A>,
@@ -1131,14 +1149,14 @@ impl Module {
     /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
     #[inline(always)]
-    pub fn set_fn_with_comments<S: AsRef<str>>(
+    pub fn set_fn_with_comments<C: AsRef<str>>(
         &mut self,
         name: impl Into<Identifier>,
         namespace: FnNamespace,
         access: FnAccess,
         arg_names: Option<&[&str]>,
         arg_types: impl AsRef<[TypeId]>,
-        comments: impl IntoIterator<Item = S>,
+        comments: impl IntoIterator<Item = C>,
         func: CallableFunction,
     ) -> u64 {
         let arg_names = arg_names.unwrap_or(&[]);
@@ -1153,14 +1171,14 @@ impl Module {
     ///
     /// If there is an existing Rust function of the same hash, it is replaced.
     #[inline]
-    fn _set_fn<A: AsRef<str>, S: AsRef<str>>(
+    fn _set_fn<A: AsRef<str>, C: AsRef<str>>(
         &mut self,
         name: impl Into<Identifier>,
         namespace: FnNamespace,
         access: FnAccess,
         arg_names: impl IntoIterator<Item = A>,
         arg_types: impl AsRef<[TypeId]>,
-        comments: impl IntoIterator<Item = S>,
+        comments: impl IntoIterator<Item = C>,
         func: CallableFunction,
     ) -> &mut FuncInfo {
         let _arg_names = arg_names;

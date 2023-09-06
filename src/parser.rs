@@ -3888,7 +3888,7 @@ impl Engine {
             body: body.into(),
             #[cfg(not(feature = "no_function"))]
             #[cfg(feature = "metadata")]
-            comments: Box::default(),
+            comments: <_>::default(),
         });
 
         let mut fn_ptr = crate::FnPtr::new_unchecked(fn_name, Vec::new());

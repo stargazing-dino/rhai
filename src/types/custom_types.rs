@@ -11,13 +11,13 @@ pub struct CustomTypeInfo {
     pub display_name: Identifier,
     /// Comments.
     #[cfg(feature = "metadata")]
-    pub comments: Box<[Identifier]>,
+    pub comments: Box<[crate::SmartString]>,
 }
 
 /// _(internals)_ A collection of custom types.
 /// Exported under the `internals` feature only.
 #[derive(Debug, Clone, Hash)]
-pub struct CustomTypesCollection(BTreeMap<Identifier, CustomTypeInfo>);
+pub struct CustomTypesCollection(BTreeMap<Identifier, Box<CustomTypeInfo>>);
 
 impl Default for CustomTypesCollection {
     #[inline(always)]
@@ -53,7 +53,7 @@ impl CustomTypesCollection {
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[inline(always)]
-    pub fn add_with_comments<C: Into<Identifier>>(
+    pub fn add_with_comments<C: Into<crate::SmartString>>(
         &mut self,
         type_name: impl Into<Identifier>,
         name: impl Into<Identifier>,
@@ -96,17 +96,17 @@ impl CustomTypesCollection {
     /// Register a custom type.
     #[inline(always)]
     pub fn add_raw(&mut self, type_name: impl Into<Identifier>, custom_type: CustomTypeInfo) {
-        self.0.insert(type_name.into(), custom_type);
+        self.0.insert(type_name.into(), custom_type.into());
     }
     /// Find a custom type.
     #[inline(always)]
     #[must_use]
     pub fn get(&self, key: &str) -> Option<&CustomTypeInfo> {
-        self.0.get(key)
+        self.0.get(key).map(<_>::as_ref)
     }
     /// Iterate all the custom types.
     #[inline(always)]
     pub fn iter(&self) -> impl Iterator<Item = (&str, &CustomTypeInfo)> {
-        self.0.iter().map(|(k, v)| (k.as_str(), v))
+        self.0.iter().map(|(k, v)| (k.as_str(), v.as_ref()))
     }
 }

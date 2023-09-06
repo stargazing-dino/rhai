@@ -1352,7 +1352,7 @@ impl Engine {
                         this_type: fn_def.this_type.clone(),
                         params: fn_def.params.clone(),
                         #[cfg(feature = "metadata")]
-                        comments: Box::default(),
+                        comments: <_>::default(),
                     })
                     .for_each(|script_def| {
                         lib2.set_script_fn(script_def);
