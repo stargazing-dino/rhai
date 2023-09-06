@@ -4,13 +4,24 @@ Rhai Release Notes
 Version 1.16.0
 ==============
 
+Compiler version
+----------------
+
+The minimum Rust compiler version is raised to `1.66.0`.
+
+Potentially-breaking changes
+----------------------------
+
+* Limit functions (e.g. `max_operations`, `max_array_size` etc.) as well as `Engine::ensure_data_size_within_limits` are no longer exported under `unchecked`. This should be the correct behavior instead of returning `None` or zero.
+* The type `OptimizationLevel` is no longer exported under `no_optimize`. Originally it was mapped to `()` under `no_optimize`.
+* O/S features such as file access and time are no longer disabled when using `wasm32-wasi` (or any WASM target other than `wasm32-unknown`).
+
 Bug fixes
 ---------
 
 * Fixes a panic when using `this` as the first parameter in a namespace-qualified function call.
 * Comparing two different data types (e.g. a custom type and a standard type) now correctly defaults to `false` (except for `!=` which defaults to `true`).
 * `max` and `min` for integers, strings and characters were missing from the standard library. They are now added.
-* O/S features such as file access and time are no longer disabled when using `wasm32-wasi` (or any WASM target other than `wasm32-unknown`).
 
 Dependencies
 ------------
@@ -23,8 +34,10 @@ Dependencies
 New features
 ------------
 
+* New `exit` function that terminates script evaluation regardless of where it is called, even inside deeply-nested function calls.
 * Added `Engine::max_variables` and `Engine::set_max_variables` to limit the maximum number of variables allowed within a scope at any time. This is to guard against defining a huge number of variables containing large data just beyond individual data size limits. When `max_variables` is exceeded a new error, `ErrorTooManyVariables`, is returned.
 * Added `zip` function for arrays.
+* Added `on_print` and `on_debug` definitions for `TypeBuilder`.
 * Doc-comments are now included in custom type definitions within plugin modules. They can be accessed via `Module::get_custom_type_comments`. These doc-comments for custom types are also exported in JSON via `Engine::gen_fn_metadata_to_json`.
 
 Enhancements

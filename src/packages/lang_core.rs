@@ -2,7 +2,7 @@ use crate::def_package;
 use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::types::dynamic::Tag;
-use crate::{Dynamic, RhaiResultOf, ERR, INT};
+use crate::{Dynamic, RhaiResult, RhaiResultOf, ERR, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -26,6 +26,26 @@ def_package! {
 
 #[export_module]
 mod core_functions {
+    /// Exit the script evaluation immediately with a value.
+    ///
+    /// # Example
+    /// ```rhai
+    /// exit(42);
+    /// ```
+    #[rhai_fn(name = "exit", return_raw)]
+    pub fn exit_with_value(value: Dynamic) -> RhaiResult {
+        Err(ERR::Exit(value, Position::NONE).into())
+    }
+    /// Exit the script evaluation immediately with `()` as exit value.
+    ///
+    /// # Example
+    /// ```rhai
+    /// exit();
+    /// ```
+    #[rhai_fn(return_raw)]
+    pub fn exit() -> RhaiResult {
+        Err(ERR::Exit(Dynamic::UNIT, Position::NONE).into())
+    }
     /// Take ownership of the data in a `Dynamic` value and return it.
     /// The data is _NOT_ cloned.
     ///
@@ -41,7 +61,7 @@ mod core_functions {
     /// print(x);               // prints ()
     /// ```
     #[rhai_fn(return_raw)]
-    pub fn take(value: &mut Dynamic) -> RhaiResultOf<Dynamic> {
+    pub fn take(value: &mut Dynamic) -> RhaiResult {
         if value.is_read_only() {
             return Err(
                 ERR::ErrorNonPureMethodCallOnConstant("take".to_string(), Position::NONE).into(),
@@ -300,10 +320,8 @@ fn collect_fn_metadata(
     #[cfg(not(feature = "no_module"))]
     ctx.engine()
         .global_sub_modules
-        .as_ref()
-        .into_iter()
-        .flatten()
-        .flat_map(|(_, m)| m.iter_script_fn())
+        .values()
+        .flat_map(|m| m.iter_script_fn())
         .filter(|(ns, a, n, p, f)| filter(*ns, *a, n, *p, f))
         .for_each(|(.., f)| {
             list.push(

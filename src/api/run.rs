@@ -140,7 +140,7 @@ impl Engine {
             global.embedded_module_resolver = ast.resolver().cloned();
         }
 
-        let _ = self.eval_global_statements(global, caches, scope, ast.statements())?;
+        let _ = self.eval_global_statements(global, caches, scope, ast.statements(), true)?;
 
         #[cfg(feature = "debugging")]
         if self.is_debugger_registered() {

@@ -4,17 +4,12 @@ use syn::{
     spanned::Spanned,
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Default, Hash)]
 pub enum ExportScope {
+    #[default]
     PubOnly,
     Prefix(String),
     All,
-}
-
-impl Default for ExportScope {
-    fn default() -> Self {
-        Self::PubOnly
-    }
 }
 
 pub trait ExportedParams: Sized {

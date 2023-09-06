@@ -5,10 +5,13 @@ use crate::{Dynamic, Identifier, ImmutableString};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
-    fmt,
+    fmt, iter,
     iter::{Extend, FromIterator},
     marker::PhantomData,
 };
+
+/// Minimum number of entries in the [`Scope`] to avoid reallocations.
+pub const MIN_SCOPE_ENTRIES: usize = 8;
 
 /// Type containing information about the current scope. Useful for keeping state between
 /// [`Engine`][crate::Engine] evaluation runs.
@@ -58,10 +61,9 @@ use std::{
 //
 // # Implementation Notes
 //
-// [`Scope`] is implemented as three arrays of exactly the same length. That's because variable
-// names take up the most space, with [`Identifier`] being three words long, but in the vast
-// majority of cases the name is NOT used to look up a variable.  Variable lookup is usually via
-// direct indexing, by-passing the name altogether.
+// [`Scope`] is implemented as three arrays.  Two (`values` and `names`) are of exactly the same
+// length. That's because in the vast majority of cases the name is NOT used to look up a variable.
+// Variable lookup is usually via direct indexing, by-passing the name altogether.
 //
 // [`Dynamic`] is reasonably small so packing it tightly improves cache performance.
 #[derive(Debug, Hash, Default)]
@@ -69,9 +71,12 @@ pub struct Scope<'a> {
     /// Current value of the entry.
     values: Vec<Dynamic>,
     /// Name of the entry.
-    names: Vec<Identifier>,
+    names: Vec<ImmutableString>,
     /// Aliases of the entry.
-    aliases: Vec<Vec<ImmutableString>>,
+    ///
+    /// This `Vec` is not filled until needed because aliases are used rarely
+    /// (only for `export` statements).
+    aliases: Vec<Box<[ImmutableString]>>,
     /// Phantom to keep the lifetime parameter in order not to break existing code.
     dummy: PhantomData<&'a ()>,
 }
@@ -129,14 +134,21 @@ impl IntoIterator for Scope<'_> {
         Box::new(
             self.values
                 .into_iter()
-                .zip(self.names.into_iter().zip(self.aliases.into_iter()))
-                .map(|(value, (name, alias))| (name.into(), value, alias)),
+                .zip(
+                    self.names.into_iter().zip(
+                        self.aliases
+                            .into_iter()
+                            .map(|a| a.to_vec())
+                            .chain(iter::repeat(Vec::new())),
+                    ),
+                )
+                .map(|(value, (name, alias))| (name.to_string(), value, alias)),
         )
     }
 }
 
 impl<'a> IntoIterator for &'a Scope<'_> {
-    type Item = (&'a Identifier, &'a Dynamic, &'a Vec<ImmutableString>);
+    type Item = (&'a str, &'a Dynamic, &'a [ImmutableString]);
     type IntoIter = Box<dyn Iterator<Item = Self::Item> + 'a>;
 
     #[must_use]
@@ -144,8 +156,15 @@ impl<'a> IntoIterator for &'a Scope<'_> {
         Box::new(
             self.values
                 .iter()
-                .zip(self.names.iter().zip(self.aliases.iter()))
-                .map(|(value, (name, alias))| (name, value, alias)),
+                .zip(
+                    self.names.iter().zip(
+                        self.aliases
+                            .iter()
+                            .map(<_>::as_ref)
+                            .chain(iter::repeat(&[][..])),
+                    ),
+                )
+                .map(|(value, (name, alias))| (name.as_str(), value, alias)),
         )
     }
 }
@@ -191,7 +210,7 @@ impl Scope<'_> {
         Self {
             values: Vec::with_capacity(capacity),
             names: Vec::with_capacity(capacity),
-            aliases: Vec::with_capacity(capacity),
+            aliases: Vec::new(),
             dummy: PhantomData,
         }
     }
@@ -271,7 +290,11 @@ impl Scope<'_> {
     /// ```
     #[inline(always)]
     pub fn push(&mut self, name: impl Into<Identifier>, value: impl Variant + Clone) -> &mut Self {
-        self.push_entry(name, AccessMode::ReadWrite, Dynamic::from(value))
+        self.push_entry(
+            name.into().into(),
+            AccessMode::ReadWrite,
+            Dynamic::from(value),
+        )
     }
     /// Add (push) a new [`Dynamic`] entry to the [`Scope`].
     ///
@@ -287,7 +310,7 @@ impl Scope<'_> {
     /// ```
     #[inline(always)]
     pub fn push_dynamic(&mut self, name: impl Into<Identifier>, value: Dynamic) -> &mut Self {
-        self.push_entry(name, value.access_mode(), value)
+        self.push_entry(name.into().into(), value.access_mode(), value)
     }
     /// Add (push) a new constant to the [`Scope`].
     ///
@@ -310,7 +333,11 @@ impl Scope<'_> {
         name: impl Into<Identifier>,
         value: impl Variant + Clone,
     ) -> &mut Self {
-        self.push_entry(name, AccessMode::ReadOnly, Dynamic::from(value))
+        self.push_entry(
+            name.into().into(),
+            AccessMode::ReadOnly,
+            Dynamic::from(value),
+        )
     }
     /// Add (push) a new constant with a [`Dynamic`] value to the Scope.
     ///
@@ -333,18 +360,21 @@ impl Scope<'_> {
         name: impl Into<Identifier>,
         value: Dynamic,
     ) -> &mut Self {
-        self.push_entry(name, AccessMode::ReadOnly, value)
+        self.push_entry(name.into().into(), AccessMode::ReadOnly, value)
     }
     /// Add (push) a new entry with a [`Dynamic`] value to the [`Scope`].
     #[inline]
     pub(crate) fn push_entry(
         &mut self,
-        name: impl Into<Identifier>,
+        name: ImmutableString,
         access: AccessMode,
         mut value: Dynamic,
     ) -> &mut Self {
-        self.names.push(name.into());
-        self.aliases.push(Vec::new());
+        if self.is_empty() {
+            self.names.reserve(MIN_SCOPE_ENTRIES);
+            self.values.reserve(MIN_SCOPE_ENTRIES);
+        }
+        self.names.push(name);
         value.set_access_mode(access);
         self.values.push(value);
         self
@@ -382,19 +412,23 @@ impl Scope<'_> {
     #[inline(always)]
     pub fn pop(&mut self) -> &mut Self {
         self.names.pop().expect("not empty");
-        let _ = self.values.pop().expect("not empty");
-        self.aliases.pop().expect("not empty");
+        self.values.truncate(self.names.len());
+        self.aliases.truncate(self.names.len());
         self
     }
     /// Remove the last entry from the [`Scope`] and return it.
     #[inline(always)]
     #[allow(dead_code)]
-    pub(crate) fn pop_entry(&mut self) -> Option<(Identifier, Dynamic, Vec<ImmutableString>)> {
+    pub(crate) fn pop_entry(&mut self) -> Option<(ImmutableString, Dynamic, Vec<ImmutableString>)> {
         self.values.pop().map(|value| {
             (
                 self.names.pop().expect("not empty"),
                 value,
-                self.aliases.pop().expect("not empty"),
+                if self.aliases.len() > self.values.len() {
+                    self.aliases.pop().expect("not empty").to_vec()
+                } else {
+                    Vec::new()
+                },
             )
         })
     }
@@ -643,6 +677,10 @@ impl Scope<'_> {
         &mut self,
         index: usize,
     ) -> (&Identifier, &Dynamic, &[ImmutableString]) {
+        if self.aliases.len() <= index {
+            self.aliases.resize(index + 1, Default::default());
+        }
+
         (
             &self.names[index],
             &self.values[index],
@@ -680,7 +718,9 @@ impl Scope<'_> {
     pub fn remove<T: Variant + Clone>(&mut self, name: &str) -> Option<T> {
         self.search(name).and_then(|index| {
             self.names.remove(index);
-            self.aliases.remove(index);
+            if self.aliases.len() > index {
+                self.aliases.remove(index);
+            }
             self.values.remove(index).try_cast()
         })
     }
@@ -733,9 +773,14 @@ impl Scope<'_> {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     pub(crate) fn add_alias_by_index(&mut self, index: usize, alias: ImmutableString) -> &mut Self {
+        if self.aliases.len() <= index {
+            self.aliases.resize(index + 1, Default::default());
+        }
         let aliases = self.aliases.get_mut(index).unwrap();
         if aliases.is_empty() || !aliases.contains(&alias) {
-            aliases.push(alias);
+            let mut vec = std::mem::take(aliases).to_vec();
+            vec.push(alias);
+            *aliases = vec.into_boxed_slice();
         }
         self
     }
@@ -778,27 +823,18 @@ impl Scope<'_> {
                 return;
             }
 
-            let v1 = &self.values[len - 1 - i];
-            let alias = &self.aliases[len - 1 - i];
-            let mut v2 = v1.clone();
-            v2.set_access_mode(v1.access_mode());
+            let index = len - 1 - i;
+            let v1 = &self.values[index];
 
-            scope.names.push(name.clone());
-            scope.values.push(v2);
-            scope.aliases.push(alias.clone());
+            scope.push_entry(name.clone(), v1.access_mode(), v1.clone());
+
+            if self.aliases.len() > index {
+                scope.aliases.resize(scope.len() - 1, Default::default());
+                scope.aliases.push(self.aliases[index].clone());
+            }
         });
 
         scope
-    }
-    /// Get an iterator to entries in the [`Scope`].
-    #[allow(dead_code)]
-    pub(crate) fn into_iter(
-        self,
-    ) -> impl Iterator<Item = (Identifier, Dynamic, Vec<ImmutableString>)> {
-        self.names
-            .into_iter()
-            .zip(self.values.into_iter().zip(self.aliases.into_iter()))
-            .map(|(name, (value, alias))| (name, value, alias))
     }
     /// Get an iterator to entries in the [`Scope`].
     /// Shared values are flatten-cloned.
@@ -859,7 +895,14 @@ impl Scope<'_> {
     pub(crate) fn remove_range(&mut self, start: usize, len: usize) {
         self.values.drain(start..start + len).for_each(|_| {});
         self.names.drain(start..start + len).for_each(|_| {});
-        self.aliases.drain(start..start + len).for_each(|_| {});
+
+        if self.aliases.len() > start {
+            if self.aliases.len() <= start + len {
+                self.aliases.truncate(start);
+            } else {
+                self.aliases.drain(start..start + len).for_each(|_| {});
+            }
+        }
     }
 }
 
@@ -867,7 +910,7 @@ impl<K: Into<Identifier>> Extend<(K, Dynamic)> for Scope<'_> {
     #[inline]
     fn extend<T: IntoIterator<Item = (K, Dynamic)>>(&mut self, iter: T) {
         for (name, value) in iter {
-            self.push_entry(name, AccessMode::ReadWrite, value);
+            self.push_entry(name.into().into(), AccessMode::ReadWrite, value);
         }
     }
 }
@@ -886,7 +929,7 @@ impl<K: Into<Identifier>> Extend<(K, bool, Dynamic)> for Scope<'_> {
     fn extend<T: IntoIterator<Item = (K, bool, Dynamic)>>(&mut self, iter: T) {
         for (name, is_constant, value) in iter {
             self.push_entry(
-                name,
+                name.into().into(),
                 if is_constant {
                     AccessMode::ReadOnly
                 } else {

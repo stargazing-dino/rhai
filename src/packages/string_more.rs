@@ -1,8 +1,8 @@
 use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
-    def_package, Dynamic, ExclusiveRange, ImmutableString, InclusiveRange, Position, RhaiResultOf,
-    SmartString, ERR, INT, MAX_USIZE_INT,
+    def_package, Dynamic, ExclusiveRange, ImmutableString, InclusiveRange, RhaiResultOf,
+    SmartString, INT, MAX_USIZE_INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -1284,10 +1284,13 @@ mod string_functions {
         let _ctx = ctx;
 
         // Check if string will be over max size limit
+        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
-            return Err(
-                ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
-            );
+            return Err(crate::ERR::ErrorDataTooLarge(
+                "Length of string".to_string(),
+                crate::Position::NONE,
+            )
+            .into());
         }
 
         let orig_len = string.chars().count();
@@ -1302,10 +1305,13 @@ mod string_functions {
             p.push(character);
         }
 
+        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size() {
-            return Err(
-                ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
-            );
+            return Err(crate::ERR::ErrorDataTooLarge(
+                "Length of string".to_string(),
+                crate::Position::NONE,
+            )
+            .into());
         }
 
         Ok(())
@@ -1342,10 +1348,13 @@ mod string_functions {
         let _ctx = ctx;
 
         // Check if string will be over max size limit
+        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_string_size() > 0 && len > _ctx.engine().max_string_size() {
-            return Err(
-                ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
-            );
+            return Err(crate::ERR::ErrorDataTooLarge(
+                "Length of string".to_string(),
+                crate::Position::NONE,
+            )
+            .into());
         }
 
         let mut str_len = string.chars().count();
@@ -1367,10 +1376,13 @@ mod string_functions {
             }
         }
 
+        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_string_size() > 0 && string.len() > _ctx.engine().max_string_size() {
-            return Err(
-                ERR::ErrorDataTooLarge("Length of string".to_string(), Position::NONE).into(),
-            );
+            return Err(crate::ERR::ErrorDataTooLarge(
+                "Length of string".to_string(),
+                crate::Position::NONE,
+            )
+            .into());
         }
 
         Ok(())

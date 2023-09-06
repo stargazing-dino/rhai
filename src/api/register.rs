@@ -61,7 +61,7 @@ impl Engine {
         const C: bool,
         R: Variant + Clone,
         const L: bool,
-        F: RegisterNativeFunction<A, N, C, R, L>,
+        F: RegisterNativeFunction<A, N, C, R, L> + SendSync + 'static,
     >(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
@@ -70,10 +70,10 @@ impl Engine {
         let param_types = F::param_types();
 
         #[cfg(feature = "metadata")]
-        let mut param_type_names: crate::StaticVec<_> = F::param_names()
+        let mut param_type_names = F::param_names()
             .iter()
             .map(|ty| format!("_: {}", self.format_type_name(ty)))
-            .collect();
+            .collect::<crate::FnArgsVec<_>>();
 
         #[cfg(feature = "metadata")]
         if F::return_type() != TypeId::of::<()>() {
@@ -81,8 +81,10 @@ impl Engine {
         }
 
         #[cfg(feature = "metadata")]
-        let param_type_names: crate::StaticVec<_> =
-            param_type_names.iter().map(String::as_str).collect();
+        let param_type_names = param_type_names
+            .iter()
+            .map(String::as_str)
+            .collect::<crate::FnArgsVec<_>>();
         #[cfg(feature = "metadata")]
         let param_type_names = Some(param_type_names.as_ref());
 
@@ -760,11 +762,7 @@ impl Engine {
             }
         }
 
-        register_static_module_raw(
-            self.global_sub_modules.get_or_insert_with(Default::default),
-            name.as_ref(),
-            module,
-        );
+        register_static_module_raw(&mut self.global_sub_modules, name.as_ref(), module);
         self
     }
     /// _(metadata)_ Generate a list of all registered functions.
@@ -786,7 +784,7 @@ impl Engine {
         }
 
         #[cfg(not(feature = "no_module"))]
-        for (name, m) in self.global_sub_modules.as_ref().into_iter().flatten() {
+        for (name, m) in self.global_sub_modules.iter() {
             signatures.extend(m.gen_fn_signatures().map(|f| format!("{name}::{f}")));
         }
 

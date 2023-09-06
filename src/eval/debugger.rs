@@ -31,10 +31,11 @@ pub type OnDebuggerCallback = dyn Fn(EvalContext, DebuggerEvent, ASTNode, Option
     + Sync;
 
 /// A command for the debugger on the next iteration.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default, Hash)]
 #[non_exhaustive]
 pub enum DebuggerCommand {
     /// Continue normal execution.
+    #[default]
     Continue,
     /// Step into the next expression, diving into functions.
     StepInto,
@@ -44,13 +45,6 @@ pub enum DebuggerCommand {
     Next,
     /// Run to the end of the current function call.
     FunctionExit,
-}
-
-impl Default for DebuggerCommand {
-    #[inline(always)]
-    fn default() -> Self {
-        Self::Continue
-    }
 }
 
 /// The debugger status.
@@ -222,7 +216,7 @@ pub struct CallStackFrame {
     /// Function name.
     pub fn_name: ImmutableString,
     /// Copies of function call arguments, if any.
-    pub args: crate::StaticVec<Dynamic>,
+    pub args: Vec<Dynamic>,
     /// Source of the function.
     pub source: Option<ImmutableString>,
     /// [Position][`Position`] of the function call.
@@ -291,13 +285,13 @@ impl Debugger {
     pub(crate) fn push_call_stack_frame(
         &mut self,
         fn_name: ImmutableString,
-        args: crate::StaticVec<Dynamic>,
+        args: impl IntoIterator<Item = Dynamic>,
         source: Option<ImmutableString>,
         pos: Position,
     ) {
         self.call_stack.push(CallStackFrame {
             fn_name,
-            args,
+            args: args.into_iter().collect(),
             source,
             pos,
         });

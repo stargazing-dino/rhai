@@ -55,12 +55,12 @@ pub struct ParseState<'e, 's> {
     /// Global runtime state.
     pub global: Option<Box<GlobalRuntimeState>>,
     /// Encapsulates a local stack with variable names to simulate an actual runtime scope.
-    pub stack: Option<Scope<'e>>,
+    pub stack: Scope<'e>,
     /// Size of the local variables stack upon entry of the current block scope.
     pub block_stack_len: usize,
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
     #[cfg(not(feature = "no_closure"))]
-    pub external_vars: Option<Vec<Ident>>,
+    pub external_vars: Vec<Ident>,
     /// An indicator that, when set to `false`, disables variable capturing into externals one
     /// single time up until the nearest consumed Identifier token.
     ///
@@ -71,10 +71,10 @@ pub struct ParseState<'e, 's> {
     pub allow_capture: bool,
     /// Encapsulates a local stack with imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
-    pub imports: Option<Vec<ImmutableString>>,
+    pub imports: Vec<ImmutableString>,
     /// List of globally-imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
-    pub global_imports: Option<Vec<ImmutableString>>,
+    pub global_imports: Vec<ImmutableString>,
 }
 
 impl fmt::Debug for ParseState<'_, '_> {
@@ -115,17 +115,17 @@ impl<'e, 's> ParseState<'e, 's> {
             tokenizer_control,
             expr_filter: |_| true,
             #[cfg(not(feature = "no_closure"))]
-            external_vars: None,
+            external_vars: Vec::new(),
             allow_capture: true,
             interned_strings,
             external_constants,
             global: None,
-            stack: None,
+            stack: Scope::new(),
             block_stack_len: 0,
             #[cfg(not(feature = "no_module"))]
-            imports: None,
+            imports: Vec::new(),
             #[cfg(not(feature = "no_module"))]
-            global_imports: None,
+            global_imports: Vec::new(),
         }
     }
 
@@ -143,9 +143,7 @@ impl<'e, 's> ParseState<'e, 's> {
 
         let index = self
             .stack
-            .as_ref()
-            .into_iter()
-            .flat_map(Scope::iter_rev_raw)
+            .iter_rev_raw()
             .enumerate()
             .find(|&(.., (n, ..))| {
                 if n == SCOPE_SEARCH_BARRIER_MARKER {
@@ -194,21 +192,11 @@ impl<'e, 's> ParseState<'e, 's> {
 
         #[cfg(not(feature = "no_closure"))]
         if self.allow_capture {
-            if !is_func_name
-                && index == 0
-                && !self
-                    .external_vars
-                    .as_deref()
-                    .into_iter()
-                    .flatten()
-                    .any(|v| v.name == name)
-            {
-                self.external_vars
-                    .get_or_insert_with(Default::default)
-                    .push(Ident {
-                        name: name.into(),
-                        pos: _pos,
-                    });
+            if !is_func_name && index == 0 && !self.external_vars.iter().any(|v| v.name == name) {
+                self.external_vars.push(Ident {
+                    name: name.into(),
+                    pos: _pos,
+                });
             }
         } else {
             self.allow_capture = true;
@@ -233,13 +221,9 @@ impl<'e, 's> ParseState<'e, 's> {
     #[must_use]
     pub fn find_module(&self, name: &str) -> Option<NonZeroUsize> {
         self.imports
-            .as_deref()
-            .into_iter()
-            .flatten()
-            .rev()
-            .enumerate()
-            .find(|(.., n)| n.as_str() == name)
-            .and_then(|(i, ..)| NonZeroUsize::new(i + 1))
+            .iter()
+            .rposition(|n| n.as_str() == name)
+            .and_then(|i| NonZeroUsize::new(i + 1))
     }
 
     /// Get an interned string, creating one if it is not yet interned.
@@ -670,16 +654,8 @@ impl Engine {
                     if settings.has_option(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
-                        && !state
-                            .global_imports
-                            .as_deref()
-                            .into_iter()
-                            .flatten()
-                            .any(|m| m.as_str() == root)
-                        && !self
-                            .global_sub_modules
-                            .as_ref()
-                            .map_or(false, |m| m.contains_key(root))
+                        && !state.global_imports.iter().any(|m| m.as_str() == root)
+                        && !self.global_sub_modules.contains_key(root)
                     {
                         return Err(
                             PERR::ModuleUndefined(root.into()).into_err(_namespace.position())
@@ -745,16 +721,8 @@ impl Engine {
                         if settings.has_option(LangOptions::STRICT_VAR)
                             && index.is_none()
                             && !is_global
-                            && !state
-                                .global_imports
-                                .as_deref()
-                                .into_iter()
-                                .flatten()
-                                .any(|m| m.as_str() == root)
-                            && !self
-                                .global_sub_modules
-                                .as_ref()
-                                .map_or(false, |m| m.contains_key(root))
+                            && !state.global_imports.iter().any(|m| m.as_str() == root)
+                            && !self.global_sub_modules.contains_key(root)
                         {
                             return Err(
                                 PERR::ModuleUndefined(root.into()).into_err(_namespace.position())
@@ -990,6 +958,7 @@ impl Engine {
         loop {
             const MISSING_RBRACKET: &str = "to end this array literal";
 
+            #[cfg(not(feature = "unchecked"))]
             if self.max_array_size() > 0 && array.len() >= self.max_array_size() {
                 return Err(PERR::LiteralTooLarge(
                     "Size of array literal".into(),
@@ -1122,6 +1091,7 @@ impl Engine {
                 }
             };
 
+            #[cfg(not(feature = "unchecked"))]
             if self.max_map_size() > 0 && map.len() >= self.max_map_size() {
                 return Err(PERR::LiteralTooLarge(
                     "Number of properties in object map literal".into(),
@@ -1516,10 +1486,7 @@ impl Engine {
                     // Keep them in `global_imports` instead so that strict variables
                     // mode will not complain.
                     new_state.global_imports.clone_from(&state.global_imports);
-                    new_state
-                        .global_imports
-                        .get_or_insert_with(Default::default)
-                        .extend(state.imports.as_deref().into_iter().flatten().cloned());
+                    new_state.global_imports.extend(state.imports.clone());
                 }
 
                 // Brand new options
@@ -1550,8 +1517,7 @@ impl Engine {
                 let (expr, fn_def) = result?;
 
                 #[cfg(not(feature = "no_closure"))]
-                for Ident { name, pos } in new_state.external_vars.as_deref().into_iter().flatten()
-                {
+                for Ident { name, pos } in new_state.external_vars.iter() {
                     let (index, is_func) = state.access_var(name, lib, *pos);
 
                     if !is_func
@@ -1651,16 +1617,9 @@ impl Engine {
             // Custom syntax.
             #[cfg(not(feature = "no_custom_syntax"))]
             Token::Custom(key) | Token::Reserved(key) | Token::Identifier(key)
-                if self
-                    .custom_syntax
-                    .as_ref()
-                    .map_or(false, |m| m.contains_key(&**key)) =>
+                if self.custom_syntax.contains_key(&**key) =>
             {
-                let (key, syntax) = self
-                    .custom_syntax
-                    .as_ref()
-                    .and_then(|m| m.get_key_value(&**key))
-                    .unwrap();
+                let (key, syntax) = self.custom_syntax.get_key_value(&**key).unwrap();
                 let (.., pos) = input.next().expect(NEVER_ENDS);
                 let settings = settings.level_up()?;
                 self.parse_custom_syntax(input, state, lib, settings, key, syntax, pos)?
@@ -1967,16 +1926,8 @@ impl Engine {
                     if settings.has_option(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
-                        && !state
-                            .global_imports
-                            .as_deref()
-                            .into_iter()
-                            .flatten()
-                            .any(|m| m.as_str() == root)
-                        && !self
-                            .global_sub_modules
-                            .as_ref()
-                            .map_or(false, |m| m.contains_key(root))
+                        && !state.global_imports.iter().any(|m| m.as_str() == root)
+                        && !self.global_sub_modules.contains_key(root)
                     {
                         return Err(
                             PERR::ModuleUndefined(root.into()).into_err(namespace.position())
@@ -2138,14 +2089,17 @@ impl Engine {
             }
             // var (indexed) = rhs
             Expr::Variable(ref x, i, var_pos) => {
-                let stack = state.stack.get_or_insert_with(Default::default);
                 let (index, .., name) = &**x;
                 let index = i.map_or_else(
                     || index.expect("either long or short index is `None`").get(),
                     |n| n.get() as usize,
                 );
 
-                match stack.get_mut_by_index(stack.len() - index).access_mode() {
+                match state
+                    .stack
+                    .get_mut_by_index(state.stack.len() - index)
+                    .access_mode()
+                {
                     AccessMode::ReadWrite => {
                         Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
                     }
@@ -2376,8 +2330,7 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .as_ref()
-                    .and_then(|m| m.get(&**c))
+                    .get(&**c)
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*current_pos))?,
                 Token::Reserved(c) if !is_valid_identifier(c) => {
@@ -2402,8 +2355,7 @@ impl Engine {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
                     .custom_keywords
-                    .as_ref()
-                    .and_then(|m| m.get(&**c))
+                    .get(&**c)
                     .copied()
                     .ok_or_else(|| PERR::Reserved(c.to_string()).into_err(*next_pos))?,
                 Token::Reserved(c) if !is_valid_identifier(c) => {
@@ -2540,10 +2492,7 @@ impl Engine {
             // Add a barrier variable to the stack so earlier variables will not be matched.
             // Variable searches stop at the first barrier.
             let marker = state.get_interned_string(SCOPE_SEARCH_BARRIER_MARKER);
-            state
-                .stack
-                .get_or_insert_with(Default::default)
-                .push(marker, ());
+            state.stack.push(marker, ());
         }
 
         let mut user_state = Dynamic::UNIT;
@@ -2932,14 +2881,12 @@ impl Engine {
         };
 
         let prev_stack_len = {
-            let stack = state.stack.get_or_insert_with(Default::default);
-
-            let prev_stack_len = stack.len();
+            let prev_stack_len = state.stack.len();
 
             if let Some(ref counter_var) = counter_var {
-                stack.push(counter_var.name.clone(), ());
+                state.stack.push(counter_var.name.clone(), ());
             }
-            stack.push(&loop_var.name, ());
+            state.stack.push(&loop_var.name, ());
 
             prev_stack_len
         };
@@ -2947,7 +2894,7 @@ impl Engine {
         settings.flags |= ParseSettingFlags::BREAKABLE;
         let body = self.parse_block(input, state, lib, settings)?.into();
 
-        state.stack.as_mut().unwrap().rewind(prev_stack_len);
+        state.stack.rewind(prev_stack_len);
 
         let branch = StmtBlock::NONE;
 
@@ -2974,40 +2921,36 @@ impl Engine {
         // let name ...
         let (name, pos) = parse_var_name(input)?;
 
-        {
-            let stack = state.stack.get_or_insert_with(Default::default);
+        if !self.allow_shadowing() && state.stack.iter().any(|(v, ..)| v == name) {
+            return Err(PERR::VariableExists(name.into()).into_err(pos));
+        }
 
-            if !self.allow_shadowing() && stack.iter().any(|(v, ..)| v == name) {
-                return Err(PERR::VariableExists(name.into()).into_err(pos));
-            }
+        if let Some(ref filter) = self.def_var_filter {
+            let will_shadow = state.stack.iter().any(|(v, ..)| v == name);
 
-            if let Some(ref filter) = self.def_var_filter {
-                let will_shadow = stack.iter().any(|(v, ..)| v == name);
+            let global = state
+                .global
+                .get_or_insert_with(|| GlobalRuntimeState::new(self).into());
 
-                let global = state
-                    .global
-                    .get_or_insert_with(|| GlobalRuntimeState::new(self).into());
+            global.level = settings.level;
+            let is_const = access == AccessMode::ReadOnly;
+            let info = VarDefInfo {
+                name: &name,
+                is_const,
+                nesting_level: settings.level,
+                will_shadow,
+            };
+            let caches = &mut Caches::new();
+            let context = EvalContext::new(self, global, caches, &mut state.stack, None);
 
-                global.level = settings.level;
-                let is_const = access == AccessMode::ReadOnly;
-                let info = VarDefInfo {
-                    name: &name,
-                    is_const,
-                    nesting_level: settings.level,
-                    will_shadow,
-                };
-                let caches = &mut Caches::new();
-                let context = EvalContext::new(self, global, caches, stack, None);
-
-                match filter(false, info, context) {
-                    Ok(true) => (),
-                    Ok(false) => return Err(PERR::ForbiddenVariable(name.into()).into_err(pos)),
-                    Err(err) => {
-                        return Err(match *err {
-                            EvalAltResult::ErrorParsing(e, pos) => e.into_err(pos),
-                            _ => PERR::ForbiddenVariable(name.into()).into_err(pos),
-                        })
-                    }
+            match filter(false, info, context) {
+                Ok(true) => (),
+                Ok(false) => return Err(PERR::ForbiddenVariable(name.into()).into_err(pos)),
+                Err(err) => {
+                    return Err(match *err {
+                        EvalAltResult::ErrorParsing(e, pos) => e.into_err(pos),
+                        _ => PERR::ForbiddenVariable(name.into()).into_err(pos),
+                    })
                 }
             }
         }
@@ -3030,13 +2973,11 @@ impl Engine {
 
         let (existing, hit_barrier) = state.find_var(&name);
 
-        let stack = state.stack.as_mut().unwrap();
-
         let existing = if !hit_barrier && existing > 0 {
-            match stack.len() - existing {
+            match state.stack.len() - existing {
                 // Variable has been aliased
                 #[cfg(not(feature = "no_module"))]
-                offset if !stack.get_entry_by_index(offset).2.is_empty() => None,
+                offset if !state.stack.get_entry_by_index(offset).2.is_empty() => None,
                 // Defined in parent block
                 offset if offset < state.block_stack_len => None,
                 offset => Some(offset),
@@ -3047,18 +2988,20 @@ impl Engine {
 
         let idx = match existing {
             Some(n) => {
-                stack.get_mut_by_index(n).set_access_mode(access);
-                Some(NonZeroUsize::new(stack.len() - n).unwrap())
+                state.stack.get_mut_by_index(n).set_access_mode(access);
+                Some(NonZeroUsize::new(state.stack.len() - n).unwrap())
             }
             None => {
-                stack.push_entry(name.as_str(), access, Dynamic::UNIT);
+                state.stack.push_entry(name.clone(), access, Dynamic::UNIT);
                 None
             }
         };
 
         #[cfg(not(feature = "no_module"))]
         if is_export {
-            stack.add_alias_by_index(stack.len() - 1, name.clone());
+            state
+                .stack
+                .add_alias_by_index(state.stack.len() - 1, name.clone());
         }
 
         let var_def = (Ident { name, pos }, expr, idx).into();
@@ -3102,10 +3045,7 @@ impl Engine {
             }
         };
 
-        state
-            .imports
-            .get_or_insert_with(Default::default)
-            .push(export.name.clone());
+        state.imports.push(export.name.clone());
 
         Ok(Stmt::Import((expr, export).into(), settings.pos))
     }
@@ -3153,8 +3093,9 @@ impl Engine {
         let (existing, hit_barrier) = state.find_var(&id);
 
         if !hit_barrier && existing > 0 {
-            let stack = state.stack.as_mut().unwrap();
-            stack.add_alias_by_index(stack.len() - existing, alias.clone());
+            state
+                .stack
+                .add_alias_by_index(state.stack.len() - existing, alias.clone());
         }
 
         let export = (
@@ -3212,10 +3153,10 @@ impl Engine {
         }
 
         let prev_entry_stack_len = state.block_stack_len;
-        state.block_stack_len = state.stack.as_ref().map_or(0, Scope::len);
+        state.block_stack_len = state.stack.len();
 
         #[cfg(not(feature = "no_module"))]
-        let orig_imports_len = state.imports.as_ref().map_or(0, Vec::len);
+        let orig_imports_len = state.imports.len();
 
         let end_pos = loop {
             // Terminated?
@@ -3272,15 +3213,11 @@ impl Engine {
             }
         };
 
-        if let Some(ref mut s) = state.stack {
-            s.rewind(state.block_stack_len);
-        }
+        state.stack.rewind(state.block_stack_len);
         state.block_stack_len = prev_entry_stack_len;
 
         #[cfg(not(feature = "no_module"))]
-        if let Some(ref mut imports) = state.imports {
-            imports.truncate(orig_imports_len);
-        }
+        state.imports.truncate(orig_imports_len);
 
         Ok((statements, settings.pos, end_pos).into())
     }
@@ -3434,10 +3371,7 @@ impl Engine {
                             // Keep them in `global_imports` instead so that strict variables
                             // mode will not complain.
                             new_state.global_imports.clone_from(&state.global_imports);
-                            new_state
-                                .global_imports
-                                .get_or_insert_with(Default::default)
-                                .extend(state.imports.as_deref().into_iter().flatten().cloned());
+                            new_state.global_imports.extend(state.imports.clone());
                         }
 
                         // Brand new options
@@ -3635,10 +3569,7 @@ impl Engine {
             }
 
             let name = state.get_interned_string(name);
-            state
-                .stack
-                .get_or_insert_with(Default::default)
-                .push(name.clone(), ());
+            state.stack.push(name.clone(), ());
             Ident { name, pos }
         } else {
             Ident {
@@ -3654,7 +3585,7 @@ impl Engine {
             Expr::Unit(catch_var.pos)
         } else {
             // Remove the error variable from the stack
-            state.stack.as_mut().unwrap().pop();
+            state.stack.pop();
 
             Expr::Variable(
                 (None, Namespace::default(), 0, catch_var.name).into(),
@@ -3755,10 +3686,7 @@ impl Engine {
                         }
 
                         let s = state.get_interned_string(*s);
-                        state
-                            .stack
-                            .get_or_insert_with(Default::default)
-                            .push(s.clone(), ());
+                        state.stack.push(s.clone(), ());
                         params.push((s, pos));
                     }
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -3891,10 +3819,7 @@ impl Engine {
                         }
 
                         let s = state.get_interned_string(*s);
-                        state
-                            .stack
-                            .get_or_insert_with(Default::default)
-                            .push(s.clone(), ());
+                        state.stack.push(s.clone(), ());
                         params_list.push(s);
                     }
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -3928,19 +3853,22 @@ impl Engine {
         // External variables may need to be processed in a consistent order,
         // so extract them into a list.
         #[cfg(not(feature = "no_closure"))]
-        let (mut params, externals) = match state.external_vars {
-            Some(ref external_vars) => {
-                let externals = external_vars.iter().cloned().collect::<FnArgsVec<_>>();
-
-                let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
-                params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));
-
-                (params, externals)
-            }
-            None => (
+        let (mut params, externals) = if state.external_vars.is_empty() {
+            (
                 FnArgsVec::with_capacity(params_list.len()),
                 FnArgsVec::new_const(),
-            ),
+            )
+        } else {
+            let externals = state
+                .external_vars
+                .iter()
+                .cloned()
+                .collect::<FnArgsVec<_>>();
+
+            let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
+            params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));
+
+            (params, externals)
         };
         #[cfg(feature = "no_closure")]
         let mut params = FnArgsVec::with_capacity(params_list.len());

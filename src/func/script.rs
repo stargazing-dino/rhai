@@ -39,6 +39,7 @@ impl Engine {
         self.track_operation(global, pos)?;
 
         // Check for stack overflow
+        #[cfg(not(feature = "unchecked"))]
         if global.level > self.max_call_levels() {
             return Err(ERR::ErrorStackOverflow(pos).into());
         }
@@ -64,8 +65,8 @@ impl Engine {
             .map_or(0, |dbg| dbg.call_stack().len());
 
         // Guard against too many variables
-        if !cfg!(feature = "unchecked") && scope.len() + fn_def.params.len() > self.max_variables()
-        {
+        #[cfg(not(feature = "unchecked"))]
+        if scope.len() + fn_def.params.len() > self.max_variables() {
             return Err(ERR::ErrorTooManyVariables(pos).into());
         }
 
@@ -79,7 +80,7 @@ impl Engine {
         #[cfg(feature = "debugging")]
         if self.is_debugger_registered() {
             let fn_name = fn_def.name.clone();
-            let args = scope.iter().skip(orig_scope_len).map(|(.., v)| v).collect();
+            let args = scope.iter().skip(orig_scope_len).map(|(.., v)| v);
             let source = global.source.clone();
 
             global
@@ -127,6 +128,11 @@ impl Engine {
             .or_else(|err| match *err {
                 // Convert return statement to return value
                 ERR::Return(x, ..) => Ok(x),
+                // Exit value is passed straight-through
+                mut err @ ERR::Exit(..) => {
+                    err.set_position(pos);
+                    Err(err.into())
+                }
                 // System errors are passed straight-through
                 mut err if err.is_system_exception() => {
                     err.set_position(pos);
@@ -224,9 +230,7 @@ impl Engine {
             // Then check imported modules
             global.contains_qualified_fn(hash_script)
             // Then check sub-modules
-            || self.global_sub_modules.as_ref().map_or(false, |m| {
-                m.values().any(|m| m.contains_qualified_fn(hash_script))
-            });
+            || self.global_sub_modules.values().any(|m| m.contains_qualified_fn(hash_script));
 
         if !r && !cache.filter.is_absent_and_set(hash_script) {
             // Do not cache "one-hit wonders"

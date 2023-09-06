@@ -580,19 +580,6 @@ impl Expr {
             _ => Self::DynamicConstant(value.into(), pos),
         }
     }
-    /// Is the expression a simple variable access?
-    ///
-    /// `non_qualified` is ignored under `no_module`.
-    #[inline]
-    #[must_use]
-    pub(crate) fn is_variable_access(&self, _non_qualified: bool) -> bool {
-        match self {
-            #[cfg(not(feature = "no_module"))]
-            Self::Variable(x, ..) if _non_qualified && !x.1.is_empty() => false,
-            Self::Variable(..) => true,
-            _ => false,
-        }
-    }
     /// Return the variable name if the expression a simple variable access.
     ///
     /// `non_qualified` is ignored under `no_module`.

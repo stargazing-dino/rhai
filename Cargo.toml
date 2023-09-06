@@ -4,7 +4,7 @@ members = [".", "codegen"]
 [package]
 name = "rhai"
 version = "1.16.0"
-rust-version = "1.61.0"
+rust-version = "1.66.0"
 edition = "2018"
 resolver = "2"
 authors = ["Jonathan Turner", "Lukáš Hozda", "Stephen Chung", "jhwgh1968"]

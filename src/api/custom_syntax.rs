@@ -265,9 +265,7 @@ impl Engine {
                         || token.as_ref().map_or(false, Token::is_reserved))
                         && !self.is_custom_keyword(s)
                     {
-                        self.custom_keywords
-                            .get_or_insert_with(Default::default)
-                            .insert(s.into(), None);
+                        self.custom_keywords.insert(s.into(), None);
                     }
                     s.into()
                 }
@@ -293,9 +291,7 @@ impl Engine {
                         || (token.as_ref().map_or(false, Token::is_reserved)
                             && !self.is_custom_keyword(s))
                     {
-                        self.custom_keywords
-                            .get_or_insert_with(Default::default)
-                            .insert(s.into(), None);
+                        self.custom_keywords.insert(s.into(), None);
                     }
                     s.into()
                 }
@@ -378,17 +374,15 @@ impl Engine {
         scope_may_be_changed: bool,
         func: impl Fn(&mut EvalContext, &[Expression], &Dynamic) -> RhaiResult + SendSync + 'static,
     ) -> &mut Self {
-        self.custom_syntax
-            .get_or_insert_with(Default::default)
-            .insert(
-                key.into(),
-                CustomSyntax {
-                    parse: Box::new(parse),
-                    func: Box::new(func),
-                    scope_may_be_changed,
-                }
-                .into(),
-            );
+        self.custom_syntax.insert(
+            key.into(),
+            CustomSyntax {
+                parse: Box::new(parse),
+                func: Box::new(func),
+                scope_may_be_changed,
+            }
+            .into(),
+        );
         self
     }
 }

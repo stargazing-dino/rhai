@@ -429,10 +429,8 @@ impl Engine {
                 }
 
                 // Guard against too many variables
-                if !cfg!(feature = "unchecked")
-                    && index.is_none()
-                    && scope.len() >= self.max_variables()
-                {
+                #[cfg(not(feature = "unchecked"))]
+                if index.is_none() && scope.len() >= self.max_variables() {
                     return Err(ERR::ErrorTooManyVariables(*pos).into());
                 }
 
@@ -676,11 +674,10 @@ impl Engine {
                 let (var_name, counter, FlowControl { expr, body, .. }) = &**x;
 
                 // Guard against too many variables
-                if !cfg!(feature = "unchecked") {
-                    let max = self.max_variables() - counter.as_ref().map_or(0, |_| 1);
-                    if scope.len() >= max {
-                        return Err(ERR::ErrorTooManyVariables(var_name.pos).into());
-                    }
+                #[cfg(not(feature = "unchecked"))]
+                if scope.len() >= self.max_variables() - counter.is_some().then_some(1).unwrap_or(0)
+                {
+                    return Err(ERR::ErrorTooManyVariables(var_name.pos).into());
                 }
 
                 let iter_obj = self
@@ -706,10 +703,8 @@ impl Engine {
                     .or_else(|| global.get_iter(iter_type))
                     .or_else(|| {
                         self.global_sub_modules
-                            .as_ref()
-                            .into_iter()
-                            .flatten()
-                            .find_map(|(_, m)| m.get_qualified_iter(iter_type))
+                            .values()
+                            .find_map(|m| m.get_qualified_iter(iter_type))
                     });
 
                 let iter_func = iter_func.ok_or_else(|| ERR::ErrorFor(expr.start_position()))?;
@@ -856,7 +851,8 @@ impl Engine {
 
                         if let Expr::Variable(x, ..) = catch_var {
                             // Guard against too many variables
-                            if !cfg!(feature = "unchecked") && scope.len() >= self.max_variables() {
+                            #[cfg(not(feature = "unchecked"))]
+                            if scope.len() >= self.max_variables() {
                                 return Err(ERR::ErrorTooManyVariables(catch_var.position()).into());
                             }
                             scope.push(x.3.clone(), err_value);
@@ -904,7 +900,8 @@ impl Engine {
                 let (expr, export) = &**x;
 
                 // Guard against too many modules
-                if !cfg!(feature = "unchecked") && global.num_modules_loaded >= self.max_modules() {
+                #[cfg(not(feature = "unchecked"))]
+                if global.num_modules_loaded >= self.max_modules() {
                     return Err(ERR::ErrorTooManyModules(*_pos).into());
                 }
 
@@ -968,8 +965,8 @@ impl Engine {
                 scope.search(name).map_or_else(
                     || Err(ERR::ErrorVariableNotFound(name.to_string(), *pos).into()),
                     |index| {
-                        let alias = if alias.is_empty() { name } else { alias }.clone();
-                        scope.add_alias_by_index(index, alias);
+                        let alias = if alias.is_empty() { name } else { alias };
+                        scope.add_alias_by_index(index, alias.clone());
                         Ok(Dynamic::UNIT)
                     },
                 )
@@ -1011,10 +1008,12 @@ impl Engine {
         caches: &mut Caches,
         scope: &mut Scope,
         statements: &[Stmt],
+        map_exit_to_return_value: bool,
     ) -> RhaiResult {
         self.eval_stmt_block(global, caches, scope, None, statements, false)
             .or_else(|err| match *err {
                 ERR::Return(out, ..) => Ok(out),
+                ERR::Exit(out, ..) if map_exit_to_return_value => Ok(out),
                 ERR::LoopBreak(..) => {
                     unreachable!("no outer loop scope to break out of")
                 }

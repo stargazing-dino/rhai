@@ -123,6 +123,9 @@ pub enum EvalAltResult {
     /// Not an error: Value returned from a script via the `return` keyword.
     /// Wrapped value is the result value.
     Return(Dynamic, Position),
+    /// Not an error: Value returned from a script via the `exit` function.
+    /// Wrapped value is the exit value.
+    Exit(Dynamic, Position),
 }
 
 impl Error for EvalAltResult {}
@@ -227,6 +230,7 @@ impl fmt::Display for EvalAltResult {
             Self::LoopBreak(false, ..) => f.write_str("'continue' must be within a loop")?,
 
             Self::Return(..) => f.write_str("NOT AN ERROR - function returns value")?,
+            Self::Exit(..) => f.write_str("NOT AN ERROR - exit value")?,
 
             Self::ErrorArrayBounds(max, index, ..) => match max {
                 0 => write!(f, "Array index {index} out of bounds: array is empty"),
@@ -287,12 +291,15 @@ impl<T: AsRef<str>> From<T> for Box<EvalAltResult> {
 impl EvalAltResult {
     /// Is this a pseudo error?  A pseudo error is one that does not occur naturally.
     ///
-    /// [`LoopBreak`][EvalAltResult::LoopBreak] and [`Return`][EvalAltResult::Return] are pseudo errors.
+    /// [`LoopBreak`][EvalAltResult::LoopBreak], [`Return`][EvalAltResult::Return] and [`Exit`][EvalAltResult::Exit] are pseudo errors.
     #[cold]
     #[inline(never)]
     #[must_use]
     pub const fn is_pseudo_error(&self) -> bool {
-        matches!(self, Self::LoopBreak(..) | Self::Return(..))
+        matches!(
+            self,
+            Self::LoopBreak(..) | Self::Return(..) | Self::Exit(..)
+        )
     }
     /// Can this error be caught?
     #[cold]
@@ -340,7 +347,7 @@ impl EvalAltResult {
             | Self::ErrorDataTooLarge(..)
             | Self::ErrorTerminated(..) => false,
 
-            Self::LoopBreak(..) | Self::Return(..) => false,
+            Self::LoopBreak(..) | Self::Return(..) | Self::Exit(..) => false,
         }
     }
     /// Is this error a system exception?
@@ -376,7 +383,7 @@ impl EvalAltResult {
         );
 
         match self {
-            Self::LoopBreak(..) | Self::Return(..) => (),
+            Self::LoopBreak(..) | Self::Return(..) | Self::Exit(..) => (),
 
             Self::ErrorSystem(..)
             | Self::ErrorParsing(..)
@@ -497,7 +504,8 @@ impl EvalAltResult {
             | Self::ErrorCustomSyntax(.., pos)
             | Self::ErrorRuntime(.., pos)
             | Self::LoopBreak(.., pos)
-            | Self::Return(.., pos) => *pos,
+            | Self::Return(.., pos)
+            | Self::Exit(.., pos) => *pos,
         }
     }
     /// Remove the [position][Position] information from this error.
@@ -558,7 +566,8 @@ impl EvalAltResult {
             | Self::ErrorCustomSyntax(.., pos)
             | Self::ErrorRuntime(.., pos)
             | Self::LoopBreak(.., pos)
-            | Self::Return(.., pos) => *pos = new_position,
+            | Self::Return(.., pos)
+            | Self::Exit(.., pos) => *pos = new_position,
         }
         self
     }

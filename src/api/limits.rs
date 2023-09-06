@@ -136,7 +136,7 @@ impl Engine {
     }
     /// The maximum levels of function calls allowed for a script.
     ///
-    /// Zero under `no_function`.
+    /// Not available under `unchecked` or `no_function`.
     #[inline(always)]
     #[must_use]
     pub const fn max_call_levels(&self) -> usize {
@@ -155,6 +155,8 @@ impl Engine {
         self
     }
     /// The maximum number of operations allowed for a script to run (0 for unlimited).
+    ///
+    /// Not available under `unchecked`.
     #[inline]
     #[must_use]
     pub const fn max_operations(&self) -> u64 {
@@ -172,6 +174,8 @@ impl Engine {
         self
     }
     /// The maximum number of imported variables allowed for a script at any instant.
+    ///
+    /// Not available under `unchecked`.
     #[inline(always)]
     #[must_use]
     pub const fn max_variables(&self) -> usize {
@@ -188,7 +192,7 @@ impl Engine {
     }
     /// The maximum number of imported [modules][crate::Module] allowed for a script.
     ///
-    /// Zero under `no_module`.
+    /// Not available under `unchecked` or `no_module`.
     #[inline(always)]
     #[must_use]
     pub const fn max_modules(&self) -> usize {
@@ -214,6 +218,8 @@ impl Engine {
         self
     }
     /// The depth limit for expressions (0 for unlimited).
+    ///
+    /// Not available under `unchecked`.
     #[inline]
     #[must_use]
     pub const fn max_expr_depth(&self) -> usize {
@@ -224,7 +230,7 @@ impl Engine {
     }
     /// The depth limit for expressions in functions (0 for unlimited).
     ///
-    /// Zero under `no_function`.
+    /// Not available under `unchecked` or `no_function`.
     #[inline]
     #[must_use]
     pub const fn max_function_expr_depth(&self) -> usize {
@@ -245,6 +251,8 @@ impl Engine {
         self
     }
     /// The maximum length, in bytes, of [strings][crate::ImmutableString] (0 for unlimited).
+    ///
+    /// Not available under `unchecked`.
     #[inline]
     #[must_use]
     pub const fn max_string_size(&self) -> usize {
@@ -264,7 +272,7 @@ impl Engine {
     }
     /// The maximum length of [arrays][crate::Array] (0 for unlimited).
     ///
-    /// Zero under `no_index`.
+    /// Not available under `unchecked` or `no_index`.
     #[inline]
     #[must_use]
     pub const fn max_array_size(&self) -> usize {
@@ -287,7 +295,7 @@ impl Engine {
     }
     /// The maximum size of [object maps][crate::Map] (0 for unlimited).
     ///
-    /// Zero under `no_object`.
+    /// Not available under `unchecked` or `no_object`.
     #[inline]
     #[must_use]
     pub const fn max_map_size(&self) -> usize {

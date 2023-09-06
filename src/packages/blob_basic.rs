@@ -4,8 +4,8 @@ use crate::eval::{calc_index, calc_offset_len};
 use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
-    def_package, Array, Blob, Dynamic, ExclusiveRange, InclusiveRange, NativeCallContext, Position,
-    RhaiResultOf, ERR, INT, INT_BYTES, MAX_USIZE_INT,
+    def_package, Array, Blob, Dynamic, ExclusiveRange, InclusiveRange, NativeCallContext,
+    RhaiResultOf, INT, INT_BYTES, MAX_USIZE_INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -376,8 +376,13 @@ pub mod blob_functions {
         let _ctx = ctx;
 
         // Check if blob will be over max size limit
+        #[cfg(not(feature = "unchecked"))]
         if _ctx.engine().max_array_size() > 0 && len > _ctx.engine().max_array_size() {
-            return Err(ERR::ErrorDataTooLarge("Size of BLOB".to_string(), Position::NONE).into());
+            return Err(crate::ERR::ErrorDataTooLarge(
+                "Size of BLOB".to_string(),
+                crate::Position::NONE,
+            )
+            .into());
         }
 
         if len > blob.len() {

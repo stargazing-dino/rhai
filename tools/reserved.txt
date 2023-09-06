@@ -78,7 +78,7 @@ shared,         true, false, false
 with,           true, false, false
 is,             true, false, false
 goto,           true, false, false
-exit,           true, false, false
+exit,           false, false, false
 match,          true, false, false
 case,           true, false, false
 default,        true, false, false

@@ -264,7 +264,7 @@ impl Engine {
             g.source = orig_source;
         }}
 
-        let r = self.eval_global_statements(global, caches, scope, ast.statements())?;
+        let r = self.eval_global_statements(global, caches, scope, ast.statements(), true)?;
 
         #[cfg(feature = "debugging")]
         if self.is_debugger_registered() {
