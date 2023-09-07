@@ -820,6 +820,7 @@ impl Expr {
     }
     /// Return this [`Expr`], replacing it with [`Expr::Unit`].
     #[inline(always)]
+    #[must_use]
     pub fn take(&mut self) -> Self {
         mem::take(self)
     }

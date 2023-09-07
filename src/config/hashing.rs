@@ -71,8 +71,5 @@ pub fn set_ahash_seed(new_seed: Option<[u64; 4]>) -> Result<(), Option<[u64; 4]>
 #[inline]
 #[must_use]
 pub fn get_ahash_seed() -> &'static Option<[u64; 4]> {
-    match AHASH_SEED.get() {
-        Some(seed) => seed,
-        None => &hashing_env::AHASH_SEED,
-    }
+    AHASH_SEED.get().unwrap_or(&hashing_env::AHASH_SEED)
 }

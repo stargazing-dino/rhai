@@ -25,7 +25,6 @@ fn hash_idx() -> (u64, u64) {
             calc_fn_hash(None, FN_IDX_GET, 2),
             calc_fn_hash(None, FN_IDX_SET, 3),
         )
-            .into()
     })
 }
 
@@ -392,17 +391,17 @@ impl Engine {
                 #[cfg(feature = "debugging")]
                 self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), lhs)?;
 
-                match this_ptr {
-                    Some(this_ptr) => {
+                this_ptr.map_or_else(
+                    || Err(ERR::ErrorUnboundThis(*var_pos).into()),
+                    |this_ptr| {
                         let target = &mut this_ptr.into();
 
                         self.eval_dot_index_chain_raw(
                             global, caches, scope2, None, lhs, expr, target, rhs, idx_values,
                             new_val,
                         )
-                    }
-                    None => Err(ERR::ErrorUnboundThis(*var_pos).into()),
-                }
+                    },
+                )
             }
             // id.??? or id[???]
             (Expr::Variable(.., var_pos), new_val) => {

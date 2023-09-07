@@ -47,7 +47,7 @@ impl fmt::Display for ScriptFnDef {
         let this_type = self
             .this_type
             .as_ref()
-            .map_or(String::new(), |s| format!("{:?}.", s));
+            .map_or(String::new(), |s| format!("{s:?}."));
 
         #[cfg(feature = "no_object")]
         let this_type = "";
@@ -112,7 +112,7 @@ impl fmt::Display for ScriptFnMetadata<'_> {
         let this_type = self
             .this_type
             .as_ref()
-            .map_or(String::new(), |s| format!("{:?}.", s));
+            .map_or(String::new(), |s| format!("{s:?}."));
 
         #[cfg(feature = "no_object")]
         let this_type = "";

@@ -614,7 +614,7 @@ impl Module {
     #[inline(always)]
     #[must_use]
     #[deprecated(since = "1.12.0", note = "use `new` instead")]
-    pub fn with_capacity(_capacity: usize) -> Self {
+    pub const fn with_capacity(_capacity: usize) -> Self {
         Self::new()
     }
 }

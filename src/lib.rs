@@ -62,9 +62,9 @@
 
 #![cfg_attr(feature = "no_std", no_std)]
 #![deny(missing_docs)]
-// #![warn(clippy::all)]
-// #![warn(clippy::pedantic)]
-// #![warn(clippy::nursery)]
+#![warn(clippy::all)]
+#![warn(clippy::pedantic)]
+#![warn(clippy::nursery)]
 #![warn(clippy::cargo)]
 #![warn(clippy::undocumented_unsafe_blocks)]
 #![allow(clippy::unit_arg)]

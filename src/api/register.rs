@@ -499,22 +499,28 @@ impl Engine {
         get_fn: impl RegisterNativeFunction<(Mut<T>, X), 2, C, V, L> + SendSync + 'static,
     ) -> &mut Self {
         #[cfg(not(feature = "no_index"))]
-        if TypeId::of::<T>() == TypeId::of::<crate::Array>() {
-            panic!("Cannot register indexer for arrays.");
-        }
+        assert!(
+            TypeId::of::<T>() != TypeId::of::<crate::Array>(),
+            "Cannot register indexer for arrays."
+        );
+
         #[cfg(not(feature = "no_object"))]
-        if TypeId::of::<T>() == TypeId::of::<crate::Map>() {
-            panic!("Cannot register indexer for object maps.");
-        }
-        if TypeId::of::<T>() == TypeId::of::<String>()
-            || TypeId::of::<T>() == TypeId::of::<&str>()
-            || TypeId::of::<T>() == TypeId::of::<crate::ImmutableString>()
-        {
-            panic!("Cannot register indexer for strings.");
-        }
-        if TypeId::of::<T>() == TypeId::of::<crate::INT>() {
-            panic!("Cannot register indexer for integers.");
-        }
+        assert!(
+            TypeId::of::<T>() != TypeId::of::<crate::Map>(),
+            "Cannot register indexer for object maps."
+        );
+
+        assert!(
+            TypeId::of::<T>() != TypeId::of::<String>()
+                && TypeId::of::<T>() != TypeId::of::<&str>()
+                && TypeId::of::<T>() != TypeId::of::<crate::ImmutableString>(),
+            "Cannot register indexer for strings."
+        );
+
+        assert!(
+            TypeId::of::<T>() != TypeId::of::<crate::INT>(),
+            "Cannot register indexer for integers."
+        );
 
         self.register_fn(crate::engine::FN_IDX_GET, get_fn)
     }
@@ -580,22 +586,28 @@ impl Engine {
         set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), 3, C, (), L> + SendSync + 'static,
     ) -> &mut Self {
         #[cfg(not(feature = "no_index"))]
-        if TypeId::of::<T>() == TypeId::of::<crate::Array>() {
-            panic!("Cannot register indexer for arrays.");
-        }
+        assert!(
+            TypeId::of::<T>() != TypeId::of::<crate::Array>(),
+            "Cannot register indexer for arrays."
+        );
+
         #[cfg(not(feature = "no_object"))]
-        if TypeId::of::<T>() == TypeId::of::<crate::Map>() {
-            panic!("Cannot register indexer for object maps.");
-        }
-        if TypeId::of::<T>() == TypeId::of::<String>()
-            || TypeId::of::<T>() == TypeId::of::<&str>()
-            || TypeId::of::<T>() == TypeId::of::<crate::ImmutableString>()
-        {
-            panic!("Cannot register indexer for strings.");
-        }
-        if TypeId::of::<T>() == TypeId::of::<crate::INT>() {
-            panic!("Cannot register indexer for integers.");
-        }
+        assert!(
+            TypeId::of::<T>() != TypeId::of::<crate::Map>(),
+            "Cannot register indexer for object maps."
+        );
+
+        assert!(
+            TypeId::of::<T>() != TypeId::of::<String>()
+                && TypeId::of::<T>() != TypeId::of::<&str>()
+                && TypeId::of::<T>() != TypeId::of::<crate::ImmutableString>(),
+            "Cannot register indexer for strings."
+        );
+
+        assert!(
+            TypeId::of::<T>() != TypeId::of::<crate::INT>(),
+            "Cannot register indexer for integers."
+        );
 
         self.register_fn(crate::engine::FN_IDX_SET, set_fn)
     }
@@ -784,7 +796,7 @@ impl Engine {
         }
 
         #[cfg(not(feature = "no_module"))]
-        for (name, m) in self.global_sub_modules.iter() {
+        for (name, m) in &self.global_sub_modules {
             signatures.extend(m.gen_fn_signatures().map(|f| format!("{name}::{f}")));
         }
 

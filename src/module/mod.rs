@@ -609,6 +609,7 @@ impl Module {
     }
     /// Get a registered custom type by its type name.
     #[inline(always)]
+    #[must_use]
     pub fn get_custom_type_raw(&self, key: &str) -> Option<&CustomTypeInfo> {
         self.custom_types.get(key)
     }

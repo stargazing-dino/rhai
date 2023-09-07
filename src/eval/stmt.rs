@@ -146,7 +146,7 @@ impl Engine {
                     (Union::Bool(b1, ..), Union::Bool(b2, ..)) => match op_x {
                         AndAssign => *b1 = *b1 && *b2,
                         OrAssign => *b1 = *b1 || *b2,
-                        XOrAssign => *b1 = *b1 ^ *b2,
+                        XOrAssign => *b1 ^= *b2,
                         _ => done = false,
                     },
                     (Union::Int(n1, ..), Union::Int(n2, ..)) => {
@@ -206,7 +206,7 @@ impl Engine {
 
                 if !done {
                     if let Some((func, need_context)) =
-                        get_builtin_op_assignment_fn(op_x, &*lock_guard, &new_val)
+                        get_builtin_op_assignment_fn(op_x, &lock_guard, &new_val)
                     {
                         // We may not need to bump the level because built-in's do not need it.
                         //defer! { let orig_level = global.level; global.level += 1 }
@@ -498,14 +498,12 @@ impl Engine {
                     .as_bool()
                     .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, expr.position()))?;
 
-                match guard_val {
-                    true if !if_block.is_empty() => {
-                        self.eval_stmt_block(global, caches, scope, this_ptr, if_block, true)
-                    }
-                    false if !else_block.is_empty() => {
-                        self.eval_stmt_block(global, caches, scope, this_ptr, else_block, true)
-                    }
-                    _ => Ok(Dynamic::UNIT),
+                if guard_val && !if_block.is_empty() {
+                    self.eval_stmt_block(global, caches, scope, this_ptr, if_block, true)
+                } else if !guard_val && !else_block.is_empty() {
+                    self.eval_stmt_block(global, caches, scope, this_ptr, else_block, true)
+                } else {
+                    Ok(Dynamic::UNIT)
                 }
             }
 
@@ -559,7 +557,7 @@ impl Engine {
 
                             let cond_result = match condition {
                                 Expr::BoolConstant(b, ..) => *b,
-                                ref c => self
+                                c => self
                                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), c)?
                                     .as_bool()
                                     .map_err(|typ| {
@@ -675,8 +673,7 @@ impl Engine {
 
                 // Guard against too many variables
                 #[cfg(not(feature = "unchecked"))]
-                if scope.len() >= self.max_variables() - counter.is_some().then_some(1).unwrap_or(0)
-                {
+                if scope.len() >= self.max_variables() - usize::from(counter.is_some()) {
                     return Err(ERR::ErrorTooManyVariables(var_name.pos).into());
                 }
 

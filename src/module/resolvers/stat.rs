@@ -49,7 +49,7 @@ impl StaticModuleResolver {
     /// ```
     #[inline(always)]
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self(BTreeMap::new())
     }
     /// Add a [module][Module] keyed by its path.
