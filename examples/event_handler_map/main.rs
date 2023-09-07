@@ -62,7 +62,7 @@ pub fn main() {
 
     // Prevent shadowing of `state`
     #[allow(deprecated)]
-    engine.on_def_var(|_, info, _| Ok(info.name != "state"));
+    engine.on_def_var(|_, info, _| Ok(info.name() != "state"));
 
     // Create a custom 'Scope' to hold state
     let mut scope = Scope::new();
