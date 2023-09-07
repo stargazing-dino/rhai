@@ -76,61 +76,22 @@ fn test_binary_ops() {
         assert!(!engine.eval::<bool>("42.0 < 42").unwrap());
         assert!(engine.eval::<bool>("42.0 <= 42").unwrap());
 
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x += 4.0; x").unwrap(),
-            14.0
-        );
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x -= 4.0; x").unwrap(),
-            6.0
-        );
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x *= 4.0; x").unwrap(),
-            40.0
-        );
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x /= 4.0; x").unwrap(),
-            2.5
-        );
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x %= 4.0; x").unwrap(),
-            2.0
-        );
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x **= 4.0; x").unwrap(),
-            10000.0
-        );
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x += 4.0; x").unwrap(), 14.0);
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x -= 4.0; x").unwrap(), 6.0);
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x *= 4.0; x").unwrap(), 40.0);
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x /= 4.0; x").unwrap(), 2.5);
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x %= 4.0; x").unwrap(), 2.0);
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x **= 4.0; x").unwrap(), 10000.0);
 
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x += 4; x").unwrap(),
-            14.0
-        );
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x -= 4; x").unwrap(),
-            6.0
-        );
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x *= 4; x").unwrap(),
-            40.0
-        );
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x /= 4; x").unwrap(),
-            2.5
-        );
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x %= 4; x").unwrap(),
-            2.0
-        );
-        assert_eq!(
-            engine.eval::<FLOAT>("let x = 10.0; x **= 4; x").unwrap(),
-            10000.0
-        );
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x += 4; x").unwrap(), 14.0);
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x -= 4; x").unwrap(), 6.0);
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x *= 4; x").unwrap(), 40.0);
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x /= 4; x").unwrap(), 2.5);
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x %= 4; x").unwrap(), 2.0);
+        assert_eq!(engine.eval::<FLOAT>("let x = 10.0; x **= 4; x").unwrap(), 10000.0);
     }
 
-    assert_eq!(
-        engine.eval::<String>(r#""hello" + ", world""#).unwrap(),
-        "hello, world"
-    );
+    assert_eq!(engine.eval::<String>(r#""hello" + ", world""#).unwrap(), "hello, world");
     assert_eq!(engine.eval::<String>(r#""hello" + '!'"#).unwrap(), "hello!");
     assert_eq!(engine.eval::<String>(r#""hello" - "el""#).unwrap(), "hlo");
     assert_eq!(engine.eval::<String>(r#""hello" - 'l'"#).unwrap(), "heo");

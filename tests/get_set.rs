@@ -24,11 +24,7 @@ fn test_get_set() {
         }
 
         fn new() -> Self {
-            Self {
-                x: 1,
-                y: 0,
-                array: vec![1, 2, 3, 4, 5],
-            }
+            Self { x: 1, y: 0, array: vec![1, 2, 3, 4, 5] }
         }
     }
 
@@ -41,51 +37,20 @@ fn test_get_set() {
     engine.register_fn("add", |value: &mut INT| *value += 41);
     engine.register_fn("new_ts", TestStruct::new);
 
-    assert_eq!(
-        engine
-            .eval::<INT>("let a = new_ts(); a.x = 500; a.x")
-            .unwrap(),
-        500
-    );
-    assert_eq!(
-        engine
-            .eval::<INT>("let a = new_ts(); a.x.add(); a.x")
-            .unwrap(),
-        42
-    );
-    assert_eq!(
-        engine
-            .eval::<INT>("let a = new_ts(); a.y.add(); a.y")
-            .unwrap(),
-        0
-    );
+    assert_eq!(engine.eval::<INT>("let a = new_ts(); a.x = 500; a.x").unwrap(), 500);
+    assert_eq!(engine.eval::<INT>("let a = new_ts(); a.x.add(); a.x").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("let a = new_ts(); a.y.add(); a.y").unwrap(), 0);
 
-    engine.register_indexer_get_set(
-        |value: &mut TestStruct, index: &str| value.array[index.len()],
-        |value: &mut TestStruct, index: &str, new_val: INT| value.array[index.len()] = new_val,
-    );
+    engine.register_indexer_get_set(|value: &mut TestStruct, index: &str| value.array[index.len()], |value: &mut TestStruct, index: &str, new_val: INT| value.array[index.len()] = new_val);
 
     #[cfg(not(feature = "no_index"))]
-    assert_eq!(
-        engine.eval::<INT>(r#"let a = new_ts(); a["abc"]"#).unwrap(),
-        4
-    );
+    assert_eq!(engine.eval::<INT>(r#"let a = new_ts(); a["abc"]"#).unwrap(), 4);
 
     #[cfg(not(feature = "no_index"))]
-    assert_eq!(
-        engine
-            .eval::<INT>(r#"let a = new_ts(); a["abc"] = 42; a["abc"]"#)
-            .unwrap(),
-        42
-    );
+    assert_eq!(engine.eval::<INT>(r#"let a = new_ts(); a["abc"] = 42; a["abc"]"#).unwrap(), 42);
 
     assert_eq!(engine.eval::<INT>(r"let a = new_ts(); a.abc").unwrap(), 4);
-    assert_eq!(
-        engine
-            .eval::<INT>(r"let a = new_ts(); a.abc = 42; a.abc")
-            .unwrap(),
-        42
-    );
+    assert_eq!(engine.eval::<INT>(r"let a = new_ts(); a.abc = 42; a.abc").unwrap(), 42);
 }
 
 #[test]
@@ -124,9 +89,7 @@ fn test_get_set_chain_with_write_back() {
         }
 
         fn new() -> TestParent {
-            TestParent {
-                child: TestChild::new(),
-            }
+            TestParent { child: TestChild::new() }
         }
     }
 
@@ -150,39 +113,13 @@ fn test_get_set_chain_with_write_back() {
     engine.register_fn("new_tp", TestParent::new);
     engine.register_fn("new_tc", TestChild::new);
 
-    assert_eq!(
-        engine.eval::<INT>("let a = new_tp(); a.child.x").unwrap(),
-        1
-    );
-    assert_eq!(
-        engine
-            .eval::<INT>("let a = new_tp(); a.child.x = 42; a.child.x")
-            .unwrap(),
-        42
-    );
-
-    assert_eq!(
-        engine
-            .eval::<String>("let a = new_tp(); type_of(a)")
-            .unwrap(),
-        "TestParent"
-    );
-
+    assert_eq!(engine.eval::<INT>("let a = new_tp(); a.child.x").unwrap(), 1);
+    assert_eq!(engine.eval::<INT>("let a = new_tp(); a.child.x = 42; a.child.x").unwrap(), 42);
+    assert_eq!(engine.eval::<String>("let a = new_tp(); type_of(a)").unwrap(), "TestParent");
     #[cfg(not(feature = "no_index"))]
-    assert_eq!(
-        engine
-            .eval::<INT>("let a = new_tp(); let c = new_tc(); c.x = 123; a[2] = c; a.child.x")
-            .unwrap(),
-        246
-    );
-
+    assert_eq!(engine.eval::<INT>("let a = new_tp(); let c = new_tc(); c.x = 123; a[2] = c; a.child.x").unwrap(), 246);
     #[cfg(not(feature = "no_index"))]
-    assert_eq!(
-        engine
-            .eval::<INT>("let a = new_tp(); a[2].x = 42; a.child.x")
-            .unwrap(),
-        84
-    );
+    assert_eq!(engine.eval::<INT>("let a = new_tp(); a[2].x = 42; a.child.x").unwrap(), 84);
 }
 
 #[test]
@@ -201,21 +138,10 @@ fn test_get_set_op_assignment() {
 
     let mut engine = Engine::new();
 
-    engine
-        .register_type::<Num>()
-        .register_fn("new_ts", || Num(40))
-        .register_get_set("v", Num::get, Num::set);
+    engine.register_type::<Num>().register_fn("new_ts", || Num(40)).register_get_set("v", Num::get, Num::set);
 
-    assert_eq!(
-        engine
-            .eval::<Num>("let a = new_ts(); a.v = a.v + 2; a")
-            .unwrap(),
-        Num(42)
-    );
-    assert_eq!(
-        engine.eval::<Num>("let a = new_ts(); a.v += 2; a").unwrap(),
-        Num(42)
-    );
+    assert_eq!(engine.eval::<Num>("let a = new_ts(); a.v = a.v + 2; a").unwrap(), Num(42));
+    assert_eq!(engine.eval::<Num>("let a = new_ts(); a.v += 2; a").unwrap(), Num(42));
 }
 
 #[test]
@@ -233,62 +159,26 @@ fn test_get_set_chain_without_write_back() {
     let mut engine = Engine::new();
     let mut scope = Scope::new();
 
-    scope.push(
-        "outer",
-        Outer {
-            inner: Inner { value: 42 },
-        },
-    );
+    scope.push("outer", Outer { inner: Inner { value: 42 } });
 
     engine
         .register_type::<Inner>()
-        .register_get_set(
-            "value",
-            |t: &mut Inner| t.value,
-            |_: NativeCallContext, _: &mut Inner, new: INT| {
-                panic!("Inner::value setter called with {}", new)
-            },
-        )
+        .register_get_set("value", |t: &mut Inner| t.value, |_: NativeCallContext, _: &mut Inner, new: INT| panic!("Inner::value setter called with {}", new))
         .register_type::<Outer>()
-        .register_get_set(
-            "inner",
-            |_: NativeCallContext, t: &mut Outer| t.inner.clone(),
-            |_: &mut Outer, new: Inner| panic!("Outer::inner setter called with {:?}", new),
-        );
+        .register_get_set("inner", |_: NativeCallContext, t: &mut Outer| t.inner.clone(), |_: &mut Outer, new: Inner| panic!("Outer::inner setter called with {:?}", new));
 
     #[cfg(not(feature = "no_index"))]
-    engine.register_indexer_get_set(
-        |t: &mut Outer, n: INT| Inner {
-            value: t.inner.value * n,
-        },
-        |_: &mut Outer, n: INT, new: Inner| {
-            panic!("Outer::inner index setter called with {} and {:?}", n, new)
-        },
-    );
+    engine.register_indexer_get_set(|t: &mut Outer, n: INT| Inner { value: t.inner.value * n }, |_: &mut Outer, n: INT, new: Inner| panic!("Outer::inner index setter called with {} and {:?}", n, new));
 
-    assert_eq!(
-        engine
-            .eval_with_scope::<INT>(&mut scope, "outer.inner.value")
-            .unwrap(),
-        42
-    );
+    assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "outer.inner.value").unwrap(), 42);
 
     #[cfg(not(feature = "no_index"))]
-    assert_eq!(
-        engine
-            .eval_with_scope::<INT>(&mut scope, "outer[2].value")
-            .unwrap(),
-        84
-    );
+    assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "outer[2].value").unwrap(), 84);
 
-    engine
-        .run_with_scope(&mut scope, "print(outer.inner.value)")
-        .unwrap();
+    engine.run_with_scope(&mut scope, "print(outer.inner.value)").unwrap();
 
     #[cfg(not(feature = "no_index"))]
-    engine
-        .run_with_scope(&mut scope, "print(outer[0].value)")
-        .unwrap();
+    engine.run_with_scope(&mut scope, "print(outer[0].value)").unwrap();
 }
 
 #[test]
@@ -349,13 +239,7 @@ fn test_get_set_indexer() {
     engine
         .register_type_with_name::<MyMap>("MyMap")
         .register_fn("new_map", MyMap::new)
-        .register_indexer_get(
-            |map: &mut MyMap, index: &str| -> Result<_, Box<EvalAltResult>> {
-                map.get(index).cloned().ok_or_else(|| {
-                    EvalAltResult::ErrorIndexNotFound(index.into(), rhai::Position::NONE).into()
-                })
-            },
-        )
+        .register_indexer_get(|map: &mut MyMap, index: &str| -> Result<_, Box<EvalAltResult>> { map.get(index).cloned().ok_or_else(|| EvalAltResult::ErrorIndexNotFound(index.into(), rhai::Position::NONE).into()) })
         .register_indexer_set(|map: &mut MyMap, index: &str, value: INT| {
             map.insert(index.to_string(), value);
         });
@@ -441,11 +325,6 @@ fn test_get_set_elvis() {
 
     engine.eval::<()>("let x = (); x?.foo.bar.baz").unwrap();
     engine.eval::<()>("let x = (); x?.foo(1,2,3)").unwrap();
-    engine
-        .eval::<()>("let x = #{a:()}; x.a?.foo.bar.baz")
-        .unwrap();
-    assert_eq!(
-        engine.eval::<String>("let x = 'x'; x?.type_of()").unwrap(),
-        "char"
-    );
+    engine.eval::<()>("let x = #{a:()}; x.a?.foo.bar.baz").unwrap();
+    assert_eq!(engine.eval::<String>("let x = 'x'; x?.type_of()").unwrap(), "char");
 }

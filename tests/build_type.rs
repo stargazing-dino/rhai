@@ -37,10 +37,7 @@ fn build_type() {
                 0 => Ok(self.x),
                 1 => Ok(self.y),
                 2 => Ok(self.z),
-                _ => Err(Box::new(EvalAltResult::ErrorIndexNotFound(
-                    idx.into(),
-                    Position::NONE,
-                ))),
+                _ => Err(Box::new(EvalAltResult::ErrorIndexNotFound(idx.into(), Position::NONE))),
             }
         }
     }

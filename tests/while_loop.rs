@@ -86,10 +86,7 @@ fn test_do() {
 
     engine.run("do {} while false").unwrap();
 
-    assert_eq!(
-        engine.eval::<INT>("do { break 42; } while false").unwrap(),
-        42
-    );
+    assert_eq!(engine.eval::<INT>("do { break 42; } while false").unwrap(), 42);
 }
 
 #[cfg(not(feature = "unchecked"))]

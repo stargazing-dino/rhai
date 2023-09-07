@@ -5,91 +5,22 @@ use rhai::{Engine, EvalAltResult, ParseErrorType, INT};
 fn test_internal_fn() {
     let engine = Engine::new();
 
-    assert_eq!(
-        engine
-            .eval::<INT>("fn add_me(a, b) { a+b } add_me(3, 4)")
-            .unwrap(),
-        7
-    );
-
-    assert_eq!(
-        engine
-            .eval::<INT>("fn add_me(a, b,) { a+b } add_me(3, 4,)")
-            .unwrap(),
-        7
-    );
-
-    assert_eq!(
-        engine
-            .eval::<INT>("fn bob() { return 4; 5 } bob()")
-            .unwrap(),
-        4
-    );
-
-    assert_eq!(
-        engine
-            .eval::<INT>("fn add(x, n) { x + n } add(40, 2)")
-            .unwrap(),
-        42
-    );
-
-    assert_eq!(
-        engine
-            .eval::<INT>("fn add(x, n,) { x + n } add(40, 2,)")
-            .unwrap(),
-        42
-    );
-
-    assert_eq!(
-        engine
-            .eval::<INT>("fn add(x, n) { x + n } let a = 40; add(a, 2); a")
-            .unwrap(),
-        40
-    );
-
+    assert_eq!(engine.eval::<INT>("fn add_me(a, b) { a+b } add_me(3, 4)").unwrap(), 7);
+    assert_eq!(engine.eval::<INT>("fn add_me(a, b,) { a+b } add_me(3, 4,)").unwrap(), 7);
+    assert_eq!(engine.eval::<INT>("fn bob() { return 4; 5 } bob()").unwrap(), 4);
+    assert_eq!(engine.eval::<INT>("fn add(x, n) { x + n } add(40, 2)").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("fn add(x, n,) { x + n } add(40, 2,)").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("fn add(x, n) { x + n } let a = 40; add(a, 2); a").unwrap(), 40);
     #[cfg(not(feature = "no_object"))]
-    assert_eq!(
-        engine
-            .eval::<INT>("fn add(n) { this + n } let x = 40; x.add(2)")
-            .unwrap(),
-        42
-    );
-
+    assert_eq!(engine.eval::<INT>("fn add(n) { this + n } let x = 40; x.add(2)").unwrap(), 42);
     #[cfg(not(feature = "no_object"))]
-    assert_eq!(
-        engine
-            .eval::<INT>("fn add(n) { this += n; } let x = 40; x.add(2); x")
-            .unwrap(),
-        42
-    );
-
-    assert_eq!(
-        engine.eval::<INT>("fn mul2(x) { x * 2 } mul2(21)").unwrap(),
-        42
-    );
-
-    assert_eq!(
-        engine
-            .eval::<INT>("fn mul2(x) { x *= 2 } let a = 21; mul2(a); a")
-            .unwrap(),
-        21
-    );
-
+    assert_eq!(engine.eval::<INT>("fn add(n) { this += n; } let x = 40; x.add(2); x").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("fn mul2(x) { x * 2 } mul2(21)").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("fn mul2(x) { x *= 2 } let a = 21; mul2(a); a").unwrap(), 21);
     #[cfg(not(feature = "no_object"))]
-    assert_eq!(
-        engine
-            .eval::<INT>("fn mul2() { this * 2 } let x = 21; x.mul2()")
-            .unwrap(),
-        42
-    );
-
+    assert_eq!(engine.eval::<INT>("fn mul2() { this * 2 } let x = 21; x.mul2()").unwrap(), 42);
     #[cfg(not(feature = "no_object"))]
-    assert_eq!(
-        engine
-            .eval::<INT>("fn mul2() { this *= 2; } let x = 21; x.mul2(); x")
-            .unwrap(),
-        42
-    );
+    assert_eq!(engine.eval::<INT>("fn mul2() { this *= 2; } let x = 21; x.mul2(); x").unwrap(), 42);
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
@@ -105,9 +36,7 @@ impl Clone for TestStruct {
 fn test_internal_fn_take() {
     let mut engine = Engine::new();
 
-    engine
-        .register_type_with_name::<TestStruct>("TestStruct")
-        .register_fn("new_ts", |x: INT| TestStruct(x));
+    engine.register_type_with_name::<TestStruct>("TestStruct").register_fn("new_ts", |x: INT| TestStruct(x));
 
     assert_eq!(
         engine
@@ -194,23 +123,16 @@ fn test_internal_fn_params() {
     let engine = Engine::new();
 
     // Expect duplicated parameters error
-    assert_eq!(
-        *engine
-            .compile("fn hello(x, x) { x }")
-            .unwrap_err()
-            .err_type(),
-        ParseErrorType::FnDuplicatedParam("hello".to_string(), "x".to_string())
-    );
+    assert!(matches!(
+        engine.compile("fn hello(x, x) { x }").unwrap_err().err_type(),
+        ParseErrorType::FnDuplicatedParam(a, b) if a == "hello" && b == "x"));
 }
 
 #[test]
 fn test_function_pointers() {
     let engine = Engine::new();
 
-    assert_eq!(
-        engine.eval::<String>(r#"type_of(Fn("abc"))"#).unwrap(),
-        "Fn"
-    );
+    assert_eq!(engine.eval::<String>(r#"type_of(Fn("abc"))"#).unwrap(), "Fn");
 
     assert_eq!(
         engine

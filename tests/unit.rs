@@ -9,9 +9,7 @@ fn test_unit() {
 #[test]
 fn test_unit_eq() {
     let engine = Engine::new();
-    assert!(engine
-        .eval::<bool>("let x = (); let y = (); x == y")
-        .unwrap());
+    assert!(engine.eval::<bool>("let x = (); let y = (); x == y").unwrap());
 }
 
 #[test]

@@ -28,27 +28,12 @@ fn test_loop() {
         21
     );
 
-    assert_eq!(
-        *engine.compile("let x = 0; break;").unwrap_err().err_type(),
-        ParseErrorType::LoopBreak
-    );
+    assert_eq!(*engine.compile("let x = 0; break;").unwrap_err().err_type(), ParseErrorType::LoopBreak);
 
     #[cfg(not(feature = "no_function"))]
-    assert_eq!(
-        *engine
-            .compile("loop { let f = || { break;  } }")
-            .unwrap_err()
-            .err_type(),
-        ParseErrorType::LoopBreak
-    );
+    assert_eq!(*engine.compile("loop { let f = || { break;  } }").unwrap_err().err_type(), ParseErrorType::LoopBreak);
 
-    assert_eq!(
-        *engine
-            .compile("let x = 0; if x > 0 { continue; }")
-            .unwrap_err()
-            .err_type(),
-        ParseErrorType::LoopBreak
-    );
+    assert_eq!(*engine.compile("let x = 0; if x > 0 { continue; }").unwrap_err().err_type(), ParseErrorType::LoopBreak);
 }
 
 #[test]

@@ -7,9 +7,7 @@ fn test_var_scope() {
 
     engine.run_with_scope(&mut scope, "let x = 4 + 5").unwrap();
     assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "x").unwrap(), 9);
-    engine
-        .run_with_scope(&mut scope, "x += 1; x += 2;")
-        .unwrap();
+    engine.run_with_scope(&mut scope, "x += 1; x += 2;").unwrap();
     assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "x").unwrap(), 12);
 
     scope.set_value("x", 42 as INT);
@@ -18,68 +16,44 @@ fn test_var_scope() {
     engine.run_with_scope(&mut scope, "{ let x = 3 }").unwrap();
     assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "x").unwrap(), 42);
 
-    #[cfg(not(feature = "no_optimize"))]
-    if engine.optimization_level() != rhai::OptimizationLevel::None {
-        scope.clear();
+    scope.clear();
+    engine.run_with_scope(&mut scope, "let x = 3; let x = 42; let x = 123;").unwrap();
+    assert_eq!(scope.len(), 1);
+    assert_eq!(scope.get_value::<INT>("x").unwrap(), 123);
+
+    scope.clear();
+    engine.run_with_scope(&mut scope, "let x = 3; let y = 0; let x = 42; let y = 999; let x = 123;").unwrap();
+    assert_eq!(scope.len(), 2);
+    assert_eq!(scope.get_value::<INT>("x").unwrap(), 123);
+    assert_eq!(scope.get_value::<INT>("y").unwrap(), 999);
+
+    scope.clear();
+    engine.run_with_scope(&mut scope, "const x = 3; let y = 0; let x = 42; let y = 999;").unwrap();
+    assert_eq!(scope.len(), 2);
+    assert_eq!(scope.get_value::<INT>("x").unwrap(), 42);
+    assert_eq!(scope.get_value::<INT>("y").unwrap(), 999);
+    assert!(!scope.is_constant("x").unwrap());
+    assert!(!scope.is_constant("y").unwrap());
+
+    scope.clear();
+    engine.run_with_scope(&mut scope, "const x = 3; let y = 0; let x = 42; let y = 999; const x = 123;").unwrap();
+    assert_eq!(scope.len(), 2);
+    assert_eq!(scope.get_value::<INT>("x").unwrap(), 123);
+    assert_eq!(scope.get_value::<INT>("y").unwrap(), 999);
+    assert!(scope.is_constant("x").unwrap());
+    assert!(!scope.is_constant("y").unwrap());
+
+    scope.clear();
+    engine.run_with_scope(&mut scope, "let x = 3; let y = 0; { let x = 42; let y = 999; } let x = 123;").unwrap();
+
+    assert_eq!(scope.len(), 2);
+    assert_eq!(scope.get_value::<INT>("x").unwrap(), 123);
+    assert_eq!(scope.get_value::<INT>("y").unwrap(), 0);
+
+    assert_eq!(
         engine
-            .run_with_scope(&mut scope, "let x = 3; let x = 42; let x = 123;")
-            .unwrap();
-        assert_eq!(scope.len(), 1);
-        assert_eq!(scope.get_value::<INT>("x").unwrap(), 123);
-
-        scope.clear();
-        engine
-            .run_with_scope(
-                &mut scope,
-                "let x = 3; let y = 0; let x = 42; let y = 999; let x = 123;",
-            )
-            .unwrap();
-        assert_eq!(scope.len(), 2);
-        assert_eq!(scope.get_value::<INT>("x").unwrap(), 123);
-        assert_eq!(scope.get_value::<INT>("y").unwrap(), 999);
-
-        scope.clear();
-        engine
-            .run_with_scope(
-                &mut scope,
-                "const x = 3; let y = 0; let x = 42; let y = 999;",
-            )
-            .unwrap();
-        assert_eq!(scope.len(), 2);
-        assert_eq!(scope.get_value::<INT>("x").unwrap(), 42);
-        assert_eq!(scope.get_value::<INT>("y").unwrap(), 999);
-        assert!(!scope.is_constant("x").unwrap());
-        assert!(!scope.is_constant("y").unwrap());
-
-        scope.clear();
-        engine
-            .run_with_scope(
-                &mut scope,
-                "const x = 3; let y = 0; let x = 42; let y = 999; const x = 123;",
-            )
-            .unwrap();
-        assert_eq!(scope.len(), 2);
-        assert_eq!(scope.get_value::<INT>("x").unwrap(), 123);
-        assert_eq!(scope.get_value::<INT>("y").unwrap(), 999);
-        assert!(scope.is_constant("x").unwrap());
-        assert!(!scope.is_constant("y").unwrap());
-
-        scope.clear();
-        engine
-            .run_with_scope(
-                &mut scope,
-                "let x = 3; let y = 0; { let x = 42; let y = 999; } let x = 123;",
-            )
-            .unwrap();
-
-        assert_eq!(scope.len(), 2);
-        assert_eq!(scope.get_value::<INT>("x").unwrap(), 123);
-        assert_eq!(scope.get_value::<INT>("y").unwrap(), 0);
-
-        assert_eq!(
-            engine
-                .eval::<INT>(
-                    "
+            .eval::<INT>(
+                "
                         let sum = 0;
                         for x in 0..10 {
                             let x = 42;
@@ -87,11 +61,10 @@ fn test_var_scope() {
                         }
                         sum
                     ",
-                )
-                .unwrap(),
-            420
-        );
-    }
+            )
+            .unwrap(),
+        420
+    );
 
     scope.clear();
 
@@ -339,9 +312,7 @@ fn test_scope_eval() {
     scope.push("z", 999 as INT);
 
     // First invocation
-    engine
-        .run_with_scope(&mut scope, " let x = 4 + 5 - y + z; y = 1;")
-        .expect("variables y and z should exist");
+    engine.run_with_scope(&mut scope, " let x = 4 + 5 - y + z; y = 1;").expect("variables y and z should exist");
 
     // Second invocation using the same state
     let result = engine.eval_with_scope::<INT>(&mut scope, "x").unwrap();
@@ -349,12 +320,7 @@ fn test_scope_eval() {
     println!("result: {result}"); // should print 966
 
     // Variable y is changed in the script
-    assert_eq!(
-        scope
-            .get_value::<INT>("y")
-            .expect("variable y should exist"),
-        1
-    );
+    assert_eq!(scope.get_value::<INT>("y").expect("variable y should exist"), 1);
 }
 
 #[test]
@@ -378,28 +344,19 @@ fn test_var_resolver() {
             #[cfg(not(feature = "no_closure"))]
             "HELLO" => Ok(Some(shared.clone())),
             // Override a variable - make it not found even if it exists!
-            "DO_NOT_USE" => {
-                Err(EvalAltResult::ErrorVariableNotFound(name.to_string(), Position::NONE).into())
-            }
+            "DO_NOT_USE" => Err(EvalAltResult::ErrorVariableNotFound(name.to_string(), Position::NONE).into()),
             // Silently maps 'chameleon' into 'innocent'.
             "chameleon" => context
                 .scope()
                 .get_value("innocent")
                 .map(Some)
-                .ok_or_else(|| {
-                    EvalAltResult::ErrorVariableNotFound(name.to_string(), Position::NONE).into()
-                }),
+                .ok_or_else(|| EvalAltResult::ErrorVariableNotFound(name.to_string(), Position::NONE).into()),
             // Return Ok(None) to continue with the normal variable resolution process.
             _ => Ok(None),
         }
     });
 
-    assert_eq!(
-        engine
-            .eval_with_scope::<INT>(&mut scope, "MYSTIC_NUMBER")
-            .unwrap(),
-        42
-    );
+    assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "MYSTIC_NUMBER").unwrap(), 42);
 
     #[cfg(not(feature = "no_closure"))]
     {
@@ -413,16 +370,10 @@ fn test_var_resolver() {
         assert_eq!(base.as_int().unwrap(), 248);
     }
 
-    assert_eq!(
-        engine
-            .eval_with_scope::<INT>(&mut scope, "chameleon")
-            .unwrap(),
-        1
-    );
-    assert!(
-        matches!(*engine.eval_with_scope::<INT>(&mut scope, "DO_NOT_USE").unwrap_err(),
-        EvalAltResult::ErrorVariableNotFound(n, ..) if n == "DO_NOT_USE")
-    );
+    assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "chameleon").unwrap(), 1);
+    assert!(matches!(
+        *engine.eval_with_scope::<INT>(&mut scope, "DO_NOT_USE").unwrap_err(),
+        EvalAltResult::ErrorVariableNotFound(n, ..) if n == "DO_NOT_USE"));
 }
 
 #[test]
@@ -438,25 +389,11 @@ fn test_var_def_filter() {
         _ => Ok(true),
     });
 
-    assert_eq!(
-        engine
-            .eval::<INT>("let y = 42; let y = 123; let z = y + 1; z")
-            .unwrap(),
-        124
-    );
-
-    assert!(matches!(
-        engine.compile("let x = 42;").unwrap_err().err_type(),
-        ParseErrorType::ForbiddenVariable(s) if s == "x"
-    ));
-    assert!(matches!(
-        *engine.run_ast(&ast).expect_err("should err"),
-        EvalAltResult::ErrorForbiddenVariable(s, _) if s == "x"
-    ));
+    assert_eq!(engine.eval::<INT>("let y = 42; let y = 123; let z = y + 1; z").unwrap(), 124);
+    assert!(matches!(engine.compile("let x = 42;").unwrap_err().err_type(), ParseErrorType::ForbiddenVariable(s) if s == "x"));
+    assert!(matches!(*engine.run_ast(&ast).expect_err("should err"), EvalAltResult::ErrorForbiddenVariable(s, _) if s == "x"));
     assert!(engine.run("const x = 42;").is_err());
     assert!(engine.run("let y = 42; { let x = y + 1; }").is_err());
     assert!(engine.run("let y = 42; { let x = y + 1; }").is_err());
-    engine
-        .run("let y = 42; { let z = y + 1; { let x = z + 1; } }")
-        .unwrap();
+    engine.run("let y = 42; { let z = y + 1; { let x = z + 1; } }").unwrap();
 }

@@ -31,14 +31,8 @@ fn test_functions_trait_object() {
         .register_fn("new_ts", || Shared::new(ABC(42)) as MySharedTestTrait)
         .register_fn("greet", |x: MySharedTestTrait| x.greet());
 
-    assert_eq!(
-        engine.eval::<String>("type_of(new_ts())").unwrap(),
-        "MySharedTestTrait"
-    );
-    assert_eq!(
-        engine.eval::<INT>("let x = new_ts(); greet(x)").unwrap(),
-        42
-    );
+    assert_eq!(engine.eval::<String>("type_of(new_ts())").unwrap(), "MySharedTestTrait");
+    assert_eq!(engine.eval::<INT>("let x = new_ts(); greet(x)").unwrap(), 42);
 }
 
 #[test]
@@ -64,7 +58,6 @@ fn test_functions_namespaces() {
     engine.register_fn("test", || 42 as INT);
 
     assert_eq!(engine.eval::<INT>("fn test() { 123 } test()").unwrap(), 123);
-
     assert_eq!(engine.eval::<INT>("test()").unwrap(), 42);
 }
 
@@ -99,12 +92,7 @@ fn test_functions_global_module() {
             if matches!(&*err, EvalAltResult::ErrorVariableNotFound(v, ..) if v == "global::ANSWER")
     ));
 
-    engine.register_fn(
-        "do_stuff",
-        |context: NativeCallContext, callback: rhai::FnPtr| -> Result<INT, _> {
-            callback.call_within_context(&context, ())
-        },
-    );
+    engine.register_fn("do_stuff", |context: NativeCallContext, callback: rhai::FnPtr| -> Result<INT, _> { callback.call_within_context(&context, ()) });
 
     #[cfg(not(feature = "no_closure"))]
     assert!(matches!(*engine.run(

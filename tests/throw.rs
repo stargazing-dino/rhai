@@ -19,27 +19,12 @@ fn test_throw() {
 fn test_try_catch() {
     let engine = Engine::new();
 
-    assert_eq!(
-        engine
-            .eval::<INT>("try { throw 42; } catch (x) { return x; }")
-            .unwrap(),
-        42
-    );
+    assert_eq!(engine.eval::<INT>("try { throw 42; } catch (x) { return x; }").unwrap(), 42);
 
-    assert_eq!(
-        engine
-            .eval::<INT>("try { throw 42; } catch { return 123; }")
-            .unwrap(),
-        123
-    );
+    assert_eq!(engine.eval::<INT>("try { throw 42; } catch { return 123; }").unwrap(), 123);
 
     #[cfg(not(feature = "unchecked"))]
-    assert_eq!(
-        engine
-            .eval::<INT>("let x = 42; try { let y = 123; print(x/0); } catch { x = 0 } x")
-            .unwrap(),
-        0
-    );
+    assert_eq!(engine.eval::<INT>("let x = 42; try { let y = 123; print(x/0); } catch { x = 0 } x").unwrap(), 0);
 
     #[cfg(not(feature = "no_function"))]
     assert_eq!(
@@ -108,10 +93,5 @@ fn test_try_catch() {
     );
 
     #[cfg(not(feature = "unchecked"))]
-    assert!(matches!(
-        *engine
-            .run("try { 42/0; } catch { throw; }")
-            .expect_err("expects error"),
-        EvalAltResult::ErrorArithmetic(..)
-    ));
+    assert!(matches!(*engine.run("try { 42/0; } catch { throw; }").expect_err("expects error"), EvalAltResult::ErrorArithmetic(..)));
 }

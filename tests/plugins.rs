@@ -114,36 +114,19 @@ fn test_plugins_package() {
     {
         assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; a.foo").unwrap(), 1);
         engine.run("const A = [1, 2, 3]; A.no_effect(42);").unwrap();
-        engine
-            .run("const A = [1, 2, 3]; A.no_effect = 42;")
-            .unwrap();
+        engine.run("const A = [1, 2, 3]; A.no_effect = 42;").unwrap();
 
-        assert!(
-            matches!(*engine.run("const A = [1, 2, 3]; A.test(42);").unwrap_err(),
-            EvalAltResult::ErrorNonPureMethodCallOnConstant(x, ..) if x == "test")
-        )
+        assert!(matches!(
+            *engine.run("const A = [1, 2, 3]; A.test(42);").unwrap_err(),
+            EvalAltResult::ErrorNonPureMethodCallOnConstant(x, ..) if x == "test"));
     }
 
     assert_eq!(engine.eval::<INT>(r#"hash("hello")"#).unwrap(), 42);
     assert_eq!(engine.eval::<INT>(r#"hash2("hello")"#).unwrap(), 42);
-    assert_eq!(
-        engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)").unwrap(),
-        6
-    );
-    assert_eq!(
-        engine.eval::<INT>("let a = [1, 2, 3]; hi(a, 2)").unwrap(),
-        6
-    );
-    assert_eq!(
-        engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)").unwrap(),
-        6
-    );
-    assert_eq!(
-        engine
-            .eval::<String>("let a = [1, 2, 3]; greet(test(a, 2))")
-            .unwrap(),
-        "6 kitties"
-    );
+    assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)").unwrap(), 6);
+    assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; hi(a, 2)").unwrap(), 6);
+    assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)").unwrap(), 6);
+    assert_eq!(engine.eval::<String>("let a = [1, 2, 3]; greet(test(a, 2))").unwrap(), "6 kitties");
     assert_eq!(engine.eval::<INT>("2 + 2").unwrap(), 4);
 
     engine.set_fast_operators(false);
@@ -229,11 +212,6 @@ mod handle {
         scope.push("world", WorldHandle::from(world));
 
         #[cfg(not(feature = "no_object"))]
-        assert_eq!(
-            engine
-                .eval_with_scope::<INT>(&mut scope, "world.len")
-                .unwrap(),
-            1
-        );
+        assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "world.len").unwrap(), 1);
     }
 }

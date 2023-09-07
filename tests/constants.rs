@@ -7,9 +7,7 @@ fn test_constant() {
     assert_eq!(engine.eval::<INT>("const x = 123; x").unwrap(), 123);
 
     assert!(matches!(
-        *engine
-            .eval::<INT>("const x = 123; x = 42;")
-            .expect_err("expects error"),
+        *engine.eval::<INT>("const x = 123; x = 42;").expect_err("expects error"),
         EvalAltResult::ErrorParsing(ParseErrorType::AssignmentToConstant(x), ..) if x == "x"
     ));
 
@@ -120,10 +118,5 @@ fn test_constant_mut() {
         42
     );
 
-    assert!(matches!(
-        *engine
-            .run_with_scope(&mut scope, "MY_NUMBER.value = 42;")
-            .unwrap_err(),
-        EvalAltResult::ErrorNonPureMethodCallOnConstant(..)
-    ));
+    assert!(matches!(*engine.run_with_scope(&mut scope, "MY_NUMBER.value = 42;").unwrap_err(), EvalAltResult::ErrorNonPureMethodCallOnConstant(..)));
 }

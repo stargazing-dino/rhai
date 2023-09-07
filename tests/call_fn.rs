@@ -31,48 +31,28 @@ fn test_call_fn() {
         )
         .unwrap();
 
-    let r = engine
-        .call_fn::<INT>(&mut scope, &ast, "hello", (42 as INT, 123 as INT))
-        .unwrap();
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "hello", (42 as INT, 123 as INT)).unwrap();
     assert_eq!(r, 165);
 
-    let r = engine
-        .call_fn::<INT>(&mut scope, &ast, "hello", (123 as INT,))
-        .unwrap();
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "hello", (123 as INT,)).unwrap();
     assert_eq!(r, 5166);
 
-    let r = engine
-        .call_fn::<INT>(&mut scope, &ast, "hello", ())
-        .unwrap();
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "hello", ()).unwrap();
     assert_eq!(r, 42);
 
-    assert_eq!(
-        scope
-            .get_value::<INT>("foo")
-            .expect("variable foo should exist"),
-        1
-    );
+    assert_eq!(scope.get_value::<INT>("foo").expect("variable foo should exist"), 1);
 
-    let r = engine
-        .call_fn::<INT>(&mut scope, &ast, "define_var", (2 as INT,))
-        .unwrap();
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "define_var", (2 as INT,)).unwrap();
     assert_eq!(r, 42);
 
     assert!(!scope.contains("bar"));
 
     let options = CallFnOptions::new().eval_ast(false).rewind_scope(false);
 
-    let r = engine
-        .call_fn_with_options::<INT>(options, &mut scope, &ast, "define_var", (2 as INT,))
-        .unwrap();
+    let r = engine.call_fn_with_options::<INT>(options, &mut scope, &ast, "define_var", (2 as INT,)).unwrap();
     assert_eq!(r, 42);
 
-    assert_eq!(
-        scope
-            .get_value::<INT>("bar")
-            .expect("variable bar should exist"),
-        21
-    );
+    assert_eq!(scope.get_value::<INT>("bar").expect("variable bar should exist"), 21);
 
     assert!(!scope.contains("scale"));
 }
@@ -98,13 +78,7 @@ fn test_call_fn_scope() {
     for _ in 0..50 {
         assert_eq!(
             engine
-                .call_fn_with_options::<INT>(
-                    CallFnOptions::new().rewind_scope(false),
-                    &mut scope,
-                    &ast,
-                    "foo",
-                    [Dynamic::THREE],
-                )
+                .call_fn_with_options::<INT>(CallFnOptions::new().rewind_scope(false), &mut scope, &ast, "foo", [Dynamic::THREE],)
                 .unwrap(),
             168
         );
@@ -129,11 +103,7 @@ impl FuncArgs for Options {
 
 #[test]
 fn test_call_fn_args() {
-    let options = Options {
-        foo: false,
-        bar: "world".to_string(),
-        baz: 42,
-    };
+    let options = Options { foo: false, bar: "world".to_string(), baz: 42 };
 
     let engine = Engine::new();
     let mut scope = Scope::new();
@@ -148,9 +118,7 @@ fn test_call_fn_args() {
         )
         .unwrap();
 
-    let result = engine
-        .call_fn::<String>(&mut scope, &ast, "hello", options)
-        .unwrap();
+    let result = engine.call_fn::<String>(&mut scope, &ast, "hello", options).unwrap();
 
     assert_eq!(result, "world42");
 }
@@ -162,16 +130,12 @@ fn test_call_fn_private() {
 
     let ast = engine.compile("fn add(x, n) { x + n }").unwrap();
 
-    let r = engine
-        .call_fn::<INT>(&mut scope, &ast, "add", (40 as INT, 2 as INT))
-        .unwrap();
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "add", (40 as INT, 2 as INT)).unwrap();
     assert_eq!(r, 42);
 
     let ast = engine.compile("private fn add(x, n, ) { x + n }").unwrap();
 
-    let r = engine
-        .call_fn::<INT>(&mut scope, &ast, "add", (40 as INT, 2 as INT))
-        .unwrap();
+    let r = engine.call_fn::<INT>(&mut scope, &ast, "add", (40 as INT, 2 as INT)).unwrap();
     assert_eq!(r, 42);
 }
 
@@ -182,21 +146,13 @@ fn test_fn_ptr_raw() {
 
     engine
         .register_fn("mul", |x: &mut INT, y: INT| *x *= y)
-        .register_raw_fn(
-            "bar",
-            [
-                TypeId::of::<INT>(),
-                TypeId::of::<FnPtr>(),
-                TypeId::of::<INT>(),
-            ],
-            move |context, args| {
-                let fp = args[1].take().cast::<FnPtr>();
-                let value = args[2].clone();
-                let this_ptr = args.get_mut(0).unwrap();
+        .register_raw_fn("bar", [TypeId::of::<INT>(), TypeId::of::<FnPtr>(), TypeId::of::<INT>()], move |context, args| {
+            let fp = args[1].take().cast::<FnPtr>();
+            let value = args[2].clone();
+            let this_ptr = args.get_mut(0).unwrap();
 
-                fp.call_raw(&context, Some(this_ptr), [value])
-            },
-        );
+            fp.call_raw(&context, Some(this_ptr), [value])
+        });
 
     assert_eq!(
         engine
@@ -260,40 +216,16 @@ fn test_fn_ptr_raw() {
 
 #[test]
 fn test_anonymous_fn() {
-    let calc_func = Func::<(INT, INT, INT), INT>::create_from_script(
-        Engine::new(),
-        "fn calc(x, y, z,) { (x + y) * z }",
-        "calc",
-    )
-    .unwrap();
-
+    let calc_func = Func::<(INT, INT, INT), INT>::create_from_script(Engine::new(), "fn calc(x, y, z,) { (x + y) * z }", "calc").unwrap();
     assert_eq!(calc_func(42, 123, 9).unwrap(), 1485);
 
-    let calc_func = Func::<(INT, String, INT), INT>::create_from_script(
-        Engine::new(),
-        "fn calc(x, y, z) { (x + len(y)) * z }",
-        "calc",
-    )
-    .unwrap();
-
+    let calc_func = Func::<(INT, String, INT), INT>::create_from_script(Engine::new(), "fn calc(x, y, z) { (x + len(y)) * z }", "calc").unwrap();
     assert_eq!(calc_func(42, "hello".to_string(), 9).unwrap(), 423);
 
-    let calc_func = Func::<(INT, String, INT), INT>::create_from_script(
-        Engine::new(),
-        "private fn calc(x, y, z) { (x + len(y)) * z }",
-        "calc",
-    )
-    .unwrap();
-
+    let calc_func = Func::<(INT, String, INT), INT>::create_from_script(Engine::new(), "private fn calc(x, y, z) { (x + len(y)) * z }", "calc").unwrap();
     assert_eq!(calc_func(42, "hello".to_string(), 9).unwrap(), 423);
 
-    let calc_func = Func::<(INT, &str, INT), INT>::create_from_script(
-        Engine::new(),
-        "fn calc(x, y, z) { (x + len(y)) * z }",
-        "calc",
-    )
-    .unwrap();
-
+    let calc_func = Func::<(INT, &str, INT), INT>::create_from_script(Engine::new(), "fn calc(x, y, z) { (x + len(y)) * z }", "calc").unwrap();
     assert_eq!(calc_func(42, "hello", 9).unwrap(), 423);
 }
 
@@ -356,9 +288,7 @@ fn test_call_fn_events() {
                 "update" => engine
                     .call_fn(scope, ast, "update", (event_data,))
                     .or_else(|err| match *err {
-                        EvalAltResult::ErrorFunctionNotFound(fn_name, ..)
-                            if fn_name.starts_with("update") =>
-                        {
+                        EvalAltResult::ErrorFunctionNotFound(fn_name, ..) if fn_name.starts_with("update") => {
                             // Default implementation of 'update' event handler
                             self.scope.set_value("state", true);
                             // Turn function-not-found into a success
