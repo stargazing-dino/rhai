@@ -128,6 +128,7 @@ impl Engine {
     /// assert!(engine.is_symbol_disabled("if"));
     /// ```
     #[inline(always)]
+    #[must_use]
     pub fn is_symbol_disabled(&self, symbol: &str) -> bool {
         self.disabled_symbols.contains(symbol)
     }

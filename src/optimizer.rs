@@ -73,7 +73,7 @@ impl<'a> OptimizerState<'a> {
 
         #[cfg(not(feature = "no_function"))]
         {
-            _global.lib = _lib.iter().cloned().collect();
+            _global.lib = _lib.to_vec();
         }
 
         Self {
@@ -511,15 +511,12 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                             // switch const { case if condition => stmt, _ => def } => if condition { stmt } else { def }
                             optimize_expr(&mut b.condition, state, false);
 
-                            let branch = match def_case {
-                                Some(index) => {
-                                    let mut def_stmt =
-                                        Stmt::Expr(expressions[*index].expr.take().into());
-                                    optimize_stmt(&mut def_stmt, state, true);
-                                    def_stmt.into()
-                                }
-                                _ => StmtBlock::NONE,
-                            };
+                            let branch = def_case.map_or(StmtBlock::NONE, |index| {
+                                let mut def_stmt =
+                                    Stmt::Expr(expressions[index].expr.take().into());
+                                optimize_stmt(&mut def_stmt, state, true);
+                                def_stmt.into()
+                            });
                             let body = Stmt::Expr(b.expr.take().into()).into();
                             let expr = b.condition.take();
 
@@ -572,15 +569,12 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                             // switch const { range if condition => stmt, _ => def } => if condition { stmt } else { def }
                             optimize_expr(&mut expr, state, false);
 
-                            let branch = match def_case {
-                                Some(index) => {
-                                    let mut def_stmt =
-                                        Stmt::Expr(expressions[*index].expr.take().into());
-                                    optimize_stmt(&mut def_stmt, state, true);
-                                    def_stmt.into()
-                                }
-                                _ => StmtBlock::NONE,
-                            };
+                            let branch = def_case.map_or(StmtBlock::NONE, |index| {
+                                let mut def_stmt =
+                                    Stmt::Expr(expressions[index].expr.take().into());
+                                optimize_stmt(&mut def_stmt, state, true);
+                                def_stmt.into()
+                            });
 
                             let body = Stmt::Expr(expressions[r.index()].expr.take().into()).into();
 
@@ -608,11 +602,11 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                         state.set_dirty();
                     }
 
-                    ranges.iter().for_each(|r| {
+                    for r in ranges {
                         let b = &mut expressions[r.index()];
                         optimize_expr(&mut b.condition, state, false);
                         optimize_expr(&mut b.expr, state, false);
-                    });
+                    }
                     return;
                 }
             }
@@ -645,7 +639,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             optimize_expr(match_expr, state, false);
 
             // Optimize blocks
-            expressions.iter_mut().for_each(|b| {
+            for b in expressions.iter_mut() {
                 optimize_expr(&mut b.condition, state, false);
                 optimize_expr(&mut b.expr, state, false);
 
@@ -653,7 +647,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                     b.expr = Expr::Unit(b.expr.position());
                     state.set_dirty();
                 }
-            });
+            }
 
             // Remove false cases
             cases.retain(|_, list| {
@@ -700,17 +694,12 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             }
 
             // Remove unused block statements
-            (0..expressions.len()).into_iter().for_each(|index| {
-                if *def_case == Some(index)
-                    || cases.values().flat_map(|c| c.iter()).any(|&n| n == index)
-                    || ranges.iter().any(|r| r.index() == index)
+            expressions.iter_mut().enumerate().for_each(|(index, b)| {
+                if *def_case != Some(index)
+                    && cases.values().flat_map(|c| c.iter()).all(|&n| n != index)
+                    && ranges.iter().all(|r| r.index() != index)
+                    && !b.expr.is_unit()
                 {
-                    return;
-                }
-
-                let b = &mut expressions[index];
-
-                if !b.expr.is_unit() {
                     b.expr = Expr::Unit(b.expr.position());
                     state.set_dirty();
                 }
@@ -916,7 +905,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             // const.is_shared()
             #[cfg(not(feature = "no_closure"))]
             (lhs, Expr::MethodCall(x, pos)) if lhs.is_constant() && x.name == crate::engine::KEYWORD_IS_SHARED && x.args.is_empty() => {
-                if let Some(..) = lhs.get_literal_value() {
+                if lhs.get_literal_value().is_some() {
                     state.set_dirty();
                     *expr = Expr::from_dynamic(Dynamic::FALSE, *pos);
                 }
@@ -948,6 +937,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 *expr = result;
             }
             // array[-int]
+            #[allow(clippy::unnecessary_cast)]
             (Expr::Array(a, pos), Expr::IntegerConstant(i, ..)) if *i < 0 && i.unsigned_abs() as u64 <= a.len() as u64 && a.iter().all(Expr::is_pure) => {
                 // Array literal where everything is pure - promote the indexed item.
                 // All other items can be thrown away.
@@ -972,18 +962,21 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 *expr = Expr::BoolConstant((*n & (1 << (*i as usize))) != 0, *pos);
             }
             // int[-int]
+            #[allow(clippy::unnecessary_cast)]
             (Expr::IntegerConstant(n, pos), Expr::IntegerConstant(i, ..)) if *i < 0 && i.unsigned_abs() as u64 <= crate::INT_BITS as u64 => {
                 // Bit-field literal indexing - get the bit
                 state.set_dirty();
                 *expr = Expr::BoolConstant((*n & (1 << (crate::INT_BITS - i.unsigned_abs() as usize))) != 0, *pos);
             }
             // string[int]
+            #[allow(clippy::unnecessary_cast)]
             (Expr::StringConstant(s, pos), Expr::IntegerConstant(i, ..)) if *i >= 0 && *i <= crate::MAX_USIZE_INT && (*i as usize) < s.chars().count() => {
                 // String literal indexing - get the character
                 state.set_dirty();
                 *expr = Expr::CharConstant(s.chars().nth(*i as usize).unwrap(), *pos);
             }
             // string[-int]
+            #[allow(clippy::unnecessary_cast)]
             (Expr::StringConstant(s, pos), Expr::IntegerConstant(i, ..)) if *i < 0 && i.unsigned_abs() as u64 <= s.chars().count() as u64 => {
                 // String literal indexing - get the character
                 state.set_dirty();
@@ -1346,9 +1339,9 @@ impl Engine {
             let mut module = crate::Module::new();
 
             if optimization_level == OptimizationLevel::None {
-                functions.into_iter().for_each(|fn_def| {
+                for fn_def in functions {
                     module.set_script_fn(fn_def);
-                });
+                }
             } else {
                 // We only need the script library's signatures for optimization purposes
                 let mut lib2 = crate::Module::new();
@@ -1363,7 +1356,7 @@ impl Engine {
                         this_type: fn_def.this_type.clone(),
                         params: fn_def.params.clone(),
                         #[cfg(feature = "metadata")]
-                        comments: Box::default(),
+                        comments: <_>::default(),
                     })
                     .for_each(|script_def| {
                         lib2.set_script_fn(script_def);
@@ -1371,7 +1364,7 @@ impl Engine {
 
                 let lib2 = &[lib2.into()];
 
-                functions.into_iter().for_each(|fn_def| {
+                for fn_def in functions {
                     let mut fn_def = crate::func::shared_take_or_clone(fn_def);
                     // Optimize the function body
                     let body = fn_def.body.take_statements();
@@ -1379,7 +1372,7 @@ impl Engine {
                     *fn_def.body = self.optimize_top_level(body, scope, lib2, optimization_level);
 
                     module.set_script_fn(fn_def);
-                });
+                }
             }
 
             module.into()

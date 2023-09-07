@@ -210,6 +210,7 @@ impl Engine {
                     .global_sub_modules
                     .values()
                     .find_map(|m| m.get_custom_type(name));
+
                 #[cfg(feature = "no_module")]
                 return None;
             })
@@ -240,6 +241,7 @@ impl Engine {
                     .global_sub_modules
                     .values()
                     .find_map(|m| m.get_custom_type(name));
+
                 #[cfg(feature = "no_module")]
                 return None;
             })

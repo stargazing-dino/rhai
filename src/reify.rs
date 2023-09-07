@@ -51,6 +51,8 @@ macro_rules! reify {
     ($old:expr => !!! $t:ty) => {{
         let old_value = $old;
         let new_value: $t =
+            // SAFETY: This is really dangerous (thus the exclamation marks).
+            //         Make sure that the transmute is safe.
             unsafe { std::mem::transmute_copy(&std::mem::ManuallyDrop::new(old_value)) };
         new_value
     }};

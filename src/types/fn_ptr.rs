@@ -218,8 +218,8 @@ impl FnPtr {
             result.try_cast_raw().map_err(|r| {
                 let result_type = engine.map_type_name(r.type_name());
                 let cast_type = match type_name::<T>() {
-                    typ @ _ if typ.contains("::") => engine.map_type_name(typ),
-                    typ @ _ => typ,
+                    typ if typ.contains("::") => engine.map_type_name(typ),
+                    typ => typ,
                 };
                 ERR::ErrorMismatchOutputType(cast_type.into(), result_type.into(), Position::NONE)
                     .into()
@@ -245,8 +245,8 @@ impl FnPtr {
             result.try_cast_raw().map_err(|r| {
                 let result_type = context.engine().map_type_name(r.type_name());
                 let cast_type = match type_name::<T>() {
-                    typ @ _ if typ.contains("::") => context.engine().map_type_name(typ),
-                    typ @ _ => typ,
+                    typ if typ.contains("::") => context.engine().map_type_name(typ),
+                    typ => typ,
                 };
                 ERR::ErrorMismatchOutputType(cast_type.into(), result_type.into(), Position::NONE)
                     .into()
@@ -306,7 +306,7 @@ impl FnPtr {
                     caches,
                     &mut crate::Scope::new(),
                     this_ptr,
-                    self.encapsulated_environ().map(|r| r.as_ref()),
+                    self.encapsulated_environ().map(AsRef::as_ref),
                     fn_def,
                     args,
                     true,
@@ -328,7 +328,7 @@ impl FnPtr {
     #[inline(always)]
     #[must_use]
     #[allow(dead_code)]
-    pub(crate) fn encapsulated_environ(&self) -> Option<&Shared<EncapsulatedEnviron>> {
+    pub(crate) const fn encapsulated_environ(&self) -> Option<&Shared<EncapsulatedEnviron>> {
         self.environ.as_ref()
     }
     /// Set a reference to the [encapsulated environment][EncapsulatedEnviron].
@@ -344,7 +344,7 @@ impl FnPtr {
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn fn_def(&self) -> Option<&Shared<crate::ast::ScriptFnDef>> {
+    pub(crate) const fn fn_def(&self) -> Option<&Shared<crate::ast::ScriptFnDef>> {
         self.fn_def.as_ref()
     }
     /// Set a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
@@ -437,32 +437,29 @@ impl FnPtr {
             if arity == N + self.curry().len() {
                 return self.call_raw(ctx, this_ptr, args);
             }
-            if MOVE_PTR {
-                if this_ptr.is_some() {
-                    if arity == N + 1 + self.curry().len() {
-                        let mut args2 = FnArgsVec::with_capacity(args.len() + 1);
-                        if move_this_ptr_to_args == 0 {
-                            args2.push(this_ptr.as_mut().unwrap().clone());
-                            args2.extend(args);
-                        } else {
-                            args2.extend(args);
-                            args2.insert(move_this_ptr_to_args, this_ptr.as_mut().unwrap().clone());
-                        }
-                        return self.call_raw(ctx, None, args2);
+            if MOVE_PTR && this_ptr.is_some() {
+                if arity == N + 1 + self.curry().len() {
+                    let mut args2 = FnArgsVec::with_capacity(args.len() + 1);
+                    if move_this_ptr_to_args == 0 {
+                        args2.push(this_ptr.as_mut().unwrap().clone());
+                        args2.extend(args);
+                    } else {
+                        args2.extend(args);
+                        args2.insert(move_this_ptr_to_args, this_ptr.as_mut().unwrap().clone());
                     }
-                    if arity == N + E + 1 + self.curry().len() {
-                        let mut args2 = FnArgsVec::with_capacity(args.len() + extras.len() + 1);
-                        if move_this_ptr_to_args == 0 {
-                            args2.push(this_ptr.as_mut().unwrap().clone());
-                            args2.extend(args);
-                            args2.extend(extras);
-                        } else {
-                            args2.extend(args);
-                            args2.insert(move_this_ptr_to_args, this_ptr.as_mut().unwrap().clone());
-                            args2.extend(extras);
-                        }
-                        return self.call_raw(ctx, None, args2);
+                    return self.call_raw(ctx, None, args2);
+                }
+                if arity == N + E + 1 + self.curry().len() {
+                    let mut args2 = FnArgsVec::with_capacity(args.len() + extras.len() + 1);
+                    if move_this_ptr_to_args == 0 {
+                        args2.push(this_ptr.as_mut().unwrap().clone());
+                        args2.extend(args);
+                    } else {
+                        args2.extend(args);
+                        args2.insert(move_this_ptr_to_args, this_ptr.as_mut().unwrap().clone());
                     }
+                    args2.extend(extras);
+                    return self.call_raw(ctx, None, args2);
                 }
             }
             if arity == N + E + self.curry().len() {
@@ -593,6 +590,6 @@ impl IndexMut<usize> for FnPtr {
 impl Extend<Dynamic> for FnPtr {
     #[inline(always)]
     fn extend<T: IntoIterator<Item = Dynamic>>(&mut self, iter: T) {
-        self.curry.extend(iter)
+        self.curry.extend(iter);
     }
 }

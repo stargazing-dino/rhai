@@ -289,6 +289,7 @@ bitflags! {
 
 bitflags! {
     /// Bit-flags containing all status for parsing property/indexing/namespace chains.
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     struct ChainingFlags: u8 {
         /// Is the construct being parsed a property?
         const PROPERTY = 0b0000_0001;
@@ -339,6 +340,13 @@ impl ParseSettings {
             ..*self
         })
     }
+    /// Create a new `ParseSettings` with one higher expression level.
+    #[inline]
+    pub fn level_up_with_position(&self, pos: Position) -> ParseResult<Self> {
+        let mut x = self.level_up()?;
+        x.pos = pos;
+        Ok(x)
+    }
 }
 
 /// Make an anonymous function.
@@ -387,18 +395,18 @@ impl Expr {
         }
     }
     /// Raise an error if the expression can never yield a boolean value.
-    fn ensure_bool_expr(self) -> ParseResult<Expr> {
+    fn ensure_bool_expr(self) -> ParseResult<Self> {
         let type_name = match self {
-            Expr::Unit(..) => "()",
-            Expr::DynamicConstant(ref v, ..) if !v.is_bool() => v.type_name(),
-            Expr::IntegerConstant(..) => "a number",
+            Self::Unit(..) => "()",
+            Self::DynamicConstant(ref v, ..) if !v.is_bool() => v.type_name(),
+            Self::IntegerConstant(..) => "a number",
             #[cfg(not(feature = "no_float"))]
-            Expr::FloatConstant(..) => "a floating-point number",
-            Expr::CharConstant(..) => "a character",
-            Expr::StringConstant(..) => "a string",
-            Expr::InterpolatedString(..) => "a string",
-            Expr::Array(..) => "an array",
-            Expr::Map(..) => "an object map",
+            Self::FloatConstant(..) => "a floating-point number",
+            Self::CharConstant(..) => "a character",
+            Self::StringConstant(..) => "a string",
+            Self::InterpolatedString(..) => "a string",
+            Self::Array(..) => "an array",
+            Self::Map(..) => "an object map",
             _ => return Ok(self),
         };
 
@@ -408,15 +416,15 @@ impl Expr {
         )
     }
     /// Raise an error if the expression can never yield an iterable value.
-    fn ensure_iterable(self) -> ParseResult<Expr> {
+    fn ensure_iterable(self) -> ParseResult<Self> {
         let type_name = match self {
-            Expr::Unit(..) => "()",
-            Expr::BoolConstant(..) => "a boolean",
-            Expr::IntegerConstant(..) => "a number",
+            Self::Unit(..) => "()",
+            Self::BoolConstant(..) => "a boolean",
+            Self::IntegerConstant(..) => "a number",
             #[cfg(not(feature = "no_float"))]
-            Expr::FloatConstant(..) => "a floating-point number",
-            Expr::CharConstant(..) => "a character",
-            Expr::Map(..) => "an object map",
+            Self::FloatConstant(..) => "a floating-point number",
+            Self::CharConstant(..) => "a character",
+            Self::Map(..) => "an object map",
             _ => return Ok(self),
         };
 
@@ -455,10 +463,10 @@ fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
 /// # Panics
 ///
 /// Panics if the next token is not the expected one, or either tokens is not a literal symbol.
-fn eat_token(input: &mut TokenStream, expected_token: Token) -> Position {
+fn eat_token(input: &mut TokenStream, expected_token: &Token) -> Position {
     let (t, pos) = input.next().expect(NEVER_ENDS);
 
-    if t != expected_token {
+    if &t != expected_token {
         unreachable!(
             "{} expected but gets {} at {}",
             expected_token.literal_syntax(),
@@ -470,9 +478,9 @@ fn eat_token(input: &mut TokenStream, expected_token: Token) -> Position {
 }
 
 /// Match a particular [token][Token], consuming it if matched.
-fn match_token(input: &mut TokenStream, token: Token) -> (bool, Position) {
+fn match_token(input: &mut TokenStream, token: &Token) -> (bool, Position) {
     let (t, pos) = input.peek().expect(NEVER_ENDS);
-    if *t == token {
+    if t == token {
         (true, eat_token(input, token))
     } else {
         (false, *pos)
@@ -531,6 +539,7 @@ fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position
 /// Panics if the expression is not a combo chain.
 #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
 fn optimize_combo_chain(expr: &mut Expr) {
+    #[allow(clippy::type_complexity)]
     let (mut x, x_options, x_pos, mut root, mut root_options, root_pos, make_sub, make_root): (
         _,
         _,
@@ -636,7 +645,7 @@ impl Engine {
             // id()
             Token::RightParen => {
                 if !no_args {
-                    eat_token(input, Token::RightParen);
+                    eat_token(input, &Token::RightParen);
                 }
 
                 #[cfg(not(feature = "no_module"))]
@@ -703,7 +712,7 @@ impl Engine {
             match input.peek().expect(NEVER_ENDS) {
                 // id(...args)
                 (Token::RightParen, ..) => {
-                    eat_token(input, Token::RightParen);
+                    eat_token(input, &Token::RightParen);
 
                     #[cfg(not(feature = "no_module"))]
                     let hash = if _namespace.is_empty() {
@@ -756,7 +765,7 @@ impl Engine {
                 }
                 // id(...args,
                 (Token::Comma, ..) => {
-                    eat_token(input, Token::Comma);
+                    eat_token(input, &Token::Comma);
                 }
                 // id(...args <EOF>
                 (Token::EOF, pos) => {
@@ -788,116 +797,105 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         lhs: Expr,
         options: ASTFlags,
-        check_index_type: bool,
+        check_types: bool,
     ) -> ParseResult<Expr> {
-        let mut settings = settings;
+        fn check_argument_types(lhs: &Expr, idx_expr: &Expr) -> Result<(), ParseError> {
+            // Check types of indexing that cannot be overridden
+            // - arrays, maps, strings, bit-fields
+            match *lhs {
+                Expr::Map(..) => match *idx_expr {
+                    // lhs[int]
+                    Expr::IntegerConstant(..) => Err(PERR::MalformedIndexExpr(
+                        "Object map expects string index, not a number".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+
+                    // lhs[string]
+                    Expr::StringConstant(..) | Expr::InterpolatedString(..) => Ok(()),
+
+                    // lhs[float]
+                    #[cfg(not(feature = "no_float"))]
+                    Expr::FloatConstant(..) => Err(PERR::MalformedIndexExpr(
+                        "Object map expects string index, not a float".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[char]
+                    Expr::CharConstant(..) => Err(PERR::MalformedIndexExpr(
+                        "Object map expects string index, not a character".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[()]
+                    Expr::Unit(..) => Err(PERR::MalformedIndexExpr(
+                        "Object map expects string index, not ()".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[??? && ???], lhs[??? || ???], lhs[true], lhs[false]
+                    Expr::And(..) | Expr::Or(..) | Expr::BoolConstant(..) => {
+                        Err(PERR::MalformedIndexExpr(
+                            "Object map expects string index, not a boolean".into(),
+                        )
+                        .into_err(idx_expr.start_position()))
+                    }
+                    _ => Ok(()),
+                },
+
+                Expr::IntegerConstant(..)
+                | Expr::Array(..)
+                | Expr::StringConstant(..)
+                | Expr::InterpolatedString(..) => match *idx_expr {
+                    // lhs[int]
+                    Expr::IntegerConstant(..) => Ok(()),
+
+                    // lhs[string]
+                    Expr::StringConstant(..) | Expr::InterpolatedString(..) => {
+                        Err(PERR::MalformedIndexExpr(
+                            "Array, string or bit-field expects numeric index, not a string".into(),
+                        )
+                        .into_err(idx_expr.start_position()))
+                    }
+                    // lhs[float]
+                    #[cfg(not(feature = "no_float"))]
+                    Expr::FloatConstant(..) => Err(PERR::MalformedIndexExpr(
+                        "Array, string or bit-field expects integer index, not a float".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[char]
+                    Expr::CharConstant(..) => Err(PERR::MalformedIndexExpr(
+                        "Array, string or bit-field expects integer index, not a character".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[()]
+                    Expr::Unit(..) => Err(PERR::MalformedIndexExpr(
+                        "Array, string or bit-field expects integer index, not ()".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[??? && ???], lhs[??? || ???], lhs[true], lhs[false]
+                    Expr::And(..) | Expr::Or(..) | Expr::BoolConstant(..) => {
+                        Err(PERR::MalformedIndexExpr(
+                            "Array, string or bit-field expects integer index, not a boolean"
+                                .into(),
+                        )
+                        .into_err(idx_expr.start_position()))
+                    }
+                    _ => Ok(()),
+                },
+                _ => Ok(()),
+            }
+        }
 
         let idx_expr = self.parse_expr(input, state, lib, settings.level_up()?)?;
 
-        // Check types of indexing that cannot be overridden
-        // - arrays, maps, strings, bit-fields
-        match lhs {
-            _ if !check_index_type => (),
-
-            Expr::Map(..) => match idx_expr {
-                // lhs[int]
-                Expr::IntegerConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Object map expects string index, not a number".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-
-                // lhs[string]
-                Expr::StringConstant(..) | Expr::InterpolatedString(..) => (),
-
-                // lhs[float]
-                #[cfg(not(feature = "no_float"))]
-                Expr::FloatConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Object map expects string index, not a float".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[char]
-                Expr::CharConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Object map expects string index, not a character".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[()]
-                Expr::Unit(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Object map expects string index, not ()".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[??? && ???], lhs[??? || ???], lhs[true], lhs[false]
-                Expr::And(..) | Expr::Or(..) | Expr::BoolConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Object map expects string index, not a boolean".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                _ => (),
-            },
-
-            Expr::IntegerConstant(..)
-            | Expr::Array(..)
-            | Expr::StringConstant(..)
-            | Expr::InterpolatedString(..) => match idx_expr {
-                // lhs[int]
-                Expr::IntegerConstant(..) => (),
-
-                // lhs[string]
-                Expr::StringConstant(..) | Expr::InterpolatedString(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Array, string or bit-field expects numeric index, not a string".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[float]
-                #[cfg(not(feature = "no_float"))]
-                Expr::FloatConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Array, string or bit-field expects integer index, not a float".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[char]
-                Expr::CharConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Array, string or bit-field expects integer index, not a character".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[()]
-                Expr::Unit(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Array, string or bit-field expects integer index, not ()".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[??? && ???], lhs[??? || ???], lhs[true], lhs[false]
-                Expr::And(..) | Expr::Or(..) | Expr::BoolConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Array, string or bit-field expects integer index, not a boolean".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                _ => (),
-            },
-            _ => (),
+        if check_types {
+            check_argument_types(&lhs, &idx_expr)?;
         }
 
         // Check if there is a closing bracket
         match input.peek().expect(NEVER_ENDS) {
             (Token::RightBracket, ..) => {
-                eat_token(input, Token::RightBracket);
+                eat_token(input, &Token::RightBracket);
 
                 // Any more indexing following?
                 match input.peek().expect(NEVER_ENDS) {
@@ -947,11 +945,10 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
         // [ ...
-        let mut settings = settings;
-        settings.pos = eat_token(input, Token::LeftBracket);
+        settings.pos = eat_token(input, &Token::LeftBracket);
 
         let mut array = FnArgsVec::new_const();
 
@@ -969,7 +966,7 @@ impl Engine {
 
             match input.peek().expect(NEVER_ENDS) {
                 (Token::RightBracket, ..) => {
-                    eat_token(input, Token::RightBracket);
+                    eat_token(input, &Token::RightBracket);
                     break;
                 }
                 (Token::EOF, pos) => {
@@ -984,7 +981,7 @@ impl Engine {
 
             match input.peek().expect(NEVER_ENDS) {
                 (Token::Comma, ..) => {
-                    eat_token(input, Token::Comma);
+                    eat_token(input, &Token::Comma);
                 }
                 (Token::RightBracket, ..) => (),
                 (Token::EOF, pos) => {
@@ -1017,11 +1014,10 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
         // #{ ...
-        let mut settings = settings;
-        settings.pos = eat_token(input, Token::MapStart);
+        settings.pos = eat_token(input, &Token::MapStart);
 
         let mut map = StaticVec::<(Ident, Expr)>::new();
         let mut template = std::collections::BTreeMap::<Identifier, crate::Dynamic>::new();
@@ -1031,7 +1027,7 @@ impl Engine {
 
             match input.peek().expect(NEVER_ENDS) {
                 (Token::RightBrace, ..) => {
-                    eat_token(input, Token::RightBrace);
+                    eat_token(input, &Token::RightBrace);
                     break;
                 }
                 (Token::EOF, pos) => {
@@ -1108,7 +1104,7 @@ impl Engine {
 
             match input.peek().expect(NEVER_ENDS) {
                 (Token::Comma, ..) => {
-                    eat_token(input, Token::Comma);
+                    eat_token(input, &Token::Comma);
                 }
                 (Token::RightBrace, ..) => (),
                 (Token::Identifier(..), pos) => {
@@ -1142,8 +1138,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // switch ...
-        let mut settings = settings.level_up()?;
-        settings.pos = eat_token(input, Token::Switch);
+        let settings = settings.level_up_with_position(eat_token(input, &Token::Switch))?;
 
         let item = self.parse_expr(input, state, lib, settings)?;
 
@@ -1170,7 +1165,7 @@ impl Engine {
 
             let (case_expr_list, condition) = match input.peek().expect(NEVER_ENDS) {
                 (Token::RightBrace, ..) => {
-                    eat_token(input, Token::RightBrace);
+                    eat_token(input, &Token::RightBrace);
                     break;
                 }
                 (Token::EOF, pos) => {
@@ -1181,9 +1176,9 @@ impl Engine {
                 }
                 (Token::Underscore, pos) if def_case.is_none() => {
                     def_case_pos = *pos;
-                    eat_token(input, Token::Underscore);
+                    eat_token(input, &Token::Underscore);
 
-                    let (if_clause, if_pos) = match_token(input, Token::If);
+                    let (if_clause, if_pos) = match_token(input, &Token::If);
 
                     if if_clause {
                         return Err(PERR::WrongSwitchCaseCondition.into_err(if_pos));
@@ -1214,12 +1209,12 @@ impl Engine {
                             }
                         }
 
-                        if !match_token(input, Token::Pipe).0 {
+                        if !match_token(input, &Token::Pipe).0 {
                             break;
                         }
                     }
 
-                    let condition = if match_token(input, Token::If).0 {
+                    let condition = if match_token(input, &Token::If).0 {
                         ensure_not_statement_expr(input, "a boolean")?;
                         let guard = self
                             .parse_expr(input, state, lib, settings)?
@@ -1314,7 +1309,7 @@ impl Engine {
 
             match input.peek().expect(NEVER_ENDS) {
                 (Token::Comma, ..) => {
-                    eat_token(input, Token::Comma);
+                    eat_token(input, &Token::Comma);
                 }
                 (Token::RightBrace, ..) => (),
                 (Token::EOF, pos) => {
@@ -1355,12 +1350,11 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         options: ChainingFlags,
     ) -> ParseResult<Expr> {
         let (token, token_pos) = input.peek().expect(NEVER_ENDS);
 
-        let mut settings = settings;
         settings.pos = *token_pos;
 
         let root_expr = match token {
@@ -1412,7 +1406,7 @@ impl Engine {
 
             // ( - grouped expression
             Token::LeftParen => {
-                settings.pos = eat_token(input, Token::LeftParen);
+                settings.pos = eat_token(input, &Token::LeftParen);
 
                 let expr = self.parse_expr(input, state, lib, settings.level_up()?)?;
 
@@ -1517,7 +1511,7 @@ impl Engine {
                 let (expr, fn_def) = result?;
 
                 #[cfg(not(feature = "no_closure"))]
-                for Ident { name, pos } in new_state.external_vars.iter() {
+                for Ident { name, pos } in &new_state.external_vars {
                     let (index, is_func) = state.access_var(name, lib, *pos);
 
                     if !is_func
@@ -1621,8 +1615,8 @@ impl Engine {
             {
                 let (key, syntax) = self.custom_syntax.get_key_value(&**key).unwrap();
                 let (.., pos) = input.next().expect(NEVER_ENDS);
-                let settings = settings.level_up()?;
-                self.parse_custom_syntax(input, state, lib, settings, key, syntax, pos)?
+                let settings = settings.level_up_with_position(pos)?;
+                self.parse_custom_syntax(input, state, lib, settings, key, syntax)?
             }
 
             // Identifier
@@ -1755,12 +1749,10 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         mut lhs: Expr,
         _options: ChainingFlags,
     ) -> ParseResult<Expr> {
-        let mut settings = settings;
-
         // Break just in case `lhs` is `Expr::Dot` or `Expr::Index`
         let mut parent_options = ASTFlags::BREAK;
 
@@ -1894,7 +1886,7 @@ impl Engine {
         #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
         if matches!(lhs, Expr::Index(ref x, ..) | Expr::Dot(ref x, ..) if matches!(x.lhs, Expr::Index(..) | Expr::Dot(..)))
         {
-            optimize_combo_chain(&mut lhs)
+            optimize_combo_chain(&mut lhs);
         }
 
         // Cache the hash key for namespace-qualified variables
@@ -1949,7 +1941,7 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
         let (token, token_pos) = input.peek().expect(NEVER_ENDS);
 
@@ -1957,14 +1949,13 @@ impl Engine {
             return Err(LexError::UnexpectedInput(token.to_string()).into_err(*token_pos));
         }
 
-        let mut settings = settings;
         settings.pos = *token_pos;
 
         match token {
             // -expr
             Token::Minus | Token::UnaryMinus => {
                 let token = token.clone();
-                let pos = eat_token(input, token.clone());
+                let pos = eat_token(input, &token);
 
                 match self.parse_unary(input, state, lib, settings.level_up()?)? {
                     // Negative integer
@@ -1998,7 +1989,7 @@ impl Engine {
             // +expr
             Token::Plus | Token::UnaryPlus => {
                 let token = token.clone();
-                let pos = eat_token(input, token.clone());
+                let pos = eat_token(input, &token);
 
                 match self.parse_unary(input, state, lib, settings.level_up()?)? {
                     expr @ Expr::IntegerConstant(..) => Ok(expr),
@@ -2020,7 +2011,7 @@ impl Engine {
             // !expr
             Token::Bang => {
                 let token = token.clone();
-                let pos = eat_token(input, Token::Bang);
+                let pos = eat_token(input, &Token::Bang);
 
                 Ok(FnCallExpr {
                     namespace: Namespace::NONE,
@@ -2075,10 +2066,10 @@ impl Engine {
             }
         }
 
-        let op_info = match op {
-            Some(op) => OpAssignment::new_op_assignment_from_token(op, op_pos),
-            None => OpAssignment::new_assignment(op_pos),
-        };
+        let op_info = op.map_or_else(
+            || OpAssignment::new_assignment(op_pos),
+            |op| OpAssignment::new_op_assignment_from_token(op, op_pos),
+        );
 
         match lhs {
             // this = rhs
@@ -2117,20 +2108,19 @@ impl Engine {
                     check_lvalue(&x.rhs, matches!(lhs, Expr::Dot(..)))
                 };
 
-                match valid_lvalue {
-                    None => {
-                        match x.lhs {
-                            // var[???] = rhs, this[???] = rhs, var.??? = rhs, this.??? = rhs
-                            Expr::Variable(..) | Expr::ThisPtr(..) => {
-                                Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
-                            }
-                            // expr[???] = rhs, expr.??? = rhs
-                            ref expr => Err(PERR::AssignmentToInvalidLHS(String::new())
-                                .into_err(expr.position())),
+                if let Some(err_pos) = valid_lvalue {
+                    Err(PERR::AssignmentToInvalidLHS(String::new()).into_err(err_pos))
+                } else {
+                    match x.lhs {
+                        // var[???] = rhs, this[???] = rhs, var.??? = rhs, this.??? = rhs
+                        Expr::Variable(..) | Expr::ThisPtr(..) => {
+                            Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
                         }
-                    }
-                    Some(err_pos) => {
-                        Err(PERR::AssignmentToInvalidLHS(String::new()).into_err(err_pos))
+                        // expr[???] = rhs, expr.??? = rhs
+                        ref expr => {
+                            Err(PERR::AssignmentToInvalidLHS(String::new())
+                                .into_err(expr.position()))
+                        }
                     }
                 }
             }
@@ -2310,11 +2300,10 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         parent_precedence: Option<Precedence>,
         lhs: Expr,
     ) -> ParseResult<Expr> {
-        let mut settings = settings;
         settings.pos = lhs.position();
 
         let mut root = lhs;
@@ -2471,10 +2460,9 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         key: impl Into<ImmutableString>,
         syntax: &crate::api::custom_syntax::CustomSyntax,
-        pos: Position,
     ) -> ParseResult<Expr> {
         #[allow(clippy::wildcard_imports)]
         use crate::api::custom_syntax::markers::*;
@@ -2482,7 +2470,8 @@ impl Engine {
         const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
         const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
 
-        let mut settings = settings;
+        let pos = settings.pos;
+
         let mut inputs = Vec::new();
         let mut segments = Vec::new();
         let mut tokens = Vec::new();
@@ -2670,9 +2659,8 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
-        let mut settings = settings;
         settings.pos = input.peek().expect(NEVER_ENDS).1;
 
         // Parse expression normally.
@@ -2691,8 +2679,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // if ...
-        let mut settings = settings.level_up()?;
-        settings.pos = eat_token(input, Token::If);
+        let settings = settings.level_up_with_position(eat_token(input, &Token::If))?;
 
         // if guard { if_body }
         ensure_not_statement_expr(input, "a boolean")?;
@@ -2703,7 +2690,7 @@ impl Engine {
         let body = self.parse_block(input, state, lib, settings)?.into();
 
         // if guard { if_body } else ...
-        let branch = if match_token(input, Token::Else).0 {
+        let branch = if match_token(input, &Token::Else).0 {
             match input.peek().expect(NEVER_ENDS) {
                 // if guard { if_body } else if ...
                 (Token::If, ..) => self.parse_if(input, state, lib, settings)?,
@@ -2765,11 +2752,9 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // do ...
-        let mut settings = settings.level_up()?;
+        let mut settings = settings.level_up_with_position(eat_token(input, &Token::Do))?;
         let orig_breakable = settings.flags.contains(ParseSettingFlags::BREAKABLE);
         settings.flags |= ParseSettingFlags::BREAKABLE;
-
-        settings.pos = eat_token(input, Token::Do);
 
         // do { body } [while|until] guard
 
@@ -2814,15 +2799,14 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // for ...
-        let mut settings = settings.level_up()?;
-        settings.pos = eat_token(input, Token::For);
+        let mut settings = settings.level_up_with_position(eat_token(input, &Token::For))?;
 
         // for name ...
-        let (name, name_pos, counter_name, counter_pos) = if match_token(input, Token::LeftParen).0
+        let (name, name_pos, counter_name, counter_pos) = if match_token(input, &Token::LeftParen).0
         {
             // ( name, counter )
             let (name, name_pos) = parse_var_name(input)?;
-            let (has_comma, pos) = match_token(input, Token::Comma);
+            let (has_comma, pos) = match_token(input, &Token::Comma);
             if !has_comma {
                 return Err(PERR::MissingToken(
                     Token::Comma.into(),
@@ -2836,7 +2820,7 @@ impl Engine {
                 return Err(PERR::DuplicatedVariable(counter_name.into()).into_err(counter_pos));
             }
 
-            let (has_close_paren, pos) = match_token(input, Token::RightParen);
+            let (has_close_paren, pos) = match_token(input, &Token::RightParen);
             if !has_close_paren {
                 return Err(PERR::MissingToken(
                     Token::RightParen.into(),
@@ -2910,12 +2894,11 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         access: AccessMode,
         is_export: bool,
     ) -> ParseResult<Stmt> {
         // let/const... (specified in `var_type`)
-        let mut settings = settings;
         settings.pos = input.next().expect(NEVER_ENDS).1;
 
         // let name ...
@@ -2958,7 +2941,7 @@ impl Engine {
         let name = state.get_interned_string(name);
 
         // let name = ...
-        let expr = if match_token(input, Token::Equals).0 {
+        let expr = if match_token(input, &Token::Equals).0 {
             // let name = expr
             self.parse_expr(input, state, lib, settings.level_up()?)?
         } else {
@@ -2986,15 +2969,12 @@ impl Engine {
             None
         };
 
-        let idx = match existing {
-            Some(n) => {
-                state.stack.get_mut_by_index(n).set_access_mode(access);
-                Some(NonZeroUsize::new(state.stack.len() - n).unwrap())
-            }
-            None => {
-                state.stack.push_entry(name.clone(), access, Dynamic::UNIT);
-                None
-            }
+        let idx = if let Some(n) = existing {
+            state.stack.get_mut_by_index(n).set_access_mode(access);
+            Some(NonZeroUsize::new(state.stack.len() - n).unwrap())
+        } else {
+            state.stack.push_entry(name.clone(), access, Dynamic::UNIT);
+            None
         };
 
         #[cfg(not(feature = "no_module"))]
@@ -3024,13 +3004,12 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // import ...
-        let mut settings = settings.level_up()?;
-        settings.pos = eat_token(input, Token::Import);
+        let settings = settings.level_up_with_position(eat_token(input, &Token::Import))?;
 
         // import expr ...
         let expr = self.parse_expr(input, state, lib, settings)?;
 
-        let export = if match_token(input, Token::As).0 {
+        let export = if match_token(input, &Token::As).0 {
             // import expr as name ...
             let (name, pos) = parse_var_name(input)?;
             Ident {
@@ -3057,10 +3036,9 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Stmt> {
-        let mut settings = settings;
-        settings.pos = eat_token(input, Token::Export);
+        settings.pos = eat_token(input, &Token::Export);
 
         match input.peek().expect(NEVER_ENDS) {
             (Token::Let, pos) => {
@@ -3084,7 +3062,7 @@ impl Engine {
 
         let (id, id_pos) = parse_var_name(input)?;
 
-        let (alias, alias_pos) = if match_token(input, Token::As).0 {
+        let (alias, alias_pos) = if match_token(input, &Token::As).0 {
             parse_var_name(input).map(|(name, pos)| (state.get_interned_string(name), pos))?
         } else {
             (state.get_interned_string(""), Position::NONE)
@@ -3121,8 +3099,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // Must start with {
-        let mut settings = settings.level_up()?;
-        settings.pos = match input.next().expect(NEVER_ENDS) {
+        let brace_start_pos = match input.next().expect(NEVER_ENDS) {
             (Token::LeftBrace, pos) => pos,
             (Token::LexError(err), pos) => return Err(err.into_err(pos)),
             (.., pos) => {
@@ -3133,6 +3110,7 @@ impl Engine {
                 .into_err(pos))
             }
         };
+        let mut settings = settings.level_up_with_position(brace_start_pos)?;
 
         let mut statements = StaticVec::new_const();
 
@@ -3161,7 +3139,7 @@ impl Engine {
         let end_pos = loop {
             // Terminated?
             match input.peek().expect(NEVER_ENDS) {
-                (Token::RightBrace, ..) => break eat_token(input, Token::RightBrace),
+                (Token::RightBrace, ..) => break eat_token(input, &Token::RightBrace),
                 (Token::EOF, pos) => {
                     return Err(PERR::MissingToken(
                         Token::RightBrace.into(),
@@ -3188,14 +3166,14 @@ impl Engine {
 
             match input.peek().expect(NEVER_ENDS) {
                 // { ... stmt }
-                (Token::RightBrace, ..) => break eat_token(input, Token::RightBrace),
+                (Token::RightBrace, ..) => break eat_token(input, &Token::RightBrace),
                 // { ... stmt;
                 (Token::SemiColon, ..) if need_semicolon => {
-                    eat_token(input, Token::SemiColon);
+                    eat_token(input, &Token::SemiColon);
                 }
                 // { ... { stmt } ;
                 (Token::SemiColon, ..) if !need_semicolon => {
-                    eat_token(input, Token::SemiColon);
+                    eat_token(input, &Token::SemiColon);
                 }
                 // { ... { stmt } ???
                 _ if !need_semicolon => (),
@@ -3228,16 +3206,15 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Stmt> {
-        let mut settings = settings;
         settings.pos = input.peek().expect(NEVER_ENDS).1;
 
         let expr = self.parse_expr(input, state, lib, settings)?;
 
         let (op, pos) = match input.peek().expect(NEVER_ENDS) {
             // var = ...
-            (Token::Equals, ..) => (None, eat_token(input, Token::Equals)),
+            (Token::Equals, ..) => (None, eat_token(input, &Token::Equals)),
             // var op= ...
             (token, ..) if token.is_op_assignment() => input
                 .next()
@@ -3260,11 +3237,9 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         use AccessMode::{ReadOnly, ReadWrite};
-
-        let mut settings = settings;
 
         #[cfg(not(feature = "no_function"))]
         #[cfg(feature = "metadata")]
@@ -3332,7 +3307,7 @@ impl Engine {
         match token {
             // ; - empty statement
             Token::SemiColon => {
-                eat_token(input, Token::SemiColon);
+                eat_token(input, &Token::SemiColon);
                 Ok(Stmt::Noop(token_pos))
             }
 
@@ -3348,7 +3323,7 @@ impl Engine {
             #[cfg(not(feature = "no_function"))]
             Token::Fn | Token::Private => {
                 let access = if matches!(token, Token::Private) {
-                    eat_token(input, Token::Private);
+                    eat_token(input, &Token::Private);
                     crate::FnAccess::Private
                 } else {
                     crate::FnAccess::Public
@@ -3404,10 +3379,10 @@ impl Engine {
                         let hash = calc_fn_hash(None, &f.name, f.params.len());
 
                         #[cfg(not(feature = "no_object"))]
-                        let hash = match f.this_type {
-                            Some(ref this_type) => crate::calc_typed_method_hash(hash, this_type),
-                            None => hash,
-                        };
+                        let hash = f
+                            .this_type
+                            .as_ref()
+                            .map_or(hash, |typ| crate::calc_typed_method_hash(hash, typ));
 
                         if !lib.is_empty() && lib.contains_key(&hash) {
                             return Err(PERR::FnDuplicatedDefinition(
@@ -3445,13 +3420,13 @@ impl Engine {
             Token::Continue
                 if self.allow_looping() && settings.has_flag(ParseSettingFlags::BREAKABLE) =>
             {
-                let pos = eat_token(input, Token::Continue);
+                let pos = eat_token(input, &Token::Continue);
                 Ok(Stmt::BreakLoop(None, ASTFlags::empty(), pos))
             }
             Token::Break
                 if self.allow_looping() && settings.has_flag(ParseSettingFlags::BREAKABLE) =>
             {
-                let pos = eat_token(input, Token::Break);
+                let pos = eat_token(input, &Token::Break);
 
                 let expr = match input.peek().expect(NEVER_ENDS) {
                     // `break` at <EOF>
@@ -3539,14 +3514,13 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // try ...
-        let mut settings = settings.level_up()?;
-        settings.pos = eat_token(input, Token::Try);
+        let settings = settings.level_up_with_position(eat_token(input, &Token::Try))?;
 
         // try { try_block }
         let body = self.parse_block(input, state, lib, settings)?.into();
 
         // try { try_block } catch
-        let (matched, catch_pos) = match_token(input, Token::Catch);
+        let (matched, catch_pos) = match_token(input, &Token::Catch);
 
         if !matched {
             return Err(
@@ -3556,9 +3530,9 @@ impl Engine {
         }
 
         // try { try_block } catch (
-        let catch_var = if match_token(input, Token::LeftParen).0 {
+        let catch_var = if match_token(input, &Token::LeftParen).0 {
             let (name, pos) = parse_var_name(input)?;
-            let (matched, err_pos) = match_token(input, Token::RightParen);
+            let (matched, err_pos) = match_token(input, &Token::RightParen);
 
             if !matched {
                 return Err(PERR::MissingToken(
@@ -3588,7 +3562,7 @@ impl Engine {
             state.stack.pop();
 
             Expr::Variable(
-                (None, Namespace::default(), 0, catch_var.name).into(),
+                (None, <_>::default(), 0, catch_var.name).into(),
                 None,
                 catch_var.pos,
             )
@@ -3622,7 +3596,7 @@ impl Engine {
 
             match token {
                 Token::StringConstant(s) if next_token == &Token::Period => {
-                    eat_token(input, Token::Period);
+                    eat_token(input, &Token::Period);
                     let s = match s.as_str() {
                         "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
                         #[cfg(not(feature = "no_float"))]
@@ -3639,7 +3613,7 @@ impl Engine {
                     .into_err(*next_pos))
                 }
                 Token::Identifier(s) if next_token == &Token::Period => {
-                    eat_token(input, Token::Period);
+                    eat_token(input, &Token::Period);
                     let s = match s.as_str() {
                         "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
                         #[cfg(not(feature = "no_float"))]
@@ -3660,11 +3634,11 @@ impl Engine {
 
         let no_params = match input.peek().expect(NEVER_ENDS) {
             (Token::LeftParen, ..) => {
-                eat_token(input, Token::LeftParen);
-                match_token(input, Token::RightParen).0
+                eat_token(input, &Token::LeftParen);
+                match_token(input, &Token::RightParen).0
             }
             (Token::Unit, ..) => {
-                eat_token(input, Token::Unit);
+                eat_token(input, &Token::Unit);
                 true
             }
             (.., pos) => return Err(PERR::FnMissingParams(name.into()).into_err(*pos)),
@@ -3756,11 +3730,10 @@ impl Engine {
         args.extend(externals.iter().cloned().map(|Ident { name, pos }| {
             let (index, is_func) = parent.access_var(&name, lib, pos);
             let idx = match index {
-                #[allow(clippy::cast_possible_truncation)]
-                Some(n) if !is_func && n.get() <= u8::MAX as usize => NonZeroU8::new(n.get() as u8),
+                Some(n) if !is_func => u8::try_from(n.get()).ok().and_then(NonZeroU8::new),
                 _ => None,
             };
-            Expr::Variable((index, Namespace::default(), 0, name).into(), idx, pos)
+            Expr::Variable((index, <_>::default(), 0, name).into(), idx, pos)
         }));
 
         let expr = FnCallExpr {
@@ -3807,7 +3780,7 @@ impl Engine {
         let settings = settings.level_up()?;
         let mut params_list = StaticVec::<ImmutableString>::new_const();
 
-        if input.next().expect(NEVER_ENDS).0 != Token::Or && !match_token(input, Token::Pipe).0 {
+        if input.next().expect(NEVER_ENDS).0 != Token::Or && !match_token(input, &Token::Pipe).0 {
             loop {
                 match input.next().expect(NEVER_ENDS) {
                     (Token::Pipe, ..) => break,
@@ -3892,7 +3865,7 @@ impl Engine {
             body: body.into(),
             #[cfg(not(feature = "no_function"))]
             #[cfg(feature = "metadata")]
-            comments: Box::default(),
+            comments: <_>::default(),
         });
 
         let mut fn_ptr = crate::FnPtr::new_unchecked(fn_name, Vec::new());
@@ -3914,7 +3887,7 @@ impl Engine {
         process_settings: impl FnOnce(&mut ParseSettings),
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
-        let mut functions = StraightHashMap::default();
+        let mut functions = <_>::default();
 
         let options = self.options & !LangOptions::STMT_EXPR & !LangOptions::LOOP_EXPR;
 
@@ -3968,7 +3941,7 @@ impl Engine {
         process_settings: impl FnOnce(&mut ParseSettings),
     ) -> ParseResult<(StmtBlockContainer, Vec<Shared<ScriptFnDef>>)> {
         let mut statements = StmtBlockContainer::new_const();
-        let mut functions = StraightHashMap::default();
+        let mut functions = <_>::default();
 
         let mut settings = ParseSettings {
             level: 0,
@@ -3996,7 +3969,7 @@ impl Engine {
                 (Token::EOF, ..) => break,
                 // stmt ;
                 (Token::SemiColon, ..) if need_semicolon => {
-                    eat_token(&mut input, Token::SemiColon);
+                    eat_token(&mut input, &Token::SemiColon);
                 }
                 // stmt ;
                 (Token::SemiColon, ..) if !need_semicolon => (),

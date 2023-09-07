@@ -286,6 +286,7 @@ impl Engine {
                 } else {
                     let abs_index = index.unsigned_abs();
 
+                    #[allow(clippy::unnecessary_cast)]
                     if abs_index as u64 > usize::MAX as u64 {
                         return Err(
                             ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
@@ -392,17 +393,17 @@ impl Engine {
                 #[cfg(feature = "debugging")]
                 self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), lhs)?;
 
-                match this_ptr {
-                    Some(this_ptr) => {
+                this_ptr.map_or_else(
+                    || Err(ERR::ErrorUnboundThis(*var_pos).into()),
+                    |this_ptr| {
                         let target = &mut this_ptr.into();
 
                         self.eval_dot_index_chain_raw(
                             global, caches, scope2, None, lhs, expr, target, rhs, idx_values,
                             new_val,
                         )
-                    }
-                    None => Err(ERR::ErrorUnboundThis(*var_pos).into()),
-                }
+                    },
+                )
             }
             // id.??? or id[???]
             (Expr::Variable(.., var_pos), new_val) => {

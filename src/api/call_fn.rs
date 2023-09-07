@@ -117,7 +117,7 @@ impl Engine {
         name: impl AsRef<str>,
         args: impl FuncArgs,
     ) -> RhaiResultOf<T> {
-        self.call_fn_with_options(CallFnOptions::default(), scope, ast, name, args)
+        self.call_fn_with_options(<_>::default(), scope, ast, name, args)
     }
     /// Call a script function defined in an [`AST`] with multiple [`Dynamic`] arguments.
     ///
@@ -182,8 +182,8 @@ impl Engine {
             result.try_cast_raw().map_err(|r| {
                 let result_type = self.map_type_name(r.type_name());
                 let cast_type = match type_name::<T>() {
-                    typ @ _ if typ.contains("::") => self.map_type_name(typ),
-                    typ @ _ => typ,
+                    typ if typ.contains("::") => self.map_type_name(typ),
+                    typ => typ,
                 };
                 ERR::ErrorMismatchOutputType(cast_type.into(), result_type.into(), Position::NONE)
                     .into()

@@ -433,7 +433,7 @@ fn test_var_def_filter() {
     engine.run_ast(&ast).unwrap();
 
     #[allow(deprecated)] // not deprecated but unstable
-    engine.on_def_var(|_, info, _| match (info.name, info.nesting_level) {
+    engine.on_def_var(|_, info, _| match (info.name(), info.nesting_level()) {
         ("x", 0 | 1) => Ok(false),
         _ => Ok(true),
     });

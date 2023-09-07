@@ -58,7 +58,7 @@ impl OpAssignment {
     /// Is this an op-assignment?
     #[must_use]
     #[inline(always)]
-    pub fn is_op_assignment(&self) -> bool {
+    pub const fn is_op_assignment(&self) -> bool {
         !matches!(self.op, Token::Equals)
     }
     /// Get information if this [`OpAssignment`] is an op-assignment.
@@ -73,7 +73,7 @@ impl OpAssignment {
     /// * `op_syntax`: Syntax of underlying operator.
     #[must_use]
     #[inline]
-    pub fn get_op_assignment_info(
+    pub const fn get_op_assignment_info(
         &self,
     ) -> Option<(u64, u64, &Token, &'static str, &Token, &'static str)> {
         if self.is_op_assignment() {
@@ -642,6 +642,7 @@ pub struct FlowControl {
 /// Exported under the `internals` feature only.
 #[derive(Debug, Clone, Hash)]
 #[non_exhaustive]
+#[allow(clippy::type_complexity)]
 pub enum Stmt {
     /// No-op.
     Noop(Position),
@@ -1038,6 +1039,7 @@ impl Stmt {
     }
     /// Return this [`Stmt`], replacing it with [`Stmt::Noop`].
     #[inline(always)]
+    #[must_use]
     pub fn take(&mut self) -> Self {
         mem::take(self)
     }

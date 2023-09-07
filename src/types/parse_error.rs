@@ -83,11 +83,27 @@ pub enum ParseErrorType {
     MissingSymbol(String),
     /// An expression in function call arguments `()` has syntax error. Wrapped value is the error
     /// description (if any).
+    ///
+    /// # Deprecated
+    ///
+    /// This error is no longer used and will be removed in the next major version.
+    #[deprecated(
+        since = "1.16.0",
+        note = "This error variant is no longer used and will be removed in the next major version."
+    )]
     MalformedCallExpr(String),
     /// An expression in indexing brackets `[]` has syntax error. Wrapped value is the error
     /// description (if any).
     MalformedIndexExpr(String),
     /// An expression in an `in` expression has syntax error. Wrapped value is the error description (if any).
+    ///
+    /// # Deprecated
+    ///
+    /// This error is no longer used and will be removed in the next major version.
+    #[deprecated(
+        since = "1.16.0",
+        note = "This error variant is no longer used and will be removed in the next major version."
+    )]
     MalformedInExpr(String),
     /// A capturing  has syntax error. Wrapped value is the error description (if any).
     MalformedCapture(String),
@@ -97,10 +113,10 @@ pub enum ParseErrorType {
     ///
     /// # Deprecated
     ///
-    /// This error variant is deprecated. It never occurs and will be removed in the next major version.
+    /// This error is no longer used and will be removed in the next major version.
     #[deprecated(
         since = "1.9.0",
-        note = "This error variant is deprecated. It never occurs and will be removed in the next major version."
+        note = "This error variant is no longer used and will be removed in the next major version."
     )]
     DuplicatedSwitchCase,
     /// A variable name is duplicated. Wrapped value is the variable name.
@@ -183,14 +199,8 @@ impl fmt::Display for ParseErrorType {
 
             Self::UnknownOperator(s) => write!(f, "Unknown operator: '{s}'"),
 
-            Self::MalformedCallExpr(s)  if s.is_empty() => f.write_str(s),
-            Self::MalformedCallExpr(..) => f.write_str("Invalid expression in function call arguments"),
-
             Self::MalformedIndexExpr(s) if s.is_empty() => f.write_str("Invalid index in indexing expression"),
             Self::MalformedIndexExpr(s) =>  f.write_str(s),
-
-            Self::MalformedInExpr(s) if s.is_empty() => f.write_str("Invalid 'in' expression"),
-            Self::MalformedInExpr(s) =>  f.write_str(s),
 
             Self::MalformedCapture(s) if s.is_empty()  => f.write_str("Invalid capturing"),
             Self::MalformedCapture(s) => f.write_str(s),
@@ -211,8 +221,6 @@ impl fmt::Display for ParseErrorType {
             Self::FnDuplicatedParam(s, arg) => write!(f, "Duplicated parameter {arg} for function {s}"),
 
             Self::DuplicatedProperty(s) => write!(f, "Duplicated property for object map literal: {s}"),
-            #[allow(deprecated)]
-            Self::DuplicatedSwitchCase => f.write_str("Duplicated switch case"),
             Self::DuplicatedVariable(s) => write!(f, "Duplicated variable name: {s}"),
 
             Self::VariableExists(s) => write!(f, "Variable already defined: {s}"),
@@ -248,6 +256,19 @@ impl fmt::Display for ParseErrorType {
             Self::WrongExport => f.write_str("Export statement can only appear at global level"),
             Self::ExprTooDeep => f.write_str("Expression exceeds maximum complexity"),
             Self::LoopBreak => f.write_str("Break statement should only be used inside a loop"),
+
+            #[allow(deprecated)]
+            Self::DuplicatedSwitchCase => f.write_str("Duplicated switch case"),
+
+            #[allow(deprecated)]
+            Self::MalformedCallExpr(s)  if s.is_empty() => f.write_str(s),
+            #[allow(deprecated)]
+            Self::MalformedCallExpr(..) => f.write_str("Invalid expression in function call arguments"),
+
+            #[allow(deprecated)]
+            Self::MalformedInExpr(s) if s.is_empty() => f.write_str("Invalid 'in' expression"),
+            #[allow(deprecated)]
+            Self::MalformedInExpr(s) =>  f.write_str(s),
         }
     }
 }

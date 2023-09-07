@@ -7,16 +7,42 @@ use std::prelude::v1::*;
 
 /// Information on a variable definition.
 #[derive(Debug, Hash)]
-#[non_exhaustive]
 pub struct VarDefInfo<'a> {
     /// Name of the variable to be defined.
-    pub name: &'a str,
+    pub(crate) name: &'a str,
     /// `true` if the statement is `const`, otherwise it is `let`.
-    pub is_const: bool,
+    pub(crate) is_const: bool,
     /// The current nesting level, with zero being the global level.
-    pub nesting_level: usize,
+    pub(crate) nesting_level: usize,
     /// Will the variable _shadow_ an existing variable?
-    pub will_shadow: bool,
+    pub(crate) will_shadow: bool,
+}
+
+impl<'a> VarDefInfo<'a> {
+    /// Name of the variable to be defined.
+    #[inline(always)]
+    #[must_use]
+    pub const fn name(&self) -> &str {
+        self.name
+    }
+    /// `true` if the statement is `const`, otherwise it is `let`.
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_const(&self) -> bool {
+        self.is_const
+    }
+    /// The current nesting level, with zero being the global level.
+    #[inline(always)]
+    #[must_use]
+    pub const fn nesting_level(&self) -> usize {
+        self.nesting_level
+    }
+    /// Will the variable _shadow_ an existing variable?
+    #[inline(always)]
+    #[must_use]
+    pub const fn will_shadow_other_variables(&self) -> bool {
+        self.will_shadow
+    }
 }
 
 impl Engine {
@@ -115,7 +141,7 @@ impl Engine {
     /// // Register a variable definition filter.
     /// engine.on_def_var(|_, info, _| {
     ///     // Disallow defining MYSTIC_NUMBER as a constant
-    ///     if info.name == "MYSTIC_NUMBER" && info.is_const {
+    ///     if info.name() == "MYSTIC_NUMBER" && info.is_const() {
     ///         Ok(false)
     ///     } else {
     ///         Ok(true)

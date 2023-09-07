@@ -118,15 +118,12 @@ impl Engine {
         let ast = {
             let mut interner;
             let mut guard;
-            let interned_strings = match self.interned_strings {
-                Some(ref interner) => {
-                    guard = locked_write(interner);
-                    &mut *guard
-                }
-                None => {
-                    interner = StringsInterner::new();
-                    &mut interner
-                }
+            let interned_strings = if let Some(ref interner) = self.interned_strings {
+                guard = locked_write(interner);
+                &mut *guard
+            } else {
+                interner = StringsInterner::new();
+                &mut interner
             };
 
             let state = &mut ParseState::new(None, interned_strings, tokenizer_control);
@@ -138,7 +135,7 @@ impl Engine {
                 #[cfg(not(feature = "no_optimize"))]
                 OptimizationLevel::None,
                 #[cfg(feature = "no_optimize")]
-                OptimizationLevel::default(),
+                <_>::default(),
             )?
         };
 

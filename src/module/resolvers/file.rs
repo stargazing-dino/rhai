@@ -228,7 +228,7 @@ impl FileModuleResolver {
     /// Is the cache enabled?
     #[inline(always)]
     #[must_use]
-    pub fn is_cache_enabled(&self) -> bool {
+    pub const fn is_cache_enabled(&self) -> bool {
         self.cache_enabled
     }
 

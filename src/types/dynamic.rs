@@ -1383,7 +1383,7 @@ impl Dynamic {
             Union::Shared(cell, ..) => crate::func::shared_try_take(cell).map_or_else(
                 |ref cell| crate::func::locked_read(cell).clone(),
                 #[cfg(not(feature = "sync"))]
-                |value| value.into_inner(),
+                crate::Locked::into_inner,
                 #[cfg(feature = "sync")]
                 |value| value.into_inner().unwrap(),
             ),
@@ -1405,7 +1405,7 @@ impl Dynamic {
                 *self = crate::func::shared_try_take(cell).map_or_else(
                     |ref cell| crate::func::locked_read(cell).clone(),
                     #[cfg(not(feature = "sync"))]
-                    |value| value.into_inner(),
+                    crate::Locked::into_inner,
                     #[cfg(feature = "sync")]
                     |value| value.into_inner().unwrap(),
                 );

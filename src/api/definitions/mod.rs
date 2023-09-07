@@ -34,7 +34,7 @@ impl Engine {
         Definitions {
             engine: self,
             scope: None,
-            config: DefinitionsConfig::default(),
+            config: <_>::default(),
         }
     }
 
@@ -61,7 +61,7 @@ impl Engine {
         Definitions {
             engine: self,
             scope: Some(scope),
-            config: DefinitionsConfig::default(),
+            config: <_>::default(),
         }
     }
 }

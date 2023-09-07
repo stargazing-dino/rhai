@@ -189,7 +189,7 @@ impl AST {
             .as_mut()
             .map(|m| m.set_id(source.clone()));
 
-        self.source = (!source.is_empty()).then(|| source);
+        self.source = (!source.is_empty()).then_some(source);
 
         self
     }

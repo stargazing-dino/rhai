@@ -80,6 +80,7 @@ mod time_functions {
 
     /// Return the number of seconds between two timestamps.
     #[rhai_fn(return_raw, name = "-")]
+    #[allow(clippy::unnecessary_wraps)]
     pub fn time_diff(timestamp1: Instant, timestamp2: Instant) -> RhaiResult {
         #[cfg(not(feature = "no_float"))]
         return Ok(if timestamp2 > timestamp1 {
@@ -205,8 +206,8 @@ mod time_functions {
             Ok(timestamp + Duration::from_secs(seconds as u64))
         }
     }
+    #[allow(clippy::cast_sign_loss)]
     fn subtract_impl(timestamp: Instant, seconds: INT) -> RhaiResultOf<Instant> {
-        #[allow(clippy::cast_sign_loss)]
         if seconds < 0 {
             return add_impl(timestamp, -seconds);
         }

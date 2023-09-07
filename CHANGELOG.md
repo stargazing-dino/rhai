@@ -31,6 +31,11 @@ Dependencies
 * [`syn`](https://crates.io/crates/syn) in [`rhai_codegen`](https://crates.io/crates/rhai_codegen) is bumped to version 2.
 * [`hashbrown`](https://crates.io/crates/hashbrown) (used in `no-std` builds) is bumped to version 0.14.
 
+Deprecated API's
+----------------
+
+* `ParseErrorType::MalformedCallExpr` and `ParseErrorType::MalformedInExpr` are deprecated and will be removed in the next major version.
+
 New features
 ------------
 

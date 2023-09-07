@@ -22,7 +22,7 @@ pub struct ExportedModParams {
 impl Parse for ExportedModParams {
     fn parse(args: ParseStream) -> syn::Result<Self> {
         if args.is_empty() {
-            return Ok(ExportedModParams::default());
+            return Ok(<_>::default());
         }
 
         Self::from_info(crate::attrs::parse_attr_items(args)?)
@@ -35,7 +35,7 @@ impl ExportedParams for ExportedModParams {
     }
 
     fn no_attrs() -> Self {
-        Default::default()
+        Self::default()
     }
 
     fn from_info(info: ExportInfo) -> syn::Result<Self> {
@@ -210,7 +210,7 @@ impl Parse for Module {
             consts,
             custom_types,
             sub_modules,
-            params: ExportedModParams::default(),
+            params: <_>::default(),
         })
     }
 }

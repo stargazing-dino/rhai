@@ -256,6 +256,7 @@ impl FnCallExpr {
 /// Exported under the `internals` feature only.
 #[derive(Clone, Hash)]
 #[non_exhaustive]
+#[allow(clippy::type_complexity)]
 pub enum Expr {
     /// Dynamic constant.
     ///
@@ -820,6 +821,7 @@ impl Expr {
     }
     /// Return this [`Expr`], replacing it with [`Expr::Unit`].
     #[inline(always)]
+    #[must_use]
     pub fn take(&mut self) -> Self {
         mem::take(self)
     }

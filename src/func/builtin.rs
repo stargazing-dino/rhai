@@ -359,8 +359,25 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
                     Divide              => impl_op!(FLOAT => $xx / $yy),
                     Modulo              => impl_op!(FLOAT => $xx % $yy),
                     PowerOf             => impl_op!(FLOAT => $xx.powf($yy as FLOAT)),
+
+                    #[cfg(feature = "unchecked")]
                     EqualsTo            => impl_op!(FLOAT => $xx == $yy),
+                    #[cfg(not(feature = "unchecked"))]
+                    EqualsTo            => Some((|_, args| {
+                        let x = args[0].$xx().unwrap() as FLOAT;
+                        let y = args[1].$yy().unwrap() as FLOAT;
+                        Ok(((x - y).abs() <= FLOAT::EPSILON).into())
+                    }, false)),
+
+                    #[cfg(feature = "unchecked")]
                     NotEqualsTo         => impl_op!(FLOAT => $xx != $yy),
+                    #[cfg(not(feature = "unchecked"))]
+                    NotEqualsTo         => Some((|_, args| {
+                        let x = args[0].$xx().unwrap() as FLOAT;
+                        let y = args[1].$yy().unwrap() as FLOAT;
+                        Ok(((x - y).abs() > FLOAT::EPSILON).into())
+                    }, false)),
+
                     GreaterThan         => impl_op!(FLOAT => $xx > $yy),
                     GreaterThanEqualsTo => impl_op!(FLOAT => $xx >= $yy),
                     LessThan            => impl_op!(FLOAT => $xx < $yy),
@@ -690,7 +707,8 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             let x = args[0].as_int().unwrap();
                             let y = args[1].as_int().unwrap();
                             let v = if y < 0 { x << -y } else { x >> y };
-                            Ok((*args[0].write_lock::<Dynamic>().unwrap() = v.into()).into())
+                            *args[0].write_lock::<Dynamic>().unwrap() = v.into();
+                            Ok(Dynamic::UNIT)
                         },
                         false,
                     ))
@@ -701,7 +719,8 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             let x = args[0].as_int().unwrap();
                             let y = args[1].as_int().unwrap();
                             let v = if y < 0 { x >> -y } else { x << y };
-                            Ok((*args[0].write_lock::<Dynamic>().unwrap() = v.into()).into())
+                            *args[0].write_lock::<Dynamic>().unwrap() = v.into();
+                            Ok(Dynamic::UNIT)
                         },
                         false,
                     ))
@@ -737,7 +756,9 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                         buf.push(x.as_char().unwrap());
                         buf.push(y);
 
-                        Ok((*x = buf.into()).into())
+                        *x = buf.into();
+
+                        Ok(Dynamic::UNIT)
                     },
                     false,
                 )),
@@ -759,7 +780,9 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             _ctx.unwrap().engine().throw_on_size((0, 0, total_len))?;
                         }
 
-                        Ok((*x += y).into())
+                        *x += y;
+
+                        Ok(Dynamic::UNIT)
                     },
                     CHECKED_BUILD,
                 )),
@@ -768,7 +791,8 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                         let (first, second) = args.split_first_mut().unwrap();
                         let x = &mut *first.write_lock::<ImmutableString>().unwrap();
                         let y = &*second[0].read_lock::<ImmutableString>().unwrap();
-                        Ok((*x -= y).into())
+                        *x -= y;
+                        Ok(Dynamic::UNIT)
                     },
                     false,
                 )),
@@ -801,7 +825,9 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
 
                         let array = &mut *args[0].write_lock::<Array>().unwrap();
 
-                        Ok(append(array, x).into())
+                        append(array, x);
+
+                        Ok(Dynamic::UNIT)
                     },
                     CHECKED_BUILD,
                 )),
@@ -826,7 +852,9 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             .engine()
                             .throw_on_size((blob1.len() + blob2.len(), 0, 0))?;
 
-                        Ok(append(blob1, blob2).into())
+                        append(blob1, blob2);
+
+                        Ok(Dynamic::UNIT)
                     },
                     CHECKED_BUILD,
                 )),
@@ -914,7 +942,9 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                         .engine()
                         .throw_on_size((0, 0, x.len() + ch.len()))?;
 
-                    Ok((*x += ch).into())
+                    *x += ch;
+
+                    Ok(Dynamic::UNIT)
                 },
                 CHECKED_BUILD,
             )),
@@ -1004,7 +1034,9 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             .engine()
                             .throw_on_size((blob.len() + 1, 0, 0))?;
 
-                        Ok(push(blob, x).into())
+                        push(blob, x);
+
+                        Ok(Dynamic::UNIT)
                     },
                     CHECKED_BUILD,
                 )),
@@ -1028,7 +1060,9 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             .engine()
                             .throw_on_size((blob.len() + 1, 0, 0))?;
 
-                        Ok(append_char(blob, x).into())
+                        append_char(blob, x);
+
+                        Ok(Dynamic::UNIT)
                     },
                     CHECKED_BUILD,
                 )),
@@ -1057,7 +1091,9 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             .engine()
                             .throw_on_size((blob.len() + s.len(), 0, 0))?;
 
-                        Ok(append_str(blob, s).into())
+                        append_str(blob, s);
+
+                        Ok(Dynamic::UNIT)
                     },
                     CHECKED_BUILD,
                 )),
