@@ -256,6 +256,7 @@ impl FnCallExpr {
 /// Exported under the `internals` feature only.
 #[derive(Clone, Hash)]
 #[non_exhaustive]
+#[allow(clippy::type_complexity)]
 pub enum Expr {
     /// Dynamic constant.
     ///

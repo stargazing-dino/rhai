@@ -460,26 +460,26 @@ impl Engine {
 
             // See if the function match print/debug (which requires special processing)
             return Ok(match name {
-                KEYWORD_PRINT => match self.print {
-                    Some(ref print) => {
+                KEYWORD_PRINT => {
+                    if let Some(ref print) = self.print {
                         let text = result.into_immutable_string().map_err(|typ| {
                             let t = self.map_type_name(type_name::<ImmutableString>()).into();
                             ERR::ErrorMismatchOutputType(t, typ.into(), pos)
                         })?;
-                        (print(&text).into(), false)
+                        print(&text);
                     }
-                    None => (Dynamic::UNIT, false),
-                },
-                KEYWORD_DEBUG => match self.debug {
-                    Some(ref debug) => {
+                    (Dynamic::UNIT, false)
+                }
+                KEYWORD_DEBUG => {
+                    if let Some(ref debug) = self.debug {
                         let text = result.into_immutable_string().map_err(|typ| {
                             let t = self.map_type_name(type_name::<ImmutableString>()).into();
                             ERR::ErrorMismatchOutputType(t, typ.into(), pos)
                         })?;
-                        (debug(&text, global.source(), pos).into(), false)
+                        debug(&text, global.source(), pos);
                     }
-                    None => (Dynamic::UNIT, false),
-                },
+                    (Dynamic::UNIT, false)
+                }
                 _ => (result, is_method),
             });
         }

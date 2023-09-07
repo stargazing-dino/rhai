@@ -937,6 +937,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 *expr = result;
             }
             // array[-int]
+            #[allow(clippy::unnecessary_cast)]
             (Expr::Array(a, pos), Expr::IntegerConstant(i, ..)) if *i < 0 && i.unsigned_abs() as u64 <= a.len() as u64 && a.iter().all(Expr::is_pure) => {
                 // Array literal where everything is pure - promote the indexed item.
                 // All other items can be thrown away.
@@ -961,18 +962,21 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 *expr = Expr::BoolConstant((*n & (1 << (*i as usize))) != 0, *pos);
             }
             // int[-int]
+            #[allow(clippy::unnecessary_cast)]
             (Expr::IntegerConstant(n, pos), Expr::IntegerConstant(i, ..)) if *i < 0 && i.unsigned_abs() as u64 <= crate::INT_BITS as u64 => {
                 // Bit-field literal indexing - get the bit
                 state.set_dirty();
                 *expr = Expr::BoolConstant((*n & (1 << (crate::INT_BITS - i.unsigned_abs() as usize))) != 0, *pos);
             }
             // string[int]
+            #[allow(clippy::unnecessary_cast)]
             (Expr::StringConstant(s, pos), Expr::IntegerConstant(i, ..)) if *i >= 0 && *i <= crate::MAX_USIZE_INT && (*i as usize) < s.chars().count() => {
                 // String literal indexing - get the character
                 state.set_dirty();
                 *expr = Expr::CharConstant(s.chars().nth(*i as usize).unwrap(), *pos);
             }
             // string[-int]
+            #[allow(clippy::unnecessary_cast)]
             (Expr::StringConstant(s, pos), Expr::IntegerConstant(i, ..)) if *i < 0 && i.unsigned_abs() as u64 <= s.chars().count() as u64 => {
                 // String literal indexing - get the character
                 state.set_dirty();

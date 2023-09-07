@@ -395,7 +395,7 @@ pub mod array_functions {
         #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         let len = len.min(MAX_USIZE_INT) as usize;
 
-        if len <= 0 {
+        if len == 0 {
             array.clear();
         } else if len < array.len() {
             array.drain(0..array.len() - len);
@@ -620,7 +620,7 @@ pub mod array_functions {
         }
 
         let mut result = Array::new();
-        result.extend(array.drain(start as usize..));
+        result.extend(array.drain(start..));
         result
     }
 

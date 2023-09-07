@@ -781,7 +781,7 @@ pub mod blob_functions {
         }
 
         let mut result = Blob::new();
-        result.extend(blob.drain(index as usize..));
+        result.extend(blob.drain(index..));
         result
     }
     /// Remove all bytes in the BLOB within an exclusive `range` and return them as a new BLOB.

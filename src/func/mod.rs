@@ -4,6 +4,7 @@ pub mod args;
 pub mod builtin;
 pub mod call;
 pub mod callable_function;
+#[allow(clippy::module_inception)]
 pub mod func;
 pub mod hashing;
 pub mod native;

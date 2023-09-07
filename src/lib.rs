@@ -60,35 +60,36 @@
 //!
 //! See [The Rhai Book](https://rhai.rs/book) for details on the Rhai scripting engine and language.
 
+// Map `no_std` feature.
 #![cfg_attr(feature = "no_std", no_std)]
+//
+// Clippy lints.
+//
 #![deny(missing_docs)]
-#![warn(clippy::all)]
-#![warn(clippy::pedantic)]
-#![warn(clippy::nursery)]
+// #![warn(clippy::all)]
+// #![warn(clippy::pedantic)]
+// #![warn(clippy::nursery)]
 #![warn(clippy::cargo)]
 #![warn(clippy::undocumented_unsafe_blocks)]
-#![allow(clippy::unit_arg)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::used_underscore_binding)]
 #![allow(clippy::inline_always)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::negative_feature_names)]
-#![allow(clippy::module_inception)]
 #![allow(clippy::box_collection)]
-#![allow(clippy::too_many_arguments)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::match_same_arms)]
-// The lints below can be turned off to reduce signal/noise ratio
-#![allow(clippy::cognitive_complexity)]
-#![allow(clippy::too_many_lines)]
-#![allow(let_underscore_drop)]
-#![allow(clippy::absurd_extreme_comparisons)]
-#![allow(clippy::unnecessary_cast)]
-#![allow(clippy::wildcard_imports)]
-#![allow(clippy::no_effect_underscore_binding)]
-#![allow(clippy::semicolon_if_nothing_returned)]
-#![allow(clippy::type_complexity)]
+#![allow(clippy::unnecessary_box_returns)]
+// The lints below are turned off to reduce signal/noise ratio
+#![allow(clippy::cognitive_complexity)] // Hey, this is a scripting engine with a compiler...
+#![allow(clippy::too_many_lines)] // Same...
+#![allow(clippy::too_many_arguments)] // Same...
+#![allow(clippy::absurd_extreme_comparisons)] // On `only_i32`, `MAX_USIZE_INT` < `INT::MAX` because `usize` == `u32` and `INT` == `i64`
+#![allow(clippy::wildcard_imports)] // Wildcard imports are used to import the plugins prelude
+#![allow(clippy::enum_glob_use)] // Sometimes useful to import all `Tokens` etc.
+#![allow(clippy::no_effect_underscore_binding)] // Underscored variables may be  used by code within feature guards
+#![allow(clippy::semicolon_if_nothing_returned)] // One-liner `match` cases are sometimes formatted as multi-line blocks
 
 #[cfg(feature = "no_std")]
 extern crate alloc;

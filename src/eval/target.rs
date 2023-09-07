@@ -23,6 +23,8 @@ use std::{
 pub fn calc_offset_len(length: usize, start: crate::INT, len: crate::INT) -> (usize, usize) {
     let start = if start < 0 {
         let abs_start = start.unsigned_abs();
+
+        #[allow(clippy::unnecessary_cast)]
         if abs_start as u64 > crate::MAX_USIZE_INT as u64 {
             0
         } else {
@@ -65,6 +67,8 @@ pub fn calc_index<E>(
 ) -> Result<usize, E> {
     if start < 0 && negative_count_from_end {
         let abs_start = start.unsigned_abs();
+
+        #[allow(clippy::unnecessary_cast)]
         return Ok(if abs_start as u64 > crate::MAX_USIZE_INT as u64 {
             0
         } else {

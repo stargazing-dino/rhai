@@ -22,25 +22,25 @@ impl<'a> VarDefInfo<'a> {
     /// Name of the variable to be defined.
     #[inline(always)]
     #[must_use]
-    pub fn name(&self) -> &str {
+    pub const fn name(&self) -> &str {
         self.name
     }
     /// `true` if the statement is `const`, otherwise it is `let`.
     #[inline(always)]
     #[must_use]
-    pub fn is_const(&self) -> bool {
+    pub const fn is_const(&self) -> bool {
         self.is_const
     }
     /// The current nesting level, with zero being the global level.
     #[inline(always)]
     #[must_use]
-    pub fn nesting_level(&self) -> usize {
+    pub const fn nesting_level(&self) -> usize {
         self.nesting_level
     }
     /// Will the variable _shadow_ an existing variable?
     #[inline(always)]
     #[must_use]
-    pub fn will_shadow_other_variables(&self) -> bool {
+    pub const fn will_shadow_other_variables(&self) -> bool {
         self.will_shadow
     }
 }

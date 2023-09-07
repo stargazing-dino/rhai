@@ -642,6 +642,7 @@ pub struct FlowControl {
 /// Exported under the `internals` feature only.
 #[derive(Debug, Clone, Hash)]
 #[non_exhaustive]
+#[allow(clippy::type_complexity)]
 pub enum Stmt {
     /// No-op.
     Noop(Position),

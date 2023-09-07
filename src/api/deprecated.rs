@@ -904,7 +904,8 @@ pub mod deprecated_array_functions {
         array: &mut Array,
         comparer: &str,
     ) -> RhaiResultOf<()> {
-        Ok(dedup_by_comparer(ctx, array, FnPtr::new(comparer)?))
+        dedup_by_comparer(ctx, array, FnPtr::new(comparer)?);
+        Ok(())
     }
     /// Reduce an array by iterating through all elements while applying a function named by `reducer`.
     ///
@@ -1120,7 +1121,8 @@ pub mod deprecated_array_functions {
         array: &mut Array,
         comparer: &str,
     ) -> RhaiResultOf<()> {
-        Ok(sort(ctx, array, FnPtr::new(comparer)?))
+        sort(ctx, array, FnPtr::new(comparer)?);
+        Ok(())
     }
     /// Remove all elements in the array that returns `true` when applied a function named by `filter`
     /// and return them as a new array.

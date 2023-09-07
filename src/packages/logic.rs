@@ -146,7 +146,7 @@ mod float_functions {
 
     #[rhai_fn(name = "max")]
     pub fn max_if_32(x: INT, y: f32) -> f32 {
-        let (x, y) = (x as f32, y as f32);
+        let (x, y) = (x as f32, y);
         if x >= y {
             x
         } else {
@@ -155,7 +155,7 @@ mod float_functions {
     }
     #[rhai_fn(name = "max")]
     pub fn max_fi_32(x: f32, y: INT) -> f32 {
-        let (x, y) = (x as f32, y as f32);
+        let (x, y) = (x, y as f32);
         if x >= y {
             x
         } else {
@@ -164,7 +164,7 @@ mod float_functions {
     }
     #[rhai_fn(name = "min")]
     pub fn min_if_32(x: INT, y: f32) -> f32 {
-        let (x, y) = (x as f32, y as f32);
+        let (x, y) = (x as f32, y);
         if x <= y {
             x
         } else {
@@ -173,7 +173,7 @@ mod float_functions {
     }
     #[rhai_fn(name = "min")]
     pub fn min_fi_32(x: f32, y: INT) -> f32 {
-        let (x, y) = (x as f32, y as f32);
+        let (x, y) = (x, y as f32);
         if x <= y {
             x
         } else {
@@ -182,7 +182,7 @@ mod float_functions {
     }
     #[rhai_fn(name = "max")]
     pub fn max_if_64(x: INT, y: f64) -> f64 {
-        let (x, y) = (x as f64, y as f64);
+        let (x, y) = (x as f64, y);
         if x >= y {
             x
         } else {
@@ -191,7 +191,7 @@ mod float_functions {
     }
     #[rhai_fn(name = "max")]
     pub fn max_fi_64(x: f64, y: INT) -> f64 {
-        let (x, y) = (x as f64, y as f64);
+        let (x, y) = (x, y as f64);
         if x >= y {
             x
         } else {
@@ -200,7 +200,7 @@ mod float_functions {
     }
     #[rhai_fn(name = "min")]
     pub fn min_if_64(x: INT, y: f64) -> f64 {
-        let (x, y) = (x as f64, y as f64);
+        let (x, y) = (x as f64, y);
         if x <= y {
             x
         } else {
@@ -209,7 +209,7 @@ mod float_functions {
     }
     #[rhai_fn(name = "min")]
     pub fn min_fi_64(x: f64, y: INT) -> f64 {
-        let (x, y) = (x as f64, y as f64);
+        let (x, y) = (x, y as f64);
         if x <= y {
             x
         } else {
@@ -229,64 +229,72 @@ mod f32_functions {
 
     #[rhai_fn(name = "==")]
     pub fn eq_if(x: INT, y: f32) -> bool {
-        (x as f32) == (y as f32)
+        #[cfg(feature = "unchecked")]
+        return (x as f32) == y;
+
+        #[cfg(not(feature = "unchecked"))]
+        return (x as f32 - y).abs() <= f32::EPSILON;
     }
     #[rhai_fn(name = "==")]
     pub fn eq_fi(x: f32, y: INT) -> bool {
-        (x as f32) == (y as f32)
+        #[cfg(feature = "unchecked")]
+        return x == (y as f32);
+
+        #[cfg(not(feature = "unchecked"))]
+        return (x - y as f32).abs() <= f32::EPSILON;
     }
     #[rhai_fn(name = "!=")]
     pub fn neq_if(x: INT, y: f32) -> bool {
         #[cfg(feature = "unchecked")]
-        return (x as f32) != (y as f32);
+        return (x as f32) != y;
 
         #[cfg(not(feature = "unchecked"))]
-        return (x as f32 - y as f32).abs() > f32::EPSILON;
+        return (x as f32 - y).abs() > f32::EPSILON;
     }
     #[rhai_fn(name = "!=")]
     pub fn neq_fi(x: f32, y: INT) -> bool {
         #[cfg(feature = "unchecked")]
-        return (x as f32) != (y as f32);
+        return x != (y as f32);
 
         #[cfg(not(feature = "unchecked"))]
-        return (x as f32 - y as f32).abs() > f32::EPSILON;
+        return (x - y as f32).abs() > f32::EPSILON;
     }
     #[rhai_fn(name = ">")]
     pub fn gt_if(x: INT, y: f32) -> bool {
-        (x as f32) > (y as f32)
+        (x as f32) > y
     }
     #[rhai_fn(name = ">")]
     pub fn gt_fi(x: f32, y: INT) -> bool {
-        (x as f32) > (y as f32)
+        x > (y as f32)
     }
     #[rhai_fn(name = ">=")]
     pub fn gte_if(x: INT, y: f32) -> bool {
-        (x as f32) >= (y as f32)
+        (x as f32) >= y
     }
     #[rhai_fn(name = ">=")]
     pub fn gte_fi(x: f32, y: INT) -> bool {
-        (x as f32) >= (y as f32)
+        x >= (y as f32)
     }
     #[rhai_fn(name = "<")]
     pub fn lt_if(x: INT, y: f32) -> bool {
-        (x as f32) < (y as f32)
+        (x as f32) < y
     }
     #[rhai_fn(name = "<")]
     pub fn lt_fi(x: f32, y: INT) -> bool {
-        (x as f32) < (y as f32)
+        x < (y as f32)
     }
     #[rhai_fn(name = "<=")]
     pub fn lte_if(x: INT, y: f32) -> bool {
-        (x as f32) <= (y as f32)
+        (x as f32) <= y
     }
     #[rhai_fn(name = "<=")]
     pub fn lte_fi(x: f32, y: INT) -> bool {
-        (x as f32) <= (y as f32)
+        x <= (y as f32)
     }
 
     #[rhai_fn(name = "max")]
     pub fn max_64_32(x: FLOAT, y: f32) -> FLOAT {
-        let (x, y) = (x as FLOAT, y as FLOAT);
+        let (x, y) = (x, y as FLOAT);
         if x >= y {
             x
         } else {
@@ -295,7 +303,7 @@ mod f32_functions {
     }
     #[rhai_fn(name = "max")]
     pub fn max_32_64(x: f32, y: FLOAT) -> FLOAT {
-        let (x, y) = (x as FLOAT, y as FLOAT);
+        let (x, y) = (x as FLOAT, y);
         if x >= y {
             x
         } else {
@@ -304,7 +312,7 @@ mod f32_functions {
     }
     #[rhai_fn(name = "min")]
     pub fn min_64_32(x: FLOAT, y: f32) -> FLOAT {
-        let (x, y) = (x as FLOAT, y as FLOAT);
+        let (x, y) = (x, y as FLOAT);
         if x <= y {
             x
         } else {
@@ -313,7 +321,7 @@ mod f32_functions {
     }
     #[rhai_fn(name = "min")]
     pub fn min_32_64(x: f32, y: FLOAT) -> FLOAT {
-        let (x, y) = (x as FLOAT, y as FLOAT);
+        let (x, y) = (x as FLOAT, y);
         if x <= y {
             x
         } else {
@@ -328,59 +336,77 @@ mod f32_functions {
 #[export_module]
 mod f64_functions {
     use crate::{FLOAT, INT};
+    #[cfg(feature = "no_std")]
+    use num_traits::Float;
 
     #[rhai_fn(name = "==")]
     pub fn eq_if(x: INT, y: f64) -> bool {
-        (x as f64) == (y as f64)
+        #[cfg(feature = "unchecked")]
+        return (x as f64) == y;
+
+        #[cfg(not(feature = "unchecked"))]
+        return (x as f64 - y).abs() <= f64::EPSILON;
     }
     #[rhai_fn(name = "==")]
     pub fn eq_fi(x: f64, y: INT) -> bool {
-        (x as f64) == (y as f64)
+        #[cfg(feature = "unchecked")]
+        return x == (y as f64);
+
+        #[cfg(not(feature = "unchecked"))]
+        return (x - y as f64).abs() <= f64::EPSILON;
     }
     #[rhai_fn(name = "!=")]
     pub fn neq_if(x: INT, y: f64) -> bool {
-        (x as f64) != (y as f64)
+        #[cfg(feature = "unchecked")]
+        return (x as f64) != y;
+
+        #[cfg(not(feature = "unchecked"))]
+        return (x as f64 - y).abs() > f64::EPSILON;
     }
     #[rhai_fn(name = "!=")]
     pub fn neq_fi(x: f64, y: INT) -> bool {
-        (x as f64) != (y as f64)
+        #[cfg(feature = "unchecked")]
+        return x != (y as f64);
+
+        #[cfg(not(feature = "unchecked"))]
+        return (x - y as f64).abs() > f64::EPSILON;
     }
     #[rhai_fn(name = ">")]
     pub fn gt_if(x: INT, y: f64) -> bool {
-        (x as f64) > (y as f64)
+        (x as f64) > y
     }
     #[rhai_fn(name = ">")]
     pub fn gt_fi(x: f64, y: INT) -> bool {
-        (x as f64) > (y as f64)
+        x > (y as f64)
     }
     #[rhai_fn(name = ">=")]
     pub fn gte_if(x: INT, y: f64) -> bool {
-        (x as f64) >= (y as f64)
+        (x as f64) >= y
     }
     #[rhai_fn(name = ">=")]
     pub fn gte_fi(x: f64, y: INT) -> bool {
-        (x as f64) >= (y as f64)
+        x >= (y as f64)
     }
     #[rhai_fn(name = "<")]
     pub fn lt_if(x: INT, y: f64) -> bool {
-        (x as f64) < (y as f64)
+        (x as f64) < y
     }
     #[rhai_fn(name = "<")]
     pub fn lt_fi(x: f64, y: INT) -> bool {
-        (x as f64) < (y as f64)
+        x < (y as f64)
     }
     #[rhai_fn(name = "<=")]
     pub fn lte_if(x: INT, y: f64) -> bool {
-        (x as f64) <= (y as f64)
+        (x as f64) <= y
     }
     #[rhai_fn(name = "<=")]
     pub fn lte_fi(x: f64, y: INT) -> bool {
-        (x as f64) <= (y as f64)
+        x <= (y as f64)
     }
 
     #[rhai_fn(name = "max")]
     pub fn max_32_64(x: FLOAT, y: f64) -> FLOAT {
-        let (x, y) = (x as FLOAT, y as FLOAT);
+        let (x, y) = (x, y as FLOAT);
         if x >= y {
             x
         } else {
@@ -389,7 +415,7 @@ mod f64_functions {
     }
     #[rhai_fn(name = "max")]
     pub fn max_64_32(x: f64, y: FLOAT) -> FLOAT {
-        let (x, y) = (x as FLOAT, y as FLOAT);
+        let (x, y) = (x as FLOAT, y);
         if x >= y {
             x
         } else {
@@ -398,7 +424,7 @@ mod f64_functions {
     }
     #[rhai_fn(name = "min")]
     pub fn min_32_64(x: FLOAT, y: f64) -> FLOAT {
-        let (x, y) = (x as FLOAT, y as FLOAT);
+        let (x, y) = (x, y as FLOAT);
         if x <= y {
             x
         } else {
@@ -407,7 +433,7 @@ mod f64_functions {
     }
     #[rhai_fn(name = "min")]
     pub fn min_64_32(x: f64, y: FLOAT) -> FLOAT {
-        let (x, y) = (x as FLOAT, y as FLOAT);
+        let (x, y) = (x as FLOAT, y);
         if x <= y {
             x
         } else {

@@ -609,6 +609,7 @@ mod string_functions {
         let start = if start < 0 {
             let abs_start = start.unsigned_abs();
 
+            #[allow(clippy::unnecessary_cast)]
             if abs_start as u64 > MAX_USIZE_INT as u64 {
                 return -1 as INT;
             }
@@ -693,6 +694,7 @@ mod string_functions {
         let start = if start < 0 {
             let abs_start = start.unsigned_abs();
 
+            #[allow(clippy::unnecessary_cast)]
             if abs_start as u64 > MAX_USIZE_INT as u64 {
                 return -1 as INT;
             }
@@ -785,6 +787,7 @@ mod string_functions {
             // Count from end if negative
             let abs_index = index.unsigned_abs();
 
+            #[allow(clippy::unnecessary_cast)]
             if abs_index as u64 > MAX_USIZE_INT as u64 {
                 return Dynamic::UNIT;
             }
@@ -839,6 +842,7 @@ mod string_functions {
         } else {
             let abs_index = index.unsigned_abs();
 
+            #[allow(clippy::unnecessary_cast)]
             if abs_index as u64 > MAX_USIZE_INT as u64 {
                 return;
             }
@@ -933,6 +937,7 @@ mod string_functions {
         let offset = if start < 0 {
             let abs_start = start.unsigned_abs();
 
+            #[allow(clippy::unnecessary_cast)]
             if abs_start as u64 > MAX_USIZE_INT as u64 {
                 return ctx.engine().const_empty_string();
             }
@@ -1084,6 +1089,7 @@ mod string_functions {
         let offset = if start < 0 {
             let abs_start = start.unsigned_abs();
 
+            #[allow(clippy::unnecessary_cast)]
             if abs_start as u64 > MAX_USIZE_INT as u64 {
                 return;
             }
@@ -1474,6 +1480,7 @@ mod string_functions {
             if index <= 0 {
                 let abs_index = index.unsigned_abs();
 
+                #[allow(clippy::unnecessary_cast)]
                 if abs_index as u64 > MAX_USIZE_INT as u64 {
                     return vec![
                         ctx.engine().const_empty_string().into(),

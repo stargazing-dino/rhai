@@ -340,6 +340,13 @@ impl ParseSettings {
             ..*self
         })
     }
+    /// Create a new `ParseSettings` with one higher expression level.
+    #[inline]
+    pub fn level_up_with_position(&self, pos: Position) -> ParseResult<Self> {
+        let mut x = self.level_up()?;
+        x.pos = pos;
+        Ok(x)
+    }
 }
 
 /// Make an anonymous function.
@@ -532,6 +539,7 @@ fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position
 /// Panics if the expression is not a combo chain.
 #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
 fn optimize_combo_chain(expr: &mut Expr) {
+    #[allow(clippy::type_complexity)]
     let (mut x, x_options, x_pos, mut root, mut root_options, root_pos, make_sub, make_root): (
         _,
         _,
@@ -789,110 +797,99 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         lhs: Expr,
         options: ASTFlags,
-        check_index_type: bool,
+        check_types: bool,
     ) -> ParseResult<Expr> {
-        let mut settings = settings;
+        fn check_argument_types(lhs: &Expr, idx_expr: &Expr) -> Result<(), ParseError> {
+            // Check types of indexing that cannot be overridden
+            // - arrays, maps, strings, bit-fields
+            match *lhs {
+                Expr::Map(..) => match *idx_expr {
+                    // lhs[int]
+                    Expr::IntegerConstant(..) => Err(PERR::MalformedIndexExpr(
+                        "Object map expects string index, not a number".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+
+                    // lhs[string]
+                    Expr::StringConstant(..) | Expr::InterpolatedString(..) => Ok(()),
+
+                    // lhs[float]
+                    #[cfg(not(feature = "no_float"))]
+                    Expr::FloatConstant(..) => Err(PERR::MalformedIndexExpr(
+                        "Object map expects string index, not a float".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[char]
+                    Expr::CharConstant(..) => Err(PERR::MalformedIndexExpr(
+                        "Object map expects string index, not a character".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[()]
+                    Expr::Unit(..) => Err(PERR::MalformedIndexExpr(
+                        "Object map expects string index, not ()".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[??? && ???], lhs[??? || ???], lhs[true], lhs[false]
+                    Expr::And(..) | Expr::Or(..) | Expr::BoolConstant(..) => {
+                        Err(PERR::MalformedIndexExpr(
+                            "Object map expects string index, not a boolean".into(),
+                        )
+                        .into_err(idx_expr.start_position()))
+                    }
+                    _ => Ok(()),
+                },
+
+                Expr::IntegerConstant(..)
+                | Expr::Array(..)
+                | Expr::StringConstant(..)
+                | Expr::InterpolatedString(..) => match *idx_expr {
+                    // lhs[int]
+                    Expr::IntegerConstant(..) => Ok(()),
+
+                    // lhs[string]
+                    Expr::StringConstant(..) | Expr::InterpolatedString(..) => {
+                        Err(PERR::MalformedIndexExpr(
+                            "Array, string or bit-field expects numeric index, not a string".into(),
+                        )
+                        .into_err(idx_expr.start_position()))
+                    }
+                    // lhs[float]
+                    #[cfg(not(feature = "no_float"))]
+                    Expr::FloatConstant(..) => Err(PERR::MalformedIndexExpr(
+                        "Array, string or bit-field expects integer index, not a float".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[char]
+                    Expr::CharConstant(..) => Err(PERR::MalformedIndexExpr(
+                        "Array, string or bit-field expects integer index, not a character".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[()]
+                    Expr::Unit(..) => Err(PERR::MalformedIndexExpr(
+                        "Array, string or bit-field expects integer index, not ()".into(),
+                    )
+                    .into_err(idx_expr.start_position())),
+                    // lhs[??? && ???], lhs[??? || ???], lhs[true], lhs[false]
+                    Expr::And(..) | Expr::Or(..) | Expr::BoolConstant(..) => {
+                        Err(PERR::MalformedIndexExpr(
+                            "Array, string or bit-field expects integer index, not a boolean"
+                                .into(),
+                        )
+                        .into_err(idx_expr.start_position()))
+                    }
+                    _ => Ok(()),
+                },
+                _ => Ok(()),
+            }
+        }
 
         let idx_expr = self.parse_expr(input, state, lib, settings.level_up()?)?;
 
-        // Check types of indexing that cannot be overridden
-        // - arrays, maps, strings, bit-fields
-        match lhs {
-            _ if !check_index_type => (),
-
-            Expr::Map(..) => match idx_expr {
-                // lhs[int]
-                Expr::IntegerConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Object map expects string index, not a number".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-
-                // lhs[string]
-                Expr::StringConstant(..) | Expr::InterpolatedString(..) => (),
-
-                // lhs[float]
-                #[cfg(not(feature = "no_float"))]
-                Expr::FloatConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Object map expects string index, not a float".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[char]
-                Expr::CharConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Object map expects string index, not a character".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[()]
-                Expr::Unit(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Object map expects string index, not ()".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[??? && ???], lhs[??? || ???], lhs[true], lhs[false]
-                Expr::And(..) | Expr::Or(..) | Expr::BoolConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Object map expects string index, not a boolean".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                _ => (),
-            },
-
-            Expr::IntegerConstant(..)
-            | Expr::Array(..)
-            | Expr::StringConstant(..)
-            | Expr::InterpolatedString(..) => match idx_expr {
-                // lhs[int]
-                Expr::IntegerConstant(..) => (),
-
-                // lhs[string]
-                Expr::StringConstant(..) | Expr::InterpolatedString(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Array, string or bit-field expects numeric index, not a string".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[float]
-                #[cfg(not(feature = "no_float"))]
-                Expr::FloatConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Array, string or bit-field expects integer index, not a float".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[char]
-                Expr::CharConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Array, string or bit-field expects integer index, not a character".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[()]
-                Expr::Unit(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Array, string or bit-field expects integer index, not ()".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                // lhs[??? && ???], lhs[??? || ???], lhs[true], lhs[false]
-                Expr::And(..) | Expr::Or(..) | Expr::BoolConstant(..) => {
-                    return Err(PERR::MalformedIndexExpr(
-                        "Array, string or bit-field expects integer index, not a boolean".into(),
-                    )
-                    .into_err(idx_expr.start_position()))
-                }
-                _ => (),
-            },
-            _ => (),
+        if check_types {
+            check_argument_types(&lhs, &idx_expr)?;
         }
 
         // Check if there is a closing bracket
@@ -948,10 +945,9 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
         // [ ...
-        let mut settings = settings;
         settings.pos = eat_token(input, &Token::LeftBracket);
 
         let mut array = FnArgsVec::new_const();
@@ -1018,10 +1014,9 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
         // #{ ...
-        let mut settings = settings;
         settings.pos = eat_token(input, &Token::MapStart);
 
         let mut map = StaticVec::<(Ident, Expr)>::new();
@@ -1143,8 +1138,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // switch ...
-        let mut settings = settings.level_up()?;
-        settings.pos = eat_token(input, &Token::Switch);
+        let settings = settings.level_up_with_position(eat_token(input, &Token::Switch))?;
 
         let item = self.parse_expr(input, state, lib, settings)?;
 
@@ -1356,12 +1350,11 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         options: ChainingFlags,
     ) -> ParseResult<Expr> {
         let (token, token_pos) = input.peek().expect(NEVER_ENDS);
 
-        let mut settings = settings;
         settings.pos = *token_pos;
 
         let root_expr = match token {
@@ -1622,8 +1615,8 @@ impl Engine {
             {
                 let (key, syntax) = self.custom_syntax.get_key_value(&**key).unwrap();
                 let (.., pos) = input.next().expect(NEVER_ENDS);
-                let settings = settings.level_up()?;
-                self.parse_custom_syntax(input, state, lib, settings, key, syntax, pos)?
+                let settings = settings.level_up_with_position(pos)?;
+                self.parse_custom_syntax(input, state, lib, settings, key, syntax)?
             }
 
             // Identifier
@@ -1756,12 +1749,10 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         mut lhs: Expr,
         _options: ChainingFlags,
     ) -> ParseResult<Expr> {
-        let mut settings = settings;
-
         // Break just in case `lhs` is `Expr::Dot` or `Expr::Index`
         let mut parent_options = ASTFlags::BREAK;
 
@@ -1895,7 +1886,7 @@ impl Engine {
         #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
         if matches!(lhs, Expr::Index(ref x, ..) | Expr::Dot(ref x, ..) if matches!(x.lhs, Expr::Index(..) | Expr::Dot(..)))
         {
-            optimize_combo_chain(&mut lhs)
+            optimize_combo_chain(&mut lhs);
         }
 
         // Cache the hash key for namespace-qualified variables
@@ -1950,7 +1941,7 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
         let (token, token_pos) = input.peek().expect(NEVER_ENDS);
 
@@ -1958,7 +1949,6 @@ impl Engine {
             return Err(LexError::UnexpectedInput(token.to_string()).into_err(*token_pos));
         }
 
-        let mut settings = settings;
         settings.pos = *token_pos;
 
         match token {
@@ -2310,11 +2300,10 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         parent_precedence: Option<Precedence>,
         lhs: Expr,
     ) -> ParseResult<Expr> {
-        let mut settings = settings;
         settings.pos = lhs.position();
 
         let mut root = lhs;
@@ -2471,10 +2460,9 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         key: impl Into<ImmutableString>,
         syntax: &crate::api::custom_syntax::CustomSyntax,
-        pos: Position,
     ) -> ParseResult<Expr> {
         #[allow(clippy::wildcard_imports)]
         use crate::api::custom_syntax::markers::*;
@@ -2482,7 +2470,8 @@ impl Engine {
         const KEYWORD_SEMICOLON: &str = Token::SemiColon.literal_syntax();
         const KEYWORD_CLOSE_BRACE: &str = Token::RightBrace.literal_syntax();
 
-        let mut settings = settings;
+        let pos = settings.pos;
+
         let mut inputs = Vec::new();
         let mut segments = Vec::new();
         let mut tokens = Vec::new();
@@ -2670,9 +2659,8 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
-        let mut settings = settings;
         settings.pos = input.peek().expect(NEVER_ENDS).1;
 
         // Parse expression normally.
@@ -2691,8 +2679,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // if ...
-        let mut settings = settings.level_up()?;
-        settings.pos = eat_token(input, &Token::If);
+        let settings = settings.level_up_with_position(eat_token(input, &Token::If))?;
 
         // if guard { if_body }
         ensure_not_statement_expr(input, "a boolean")?;
@@ -2765,11 +2752,9 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // do ...
-        let mut settings = settings.level_up()?;
+        let mut settings = settings.level_up_with_position(eat_token(input, &Token::Do))?;
         let orig_breakable = settings.flags.contains(ParseSettingFlags::BREAKABLE);
         settings.flags |= ParseSettingFlags::BREAKABLE;
-
-        settings.pos = eat_token(input, &Token::Do);
 
         // do { body } [while|until] guard
 
@@ -2814,8 +2799,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // for ...
-        let mut settings = settings.level_up()?;
-        settings.pos = eat_token(input, &Token::For);
+        let mut settings = settings.level_up_with_position(eat_token(input, &Token::For))?;
 
         // for name ...
         let (name, name_pos, counter_name, counter_pos) = if match_token(input, &Token::LeftParen).0
@@ -2910,12 +2894,11 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
         access: AccessMode,
         is_export: bool,
     ) -> ParseResult<Stmt> {
         // let/const... (specified in `var_type`)
-        let mut settings = settings;
         settings.pos = input.next().expect(NEVER_ENDS).1;
 
         // let name ...
@@ -3021,8 +3004,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // import ...
-        let mut settings = settings.level_up()?;
-        settings.pos = eat_token(input, &Token::Import);
+        let settings = settings.level_up_with_position(eat_token(input, &Token::Import))?;
 
         // import expr ...
         let expr = self.parse_expr(input, state, lib, settings)?;
@@ -3054,9 +3036,8 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Stmt> {
-        let mut settings = settings;
         settings.pos = eat_token(input, &Token::Export);
 
         match input.peek().expect(NEVER_ENDS) {
@@ -3118,8 +3099,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // Must start with {
-        let mut settings = settings.level_up()?;
-        settings.pos = match input.next().expect(NEVER_ENDS) {
+        let brace_start_pos = match input.next().expect(NEVER_ENDS) {
             (Token::LeftBrace, pos) => pos,
             (Token::LexError(err), pos) => return Err(err.into_err(pos)),
             (.., pos) => {
@@ -3130,6 +3110,7 @@ impl Engine {
                 .into_err(pos))
             }
         };
+        let mut settings = settings.level_up_with_position(brace_start_pos)?;
 
         let mut statements = StaticVec::new_const();
 
@@ -3225,9 +3206,8 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Stmt> {
-        let mut settings = settings;
         settings.pos = input.peek().expect(NEVER_ENDS).1;
 
         let expr = self.parse_expr(input, state, lib, settings)?;
@@ -3257,11 +3237,9 @@ impl Engine {
         input: &mut TokenStream,
         state: &mut ParseState,
         lib: &mut FnLib,
-        settings: ParseSettings,
+        mut settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         use AccessMode::{ReadOnly, ReadWrite};
-
-        let mut settings = settings;
 
         #[cfg(not(feature = "no_function"))]
         #[cfg(feature = "metadata")]
@@ -3536,8 +3514,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // try ...
-        let mut settings = settings.level_up()?;
-        settings.pos = eat_token(input, &Token::Try);
+        let settings = settings.level_up_with_position(eat_token(input, &Token::Try))?;
 
         // try { try_block }
         let body = self.parse_block(input, state, lib, settings)?.into();
