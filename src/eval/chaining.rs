@@ -20,14 +20,13 @@ static INDEXER_HASHES: OnceCell<(u64, u64)> = OnceCell::new();
 #[inline(always)]
 #[must_use]
 fn hash_idx() -> (u64, u64) {
-    *INDEXER_HASHES
-        .get_or_init(|| {
-            (
-                calc_fn_hash(None, FN_IDX_GET, 2),
-                calc_fn_hash(None, FN_IDX_SET, 3),
-            )
-        })
-        .into()
+    *INDEXER_HASHES.get_or_init(|| {
+        (
+            calc_fn_hash(None, FN_IDX_GET, 2),
+            calc_fn_hash(None, FN_IDX_SET, 3),
+        )
+            .into()
+    })
 }
 
 /// Method of chaining.
