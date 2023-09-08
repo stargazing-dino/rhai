@@ -617,6 +617,23 @@ impl Module {
     pub const fn with_capacity(_capacity: usize) -> Self {
         Self::new()
     }
+
+    /// Get the display name of a registered custom type.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated. Use `get_custom_type_display_by_name` instead.
+    ///
+    /// This method will be removed in the next major version.
+    #[inline(always)]
+    #[must_use]
+    #[deprecated(
+        since = "1.16.0",
+        note = "use `get_custom_type_display_by_name` instead"
+    )]
+    pub fn get_custom_type(&self, type_name: &str) -> Option<&str> {
+        self.get_custom_type_display_by_name(type_name)
+    }
 }
 
 #[cfg(not(feature = "no_index"))]

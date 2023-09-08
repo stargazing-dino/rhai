@@ -486,7 +486,7 @@ impl Module {
     ///
     /// module.set_custom_type::<TestStruct>("MyType");
     ///
-    /// assert_eq!(module.get_custom_type(name), Some("MyType"));
+    /// assert_eq!(module.get_custom_type_display_by_name(name), Some("MyType"));
     /// ```
     #[inline(always)]
     pub fn set_custom_type<T>(&mut self, name: &str) -> &mut Self {
@@ -526,15 +526,15 @@ impl Module {
     ///
     /// module.set_custom_type_raw(name, "MyType");
     ///
-    /// assert_eq!(module.get_custom_type(name), Some("MyType"));
+    /// assert_eq!(module.get_custom_type_display_by_name(name), Some("MyType"));
     /// ```
     #[inline(always)]
     pub fn set_custom_type_raw(
         &mut self,
-        type_path: impl Into<Identifier>,
-        name: impl Into<Identifier>,
+        type_name: impl Into<Identifier>,
+        display_name: impl Into<Identifier>,
     ) -> &mut Self {
-        self.custom_types.add(type_path, name);
+        self.custom_types.add(type_name, display_name);
         self
     }
     /// Map a custom type to a friendly display name.
@@ -554,12 +554,12 @@ impl Module {
     #[inline(always)]
     pub fn set_custom_type_with_comments_raw<C: Into<SmartString>>(
         &mut self,
-        type_path: impl Into<Identifier>,
-        name: impl Into<Identifier>,
+        type_name: impl Into<Identifier>,
+        display_name: impl Into<Identifier>,
         comments: impl IntoIterator<Item = C>,
     ) -> &mut Self {
         self.custom_types
-            .add_with_comments(type_path, name, comments);
+            .add_with_comments(type_name, display_name, comments);
         self
     }
     /// Get the display name of a registered custom type.
@@ -577,12 +577,12 @@ impl Module {
     ///
     /// module.set_custom_type::<TestStruct>("MyType");
     ///
-    /// assert_eq!(module.get_custom_type(name), Some("MyType"));
+    /// assert_eq!(module.get_custom_type_display_by_name(name), Some("MyType"));
     /// ```
     #[inline]
     #[must_use]
-    pub fn get_custom_type(&self, key: &str) -> Option<&str> {
-        self.get_custom_type_raw(key)
+    pub fn get_custom_type_display_by_name(&self, type_name: &str) -> Option<&str> {
+        self.get_custom_type_by_name_raw(type_name)
             .map(|t| t.display_name.as_str())
     }
     /// Get the display name of a registered custom type.
@@ -600,18 +600,24 @@ impl Module {
     ///
     /// module.set_custom_type::<TestStruct>("MyType");
     ///
-    /// assert_eq!(module.get_custom_type_display_name::<TestStruct>(), Some("MyType"));
+    /// assert_eq!(module.get_custom_type_display::<TestStruct>(), Some("MyType"));
     /// ```
     #[inline(always)]
     #[must_use]
-    pub fn get_custom_type_display_name<T>(&self) -> Option<&str> {
-        self.get_custom_type(type_name::<T>())
+    pub fn get_custom_type_display<T>(&self) -> Option<&str> {
+        self.get_custom_type_display_by_name(type_name::<T>())
+    }
+    /// Get a registered custom type .
+    #[inline(always)]
+    #[must_use]
+    pub fn get_custom_type_raw<T>(&self) -> Option<&CustomTypeInfo> {
+        self.get_custom_type_by_name_raw(type_name::<T>())
     }
     /// Get a registered custom type by its type name.
     #[inline(always)]
     #[must_use]
-    pub fn get_custom_type_raw(&self, key: &str) -> Option<&CustomTypeInfo> {
-        self.custom_types.get(key)
+    pub fn get_custom_type_by_name_raw(&self, type_name: &str) -> Option<&CustomTypeInfo> {
+        self.custom_types.get(type_name)
     }
 
     /// Returns `true` if this [`Module`] contains no items.

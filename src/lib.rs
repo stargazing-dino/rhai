@@ -240,8 +240,8 @@ pub use rhai_codegen::*;
 #[cfg(not(feature = "no_time"))]
 pub use types::Instant;
 pub use types::{
-    Dynamic, EvalAltResult, FnPtr, ImmutableString, LexError, ParseError, ParseErrorType, Position,
-    Scope,
+    CustomTypeInfo, Dynamic, EvalAltResult, FnPtr, ImmutableString, LexError, ParseError,
+    ParseErrorType, Position, Scope,
 };
 
 /// _(debugging)_ Module containing types for debugging.

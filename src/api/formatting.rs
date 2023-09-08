@@ -203,13 +203,13 @@ impl Engine {
     pub fn map_type_name<'a>(&'a self, name: &'a str) -> &'a str {
         self.global_modules
             .iter()
-            .find_map(|m| m.get_custom_type(name))
+            .find_map(|m| m.get_custom_type_display_by_name(name))
             .or_else(|| {
                 #[cfg(not(feature = "no_module"))]
                 return self
                     .global_sub_modules
                     .values()
-                    .find_map(|m| m.get_custom_type(name));
+                    .find_map(|m| m.get_custom_type_display_by_name(name));
 
                 #[cfg(feature = "no_module")]
                 return None;
@@ -234,13 +234,13 @@ impl Engine {
 
         self.global_modules
             .iter()
-            .find_map(|m| m.get_custom_type(name))
+            .find_map(|m| m.get_custom_type_display_by_name(name))
             .or_else(|| {
                 #[cfg(not(feature = "no_module"))]
                 return self
                     .global_sub_modules
                     .values()
-                    .find_map(|m| m.get_custom_type(name));
+                    .find_map(|m| m.get_custom_type_display_by_name(name));
 
                 #[cfg(feature = "no_module")]
                 return None;

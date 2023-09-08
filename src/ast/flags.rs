@@ -53,6 +53,11 @@ bitflags! {
     }
 }
 
+impl ASTFlags {
+    /// No flags.
+    pub const NONE: Self = Self::empty();
+}
+
 impl std::fmt::Debug for ASTFlags {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", &self.0)

@@ -35,6 +35,7 @@ Deprecated API's
 ----------------
 
 * `ParseErrorType::MalformedCallExpr` and `ParseErrorType::MalformedInExpr` are deprecated and will be removed in the next major version.
+* `Module::get_custom_type` is deprecated in favor of `Module::get_custom_type_display_by_name` and other new methods.
 
 New features
 ------------
@@ -43,7 +44,7 @@ New features
 * Added `Engine::max_variables` and `Engine::set_max_variables` to limit the maximum number of variables allowed within a scope at any time. This is to guard against defining a huge number of variables containing large data just beyond individual data size limits. When `max_variables` is exceeded a new error, `ErrorTooManyVariables`, is returned.
 * Added `zip` function for arrays.
 * Added `on_print` and `on_debug` definitions for `TypeBuilder`.
-* Doc-comments are now included in custom type definitions within plugin modules. They can be accessed via `Module::get_custom_type_comments`. These doc-comments for custom types are also exported in JSON via `Engine::gen_fn_metadata_to_json`.
+* Doc-comments are now included in custom type definitions within plugin modules. They can be accessed via `Module::get_custom_type_raw`. These doc-comments for custom types are also exported in JSON via `Engine::gen_fn_metadata_to_json`.
 
 Enhancements
 ------------
