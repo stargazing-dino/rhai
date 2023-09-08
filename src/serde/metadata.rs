@@ -54,8 +54,8 @@ impl<'a> From<(&'a str, &'a CustomTypeInfo)> for CustomTypeMetadata<'a> {
     fn from(value: (&'a str, &'a CustomTypeInfo)) -> Self {
         Self {
             type_name: value.0,
-            display_name: value.1.display_name(),
-            doc_comments: value.1.iter_comments().collect(),
+            display_name: &value.1.display_name,
+            doc_comments: value.1.comments.iter().map(<_>::as_ref).collect(),
         }
     }
 }

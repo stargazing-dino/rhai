@@ -586,7 +586,7 @@ impl Module {
     #[must_use]
     pub fn get_custom_type_display_by_name(&self, type_name: &str) -> Option<&str> {
         self.get_custom_type_by_name_raw(type_name)
-            .map(CustomTypeInfo::display_name)
+            .map(|typ| typ.display_name.as_str())
     }
     /// Get the display name of a registered custom type.
     ///
@@ -610,16 +610,34 @@ impl Module {
     pub fn get_custom_type_display<T>(&self) -> Option<&str> {
         self.get_custom_type_display_by_name(type_name::<T>())
     }
-    /// Get a registered custom type .
+    /// _(internals)_ Get a registered custom type .
+    /// Exported under the `internals` feature only.
+    #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
     pub fn get_custom_type_raw<T>(&self) -> Option<&CustomTypeInfo> {
         self.get_custom_type_by_name_raw(type_name::<T>())
     }
-    /// Get a registered custom type by its type name.
+    /// Get a registered custom type .
+    #[cfg(not(feature = "internals"))]
+    #[inline(always)]
+    #[must_use]
+    pub fn get_custom_type_raw<T>(&self) -> Option<&CustomTypeInfo> {
+        self.get_custom_type_by_name_raw(type_name::<T>())
+    }
+    /// _(internals)_ Get a registered custom type by its type name.
+    /// Exported under the `internals` feature only.
+    #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
     pub fn get_custom_type_by_name_raw(&self, type_name: &str) -> Option<&CustomTypeInfo> {
+        self.custom_types.get(type_name)
+    }
+    /// Get a registered custom type by its type name.
+    #[cfg(not(feature = "internals"))]
+    #[inline(always)]
+    #[must_use]
+    fn get_custom_type_by_name_raw(&self, type_name: &str) -> Option<&CustomTypeInfo> {
         self.custom_types.get(type_name)
     }
 

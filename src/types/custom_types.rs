@@ -5,47 +5,27 @@ use crate::Identifier;
 use std::prelude::v1::*;
 use std::{any::type_name, collections::BTreeMap};
 
-/// Information for a registered custom type.
+/// _(internals)_ Information for a registered custom type.
+/// Exported under the `internals` feature only.
 #[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
 pub struct CustomTypeInfo {
     /// Rust name of the custom type.
-    type_name: Identifier,
+    pub type_name: Identifier,
     /// Friendly display name of the custom type.
-    display_name: Identifier,
+    pub display_name: Identifier,
     /// Comments.
+    ///
+    /// Block doc-comments are kept in separate strings.
+    ///
+    /// Line doc-comments are merged, with line-breaks, into a single string without a final
+    /// termination line-break.
+    ///
+    /// Leading white-spaces are stripped, each string always starting with the corresponding
+    /// doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments starts with `///`.
     #[cfg(feature = "metadata")]
-    comments: Box<[crate::SmartString]>,
-}
-
-impl CustomTypeInfo {
-    /// Rust name of the custom type.
-    #[inline(always)]
-    #[must_use]
-    pub fn type_name(&self) -> &str {
-        &self.type_name
-    }
-    /// Friendly display name of the custom type.
-    #[inline(always)]
-    #[must_use]
-    pub fn display_name(&self) -> &str {
-        &self.display_name
-    }
-    /// _(metadata)_ Iterate the doc-comments defined on the custom type.
-    /// Exported under the `metadata` feature only.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    #[must_use]
-    pub fn iter_comments(&self) -> impl Iterator<Item = &str> {
-        self.comments.iter().map(|s| s.as_str())
-    }
-    /// _(metadata)_ Doc-comments defined on the custom type.
-    /// Exported under the `metadata` feature only.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    #[must_use]
-    pub fn comments(&self) -> &[crate::SmartString] {
-        &self.comments
-    }
+    pub comments: Box<[crate::SmartString]>,
 }
 
 /// _(internals)_ A collection of custom types.

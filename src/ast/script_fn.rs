@@ -23,18 +23,17 @@ pub struct ScriptFnDef {
     pub this_type: Option<ImmutableString>,
     /// Names of function parameters.
     pub params: FnArgsVec<ImmutableString>,
-    /// _(metadata)_ Function doc-comments (if any).
-    /// Exported under the `metadata` feature only.
+    /// _(metadata)_ Function doc-comments (if any). Exported under the `metadata` feature only.
     ///
     /// Doc-comments are comment lines beginning with `///` or comment blocks beginning with `/**`,
     /// placed immediately before a function definition.
     ///
-    /// Block doc-comments are kept in a single string slice with line-breaks within.
+    /// Block doc-comments are kept in a single string with line-breaks within.
     ///
-    /// Line doc-comments are merged, with line-breaks, into a single string slice without a termination line-break.
+    /// Line doc-comments are merged, with line-breaks, into a single string without a termination line-break.
     ///
-    /// Leading white-spaces are stripped, and each string slice always starts with the
-    /// corresponding doc-comment leader: `///` or `/**`.
+    /// Leading white-spaces are stripped, and each string always starts with the corresponding
+    /// doc-comment leader: `///` or `/**`.
     ///
     /// Each line in non-block doc-comments starts with `///`.
     #[cfg(feature = "metadata")]

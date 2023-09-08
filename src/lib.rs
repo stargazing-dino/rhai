@@ -240,8 +240,8 @@ pub use rhai_codegen::*;
 #[cfg(not(feature = "no_time"))]
 pub use types::Instant;
 pub use types::{
-    CustomTypeInfo, Dynamic, EvalAltResult, FnPtr, ImmutableString, LexError, ParseError,
-    ParseErrorType, Position, Scope, VarDefInfo,
+    Dynamic, EvalAltResult, FnPtr, ImmutableString, LexError, ParseError, ParseErrorType, Position,
+    Scope, VarDefInfo,
 };
 
 /// _(debugging)_ Module containing types for debugging.
@@ -329,7 +329,7 @@ pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant}
 pub use types::FloatWrapper;
 
 #[cfg(feature = "internals")]
-pub use types::{Span, StringsInterner};
+pub use types::{CustomTypeInfo, Span, StringsInterner};
 
 #[cfg(feature = "internals")]
 pub use tokenizer::{
