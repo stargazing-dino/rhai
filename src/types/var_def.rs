@@ -4,7 +4,7 @@
 use std::prelude::v1::*;
 
 /// Information on a variable definition.
-#[derive(Debug, Hash)]
+#[derive(Debug, Clone, Hash)]
 pub struct VarDefInfo<'a> {
     /// Name of the variable to be defined.
     name: &'a str,

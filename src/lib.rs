@@ -54,7 +54,9 @@
 //!
 //! # Features
 //!
-#![cfg_attr(feature = "document-features", doc = document_features::document_features!(feature_label = "<span id=\"feature-{feature}\">**`{feature}`**</span>"))]
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!(
+    feature_label = "<span id=\"feature-{feature}\">**`{feature}`**</span>"
+))]
 //!
 //! # On-Line Documentation
 //!

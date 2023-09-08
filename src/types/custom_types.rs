@@ -7,7 +7,8 @@ use std::{any::type_name, collections::BTreeMap};
 
 /// _(internals)_ Information for a registered custom type.
 /// Exported under the `internals` feature only.
-#[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+#[non_exhaustive]
 pub struct CustomTypeInfo {
     /// Rust name of the custom type.
     pub type_name: Identifier,

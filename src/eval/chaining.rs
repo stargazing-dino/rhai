@@ -21,6 +21,7 @@ static INDEXER_HASHES: OnceCell<(u64, u64)> = OnceCell::new();
 #[must_use]
 fn hash_idx() -> (u64, u64) {
     *INDEXER_HASHES.get_or_init(|| {
+        #[allow(clippy::useless_conversion)]
         (
             calc_fn_hash(None, FN_IDX_GET, 2),
             calc_fn_hash(None, FN_IDX_SET, 3),

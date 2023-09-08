@@ -20,9 +20,9 @@ enum FnType {
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FnParam<'a> {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<&'a str>,
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
     pub typ: Option<Cow<'a, str>>,
 }
 
@@ -164,14 +164,14 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ModuleMetadata<'a> {
-    #[serde(skip_serializing_if = "str::is_empty")]
-    pub doc: &'a str,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub modules: BTreeMap<&'a str, Self>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub custom_types: Vec<CustomTypeMetadata<'a>>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub functions: Vec<FnMetadata<'a>>,
+    #[serde(default, skip_serializing_if = "str::is_empty")]
+    pub doc: &'a str,
 }
 
 impl ModuleMetadata<'_> {

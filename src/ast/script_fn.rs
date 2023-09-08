@@ -75,17 +75,30 @@ impl fmt::Display for ScriptFnDef {
 ///
 /// Created by [`AST::iter_functions`][super::AST::iter_functions].
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "camelCase")
+)]
 #[non_exhaustive]
 pub struct ScriptFnMetadata<'a> {
     /// Function name.
     pub name: &'a str,
     /// Function parameters (if any).
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub params: Vec<&'a str>,
     /// Function access mode.
     pub access: FnAccess,
-    #[cfg(not(feature = "no_object"))]
     /// Type of `this` pointer, if any.
     /// Not available under `no_object`.
+    #[cfg(not(feature = "no_object"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Option::is_none")
+    )]
     pub this_type: Option<&'a str>,
     /// _(metadata)_ Function doc-comments (if any).
     /// Exported under the `metadata` feature only.
@@ -102,6 +115,10 @@ pub struct ScriptFnMetadata<'a> {
     ///
     /// Each line in non-block doc-comments starts with `///`.
     #[cfg(feature = "metadata")]
+    #[cfg_attr(
+        feature = "serde",
+        serde(default, skip_serializing_if = "Vec::is_empty")
+    )]
     pub comments: Vec<&'a str>,
 }
 

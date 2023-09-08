@@ -98,7 +98,6 @@ impl Engine {
 ///
 /// To define a pretty-print name, call [`with_name`][`TypeBuilder::with_name`],
 /// to use [`Engine::register_type_with_name`] instead.
-#[must_use]
 pub struct TypeBuilder<'a, T: Variant + Clone> {
     engine: &'a mut Engine,
     name: Option<&'static str>,
