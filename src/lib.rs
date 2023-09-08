@@ -225,7 +225,7 @@ pub use api::custom_syntax::Expression;
 #[cfg(not(feature = "no_std"))]
 #[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
 pub use api::files::{eval_file, run_file};
-pub use api::{eval::eval, events::VarDefInfo, run::run};
+pub use api::{eval::eval, run::run};
 pub use ast::{FnAccess, AST};
 use defer::Deferred;
 pub use engine::{Engine, OP_CONTAINS, OP_EQUALS};
@@ -241,7 +241,7 @@ pub use rhai_codegen::*;
 pub use types::Instant;
 pub use types::{
     CustomTypeInfo, Dynamic, EvalAltResult, FnPtr, ImmutableString, LexError, ParseError,
-    ParseErrorType, Position, Scope,
+    ParseErrorType, Position, Scope, VarDefInfo,
 };
 
 /// _(debugging)_ Module containing types for debugging.

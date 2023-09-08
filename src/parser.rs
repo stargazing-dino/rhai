@@ -1,6 +1,5 @@
 //! Main module defining the lexer and parser.
 
-use crate::api::events::VarDefInfo;
 use crate::api::options::LangOptions;
 use crate::ast::{
     ASTFlags, BinaryExpr, CaseBlocksList, ConditionalExpr, Expr, FlowControl, FnCallExpr,
@@ -19,7 +18,7 @@ use crate::types::StringsInterner;
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
     Identifier, ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position,
-    Scope, Shared, SmartString, StaticVec, AST, PERR,
+    Scope, Shared, SmartString, StaticVec, VarDefInfo, AST, PERR,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -2917,12 +2916,7 @@ impl Engine {
 
             global.level = settings.level;
             let is_const = access == AccessMode::ReadOnly;
-            let info = VarDefInfo {
-                name: &name,
-                is_const,
-                nesting_level: settings.level,
-                will_shadow,
-            };
+            let info = VarDefInfo::new(&name, is_const, settings.level, will_shadow);
             let caches = &mut Caches::new();
             let context = EvalContext::new(self, global, caches, &mut state.stack, None);
 

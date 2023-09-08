@@ -1,7 +1,6 @@
 //! Module defining functions for evaluating a statement.
 
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
-use crate::api::events::VarDefInfo;
 use crate::ast::{
     ASTFlags, BinaryExpr, ConditionalExpr, Expr, FlowControl, OpAssignment, Stmt,
     SwitchCasesCollection,
@@ -9,7 +8,7 @@ use crate::ast::{
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::tokenizer::Token;
 use crate::types::dynamic::{AccessMode, Union};
-use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, ERR, INT};
+use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, VarDefInfo, ERR, INT};
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -407,12 +406,7 @@ impl Engine {
                 if let Some(ref filter) = self.def_var_filter {
                     let will_shadow = scope.contains(var_name);
                     let is_const = access == AccessMode::ReadOnly;
-                    let info = VarDefInfo {
-                        name: var_name,
-                        is_const,
-                        nesting_level: global.scope_level,
-                        will_shadow,
-                    };
+                    let info = VarDefInfo::new(var_name, is_const, global.scope_level, will_shadow);
                     let orig_scope_len = scope.len();
                     let context =
                         EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());

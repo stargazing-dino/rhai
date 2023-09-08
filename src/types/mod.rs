@@ -12,6 +12,7 @@ pub mod parse_error;
 pub mod position;
 pub mod position_none;
 pub mod scope;
+pub mod var_def;
 pub mod variant;
 
 pub use bloom_filter::BloomFilterU64;
@@ -26,6 +27,7 @@ pub use fn_ptr::FnPtr;
 pub use immutable_string::ImmutableString;
 pub use interner::StringsInterner;
 pub use parse_error::{LexError, ParseError, ParseErrorType};
+pub use var_def::VarDefInfo;
 
 #[cfg(not(feature = "no_position"))]
 pub use position::{Position, Span};

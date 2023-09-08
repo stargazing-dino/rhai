@@ -1,49 +1,9 @@
 //! Module that defines public event handlers for [`Engine`].
 
 use crate::func::SendSync;
-use crate::{Dynamic, Engine, EvalContext, Position, RhaiResultOf};
+use crate::{Dynamic, Engine, EvalContext, Position, RhaiResultOf, VarDefInfo};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-
-/// Information on a variable definition.
-#[derive(Debug, Hash)]
-pub struct VarDefInfo<'a> {
-    /// Name of the variable to be defined.
-    pub(crate) name: &'a str,
-    /// `true` if the statement is `const`, otherwise it is `let`.
-    pub(crate) is_const: bool,
-    /// The current nesting level, with zero being the global level.
-    pub(crate) nesting_level: usize,
-    /// Will the variable _shadow_ an existing variable?
-    pub(crate) will_shadow: bool,
-}
-
-impl<'a> VarDefInfo<'a> {
-    /// Name of the variable to be defined.
-    #[inline(always)]
-    #[must_use]
-    pub const fn name(&self) -> &str {
-        self.name
-    }
-    /// `true` if the statement is `const`, otherwise it is `let`.
-    #[inline(always)]
-    #[must_use]
-    pub const fn is_const(&self) -> bool {
-        self.is_const
-    }
-    /// The current nesting level, with zero being the global level.
-    #[inline(always)]
-    #[must_use]
-    pub const fn nesting_level(&self) -> usize {
-        self.nesting_level
-    }
-    /// Will the variable _shadow_ an existing variable?
-    #[inline(always)]
-    #[must_use]
-    pub const fn will_shadow_other_variables(&self) -> bool {
-        self.will_shadow
-    }
-}
 
 impl Engine {
     /// Provide a callback that will be invoked before each variable access.
