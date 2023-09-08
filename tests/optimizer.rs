@@ -67,25 +67,25 @@ fn test_optimizer_parse() {
 
     let ast = engine.compile("{ const DECISION = false; if DECISION { 42 } else { 123 } }").unwrap();
 
-    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: None, resolver: None, body: [Expr(123 @ 1:53)] }"#);
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Expr(123 @ 1:53)] }"#);
 
     let ast = engine.compile("const DECISION = false; if DECISION { 42 } else { 123 }").unwrap();
 
-    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: None, resolver: None, body: [Var(("DECISION" @ 1:7, false @ 1:18, None), CONSTANT, 1:1), Expr(123 @ 1:51)] }"#);
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Var(("DECISION" @ 1:7, false @ 1:18, None), CONSTANT, 1:1), Expr(123 @ 1:51)] }"#);
 
     let ast = engine.compile("if 1 == 2 { 42 }").unwrap();
 
-    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: None, resolver: None, body: [] }"#);
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [] }"#);
 
     engine.set_optimization_level(OptimizationLevel::Full);
 
     let ast = engine.compile("abs(-42)").unwrap();
 
-    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: None, resolver: None, body: [Expr(42 @ 1:1)] }"#);
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Expr(42 @ 1:1)] }"#);
 
     let ast = engine.compile("NUMBER").unwrap();
 
-    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: None, resolver: None, body: [Expr(Variable(NUMBER) @ 1:1)] }"#);
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Expr(Variable(NUMBER) @ 1:1)] }"#);
 
     let mut module = Module::new();
     module.set_var("NUMBER", 42 as INT);
@@ -94,7 +94,7 @@ fn test_optimizer_parse() {
 
     let ast = engine.compile("NUMBER").unwrap();
 
-    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: None, resolver: None, body: [Expr(42 @ 1:1)] }"#);
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Expr(42 @ 1:1)] }"#);
 }
 
 #[cfg(not(feature = "no_function"))]

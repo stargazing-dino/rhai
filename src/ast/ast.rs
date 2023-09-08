@@ -1,6 +1,6 @@
 //! Module defining the AST (abstract syntax tree).
 
-use super::{ASTFlags, Expr, FnAccess, Stmt, StmtBlock, StmtBlockContainer};
+use super::{ASTFlags, Expr, FnAccess, Stmt};
 use crate::{Dynamic, FnNamespace, ImmutableString, Position};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -8,6 +8,7 @@ use std::{
     borrow::Borrow,
     fmt,
     hash::Hash,
+    mem,
     ops::{Add, AddAssign},
     ptr,
 };
@@ -21,17 +22,17 @@ use std::{
 pub struct AST {
     /// Source of the [`AST`].
     source: Option<ImmutableString>,
-    /// [`AST`] documentation.
-    #[cfg(feature = "metadata")]
-    doc: Option<Box<crate::SmartString>>,
     /// Global statements.
-    body: Option<Box<StmtBlock>>,
+    body: Box<[Stmt]>,
     /// Script-defined functions.
     #[cfg(not(feature = "no_function"))]
     lib: crate::SharedModule,
     /// Embedded module resolver, if any.
     #[cfg(not(feature = "no_module"))]
     resolver: Option<crate::Shared<crate::module::resolvers::StaticModuleResolver>>,
+    /// [`AST`] documentation.
+    #[cfg(feature = "metadata")]
+    doc: crate::SmartString,
 }
 
 impl Default for AST {
@@ -54,19 +55,12 @@ impl fmt::Debug for AST {
         #[cfg(not(feature = "no_module"))]
         fp.field("resolver", &self.resolver);
 
-        fp.field(
-            "body",
-            &self
-                .body
-                .as_deref()
-                .map(|b| b.as_slice())
-                .unwrap_or_default(),
-        );
+        fp.field("body", &self.body);
 
         #[cfg(not(feature = "no_function"))]
         for (.., fn_def) in self.lib.iter_script_fn() {
             let sig = fn_def.to_string();
-            fp.field(&sig, &fn_def.body.as_slice());
+            fp.field(&sig, &fn_def.body.statements());
         }
 
         fp.finish()
@@ -82,13 +76,14 @@ impl AST {
         statements: impl IntoIterator<Item = Stmt>,
         #[cfg(not(feature = "no_function"))] functions: impl Into<crate::SharedModule>,
     ) -> Self {
-        let stmt = StmtBlock::new(statements, Position::NONE, Position::NONE);
-
         Self {
             source: None,
             #[cfg(feature = "metadata")]
-            doc: None,
-            body: (!stmt.is_empty()).then(|| stmt.into()),
+            doc: crate::SmartString::new_const(),
+            body: statements
+                .into_iter()
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             #[cfg(not(feature = "no_function"))]
             lib: functions.into(),
             #[cfg(not(feature = "no_module"))]
@@ -104,13 +99,14 @@ impl AST {
         statements: impl IntoIterator<Item = Stmt>,
         #[cfg(not(feature = "no_function"))] functions: impl Into<crate::SharedModule>,
     ) -> Self {
-        let stmt = StmtBlock::new(statements, Position::NONE, Position::NONE);
-
         Self {
             source: None,
             #[cfg(feature = "metadata")]
-            doc: None,
-            body: (!stmt.is_empty()).then(|| stmt.into()),
+            doc: crate::SmartString::new_const(),
+            body: statements
+                .into_iter()
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             #[cfg(not(feature = "no_function"))]
             lib: functions.into(),
             #[cfg(not(feature = "no_module"))]
@@ -159,8 +155,8 @@ impl AST {
         Self {
             source: None,
             #[cfg(feature = "metadata")]
-            doc: None,
-            body: None,
+            doc: crate::SmartString::new_const(),
+            body: <_>::default(),
             #[cfg(not(feature = "no_function"))]
             lib: crate::Module::new().into(),
             #[cfg(not(feature = "no_module"))]
@@ -209,65 +205,51 @@ impl AST {
     #[inline(always)]
     #[must_use]
     pub fn doc(&self) -> &str {
-        self.doc.as_ref().map(|s| s.as_str()).unwrap_or_default()
+        &self.doc
+    }
+    /// Get a mutable reference to the documentation.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    #[must_use]
+    #[allow(dead_code)]
+    pub(crate) fn doc_mut(&mut self) -> &mut crate::SmartString {
+        &mut self.doc
+    }
+    /// Set the documentation.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub(crate) fn set_doc(&mut self, doc: impl Into<crate::SmartString>) {
+        self.doc = doc.into();
     }
     /// Clear the documentation.
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[inline(always)]
     pub fn clear_doc(&mut self) -> &mut Self {
-        self.doc = None;
+        self.doc.clear();
         self
-    }
-    /// Get a mutable reference to the documentation.
-    ///
-    /// Only available under `metadata`.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    #[must_use]
-    #[allow(dead_code)]
-    pub(crate) fn doc_mut(&mut self) -> Option<&mut crate::SmartString> {
-        self.doc.as_deref_mut()
-    }
-    /// Set the documentation.
-    ///
-    /// Only available under `metadata`.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    pub(crate) fn set_doc(&mut self, doc: impl Into<crate::SmartString>) {
-        let doc = doc.into();
-        self.doc = (!doc.is_empty()).then(|| doc.into());
     }
     /// Get the statements.
     #[cfg(not(feature = "internals"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn statements(&self) -> &[Stmt] {
-        self.body
-            .as_deref()
-            .map(StmtBlock::statements)
-            .unwrap_or_default()
+    pub(crate) const fn statements(&self) -> &[Stmt] {
+        &self.body
     }
     /// _(internals)_ Get the statements.
     /// Exported under the `internals` feature only.
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub fn statements(&self) -> &[Stmt] {
-        self.body
-            .as_deref()
-            .map(StmtBlock::statements)
-            .unwrap_or_default()
+    pub const fn statements(&self) -> &[Stmt] {
+        &self.body
     }
     /// Extract the statements.
     #[allow(dead_code)]
     #[inline(always)]
     #[must_use]
-    pub(crate) fn take_statements(&mut self) -> StmtBlockContainer {
-        self.body
-            .as_deref_mut()
-            .map(StmtBlock::take_statements)
-            .unwrap_or_default()
+    pub(crate) fn take_statements(&mut self) -> Box<[Stmt]> {
+        mem::take(&mut self.body)
     }
     /// Does this [`AST`] contain script-defined functions?
     ///
@@ -361,7 +343,7 @@ impl AST {
             source: self.source.clone(),
             #[cfg(feature = "metadata")]
             doc: self.doc.clone(),
-            body: None,
+            body: <_>::default(),
             lib: lib.into(),
             #[cfg(not(feature = "no_module"))]
             resolver: self.resolver.clone(),
@@ -559,15 +541,15 @@ impl AST {
         other: &Self,
         _filter: impl Fn(FnNamespace, FnAccess, bool, &str, usize) -> bool,
     ) -> Self {
-        let merged = match (&self.body, &other.body) {
-            (Some(body), Some(other)) => {
-                let mut body = body.as_ref().clone();
+        let merged = match (self.body.as_ref(), other.body.as_ref()) {
+            ([], []) => <_>::default(),
+            (_, []) => self.body.to_vec(),
+            ([], _) => other.body.to_vec(),
+            (body, other) => {
+                let mut body = body.to_vec();
                 body.extend(other.iter().cloned());
                 body
             }
-            (Some(body), None) => body.as_ref().clone(),
-            (None, Some(body)) => body.as_ref().clone(),
-            (None, None) => StmtBlock::NONE,
         };
 
         #[cfg(not(feature = "no_function"))]
@@ -614,13 +596,13 @@ impl AST {
         }
 
         #[cfg(feature = "metadata")]
-        match (&other.doc, &mut _ast.doc) {
-            (Some(other_doc), Some(ast_doc)) => {
-                ast_doc.push('\n');
-                ast_doc.push_str(other_doc);
+        match (other.doc.as_str(), _ast.doc.as_str()) {
+            ("", _) => (),
+            (_, "") => _ast.doc = other.doc.clone(),
+            (_, _) => {
+                _ast.doc.push('\n');
+                _ast.doc.push_str(&other.doc);
             }
-            (Some(other_doc), None) => _ast.doc = Some(other_doc.clone()),
-            _ => (),
         }
 
         _ast
@@ -708,11 +690,15 @@ impl AST {
             }
         }
 
-        match (&mut self.body, other.body) {
-            (Some(body), Some(other)) => body.extend(other.into_iter()),
-            (Some(_), None) => (),
-            (None, body @ Some(_)) => self.body = body,
-            (None, None) => (),
+        match (self.body.as_ref(), other.body.as_ref()) {
+            (_, []) => (),
+            ([], _) => self.body = other.body,
+            (_, _) => {
+                let mut body = self.body.to_vec();
+                let other = other.body.to_vec();
+                body.extend(other);
+                self.body = body.into_boxed_slice();
+            }
         }
 
         #[cfg(not(feature = "no_function"))]
@@ -721,13 +707,13 @@ impl AST {
         }
 
         #[cfg(feature = "metadata")]
-        match (other.doc, &mut self.doc) {
-            (Some(ref other_doc), Some(self_doc)) => {
-                self_doc.push('\n');
-                self_doc.push_str(other_doc);
+        match (other.doc.as_str(), self.doc.as_str()) {
+            ("", _) => (),
+            (_, "") => self.doc = other.doc,
+            (_, _) => {
+                self.doc.push('\n');
+                self.doc.push_str(&other.doc);
             }
-            (Some(other_doc), None) => self.doc = Some(other_doc),
-            _ => (),
         }
 
         self
@@ -810,7 +796,7 @@ impl AST {
     /// Clear all statements in the [`AST`], leaving only function definitions.
     #[inline(always)]
     pub fn clear_statements(&mut self) -> &mut Self {
-        self.body = None;
+        self.body = <_>::default();
         self
     }
     /// Extract all top-level literal constant and/or variable definitions.

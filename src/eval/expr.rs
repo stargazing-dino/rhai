@@ -390,7 +390,9 @@ impl Engine {
                     .and_then(|r| self.check_data_size(r, expr.start_position()))
             }
 
-            Expr::Stmt(x) => self.eval_stmt_block(global, caches, scope, this_ptr, x, true),
+            Expr::Stmt(x) => {
+                self.eval_stmt_block(global, caches, scope, this_ptr, x.statements(), true)
+            }
 
             #[cfg(not(feature = "no_index"))]
             Expr::Index(..) => {

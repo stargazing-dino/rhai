@@ -175,7 +175,7 @@ impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
                 self.caches,
                 self.scope,
                 this_ptr,
-                stmts,
+                stmts.statements(),
                 rewind_scope,
             ),
             _ => self

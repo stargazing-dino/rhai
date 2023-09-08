@@ -53,7 +53,7 @@ impl Engine {
 
         let mut _new_ast = self.optimize_into_ast(
             Some(scope),
-            ast.take_statements(),
+            ast.take_statements().to_vec().into(),
             #[cfg(not(feature = "no_function"))]
             ast.shared_lib()
                 .iter_fn()
@@ -63,12 +63,7 @@ impl Engine {
         );
 
         #[cfg(feature = "metadata")]
-        match ast.doc_mut() {
-            Some(doc) => _new_ast.set_doc(std::mem::take(doc)),
-            None => {
-                _new_ast.clear_doc();
-            }
-        }
+        _new_ast.set_doc(std::mem::take(ast.doc_mut()));
 
         _new_ast
     }

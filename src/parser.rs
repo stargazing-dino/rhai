@@ -1301,8 +1301,8 @@ impl Engine {
 
                     cases
                         .entry(hash)
-                        .and_modify(|cases| cases.push(index))
-                        .or_insert_with(|| [index].into());
+                        .or_insert(CaseBlocksList::new_const())
+                        .push(index);
                 }
             }
 
