@@ -9,20 +9,20 @@ use std::{any::type_name, collections::BTreeMap};
 #[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
 pub struct CustomTypeInfo {
     /// Rust name of the custom type.
-    pub(crate) type_id: Identifier,
+    type_name: Identifier,
     /// Friendly display name of the custom type.
-    pub(crate) display_name: Identifier,
+    display_name: Identifier,
     /// Comments.
     #[cfg(feature = "metadata")]
-    pub(crate) comments: Box<[crate::SmartString]>,
+    comments: Box<[crate::SmartString]>,
 }
 
 impl CustomTypeInfo {
     /// Rust name of the custom type.
     #[inline(always)]
     #[must_use]
-    pub fn type_id(&self) -> &str {
-        &self.type_id
+    pub fn type_name(&self) -> &str {
+        &self.type_name
     }
     /// Friendly display name of the custom type.
     #[inline(always)]
@@ -76,7 +76,7 @@ impl CustomTypesCollection {
     pub fn add(&mut self, type_name: impl Into<Identifier>, name: impl Into<Identifier>) {
         let type_name = type_name.into();
         let custom_type = CustomTypeInfo {
-            type_id: type_name.clone(),
+            type_name: type_name.clone(),
             display_name: name.into(),
             #[cfg(feature = "metadata")]
             comments: <_>::default(),
@@ -95,7 +95,7 @@ impl CustomTypesCollection {
     ) {
         let type_name = type_name.into();
         let custom_type = CustomTypeInfo {
-            type_id: type_name.clone(),
+            type_name: type_name.clone(),
             display_name: name.into(),
             comments: comments.into_iter().map(Into::into).collect(),
         };
@@ -107,7 +107,7 @@ impl CustomTypesCollection {
         self.add_raw(
             type_name::<T>(),
             CustomTypeInfo {
-                type_id: type_name::<T>().into(),
+                type_name: type_name::<T>().into(),
                 display_name: name.into(),
                 #[cfg(feature = "metadata")]
                 comments: <_>::default(),
@@ -122,7 +122,7 @@ impl CustomTypesCollection {
         self.add_raw(
             type_name::<T>(),
             CustomTypeInfo {
-                type_id: type_name::<T>().into(),
+                type_name: type_name::<T>().into(),
                 display_name: name.into(),
                 #[cfg(feature = "metadata")]
                 comments: comments.iter().map(|&s| s.into()).collect(),

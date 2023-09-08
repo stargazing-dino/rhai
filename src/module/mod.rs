@@ -583,7 +583,7 @@ impl Module {
     #[must_use]
     pub fn get_custom_type_display_by_name(&self, type_name: &str) -> Option<&str> {
         self.get_custom_type_by_name_raw(type_name)
-            .map(|t| t.display_name.as_str())
+            .map(CustomTypeInfo::display_name)
     }
     /// Get the display name of a registered custom type.
     ///
