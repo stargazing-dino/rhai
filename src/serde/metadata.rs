@@ -5,19 +5,19 @@ use crate::api::formatting::format_type;
 use crate::module::{calc_native_fn_hash, FuncInfo, ModuleFlags};
 use crate::types::custom_types::CustomTypeInfo;
 use crate::{calc_fn_hash, Engine, FnAccess, SmartString, AST};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{borrow::Cow, cmp::Ordering, collections::BTreeMap};
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 enum FnType {
     Script,
     Native,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FnParam<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -26,7 +26,7 @@ struct FnParam<'a> {
     pub typ: Option<Cow<'a, str>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CustomTypeMetadata<'a> {
     pub type_name: &'a str,
@@ -60,7 +60,7 @@ impl<'a> From<(&'a str, &'a CustomTypeInfo)> for CustomTypeMetadata<'a> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FnMetadata<'a> {
     pub base_hash: u64,
@@ -79,9 +79,6 @@ struct FnMetadata<'a> {
     pub num_params: usize,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub params: Vec<FnParam<'a>>,
-    // No idea why the following is needed otherwise serde comes back with a lifetime error
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub _dummy: Option<&'a str>,
     #[serde(default, skip_serializing_if = "str::is_empty")]
     pub return_type: Cow<'a, str>,
     pub signature: SmartString,
@@ -143,7 +140,6 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
                     FnParam { name, typ }
                 })
                 .collect(),
-            _dummy: None,
             return_type: format_type(&info.metadata.return_type, true),
             signature: info.gen_signature().into(),
             doc_comments: if info.func.is_script() {
@@ -165,7 +161,7 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ModuleMetadata<'a> {
     #[serde(skip_serializing_if = "str::is_empty")]

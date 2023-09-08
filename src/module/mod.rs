@@ -34,8 +34,11 @@ const FN_MAP_SIZE: usize = 16;
 
 /// A type representing the namespace of a function.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[cfg_attr(feature = "metadata", derive(serde::Serialize))]
-#[cfg_attr(feature = "metadata", serde(rename_all = "camelCase"))]
+#[cfg_attr(
+    feature = "metadata",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "camelCase")
+)]
 #[non_exhaustive]
 pub enum FnNamespace {
     /// Module namespace only.
