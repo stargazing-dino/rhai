@@ -843,7 +843,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             let orig_len = x.len();
 
             if state.propagate_constants {
-                x.retain(|(v, _)| state.find_literal_constant(v).is_none());
+                x.retain(|(v, _)| state.find_literal_constant(v.as_str()).is_none());
 
                 if x.len() != orig_len {
                     state.set_dirty();

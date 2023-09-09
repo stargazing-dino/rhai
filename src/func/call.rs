@@ -734,8 +734,8 @@ impl Engine {
     ) -> RhaiResultOf<(Dynamic, bool)> {
         let (result, updated) = match fn_name {
             // Handle fn_ptr.call(...)
-            KEYWORD_FN_PTR_CALL if target.is_fnptr() => {
-                let fn_ptr = target.read_lock::<FnPtr>().expect("`FnPtr`");
+            KEYWORD_FN_PTR_CALL if target.as_ref().is_fnptr() => {
+                let fn_ptr = target.as_ref().read_lock::<FnPtr>().expect("`FnPtr`");
 
                 // Arguments are passed as-is, adding the curried arguments
                 let mut curry = fn_ptr.curry().iter().cloned().collect::<FnArgsVec<_>>();
@@ -784,8 +784,10 @@ impl Engine {
 
             // Handle obj.call()
             KEYWORD_FN_PTR_CALL if call_args.is_empty() => {
-                return Err(self
-                    .make_type_mismatch_err::<FnPtr>(self.map_type_name(target.type_name()), pos))
+                return Err(self.make_type_mismatch_err::<FnPtr>(
+                    self.map_type_name(target.as_ref().type_name()),
+                    pos,
+                ))
             }
 
             // Handle obj.call(fn_ptr, ...)
@@ -865,8 +867,9 @@ impl Engine {
 
             // Handle fn_ptr.curry(...)
             KEYWORD_FN_PTR_CURRY => {
-                let typ = target.type_name();
+                let typ = target.as_ref().type_name();
                 let mut fn_ptr = target
+                    .as_ref()
                     .read_lock::<FnPtr>()
                     .ok_or_else(|| {
                         self.make_type_mismatch_err::<FnPtr>(self.map_type_name(typ), pos)
@@ -895,7 +898,7 @@ impl Engine {
                 // Check if it is a map method call in OOP style
 
                 #[cfg(not(feature = "no_object"))]
-                if let Some(map) = target.read_lock::<crate::Map>() {
+                if let Some(map) = target.as_ref().read_lock::<crate::Map>() {
                     if let Some(val) = map.get(fn_name) {
                         if let Some(fn_ptr) = val.read_lock::<FnPtr>() {
                             // Remap the function name
@@ -1340,7 +1343,7 @@ impl Engine {
                 let mut target =
                     self.search_namespace(global, caches, scope, this_ptr, first_expr)?;
 
-                if target.is_read_only() {
+                if target.as_ref().is_read_only() {
                     target = target.into_owned();
                 }
 

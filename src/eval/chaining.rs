@@ -552,7 +552,7 @@ impl Engine {
             #[cfg(not(feature = "no_index"))]
             ChainType::Indexing => {
                 // Check for existence with the null conditional operator
-                if parent.options().contains(ASTFlags::NEGATED) && target.is_unit() {
+                if parent.options().contains(ASTFlags::NEGATED) && target.as_ref().is_unit() {
                     return Ok((Dynamic::UNIT, false));
                 }
 
@@ -571,6 +571,7 @@ impl Engine {
                         let idx_pos = x.lhs.start_position();
 
                         let (try_setter, result) = {
+                            let target = target.as_mut();
                             let mut obj = self.get_indexed_mut(
                                 global, caches, target, idx_val, idx_pos, op_pos, false, true,
                             )?;
@@ -591,6 +592,7 @@ impl Engine {
 
                         if let Some(mut new_val) = try_setter {
                             // Try to call index setter if value is changed
+                            let target = target.as_mut();
                             let idx = &mut idx_val_for_setter;
                             let new_val = &mut new_val;
                             // The return value of a indexer setter (usually `()`) is thrown away and not used.
@@ -611,6 +613,7 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, parent)?;
 
+                        let target = target.as_mut();
                         let idx_val = &mut idx_values.pop().unwrap();
                         let idx = &mut idx_val.clone();
 
@@ -667,6 +670,7 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, parent)?;
 
+                        let target = target.as_mut();
                         let idx_val = &mut idx_values.pop().unwrap();
 
                         self.get_indexed_mut(
@@ -680,11 +684,11 @@ impl Engine {
             #[cfg(not(feature = "no_object"))]
             ChainType::Dotting => {
                 // Check for existence with the Elvis operator
-                if parent.options().contains(ASTFlags::NEGATED) && target.is_unit() {
+                if parent.options().contains(ASTFlags::NEGATED) && target.as_ref().is_unit() {
                     return Ok((Dynamic::UNIT, false));
                 }
 
-                match (rhs, new_val, target.is_map()) {
+                match (rhs, new_val, target.as_ref().is_map()) {
                     // xxx.fn_name(...) = ???
                     (Expr::MethodCall(..), Some(..), ..) => {
                         unreachable!("method call cannot be assigned to")
@@ -723,6 +727,7 @@ impl Engine {
 
                         let index = &mut x.2.clone().into();
                         {
+                            let target = target.as_mut();
                             let val_target = &mut self.get_indexed_mut(
                                 global, caches, target, index, *pos, op_pos, true, false,
                             )?;
@@ -738,6 +743,7 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, scope, this_ptr, rhs)?;
 
+                        let target = target.as_mut();
                         let index = &mut x.2.clone().into();
                         let val = self.get_indexed_mut(
                             global, caches, target, index, *pos, op_pos, false, false,
@@ -761,6 +767,7 @@ impl Engine {
                                 .or_else(|err| match *err {
                                     // Try an indexer if property does not exist
                                     ERR::ErrorDotExpr(..) => {
+                                        let target = target.as_mut();
                                         let mut prop = name.into();
                                         self.call_indexer_get(
                                             global, caches, target, &mut prop, op_pos,
@@ -795,6 +802,7 @@ impl Engine {
                         .or_else(|err| match *err {
                             // Try an indexer if property does not exist
                             ERR::ErrorDotExpr(..) => {
+                                let target = target.as_mut();
                                 let idx = &mut name.into();
                                 let new_val = &mut new_val;
                                 self.call_indexer_set(
@@ -823,6 +831,7 @@ impl Engine {
                             |err| match *err {
                                 // Try an indexer if property does not exist
                                 ERR::ErrorDotExpr(..) => {
+                                    let target = target.as_mut();
                                     let mut prop = name.into();
                                     self.call_indexer_get(global, caches, target, &mut prop, op_pos)
                                         .map(|r| (r, false))
@@ -848,6 +857,7 @@ impl Engine {
                                 #[cfg(feature = "debugging")]
                                 self.run_debugger(global, caches, scope, _tp, _node)?;
 
+                                let target = target.as_mut();
                                 let index = &mut p.2.clone().into();
                                 self.get_indexed_mut(
                                     global, caches, target, index, pos, op_pos, false, true,
@@ -915,6 +925,7 @@ impl Engine {
                                     .or_else(|err| match *err {
                                         // Try an indexer if property does not exist
                                         ERR::ErrorDotExpr(..) => {
+                                            let target = target.as_mut();
                                             let mut prop = name.into();
                                             self.call_indexer_get(
                                                 global, caches, target, &mut prop, op_pos,
@@ -951,8 +962,9 @@ impl Engine {
                                         .or_else(|err| match *err {
                                             // Try an indexer if property does not exist
                                             ERR::ErrorDotExpr(..) => {
+                                                let target = target.as_mut();
                                                 let idx = &mut name.into();
-                                                let new_val = val;
+                                                let new_val = val.as_mut();
                                                 self.call_indexer_set(
                                                     global, caches, target, idx, new_val,
                                                     is_ref_mut, op_pos,

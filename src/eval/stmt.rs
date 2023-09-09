@@ -120,7 +120,7 @@ impl Engine {
         mut new_val: Dynamic,
     ) -> RhaiResultOf<()> {
         // Assignment to constant variable?
-        if target.is_read_only() {
+        if target.as_ref().is_read_only() {
             let name = root.get_variable_name(false).unwrap_or_default();
             let pos = root.start_position();
             return Err(ERR::ErrorAssignmentToConstant(name.to_string(), pos).into());
@@ -129,7 +129,7 @@ impl Engine {
         let pos = op_info.position();
 
         if let Some((hash_x, hash, op_x, op_x_str, op, op_str)) = op_info.get_op_assignment_info() {
-            let mut lock_guard = target.write_lock::<Dynamic>().unwrap();
+            let mut lock_guard = target.as_mut().write_lock::<Dynamic>().unwrap();
             let mut done = false;
 
             // Short-circuit built-in op-assignments if under Fast Operators mode
@@ -246,10 +246,10 @@ impl Engine {
             match target {
                 // Lock it again just in case it is shared
                 Target::RefMut(_) | Target::TempValue(_) => {
-                    *target.write_lock::<Dynamic>().unwrap() = new_val
+                    *target.as_mut().write_lock::<Dynamic>().unwrap() = new_val
                 }
                 #[allow(unreachable_patterns)]
-                _ => **target = new_val,
+                _ => *target.as_mut() = new_val,
             }
         }
 
@@ -388,8 +388,8 @@ impl Engine {
 
             // Variable definition
             Stmt::Var(x, options, pos) => {
-                if !self.allow_shadowing() && scope.contains(&x.0) {
-                    return Err(ERR::ErrorVariableExists(x.0.to_string(), *pos).into());
+                if !self.allow_shadowing() && scope.contains(x.0.as_str()) {
+                    return Err(ERR::ErrorVariableExists(x.0.as_str().to_string(), *pos).into());
                 }
 
                 // Let/const statement
@@ -404,9 +404,14 @@ impl Engine {
 
                 // Check variable definition filter
                 if let Some(ref filter) = self.def_var_filter {
-                    let will_shadow = scope.contains(var_name);
+                    let will_shadow = scope.contains(var_name.as_str());
                     let is_const = access == AccessMode::ReadOnly;
-                    let info = VarDefInfo::new(var_name, is_const, global.scope_level, will_shadow);
+                    let info = VarDefInfo::new(
+                        var_name.as_str(),
+                        is_const,
+                        global.scope_level,
+                        will_shadow,
+                    );
                     let orig_scope_len = scope.len();
                     let context =
                         EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());
@@ -418,7 +423,11 @@ impl Engine {
                     }
 
                     if !filter_result? {
-                        return Err(ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into());
+                        return Err(ERR::ErrorForbiddenVariable(
+                            var_name.as_str().to_string(),
+                            *pos,
+                        )
+                        .into());
                     }
                 }
 

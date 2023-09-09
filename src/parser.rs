@@ -670,9 +670,9 @@ impl Engine {
                         );
                     }
 
-                    _namespace.set_index(index);
+                    _namespace.index = index;
 
-                    calc_fn_hash(_namespace.iter().map(Ident::as_str), &id, 0)
+                    calc_fn_hash(_namespace.path.iter().map(Ident::as_str), &id, 0)
                 };
                 #[cfg(feature = "no_module")]
                 let hash = calc_fn_hash(None, &id, 0);
@@ -737,9 +737,9 @@ impl Engine {
                             );
                         }
 
-                        _namespace.set_index(index);
+                        _namespace.index = index;
 
-                        calc_fn_hash(_namespace.iter().map(Ident::as_str), &id, args.len())
+                        calc_fn_hash(_namespace.path.iter().map(Ident::as_str), &id, args.len())
                     };
                     #[cfg(feature = "no_module")]
                     let hash = calc_fn_hash(None, &id, args.len());
@@ -1045,7 +1045,7 @@ impl Engine {
                     return Err(PERR::PropertyExpected.into_err(pos))
                 }
                 (Token::Identifier(s) | Token::StringConstant(s), pos) => {
-                    if map.iter().any(|(p, ..)| **p == *s) {
+                    if map.iter().any(|(p, ..)| p.as_str() == s.as_str()) {
                         return Err(PERR::DuplicatedProperty(s.to_string()).into_err(pos));
                     }
                     (*s, pos)
@@ -1827,7 +1827,7 @@ impl Engine {
                     let (.., mut namespace, _, name) = *x;
                     let var_name_def = Ident { name, pos };
 
-                    namespace.push(var_name_def);
+                    namespace.path.push(var_name_def);
 
                     let var_name = state.get_interned_string(id2);
 
@@ -1902,7 +1902,7 @@ impl Engine {
         #[cfg(not(feature = "no_module"))]
         if let Some((.., namespace, hash, name)) = namespaced_variable {
             if !namespace.is_empty() {
-                *hash = crate::calc_var_hash(namespace.iter().map(Ident::as_str), name);
+                *hash = crate::calc_var_hash(namespace.path.iter().map(Ident::as_str), name);
 
                 #[cfg(not(feature = "no_module"))]
                 {
@@ -1925,7 +1925,7 @@ impl Engine {
                         );
                     }
 
-                    namespace.set_index(index);
+                    namespace.index = index;
                 }
             }
         }
