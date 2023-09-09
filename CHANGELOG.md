@@ -52,6 +52,7 @@ Enhancements
 * [`once_cell`](https://crates.io/crates/once_cell) is used in `std` environments instead of the home-brew `SusLock` which is removed.
 * Originally, unit tests use the `?` operator liberally to simplify code. However, this causes the loss of proper line numbers when a test fails, making it difficult to identify the exact location of the failure. This is now fixed by changing to `unwrap()`.
 * Many inlined collections are turned back into `Vec` because they are not transient and do not appear to improve performance.  Using `Vec` seems to be yield better performance as it probably enables more compiler optimizations.
+* General code clean-up to remove optimizations tricks that are not obviously beneficial in favor of clearer code.
 
 
 Version 1.15.1
