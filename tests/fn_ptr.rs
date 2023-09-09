@@ -141,9 +141,7 @@ fn test_fn_ptr_curry() {
 fn test_fn_ptr_call() {
     let engine = Engine::new();
 
-    let ast = engine
-        .compile("private fn foo(x, y) { len(x) + y }")
-        .unwrap();
+    let ast = engine.compile("private fn foo(x, y) { len(x) + y }").unwrap();
 
     let mut fn_ptr = FnPtr::new("foo").unwrap();
     fn_ptr.set_curry(vec!["abc".into()]);

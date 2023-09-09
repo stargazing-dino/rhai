@@ -4,7 +4,7 @@ use rhai::{Engine, INT};
 use rhai::FLOAT;
 
 #[cfg(not(feature = "no_float"))]
-const EPSILON: FLOAT = 0.000_001;
+const EPSILON: FLOAT = FLOAT::EPSILON;
 
 #[test]
 fn test_power_of() {
@@ -16,10 +16,7 @@ fn test_power_of() {
 
     #[cfg(not(feature = "no_float"))]
     {
-        assert!(
-            (engine.eval::<FLOAT>("2.2 ** 3.3").unwrap() - 13.489_468_760_533_386 as FLOAT).abs()
-                <= EPSILON
-        );
+        assert!((engine.eval::<FLOAT>("2.2 ** 3.3").unwrap() - (2.2 as FLOAT).powf(3.3)).abs() <= EPSILON);
         assert!((engine.eval::<FLOAT>("2.0**-2.0").unwrap() - 0.25 as FLOAT).abs() < EPSILON);
         assert!((engine.eval::<FLOAT>("(-2.0**-2.0)").unwrap() - 0.25 as FLOAT).abs() < EPSILON);
         assert!((engine.eval::<FLOAT>("(-2.0**-2)").unwrap() - 0.25 as FLOAT).abs() < EPSILON);
@@ -36,24 +33,10 @@ fn test_power_of_equals() {
 
     #[cfg(not(feature = "no_float"))]
     {
-        assert!(
-            (engine.eval::<FLOAT>("let x = 2.2; x **= 3.3; x").unwrap()
-                - 13.489_468_760_533_386 as FLOAT)
-                .abs()
-                <= EPSILON
-        );
-        assert!(
-            (engine.eval::<FLOAT>("let x = 2.0; x **= -2.0; x").unwrap() - 0.25 as FLOAT).abs()
-                < EPSILON
-        );
-        assert!(
-            (engine.eval::<FLOAT>("let x = -2.0; x **= -2.0; x").unwrap() - 0.25 as FLOAT).abs()
-                < EPSILON
-        );
-        assert!(
-            (engine.eval::<FLOAT>("let x = -2.0; x **= -2; x").unwrap() - 0.25 as FLOAT).abs()
-                < EPSILON
-        );
+        assert!((engine.eval::<FLOAT>("let x = 2.2; x **= 3.3; x").unwrap() - (2.2 as FLOAT).powf(3.3)).abs() <= EPSILON);
+        assert!((engine.eval::<FLOAT>("let x = 2.0; x **= -2.0; x").unwrap() - 0.25 as FLOAT).abs() < EPSILON);
+        assert!((engine.eval::<FLOAT>("let x = -2.0; x **= -2.0; x").unwrap() - 0.25 as FLOAT).abs() < EPSILON);
+        assert!((engine.eval::<FLOAT>("let x = -2.0; x **= -2; x").unwrap() - 0.25 as FLOAT).abs() < EPSILON);
         assert_eq!(engine.eval::<INT>("let x =4; x **= 3; x").unwrap(), 64);
     }
 }

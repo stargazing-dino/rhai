@@ -44,9 +44,7 @@ fn test_packages() {
 #[test]
 fn test_packages_with_script() {
     let mut engine = Engine::new();
-    let ast = engine
-        .compile("fn foo(x) { x + 1 }  fn bar(x) { foo(x) + 1 }")
-        .unwrap();
+    let ast = engine.compile("fn foo(x) { x + 1 }  fn bar(x) { foo(x) + 1 }").unwrap();
 
     let module = Module::eval_ast_as_new(Scope::new(), &ast, &engine).unwrap();
     engine.register_global_module(module.into());

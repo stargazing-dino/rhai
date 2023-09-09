@@ -7,18 +7,8 @@ fn test_map_indexing() {
 
     #[cfg(not(feature = "no_index"))]
     {
-        assert_eq!(
-            engine
-                .eval::<INT>(r#"let x = #{a: 1, b: 2, c: 3}; x["b"]"#)
-                .unwrap(),
-            2
-        );
-        assert_eq!(
-            engine
-                .eval::<INT>(r#"let x = #{a: 1, b: 2, c: 3,}; x["b"]"#)
-                .unwrap(),
-            2
-        );
+        assert_eq!(engine.eval::<INT>(r#"let x = #{a: 1, b: 2, c: 3}; x["b"]"#).unwrap(), 2);
+        assert_eq!(engine.eval::<INT>(r#"let x = #{a: 1, b: 2, c: 3,}; x["b"]"#).unwrap(), 2);
         assert_eq!(
             engine
                 .eval::<char>(
@@ -30,20 +20,10 @@ fn test_map_indexing() {
                 .unwrap(),
             'o'
         );
-        assert_eq!(
-            engine
-                .eval::<String>(r#"let a = [#{s:"hello"}]; a[0].s[2] = 'X'; a[0].s"#)
-                .unwrap(),
-            "heXlo"
-        );
+        assert_eq!(engine.eval::<String>(r#"let a = [#{s:"hello"}]; a[0].s[2] = 'X'; a[0].s"#).unwrap(), "heXlo");
     }
 
-    assert_eq!(
-        engine
-            .eval::<INT>("let y = #{a: 1, b: 2, c: 3}; y.a = 5; y.a")
-            .unwrap(),
-        5
-    );
+    assert_eq!(engine.eval::<INT>("let y = #{a: 1, b: 2, c: 3}; y.a = 5; y.a").unwrap(), 5);
 
     engine.run("let y = #{a: 1, b: 2, c: 3}; y.z").unwrap();
 
@@ -61,22 +41,11 @@ b`: 1};
         1
     );
 
-    assert!(matches!(
-        *engine
-            .eval::<INT>("let y = #{`a${1}`: 1}; y.a1")
-            .unwrap_err(),
-        EvalAltResult::ErrorParsing(ParseErrorType::PropertyExpected, ..)
-    ));
+    assert!(matches!(*engine.eval::<INT>("let y = #{`a${1}`: 1}; y.a1").unwrap_err(), EvalAltResult::ErrorParsing(ParseErrorType::PropertyExpected, ..)));
 
-    assert!(engine
-        .eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "c" in y"#)
-        .unwrap());
-    assert!(engine
-        .eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "b" in y"#)
-        .unwrap());
-    assert!(!engine
-        .eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "z" in y"#)
-        .unwrap());
+    assert!(engine.eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "c" in y"#).unwrap());
+    assert!(engine.eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "b" in y"#).unwrap());
+    assert!(!engine.eval::<bool>(r#"let y = #{a: 1, b: 2, c: 3}; "z" in y"#).unwrap());
 
     assert_eq!(
         engine
@@ -138,11 +107,10 @@ fn test_map_prop() {
 
     engine.set_fail_on_invalid_map_property(true);
 
-    assert!(
-        matches!(*engine.eval::<()>("let x = #{a: 42}; x.b").unwrap_err(),
-            EvalAltResult::ErrorPropertyNotFound(prop, _) if prop == "b"
-        )
-    );
+    assert!(matches!(
+        *engine.eval::<()>("let x = #{a: 42}; x.b").unwrap_err(),
+        EvalAltResult::ErrorPropertyNotFound(prop, _) if prop == "b"
+    ));
 }
 
 #[cfg(not(feature = "no_index"))]
@@ -152,55 +120,19 @@ fn test_map_index_types() {
 
     engine.compile(r#"#{a:1, b:2, c:3}["a"]['x']"#).unwrap();
 
-    assert!(matches!(
-        engine
-            .compile("#{a:1, b:2, c:3}['x']")
-            .unwrap_err()
-            .err_type(),
-        ParseErrorType::MalformedIndexExpr(..)
-    ));
-
-    assert!(matches!(
-        engine
-            .compile("#{a:1, b:2, c:3}[1]")
-            .unwrap_err()
-            .err_type(),
-        ParseErrorType::MalformedIndexExpr(..)
-    ));
-
+    assert!(matches!(engine.compile("#{a:1, b:2, c:3}['x']").unwrap_err().err_type(), ParseErrorType::MalformedIndexExpr(..)));
+    assert!(matches!(engine.compile("#{a:1, b:2, c:3}[1]").unwrap_err().err_type(), ParseErrorType::MalformedIndexExpr(..)));
     #[cfg(not(feature = "no_float"))]
-    assert!(matches!(
-        engine
-            .compile("#{a:1, b:2, c:3}[123.456]")
-            .unwrap_err()
-            .err_type(),
-        ParseErrorType::MalformedIndexExpr(..)
-    ));
-
-    assert!(matches!(
-        engine
-            .compile("#{a:1, b:2, c:3}[()]")
-            .unwrap_err()
-            .err_type(),
-        ParseErrorType::MalformedIndexExpr(..)
-    ));
-
-    assert!(matches!(
-        engine
-            .compile("#{a:1, b:2, c:3}[true && false]")
-            .unwrap_err()
-            .err_type(),
-        ParseErrorType::MalformedIndexExpr(..)
-    ));
+    assert!(matches!(engine.compile("#{a:1, b:2, c:3}[123.456]").unwrap_err().err_type(), ParseErrorType::MalformedIndexExpr(..)));
+    assert!(matches!(engine.compile("#{a:1, b:2, c:3}[()]").unwrap_err().err_type(), ParseErrorType::MalformedIndexExpr(..)));
+    assert!(matches!(engine.compile("#{a:1, b:2, c:3}[true && false]").unwrap_err().err_type(), ParseErrorType::MalformedIndexExpr(..)));
 }
 
 #[test]
 fn test_map_assign() {
     let engine = Engine::new();
 
-    let x = engine
-        .eval::<Map>(r#"let x = #{a: 1, b: true, "c$": "hello"}; x"#)
-        .unwrap();
+    let x = engine.eval::<Map>(r#"let x = #{a: 1, b: true, "c$": "hello"}; x"#).unwrap();
 
     assert_eq!(x["a"].as_int().unwrap(), 1);
     assert!(x["b"].as_bool().unwrap());
@@ -211,9 +143,7 @@ fn test_map_assign() {
 fn test_map_return() {
     let engine = Engine::new();
 
-    let x = engine
-        .eval::<Map>(r#"#{a: 1, b: true, "c$": "hello"}"#)
-        .unwrap();
+    let x = engine.eval::<Map>(r#"#{a: 1, b: true, "c$": "hello"}"#).unwrap();
 
     assert_eq!(x["a"].as_int().unwrap(), 1);
     assert!(x["b"].as_bool().unwrap());
@@ -290,35 +220,12 @@ fn test_map_json() {
 
     engine.parse_json(json, true).unwrap();
 
-    assert!(matches!(
-        *engine.parse_json("123", true).unwrap_err(),
-        EvalAltResult::ErrorMismatchOutputType(..)
-    ));
-
-    assert!(matches!(
-        *engine.parse_json("{a:42}", true).unwrap_err(),
-        EvalAltResult::ErrorParsing(..)
-    ));
-
-    assert!(matches!(
-        *engine.parse_json("#{a:123}", true).unwrap_err(),
-        EvalAltResult::ErrorParsing(..)
-    ));
-
-    assert!(matches!(
-        *engine.parse_json("{a:()}", true).unwrap_err(),
-        EvalAltResult::ErrorParsing(..)
-    ));
-
-    assert!(matches!(
-        *engine.parse_json("#{a:123+456}", true).unwrap_err(),
-        EvalAltResult::ErrorParsing(..)
-    ));
-
-    assert!(matches!(
-        *engine.parse_json("{a:`hello${world}`}", true).unwrap_err(),
-        EvalAltResult::ErrorParsing(..)
-    ));
+    assert!(matches!(*engine.parse_json("123", true).unwrap_err(), EvalAltResult::ErrorMismatchOutputType(..)));
+    assert!(matches!(*engine.parse_json("{a:42}", true).unwrap_err(), EvalAltResult::ErrorParsing(..)));
+    assert!(matches!(*engine.parse_json("#{a:123}", true).unwrap_err(), EvalAltResult::ErrorParsing(..)));
+    assert!(matches!(*engine.parse_json("{a:()}", true).unwrap_err(), EvalAltResult::ErrorParsing(..)));
+    assert!(matches!(*engine.parse_json("#{a:123+456}", true).unwrap_err(), EvalAltResult::ErrorParsing(..)));
+    assert!(matches!(*engine.parse_json("{a:`hello${world}`}", true).unwrap_err(), EvalAltResult::ErrorParsing(..)));
 }
 
 #[test]

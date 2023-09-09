@@ -148,20 +148,8 @@ fn test_eval_function() {
         84
     );
 
-    assert_eq!(
-        scope
-            .get_value::<INT>("x")
-            .expect("variable x should exist"),
-        10
-    );
-
-    assert_eq!(
-        scope
-            .get_value::<INT>("y")
-            .expect("variable y should exist"),
-        32
-    );
-
+    assert_eq!(scope.get_value::<INT>("x").expect("variable x should exist"), 10);
+    assert_eq!(scope.get_value::<INT>("y").expect("variable y should exist"), 32);
     assert!(scope.contains("script"));
     assert_eq!(scope.len(), 3);
 }
@@ -173,10 +161,7 @@ fn test_eval_disabled() {
     engine.disable_symbol("eval");
 
     assert!(matches!(
-        engine
-            .compile(r#"eval("40 + 2")"#)
-            .unwrap_err()
-            .err_type(),
+        engine.compile(r#"eval("40 + 2")"#).unwrap_err().err_type(),
         ParseErrorType::BadInput(LexError::ImproperSymbol(err, ..)) if err == "eval"
     ));
 }

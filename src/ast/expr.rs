@@ -391,7 +391,7 @@ impl fmt::Debug for Expr {
                 }
                 f.write_str(&x.3)?;
                 #[cfg(not(feature = "no_module"))]
-                if let Some(n) = x.1.index() {
+                if let Some(n) = x.1.index {
                     write!(f, " #{n}")?;
                 }
                 if let Some(n) = i.map_or_else(|| x.0, |n| NonZeroUsize::new(n.get() as usize)) {

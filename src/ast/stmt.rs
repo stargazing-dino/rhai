@@ -15,7 +15,7 @@ use std::{
     hash::{Hash, Hasher},
     mem,
     num::NonZeroUsize,
-    ops::{Deref, DerefMut, Range, RangeInclusive},
+    ops::{Range, RangeInclusive},
 };
 
 /// _(internals)_ An op-assignment operator.
@@ -365,7 +365,7 @@ impl RangeCase {
     }
 }
 
-pub type CaseBlocksList = smallvec::SmallVec<[usize; 1]>;
+pub type CaseBlocksList = smallvec::SmallVec<[usize; 2]>;
 
 /// _(internals)_ A type containing all cases for a `switch` statement.
 /// Exported under the `internals` feature only.
@@ -473,6 +473,12 @@ impl StmtBlock {
     pub fn statements(&self) -> &[Stmt] {
         &self.block
     }
+    /// Get the statements of this statements block.
+    #[inline(always)]
+    #[must_use]
+    pub fn statements_mut(&mut self) -> &mut StmtBlockContainer {
+        &mut self.block
+    }
     /// Extract the statements.
     #[inline(always)]
     #[must_use]
@@ -516,22 +522,6 @@ impl StmtBlock {
     #[inline(always)]
     pub fn set_position(&mut self, start_pos: Position, end_pos: Position) {
         self.span = Span::new(start_pos, end_pos);
-    }
-}
-
-impl Deref for StmtBlock {
-    type Target = StmtBlockContainer;
-
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.block
-    }
-}
-
-impl DerefMut for StmtBlock {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.block
     }
 }
 

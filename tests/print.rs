@@ -12,24 +12,9 @@ fn test_to_string() {
     scope.push("y", 42_i32);
     scope.push("z", 42_i16);
 
-    assert_eq!(
-        engine
-            .eval_with_scope::<String>(&mut scope, "to_string(x)")
-            .unwrap(),
-        "42"
-    );
-    assert_eq!(
-        engine
-            .eval_with_scope::<String>(&mut scope, "to_string(x)")
-            .unwrap(),
-        "42"
-    );
-    assert_eq!(
-        engine
-            .eval_with_scope::<String>(&mut scope, "to_string(x)")
-            .unwrap(),
-        "42"
-    );
+    assert_eq!(engine.eval_with_scope::<String>(&mut scope, "to_string(x)").unwrap(), "42");
+    assert_eq!(engine.eval_with_scope::<String>(&mut scope, "to_string(x)").unwrap(), "42");
+    assert_eq!(engine.eval_with_scope::<String>(&mut scope, "to_string(x)").unwrap(), "42");
 }
 
 #[test]
@@ -42,14 +27,10 @@ fn test_print_debug() {
 
     let mut engine = Engine::new();
 
-    engine
-        .on_print(move |s| log1.write().unwrap().push(format!("entry: {s}")))
-        .on_debug(move |s, src, pos| {
-            let src = src.unwrap_or("unknown");
-            log2.write()
-                .unwrap()
-                .push(format!("DEBUG of {src} at {pos:?}: {s}"))
-        });
+    engine.on_print(move |s| log1.write().unwrap().push(format!("entry: {s}"))).on_debug(move |s, src, pos| {
+        let src = src.unwrap_or("unknown");
+        log2.write().unwrap().push(format!("DEBUG of {src} at {pos:?}: {s}"))
+    });
 
     // Evaluate script
     engine.run("print(40 + 2)").unwrap();
@@ -60,14 +41,7 @@ fn test_print_debug() {
     // 'logbook' captures all the 'print' and 'debug' output
     assert_eq!(logbook.read().unwrap().len(), 2);
     assert_eq!(logbook.read().unwrap()[0], "entry: 42");
-    assert_eq!(
-        logbook.read().unwrap()[1],
-        if cfg!(not(feature = "no_position")) {
-            r#"DEBUG of world at 1:19: "hello!""#
-        } else {
-            r#"DEBUG of world at none: "hello!""#
-        }
-    );
+    assert_eq!(logbook.read().unwrap()[1], if cfg!(not(feature = "no_position")) { r#"DEBUG of world at 1:19: "hello!""# } else { r#"DEBUG of world at none: "hello!""# });
 
     for entry in logbook.read().unwrap().iter() {
         println!("{entry}");

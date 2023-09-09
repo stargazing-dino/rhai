@@ -1,12 +1,9 @@
 //! Type to hold a mutable reference to the target of an evaluation.
 
 use crate::{Dynamic, Position, RhaiResultOf};
+use std::borrow::{Borrow, BorrowMut};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{
-    borrow::Borrow,
-    ops::{Deref, DerefMut},
-};
 
 /// Calculate an offset+len pair given an actual length of the underlying array.
 ///
@@ -381,11 +378,9 @@ impl<'a> From<&'a mut Dynamic> for Target<'a> {
     }
 }
 
-impl Deref for Target<'_> {
-    type Target = Dynamic;
-
+impl AsRef<Dynamic> for Target<'_> {
     #[inline]
-    fn deref(&self) -> &Dynamic {
+    fn as_ref(&self) -> &Dynamic {
         match self {
             Self::RefMut(r) => r,
             #[cfg(not(feature = "no_closure"))]
@@ -400,23 +395,16 @@ impl Deref for Target<'_> {
     }
 }
 
-impl AsRef<Dynamic> for Target<'_> {
-    #[inline(always)]
-    fn as_ref(&self) -> &Dynamic {
-        self
-    }
-}
-
 impl Borrow<Dynamic> for Target<'_> {
     #[inline(always)]
     fn borrow(&self) -> &Dynamic {
-        self
+        self.as_ref()
     }
 }
 
-impl DerefMut for Target<'_> {
+impl AsMut<Dynamic> for Target<'_> {
     #[inline]
-    fn deref_mut(&mut self) -> &mut Dynamic {
+    fn as_mut(&mut self) -> &mut Dynamic {
         match self {
             Self::RefMut(r) => r,
             #[cfg(not(feature = "no_closure"))]
@@ -431,10 +419,10 @@ impl DerefMut for Target<'_> {
     }
 }
 
-impl AsMut<Dynamic> for Target<'_> {
+impl BorrowMut<Dynamic> for Target<'_> {
     #[inline(always)]
-    fn as_mut(&mut self) -> &mut Dynamic {
-        self
+    fn borrow_mut(&mut self) -> &mut Dynamic {
+        self.as_mut()
     }
 }
 

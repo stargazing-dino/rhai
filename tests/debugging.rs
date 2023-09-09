@@ -11,10 +11,7 @@ use rhai::Map;
 fn test_debugging() {
     let mut engine = Engine::new();
 
-    engine.register_debugger(
-        |_, dbg| dbg,
-        |_, _, _, _, _| Ok(rhai::debugger::DebuggerCommand::Continue),
-    );
+    engine.register_debugger(|_, dbg| dbg, |_, _, _, _, _| Ok(rhai::debugger::DebuggerCommand::Continue));
 
     #[cfg(not(feature = "no_function"))]
     #[cfg(not(feature = "no_index"))]
@@ -58,18 +55,10 @@ fn test_debugger_state() {
         },
         |mut context, _, _, _, _| {
             // Print debugger state - which is an object map
-            println!(
-                "Current state = {}",
-                context.global_runtime_state().debugger().state()
-            );
+            println!("Current state = {}", context.global_runtime_state().debugger().state());
 
             // Modify state
-            let mut state = context
-                .global_runtime_state_mut()
-                .debugger_mut()
-                .state_mut()
-                .write_lock::<Map>()
-                .unwrap();
+            let mut state = context.global_runtime_state_mut().debugger_mut().state_mut().write_lock::<Map>().unwrap();
             let hello = state.get("hello").unwrap().as_int().unwrap();
             state.insert("hello".into(), (hello + 1).into());
             state.insert("foo".into(), true.into());

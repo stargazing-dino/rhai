@@ -23,22 +23,9 @@ fn test_optimizer() {
 #[test]
 fn test_optimizer_run() {
     fn run_test(engine: &mut Engine) {
-        assert_eq!(
-            engine.eval::<INT>("if true { 42 } else { 123 }").unwrap(),
-            42
-        );
-        assert_eq!(
-            engine
-                .eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")
-                .unwrap(),
-            42
-        );
-        assert_eq!(
-            engine
-                .eval::<INT>(r#"const abc = "hello"; if abc < "foo" { 42 } else { 123 }"#)
-                .unwrap(),
-            123
-        );
+        assert_eq!(engine.eval::<INT>("if true { 42 } else { 123 }").unwrap(), 42);
+        assert_eq!(engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }").unwrap(), 42);
+        assert_eq!(engine.eval::<INT>(r#"const abc = "hello"; if abc < "foo" { 42 } else { 123 }"#).unwrap(), 123);
     }
 
     let mut engine = Engine::new();
@@ -57,30 +44,15 @@ fn test_optimizer_run() {
 
     engine.set_optimization_level(OptimizationLevel::Simple);
 
-    assert_eq!(
-        engine
-            .eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")
-            .unwrap(),
-        42
-    );
+    assert_eq!(engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }").unwrap(), 42);
 
     engine.set_fast_operators(false);
 
-    assert_eq!(
-        engine
-            .eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")
-            .unwrap(),
-        123
-    );
+    assert_eq!(engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }").unwrap(), 123);
 
     engine.set_optimization_level(OptimizationLevel::Full);
 
-    assert_eq!(
-        engine
-            .eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }")
-            .unwrap(),
-        123
-    );
+    assert_eq!(engine.eval::<INT>("if 1 == 1 || 2 > 3 { 42 } else { 123 }").unwrap(), 123);
 }
 
 #[cfg(feature = "metadata")]
@@ -93,46 +65,27 @@ fn test_optimizer_parse() {
 
     engine.set_optimization_level(OptimizationLevel::Simple);
 
-    let ast = engine
-        .compile("{ const DECISION = false; if DECISION { 42 } else { 123 } }")
-        .unwrap();
+    let ast = engine.compile("{ const DECISION = false; if DECISION { 42 } else { 123 } }").unwrap();
 
-    assert_eq!(
-        format!("{ast:?}"),
-        r#"AST { source: None, doc: None, resolver: None, body: [Expr(123 @ 1:53)] }"#
-    );
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Expr(123 @ 1:53)] }"#);
 
-    let ast = engine
-        .compile("const DECISION = false; if DECISION { 42 } else { 123 }")
-        .unwrap();
+    let ast = engine.compile("const DECISION = false; if DECISION { 42 } else { 123 }").unwrap();
 
-    assert_eq!(
-        format!("{ast:?}"),
-        r#"AST { source: None, doc: None, resolver: None, body: [Var(("DECISION" @ 1:7, false @ 1:18, None), CONSTANT, 1:1), Expr(123 @ 1:51)] }"#
-    );
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Var(("DECISION" @ 1:7, false @ 1:18, None), CONSTANT, 1:1), Expr(123 @ 1:51)] }"#);
 
     let ast = engine.compile("if 1 == 2 { 42 }").unwrap();
 
-    assert_eq!(
-        format!("{ast:?}"),
-        r#"AST { source: None, doc: None, resolver: None, body: [] }"#
-    );
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [] }"#);
 
     engine.set_optimization_level(OptimizationLevel::Full);
 
     let ast = engine.compile("abs(-42)").unwrap();
 
-    assert_eq!(
-        format!("{ast:?}"),
-        r#"AST { source: None, doc: None, resolver: None, body: [Expr(42 @ 1:1)] }"#
-    );
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Expr(42 @ 1:1)] }"#);
 
     let ast = engine.compile("NUMBER").unwrap();
 
-    assert_eq!(
-        format!("{ast:?}"),
-        r#"AST { source: None, doc: None, resolver: None, body: [Expr(Variable(NUMBER) @ 1:1)] }"#
-    );
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Expr(Variable(NUMBER) @ 1:1)] }"#);
 
     let mut module = Module::new();
     module.set_var("NUMBER", 42 as INT);
@@ -141,10 +94,7 @@ fn test_optimizer_parse() {
 
     let ast = engine.compile("NUMBER").unwrap();
 
-    assert_eq!(
-        format!("{ast:?}"),
-        r#"AST { source: None, doc: None, resolver: None, body: [Expr(42 @ 1:1)] }"#
-    );
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Expr(42 @ 1:1)] }"#);
 }
 
 #[cfg(not(feature = "no_function"))]
@@ -165,10 +115,7 @@ fn test_optimizer_scope() {
     scope.push("FOO", 123 as INT);
 
     assert_eq!(engine.eval_ast::<INT>(&ast).unwrap(), 42);
-    assert_eq!(
-        engine.eval_ast_with_scope::<INT>(&mut scope, &ast).unwrap(),
-        42
-    );
+    assert_eq!(engine.eval_ast_with_scope::<INT>(&mut scope, &ast).unwrap(), 42);
 
     let ast = engine.compile_with_scope(&scope, SCRIPT).unwrap();
 
@@ -226,9 +173,7 @@ fn test_optimizer_full() {
         .register_type_with_name::<TestStruct>("TestStruct")
         .register_fn("ts", |n: INT| TestStruct(n))
         .register_fn("value", |ts: &mut TestStruct| ts.0)
-        .register_fn("+", |ts1: &mut TestStruct, ts2: TestStruct| {
-            TestStruct(ts1.0 + ts2.0)
-        });
+        .register_fn("+", |ts1: &mut TestStruct, ts2: TestStruct| TestStruct(ts1.0 + ts2.0));
 
     let ast = engine
         .compile(
@@ -242,10 +187,7 @@ fn test_optimizer_full() {
     #[cfg(feature = "internals")]
     assert_eq!(ast.statements().len(), 2);
 
-    assert_eq!(
-        engine.eval_ast_with_scope::<INT>(&mut scope, &ast).unwrap(),
-        42
-    );
+    assert_eq!(engine.eval_ast_with_scope::<INT>(&mut scope, &ast).unwrap(), 42);
 
     assert_eq!(scope.len(), 1);
 

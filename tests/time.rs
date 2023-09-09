@@ -11,10 +11,7 @@ use rhai::INT;
 fn test_timestamp() {
     let engine = Engine::new();
 
-    assert_eq!(
-        engine.eval::<String>("type_of(timestamp())").unwrap(),
-        "timestamp"
-    );
+    assert_eq!(engine.eval::<String>("type_of(timestamp())").unwrap(), "timestamp");
 
     #[cfg(not(feature = "no_float"))]
     assert!(

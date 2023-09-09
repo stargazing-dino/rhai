@@ -1,7 +1,6 @@
 //! Module defining functions for evaluating a statement.
 
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
-use crate::api::events::VarDefInfo;
 use crate::ast::{
     ASTFlags, BinaryExpr, ConditionalExpr, Expr, FlowControl, OpAssignment, Stmt,
     SwitchCasesCollection,
@@ -9,7 +8,7 @@ use crate::ast::{
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::tokenizer::Token;
 use crate::types::dynamic::{AccessMode, Union};
-use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, ERR, INT};
+use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, VarDefInfo, ERR, INT};
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -121,7 +120,7 @@ impl Engine {
         mut new_val: Dynamic,
     ) -> RhaiResultOf<()> {
         // Assignment to constant variable?
-        if target.is_read_only() {
+        if target.as_ref().is_read_only() {
             let name = root.get_variable_name(false).unwrap_or_default();
             let pos = root.start_position();
             return Err(ERR::ErrorAssignmentToConstant(name.to_string(), pos).into());
@@ -130,7 +129,7 @@ impl Engine {
         let pos = op_info.position();
 
         if let Some((hash_x, hash, op_x, op_x_str, op, op_str)) = op_info.get_op_assignment_info() {
-            let mut lock_guard = target.write_lock::<Dynamic>().unwrap();
+            let mut lock_guard = target.as_mut().write_lock::<Dynamic>().unwrap();
             let mut done = false;
 
             // Short-circuit built-in op-assignments if under Fast Operators mode
@@ -247,10 +246,10 @@ impl Engine {
             match target {
                 // Lock it again just in case it is shared
                 Target::RefMut(_) | Target::TempValue(_) => {
-                    *target.write_lock::<Dynamic>().unwrap() = new_val
+                    *target.as_mut().write_lock::<Dynamic>().unwrap() = new_val
                 }
                 #[allow(unreachable_patterns)]
-                _ => **target = new_val,
+                _ => *target.as_mut() = new_val,
             }
         }
 
@@ -285,11 +284,11 @@ impl Engine {
                 .map(Dynamic::flatten),
 
             // Block scope
-            Stmt::Block(statements, ..) => {
-                if statements.is_empty() {
+            Stmt::Block(stmts, ..) => {
+                if stmts.is_empty() {
                     Ok(Dynamic::UNIT)
                 } else {
-                    self.eval_stmt_block(global, caches, scope, this_ptr, statements, true)
+                    self.eval_stmt_block(global, caches, scope, this_ptr, stmts.statements(), true)
                 }
             }
 
@@ -389,8 +388,8 @@ impl Engine {
 
             // Variable definition
             Stmt::Var(x, options, pos) => {
-                if !self.allow_shadowing() && scope.contains(&x.0) {
-                    return Err(ERR::ErrorVariableExists(x.0.to_string(), *pos).into());
+                if !self.allow_shadowing() && scope.contains(x.0.as_str()) {
+                    return Err(ERR::ErrorVariableExists(x.0.as_str().to_string(), *pos).into());
                 }
 
                 // Let/const statement
@@ -405,14 +404,14 @@ impl Engine {
 
                 // Check variable definition filter
                 if let Some(ref filter) = self.def_var_filter {
-                    let will_shadow = scope.contains(var_name);
+                    let will_shadow = scope.contains(var_name.as_str());
                     let is_const = access == AccessMode::ReadOnly;
-                    let info = VarDefInfo {
-                        name: var_name,
+                    let info = VarDefInfo::new(
+                        var_name.as_str(),
                         is_const,
-                        nesting_level: global.scope_level,
+                        global.scope_level,
                         will_shadow,
-                    };
+                    );
                     let orig_scope_len = scope.len();
                     let context =
                         EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());
@@ -424,7 +423,11 @@ impl Engine {
                     }
 
                     if !filter_result? {
-                        return Err(ERR::ErrorForbiddenVariable(var_name.to_string(), *pos).into());
+                        return Err(ERR::ErrorForbiddenVariable(
+                            var_name.as_str().to_string(),
+                            *pos,
+                        )
+                        .into());
                     }
                 }
 
@@ -487,21 +490,17 @@ impl Engine {
 
             // If statement
             Stmt::If(x, ..) => {
-                let FlowControl {
-                    expr,
-                    body: if_block,
-                    branch: else_block,
-                } = &**x;
+                let FlowControl { expr, body, branch } = &**x;
 
                 let guard_val = self
                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), expr)?
                     .as_bool()
                     .map_err(|typ| self.make_type_mismatch_err::<bool>(typ, expr.position()))?;
 
-                if guard_val && !if_block.is_empty() {
-                    self.eval_stmt_block(global, caches, scope, this_ptr, if_block, true)
-                } else if !guard_val && !else_block.is_empty() {
-                    self.eval_stmt_block(global, caches, scope, this_ptr, else_block, true)
+                if guard_val && !body.is_empty() {
+                    self.eval_stmt_block(global, caches, scope, this_ptr, body.statements(), true)
+                } else if !guard_val && !branch.is_empty() {
+                    self.eval_stmt_block(global, caches, scope, this_ptr, branch.statements(), true)
                 } else {
                     Ok(Dynamic::UNIT)
                 }
@@ -594,8 +593,9 @@ impl Engine {
 
                 loop {
                     let this_ptr = this_ptr.as_deref_mut();
+                    let statements = body.statements();
 
-                    match self.eval_stmt_block(global, caches, scope, this_ptr, body, true) {
+                    match self.eval_stmt_block(global, caches, scope, this_ptr, statements, true) {
                         Ok(..) => (),
                         Err(err) => match *err {
                             ERR::LoopBreak(false, ..) => (),
@@ -625,8 +625,9 @@ impl Engine {
                     }
 
                     let this_ptr = this_ptr.as_deref_mut();
+                    let statements = body.statements();
 
-                    match self.eval_stmt_block(global, caches, scope, this_ptr, body, true) {
+                    match self.eval_stmt_block(global, caches, scope, this_ptr, statements, true) {
                         Ok(..) => (),
                         Err(err) => match *err {
                             ERR::LoopBreak(false, ..) => (),
@@ -645,8 +646,11 @@ impl Engine {
                 loop {
                     if !body.is_empty() {
                         let this_ptr = this_ptr.as_deref_mut();
+                        let statements = body.statements();
 
-                        match self.eval_stmt_block(global, caches, scope, this_ptr, body, true) {
+                        match self
+                            .eval_stmt_block(global, caches, scope, this_ptr, statements, true)
+                        {
                             Ok(..) => (),
                             Err(err) => match *err {
                                 ERR::LoopBreak(false, ..) => continue,
@@ -755,8 +759,11 @@ impl Engine {
 
                         // Run block
                         let this_ptr = this_ptr.as_deref_mut();
+                        let statements = body.statements();
 
-                        match self.eval_stmt_block(global, caches, scope, this_ptr, body, true) {
+                        match self
+                            .eval_stmt_block(global, caches, scope, this_ptr, statements, true)
+                        {
                             Ok(_) => (),
                             Err(err) => match *err {
                                 ERR::LoopBreak(false, ..) => (),
@@ -788,9 +795,9 @@ impl Engine {
             // Try/Catch statement
             Stmt::TryCatch(x, ..) => {
                 let FlowControl {
-                    body: try_block,
+                    body,
                     expr: catch_var,
-                    branch: catch_block,
+                    branch,
                 } = &**x;
 
                 match self.eval_stmt_block(
@@ -798,7 +805,7 @@ impl Engine {
                     caches,
                     scope,
                     this_ptr.as_deref_mut(),
-                    try_block,
+                    body.statements(),
                     true,
                 ) {
                     r @ Ok(_) => r,
@@ -856,8 +863,9 @@ impl Engine {
                         }
 
                         let this_ptr = this_ptr.as_deref_mut();
+                        let statements = branch.statements();
 
-                        self.eval_stmt_block(global, caches, scope, this_ptr, catch_block, true)
+                        self.eval_stmt_block(global, caches, scope, this_ptr, statements, true)
                             .map(|_| Dynamic::UNIT)
                             .map_err(|result_err| match *result_err {
                                 // Re-throw exception

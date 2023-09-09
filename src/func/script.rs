@@ -122,7 +122,7 @@ impl Engine {
                 caches,
                 scope,
                 this_ptr.as_deref_mut(),
-                &fn_def.body,
+                fn_def.body.statements(),
                 rewind_scope,
             )
             .or_else(|err| match *err {

@@ -7,15 +7,9 @@ const EPSILON: FLOAT = 0.000_000_000_1;
 fn test_float() {
     let engine = Engine::new();
 
-    assert!(engine
-        .eval::<bool>("let x = 0.0; let y = 1.0; x < y")
-        .unwrap());
-    assert!(!engine
-        .eval::<bool>("let x = 0.0; let y = 1.0; x > y")
-        .unwrap());
-    assert!(!engine
-        .eval::<bool>("let x = 0.; let y = 1.; x > y")
-        .unwrap());
+    assert!(engine.eval::<bool>("let x = 0.0; let y = 1.0; x < y").unwrap());
+    assert!(!engine.eval::<bool>("let x = 0.0; let y = 1.0; x > y").unwrap());
+    assert!(!engine.eval::<bool>("let x = 0.; let y = 1.; x > y").unwrap());
     assert!((engine.eval::<FLOAT>("let x = 9.9999; x").unwrap() - 9.9999 as FLOAT).abs() < EPSILON);
 }
 
@@ -32,10 +26,7 @@ fn test_float_scientific() {
 fn test_float_parse() {
     let engine = Engine::new();
 
-    assert!(
-        (engine.eval::<FLOAT>(r#"parse_float("9.9999")"#).unwrap() - 9.9999 as FLOAT).abs()
-            < EPSILON
-    );
+    assert!((engine.eval::<FLOAT>(r#"parse_float("9.9999")"#).unwrap() - 9.9999 as FLOAT).abs() < EPSILON);
 }
 
 #[test]
@@ -72,34 +63,15 @@ fn test_struct_with_float() {
     engine.register_fn("update", TestStruct::update);
     engine.register_fn("new_ts", TestStruct::new);
 
-    assert!(
-        (engine
-            .eval::<FLOAT>("let ts = new_ts(); ts.update(); ts.x")
-            .unwrap()
-            - 6.789)
-            .abs()
-            < EPSILON
-    );
-    assert!(
-        (engine
-            .eval::<FLOAT>("let ts = new_ts(); ts.x = 10.1001; ts.x")
-            .unwrap()
-            - 10.1001)
-            .abs()
-            < EPSILON
-    );
+    assert!((engine.eval::<FLOAT>("let ts = new_ts(); ts.update(); ts.x").unwrap() - 6.789).abs() < EPSILON);
+    assert!((engine.eval::<FLOAT>("let ts = new_ts(); ts.x = 10.1001; ts.x").unwrap() - 10.1001).abs() < EPSILON);
 }
 
 #[test]
 fn test_float_func() {
     let mut engine = Engine::new();
 
-    engine.register_fn("sum", |x: FLOAT, y: FLOAT, z: FLOAT, w: FLOAT| {
-        x + y + z + w
-    });
+    engine.register_fn("sum", |x: FLOAT, y: FLOAT, z: FLOAT, w: FLOAT| x + y + z + w);
 
-    assert_eq!(
-        engine.eval::<FLOAT>("sum(1.0, 2.0, 3.0, 4.0)").unwrap(),
-        10.0
-    );
+    assert_eq!(engine.eval::<FLOAT>("sum(1.0, 2.0, 3.0, 4.0)").unwrap(), 10.0);
 }

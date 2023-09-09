@@ -54,7 +54,9 @@
 //!
 //! # Features
 //!
-#![cfg_attr(feature = "document-features", doc = document_features::document_features!(feature_label = "<span id=\"feature-{feature}\">**`{feature}`**</span>"))]
+#![cfg_attr(feature = "document-features", doc = document_features::document_features!(
+    feature_label = "<span id=\"feature-{feature}\">**`{feature}`**</span>"
+))]
 //!
 //! # On-Line Documentation
 //!
@@ -225,7 +227,7 @@ pub use api::custom_syntax::Expression;
 #[cfg(not(feature = "no_std"))]
 #[cfg(any(not(target_family = "wasm"), not(target_os = "unknown")))]
 pub use api::files::{eval_file, run_file};
-pub use api::{eval::eval, events::VarDefInfo, run::run};
+pub use api::{eval::eval, run::run};
 pub use ast::{FnAccess, AST};
 use defer::Deferred;
 pub use engine::{Engine, OP_CONTAINS, OP_EQUALS};
@@ -241,7 +243,7 @@ pub use rhai_codegen::*;
 pub use types::Instant;
 pub use types::{
     Dynamic, EvalAltResult, FnPtr, ImmutableString, LexError, ParseError, ParseErrorType, Position,
-    Scope,
+    Scope, VarDefInfo,
 };
 
 /// _(debugging)_ Module containing types for debugging.
@@ -329,7 +331,7 @@ pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant}
 pub use types::FloatWrapper;
 
 #[cfg(feature = "internals")]
-pub use types::{Span, StringsInterner};
+pub use types::{CustomTypeInfo, Span, StringsInterner};
 
 #[cfg(feature = "internals")]
 pub use tokenizer::{

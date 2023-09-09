@@ -3,12 +3,7 @@
 use crate::{ImmutableString, Position};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{
-    borrow::Borrow,
-    fmt,
-    hash::Hash,
-    ops::{Deref, DerefMut},
-};
+use std::{borrow::Borrow, fmt, hash::Hash};
 
 /// _(internals)_ An identifier containing a name and a [position][Position].
 /// Exported under the `internals` feature only.
@@ -45,27 +40,17 @@ impl AsRef<str> for Ident {
     }
 }
 
-impl Deref for Ident {
-    type Target = ImmutableString;
-
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.name
-    }
-}
-
-impl DerefMut for Ident {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.name
-    }
-}
-
 impl Ident {
     /// Get the name of the identifier as a string slice.
     #[inline(always)]
     #[must_use]
     pub fn as_str(&self) -> &str {
         self.name.as_str()
+    }
+    /// Is the identifier empty?
+    #[inline(always)]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.name.is_empty()
     }
 }

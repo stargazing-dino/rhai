@@ -6,8 +6,11 @@ use std::prelude::v1::*;
 
 /// A type representing the access mode of a function.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[cfg_attr(feature = "metadata", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "metadata", serde(rename_all = "camelCase"))]
+#[cfg_attr(
+    feature = "metadata",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "camelCase")
+)]
 #[non_exhaustive]
 pub enum FnAccess {
     /// Private function.
@@ -51,6 +54,11 @@ bitflags! {
         /// The [`AST`][crate::AST] node breaks out of normal control flow.
         const BREAK = 0b_0000_1000;
     }
+}
+
+impl ASTFlags {
+    /// No flags.
+    pub const NONE: Self = Self::empty();
 }
 
 impl std::fmt::Debug for ASTFlags {

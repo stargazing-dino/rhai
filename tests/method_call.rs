@@ -20,34 +20,17 @@ impl TestStruct {
 fn test_method_call() {
     let mut engine = Engine::new();
 
-    engine
-        .register_type::<TestStruct>()
-        .register_fn("update", TestStruct::update)
-        .register_fn("new_ts", TestStruct::new);
+    engine.register_type::<TestStruct>().register_fn("update", TestStruct::update).register_fn("new_ts", TestStruct::new);
 
-    assert_eq!(
-        engine
-            .eval::<TestStruct>("let x = new_ts(); x.update(1000); x")
-            .unwrap(),
-        TestStruct { x: 1001 }
-    );
-
-    assert_eq!(
-        engine
-            .eval::<TestStruct>("let x = new_ts(); update(x, 1000); x")
-            .unwrap(),
-        TestStruct { x: 1001 }
-    );
+    assert_eq!(engine.eval::<TestStruct>("let x = new_ts(); x.update(1000); x").unwrap(), TestStruct { x: 1001 });
+    assert_eq!(engine.eval::<TestStruct>("let x = new_ts(); update(x, 1000); x").unwrap(), TestStruct { x: 1001 });
 }
 
 #[test]
 fn test_method_call_style() {
     let engine = Engine::new();
 
-    assert_eq!(
-        engine.eval::<INT>("let x = -123; x.abs(); x").unwrap(),
-        -123
-    );
+    assert_eq!(engine.eval::<INT>("let x = -123; x.abs(); x").unwrap(), -123);
 }
 
 #[cfg(not(feature = "no_optimize"))]
@@ -60,9 +43,7 @@ fn test_method_call_with_full_optimization() {
     engine
         .register_fn("new_ts", TestStruct::new)
         .register_fn("ymd", |_: INT, _: INT, _: INT| 42 as INT)
-        .register_fn("range", |_: &mut TestStruct, _: INT, _: INT| {
-            TestStruct::new()
-        });
+        .register_fn("range", |_: &mut TestStruct, _: INT, _: INT| TestStruct::new());
 
     assert_eq!(
         engine

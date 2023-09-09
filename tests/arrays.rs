@@ -12,148 +12,33 @@ fn test_arrays() {
 
     assert_eq!(engine.eval::<INT>("let x = [1, 2, 3]; x[1]").unwrap(), 2);
     assert_eq!(engine.eval::<INT>("let x = [1, 2, 3,]; x[1]").unwrap(), 2);
-    assert_eq!(
-        engine
-            .eval::<INT>("let y = [1, 2, 3]; y[1] = 5; y[1]")
-            .unwrap(),
-        5
-    );
-    assert_eq!(
-        engine
-            .eval::<char>(r#"let y = [1, [ 42, 88, "93" ], 3]; y[1][2][1]"#)
-            .unwrap(),
-        '3'
-    );
+    assert_eq!(engine.eval::<INT>("let y = [1, 2, 3]; y[1] = 5; y[1]").unwrap(), 5);
+    assert_eq!(engine.eval::<char>(r#"let y = [1, [ 42, 88, "93" ], 3]; y[1][2][1]"#).unwrap(), '3');
     assert_eq!(engine.eval::<INT>("let y = [1, 2, 3]; y[0]").unwrap(), 1);
     assert_eq!(engine.eval::<INT>("let y = [1, 2, 3]; y[-1]").unwrap(), 3);
     assert_eq!(engine.eval::<INT>("let y = [1, 2, 3]; y[-3]").unwrap(), 1);
     assert!(engine.eval::<bool>("let y = [1, 2, 3]; 2 in y").unwrap());
     assert!(engine.eval::<bool>("let y = [1, 2, 3]; 42 !in y").unwrap());
-    assert_eq!(
-        engine
-            .eval::<INT>("let y = [1, 2, 3]; y += 4; y[3]")
-            .unwrap(),
-        4
-    );
-    assert_eq!(
-        engine
-            .eval::<INT>("let y = [1, 2, 3]; pad(y, 5, 42); len(y)")
-            .unwrap(),
-        5
-    );
-    assert_eq!(
-        engine
-            .eval::<INT>("let y = [1, 2, 3]; pad(y, 5, [42]); len(y)")
-            .unwrap(),
-        5
-    );
-    assert_eq!(
-        engine
-            .eval::<INT>("let y = [1, 2, 3]; pad(y, 5, [42, 999, 123]); y[4][0]")
-            .unwrap(),
-        42
-    );
-    assert_eq!(
-        engine
-            .eval::<Dynamic>("let y = [1, 2, 3]; y[1] += 4; y")
-            .unwrap()
-            .into_typed_array::<INT>()
-            .unwrap(),
-        [1, 6, 3]
-    );
-    assert_eq!(
-        engine
-            .eval::<Dynamic>("let y = [1, 2, 3]; extract(y, 1, 10)")
-            .unwrap()
-            .into_typed_array::<INT>()
-            .unwrap(),
-        vec![2, 3]
-    );
-    assert_eq!(
-        engine
-            .eval::<Dynamic>("let y = [1, 2, 3]; extract(y, -3, 1)")
-            .unwrap()
-            .into_typed_array::<INT>()
-            .unwrap(),
-        vec![1]
-    );
-    assert_eq!(
-        engine
-            .eval::<Dynamic>("let y = [1, 2, 3]; extract(y, -99, 2)")
-            .unwrap()
-            .into_typed_array::<INT>()
-            .unwrap(),
-        vec![1, 2]
-    );
-    assert_eq!(
-        engine
-            .eval::<Dynamic>("let y = [1, 2, 3]; extract(y, 99, 1)")
-            .unwrap()
-            .into_typed_array::<INT>()
-            .unwrap(),
-        vec![] as Vec<INT>
-    );
+    assert_eq!(engine.eval::<INT>("let y = [1, 2, 3]; y += 4; y[3]").unwrap(), 4);
+    assert_eq!(engine.eval::<INT>("let y = [1, 2, 3]; pad(y, 5, 42); len(y)").unwrap(), 5);
+    assert_eq!(engine.eval::<INT>("let y = [1, 2, 3]; pad(y, 5, [42]); len(y)").unwrap(), 5);
+    assert_eq!(engine.eval::<INT>("let y = [1, 2, 3]; pad(y, 5, [42, 999, 123]); y[4][0]").unwrap(), 42);
+    assert_eq!(engine.eval::<Dynamic>("let y = [1, 2, 3]; y[1] += 4; y").unwrap().into_typed_array::<INT>().unwrap(), [1, 6, 3]);
+    assert_eq!(engine.eval::<Dynamic>("let y = [1, 2, 3]; extract(y, 1, 10)").unwrap().into_typed_array::<INT>().unwrap(), vec![2, 3]);
+    assert_eq!(engine.eval::<Dynamic>("let y = [1, 2, 3]; extract(y, -3, 1)").unwrap().into_typed_array::<INT>().unwrap(), vec![1]);
+    assert_eq!(engine.eval::<Dynamic>("let y = [1, 2, 3]; extract(y, -99, 2)").unwrap().into_typed_array::<INT>().unwrap(), vec![1, 2]);
+    assert_eq!(engine.eval::<Dynamic>("let y = [1, 2, 3]; extract(y, 99, 1)").unwrap().into_typed_array::<INT>().unwrap(), vec![] as Vec<INT>);
 
     #[cfg(not(feature = "no_object"))]
     {
-        assert_eq!(
-            engine
-                .eval::<Dynamic>("let y = [1, 2, 3]; y.push(4); y")
-                .unwrap()
-                .into_typed_array::<INT>()
-                .unwrap(),
-            [1, 2, 3, 4]
-        );
-        assert_eq!(
-            engine
-                .eval::<Dynamic>("let y = [1, 2, 3]; y.insert(0, 4); y")
-                .unwrap()
-                .into_typed_array::<INT>()
-                .unwrap(),
-            [4, 1, 2, 3]
-        );
-        assert_eq!(
-            engine
-                .eval::<Dynamic>("let y = [1, 2, 3]; y.insert(999, 4); y")
-                .unwrap()
-                .into_typed_array::<INT>()
-                .unwrap(),
-            [1, 2, 3, 4]
-        );
-        assert_eq!(
-            engine
-                .eval::<Dynamic>("let y = [1, 2, 3]; y.insert(-2, 4); y")
-                .unwrap()
-                .into_typed_array::<INT>()
-                .unwrap(),
-            [1, 4, 2, 3]
-        );
-        assert_eq!(
-            engine
-                .eval::<Dynamic>("let y = [1, 2, 3]; y.insert(-999, 4); y")
-                .unwrap()
-                .into_typed_array::<INT>()
-                .unwrap(),
-            [4, 1, 2, 3]
-        );
-        assert_eq!(
-            engine
-                .eval::<INT>("let y = [1, 2, 3]; let z = [42]; y[z.len]")
-                .unwrap(),
-            2
-        );
-        assert_eq!(
-            engine
-                .eval::<INT>("let y = [1, 2, [3, 4, 5, 6]]; let z = [42]; y[2][z.len]")
-                .unwrap(),
-            4
-        );
-        assert_eq!(
-            engine
-                .eval::<INT>("let y = [1, 2, 3]; let z = [2]; y[z[0]]")
-                .unwrap(),
-            3
-        );
+        assert_eq!(engine.eval::<Dynamic>("let y = [1, 2, 3]; y.push(4); y").unwrap().into_typed_array::<INT>().unwrap(), [1, 2, 3, 4]);
+        assert_eq!(engine.eval::<Dynamic>("let y = [1, 2, 3]; y.insert(0, 4); y").unwrap().into_typed_array::<INT>().unwrap(), [4, 1, 2, 3]);
+        assert_eq!(engine.eval::<Dynamic>("let y = [1, 2, 3]; y.insert(999, 4); y").unwrap().into_typed_array::<INT>().unwrap(), [1, 2, 3, 4]);
+        assert_eq!(engine.eval::<Dynamic>("let y = [1, 2, 3]; y.insert(-2, 4); y").unwrap().into_typed_array::<INT>().unwrap(), [1, 4, 2, 3]);
+        assert_eq!(engine.eval::<Dynamic>("let y = [1, 2, 3]; y.insert(-999, 4); y").unwrap().into_typed_array::<INT>().unwrap(), [4, 1, 2, 3]);
+        assert_eq!(engine.eval::<INT>("let y = [1, 2, 3]; let z = [42]; y[z.len]").unwrap(), 2);
+        assert_eq!(engine.eval::<INT>("let y = [1, 2, [3, 4, 5, 6]]; let z = [42]; y[2][z.len]").unwrap(), 4);
+        assert_eq!(engine.eval::<INT>("let y = [1, 2, 3]; let z = [2]; y[z[0]]").unwrap(), 3);
 
         assert_eq!(
             engine
@@ -238,12 +123,7 @@ fn test_arrays() {
         )
         .unwrap());
 
-    let value = vec![
-        String::from("hello"),
-        String::from("world"),
-        String::from("foo"),
-        String::from("bar"),
-    ];
+    let value = vec![String::from("hello"), String::from("world"), String::from("foo"), String::from("bar")];
 
     let array: Dynamic = value.into();
 
@@ -277,37 +157,16 @@ fn test_array_index_types() {
 
     engine.compile("[1, 2, 3][0]['x']").unwrap();
 
-    assert!(matches!(
-        engine.compile("[1, 2, 3]['x']").unwrap_err().err_type(),
-        ParseErrorType::MalformedIndexExpr(..)
-    ));
+    assert!(matches!(engine.compile("[1, 2, 3]['x']").unwrap_err().err_type(), ParseErrorType::MalformedIndexExpr(..)));
 
     #[cfg(not(feature = "no_float"))]
-    assert!(matches!(
-        engine.compile("[1, 2, 3][123.456]").unwrap_err().err_type(),
-        ParseErrorType::MalformedIndexExpr(..)
-    ));
+    assert!(matches!(engine.compile("[1, 2, 3][123.456]").unwrap_err().err_type(), ParseErrorType::MalformedIndexExpr(..)));
 
-    assert!(matches!(
-        engine.compile("[1, 2, 3][()]").unwrap_err().err_type(),
-        ParseErrorType::MalformedIndexExpr(..)
-    ));
+    assert!(matches!(engine.compile("[1, 2, 3][()]").unwrap_err().err_type(), ParseErrorType::MalformedIndexExpr(..)));
 
-    assert!(matches!(
-        engine
-            .compile(r#"[1, 2, 3]["hello"]"#)
-            .unwrap_err()
-            .err_type(),
-        ParseErrorType::MalformedIndexExpr(..)
-    ));
+    assert!(matches!(engine.compile(r#"[1, 2, 3]["hello"]"#).unwrap_err().err_type(), ParseErrorType::MalformedIndexExpr(..)));
 
-    assert!(matches!(
-        engine
-            .compile("[1, 2, 3][true && false]")
-            .unwrap_err()
-            .err_type(),
-        ParseErrorType::MalformedIndexExpr(..)
-    ));
+    assert!(matches!(engine.compile("[1, 2, 3][true && false]").unwrap_err().err_type(), ParseErrorType::MalformedIndexExpr(..)));
 }
 
 #[test]
@@ -370,12 +229,7 @@ fn test_arrays_map_reduce() {
 
     assert_eq!(engine.eval::<INT>("[1].map(|x| x + 41)[0]").unwrap(), 42);
     assert_eq!(engine.eval::<INT>("[1].map(|| this + 41)[0]").unwrap(), 42);
-    assert_eq!(
-        engine
-            .eval::<INT>("let x = [1, 2, 3]; x.for_each(|| this += 41); x[0]")
-            .unwrap(),
-        42
-    );
+    assert_eq!(engine.eval::<INT>("let x = [1, 2, 3]; x.for_each(|| this += 41); x[0]").unwrap(), 42);
     assert_eq!(
         engine
             .eval::<INT>(
@@ -391,18 +245,8 @@ fn test_arrays_map_reduce() {
         12
     );
     assert_eq!(engine.eval::<INT>("([1].map(|x| x + 41))[0]").unwrap(), 42);
-    assert_eq!(
-        engine
-            .eval::<INT>("let c = 40; let y = 1; [1].map(|x, i| c + x + y + i)[0]")
-            .unwrap(),
-        42
-    );
-    assert_eq!(
-        engine
-            .eval::<INT>("let x = [1, 2, 3]; x.for_each(|i| this += i); x[2]")
-            .unwrap(),
-        5
-    );
+    assert_eq!(engine.eval::<INT>("let c = 40; let y = 1; [1].map(|x, i| c + x + y + i)[0]").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("let x = [1, 2, 3]; x.for_each(|i| this += i); x[2]").unwrap(), 5);
 
     assert_eq!(
         engine

@@ -16,18 +16,9 @@ fn test_tokens_disabled() {
 
     engine.disable_symbol("+="); // disable the '+=' operator
 
-    assert_eq!(
-        *engine
-            .compile("let x = 40 + 2; x += 1;")
-            .unwrap_err()
-            .err_type(),
-        ParseErrorType::UnknownOperator("+=".to_string())
-    );
+    assert_eq!(*engine.compile("let x = 40 + 2; x += 1;").unwrap_err().err_type(), ParseErrorType::UnknownOperator("+=".to_string()));
 
-    assert!(matches!(
-        engine.compile("let x = += 0;").unwrap_err().err_type(),
-        ParseErrorType::Reserved(err) if err == "+="
-    ));
+    assert!(matches!(engine.compile("let x = += 0;").unwrap_err().err_type(), ParseErrorType::Reserved(err) if err == "+="));
 }
 
 #[cfg(not(feature = "no_custom_syntax"))]
@@ -42,12 +33,7 @@ fn test_tokens_custom_operator_identifiers() {
     // Register a binary function named `foo`
     engine.register_fn("foo", |x: INT, y: INT| (x * y) - (x + y));
 
-    assert_eq!(
-        engine
-            .eval_expression::<INT>("1 + 2 * 3 foo 4 - 5 / 6")
-            .unwrap(),
-        15
-    );
+    assert_eq!(engine.eval_expression::<INT>("1 + 2 * 3 foo 4 - 5 / 6").unwrap(), 15);
 
     #[cfg(not(feature = "no_function"))]
     assert_eq!(
@@ -75,24 +61,14 @@ fn test_tokens_custom_operator_symbol() {
     // Register a binary function named `#`
     engine.register_fn("#", |x: INT, y: INT| (x * y) - (x + y));
 
-    assert_eq!(
-        engine
-            .eval_expression::<INT>("1 + 2 * 3 # 4 - 5 / 6")
-            .unwrap(),
-        15
-    );
+    assert_eq!(engine.eval_expression::<INT>("1 + 2 * 3 # 4 - 5 / 6").unwrap(), 15);
 
     // Register a custom operator named `=>`
     assert!(engine.register_custom_operator("=>", 160).is_err());
     engine.disable_symbol("=>");
     engine.register_custom_operator("=>", 160).unwrap();
     engine.register_fn("=>", |x: INT, y: INT| (x * y) - (x + y));
-    assert_eq!(
-        engine
-            .eval_expression::<INT>("1 + 2 * 3 => 4 - 5 / 6")
-            .unwrap(),
-        15
-    );
+    assert_eq!(engine.eval_expression::<INT>("1 + 2 * 3 => 4 - 5 / 6").unwrap(), 15);
 }
 
 #[test]

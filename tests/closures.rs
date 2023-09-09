@@ -12,14 +12,10 @@ use rhai::Map;
 fn test_fn_ptr_curry_call() {
     let mut engine = Engine::new();
 
-    engine.register_raw_fn(
-        "call_with_arg",
-        [TypeId::of::<FnPtr>(), TypeId::of::<INT>()],
-        |context, args| {
-            let fn_ptr = args[0].take().cast::<FnPtr>();
-            fn_ptr.call_raw(&context, None, [args[1].take()])
-        },
-    );
+    engine.register_raw_fn("call_with_arg", [TypeId::of::<FnPtr>(), TypeId::of::<INT>()], |context, args| {
+        let fn_ptr = args[0].take().cast::<FnPtr>();
+        fn_ptr.call_raw(&context, None, [args[1].take()])
+    });
 
     #[cfg(not(feature = "no_object"))]
     assert_eq!(
@@ -46,10 +42,7 @@ fn test_closures() {
 
     scope.push("x", 42 as INT);
 
-    assert!(matches!(
-        engine.compile_expression("|x| {}").unwrap_err().err_type(),
-        ParseErrorType::BadInput(..)
-    ));
+    assert!(matches!(engine.compile_expression("|x| {}").unwrap_err().err_type(), ParseErrorType::BadInput(..)));
 
     assert_eq!(
         engine
@@ -178,15 +171,11 @@ fn test_closures() {
         42
     );
 
-    engine.register_raw_fn(
-        "custom_call",
-        [TypeId::of::<INT>(), TypeId::of::<FnPtr>()],
-        |context, args| {
-            let func = take(args[1]).cast::<FnPtr>();
+    engine.register_raw_fn("custom_call", [TypeId::of::<INT>(), TypeId::of::<FnPtr>()], |context, args| {
+        let func = take(args[1]).cast::<FnPtr>();
 
-            func.call_raw(&context, None, [])
-        },
-    );
+        func.call_raw(&context, None, [])
+    });
 
     assert_eq!(
         engine
@@ -333,17 +322,9 @@ fn test_closures_shared_obj() {
     // Register API on TestStruct
     engine
         .register_type_with_name::<TestStruct>("TestStruct")
-        .register_get_set(
-            "data",
-            |p: &mut TestStruct| *p.borrow(),
-            |p: &mut TestStruct, value: INT| *p.borrow_mut() = value,
-        )
-        .register_fn("+=", |p1: &mut TestStruct, p2: TestStruct| {
-            *p1.borrow_mut() += *p2.borrow()
-        })
-        .register_fn("-=", |p1: &mut TestStruct, p2: TestStruct| {
-            *p1.borrow_mut() -= *p2.borrow()
-        });
+        .register_get_set("data", |p: &mut TestStruct| *p.borrow(), |p: &mut TestStruct, value: INT| *p.borrow_mut() = value)
+        .register_fn("+=", |p1: &mut TestStruct, p2: TestStruct| *p1.borrow_mut() += *p2.borrow())
+        .register_fn("-=", |p1: &mut TestStruct, p2: TestStruct| *p1.borrow_mut() -= *p2.borrow());
 
     let engine = engine; // Make engine immutable
 
@@ -418,9 +399,7 @@ fn test_closures_callback() {
     }
 
     fn phaser(callback: impl Fn(INT) -> Result<INT, Box<EvalAltResult>> + 'static) -> impl Node {
-        PhaserNode {
-            func: Box::new(callback),
-        }
+        PhaserNode { func: Box::new(callback) }
     }
 
     let mut engine = Engine::new();

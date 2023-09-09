@@ -1,6 +1,5 @@
 //! Main module defining the lexer and parser.
 
-use crate::api::events::VarDefInfo;
 use crate::api::options::LangOptions;
 use crate::ast::{
     ASTFlags, BinaryExpr, CaseBlocksList, ConditionalExpr, Expr, FlowControl, FnCallExpr,
@@ -19,7 +18,7 @@ use crate::types::StringsInterner;
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
     Identifier, ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position,
-    Scope, Shared, SmartString, StaticVec, AST, PERR,
+    Scope, Shared, SmartString, StaticVec, VarDefInfo, AST, PERR,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -671,9 +670,9 @@ impl Engine {
                         );
                     }
 
-                    _namespace.set_index(index);
+                    _namespace.index = index;
 
-                    calc_fn_hash(_namespace.iter().map(Ident::as_str), &id, 0)
+                    calc_fn_hash(_namespace.path.iter().map(Ident::as_str), &id, 0)
                 };
                 #[cfg(feature = "no_module")]
                 let hash = calc_fn_hash(None, &id, 0);
@@ -738,9 +737,9 @@ impl Engine {
                             );
                         }
 
-                        _namespace.set_index(index);
+                        _namespace.index = index;
 
-                        calc_fn_hash(_namespace.iter().map(Ident::as_str), &id, args.len())
+                        calc_fn_hash(_namespace.path.iter().map(Ident::as_str), &id, args.len())
                     };
                     #[cfg(feature = "no_module")]
                     let hash = calc_fn_hash(None, &id, args.len());
@@ -1046,7 +1045,7 @@ impl Engine {
                     return Err(PERR::PropertyExpected.into_err(pos))
                 }
                 (Token::Identifier(s) | Token::StringConstant(s), pos) => {
-                    if map.iter().any(|(p, ..)| **p == *s) {
+                    if map.iter().any(|(p, ..)| p.as_str() == s.as_str()) {
                         return Err(PERR::DuplicatedProperty(s.to_string()).into_err(pos));
                     }
                     (*s, pos)
@@ -1302,8 +1301,8 @@ impl Engine {
 
                     cases
                         .entry(hash)
-                        .and_modify(|cases| cases.push(index))
-                        .or_insert_with(|| [index].into());
+                        .or_insert(CaseBlocksList::new_const())
+                        .push(index);
                 }
             }
 
@@ -1828,7 +1827,7 @@ impl Engine {
                     let (.., mut namespace, _, name) = *x;
                     let var_name_def = Ident { name, pos };
 
-                    namespace.push(var_name_def);
+                    namespace.path.push(var_name_def);
 
                     let var_name = state.get_interned_string(id2);
 
@@ -1903,7 +1902,7 @@ impl Engine {
         #[cfg(not(feature = "no_module"))]
         if let Some((.., namespace, hash, name)) = namespaced_variable {
             if !namespace.is_empty() {
-                *hash = crate::calc_var_hash(namespace.iter().map(Ident::as_str), name);
+                *hash = crate::calc_var_hash(namespace.path.iter().map(Ident::as_str), name);
 
                 #[cfg(not(feature = "no_module"))]
                 {
@@ -1926,7 +1925,7 @@ impl Engine {
                         );
                     }
 
-                    namespace.set_index(index);
+                    namespace.index = index;
                 }
             }
         }
@@ -2917,12 +2916,7 @@ impl Engine {
 
             global.level = settings.level;
             let is_const = access == AccessMode::ReadOnly;
-            let info = VarDefInfo {
-                name: &name,
-                is_const,
-                nesting_level: settings.level,
-                will_shadow,
-            };
+            let info = VarDefInfo::new(&name, is_const, settings.level, will_shadow);
             let caches = &mut Caches::new();
             let context = EvalContext::new(self, global, caches, &mut state.stack, None);
 

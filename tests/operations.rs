@@ -17,10 +17,7 @@ fn test_max_operations() {
 
     engine.run("let x = 0; while x < 20 { x += 1; }").unwrap();
 
-    assert!(matches!(
-        *engine.run("for x in 0..500 {}").unwrap_err(),
-        EvalAltResult::ErrorTooManyOperations(..)
-    ));
+    assert!(matches!(*engine.run("for x in 0..500 {}").unwrap_err(), EvalAltResult::ErrorTooManyOperations(..)));
 
     engine.set_max_operations(0);
 
@@ -38,21 +35,13 @@ fn test_max_operations_literal() {
     engine.run("[1, 2, 3, 4, 5, 6, 7]").unwrap();
 
     #[cfg(not(feature = "no_index"))]
-    assert!(matches!(
-        *engine.run("[1, 2, 3, 4, 5, 6, 7, 8, 9]").unwrap_err(),
-        EvalAltResult::ErrorTooManyOperations(..)
-    ));
+    assert!(matches!(*engine.run("[1, 2, 3, 4, 5, 6, 7, 8, 9]").unwrap_err(), EvalAltResult::ErrorTooManyOperations(..)));
 
     #[cfg(not(feature = "no_object"))]
     engine.run("#{a:1, b:2, c:3, d:4, e:5, f:6, g:7}").unwrap();
 
     #[cfg(not(feature = "no_object"))]
-    assert!(matches!(
-        *engine
-            .run("#{a:1, b:2, c:3, d:4, e:5, f:6, g:7, h:8, i:9}")
-            .unwrap_err(),
-        EvalAltResult::ErrorTooManyOperations(..)
-    ));
+    assert!(matches!(*engine.run("#{a:1, b:2, c:3, d:4, e:5, f:6, g:7, h:8, i:9}").unwrap_err(), EvalAltResult::ErrorTooManyOperations(..)));
 }
 
 #[test]
@@ -145,18 +134,9 @@ fn test_max_operations_progress() {
     engine.set_optimization_level(rhai::OptimizationLevel::None);
     engine.set_max_operations(500);
 
-    engine.on_progress(|count| {
-        if count < 100 {
-            None
-        } else {
-            Some((42 as INT).into())
-        }
-    });
+    engine.on_progress(|count| if count < 100 { None } else { Some((42 as INT).into()) });
 
     assert!(matches!(
-        *engine
-            .run("for x in 0..500 {}")
-            .unwrap_err(),
-        EvalAltResult::ErrorTerminated(x, ..) if x.as_int().unwrap() == 42
-    ));
+        *engine.run("for x in 0..500 {}").unwrap_err(),
+        EvalAltResult::ErrorTerminated(x, ..) if x.as_int().unwrap() == 42));
 }

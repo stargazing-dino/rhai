@@ -7,12 +7,7 @@ fn test_ops() {
     assert_eq!(engine.eval::<INT>("60 + 5").unwrap(), 65);
     assert_eq!(engine.eval::<INT>("(1 + 2) * (6 - 4) / 2").unwrap(), 3);
     assert_eq!(engine.eval::<INT>("let x = 41; x = x + 1; x").unwrap(), 42);
-    assert_eq!(
-        engine
-            .eval::<String>(r#"let s = "hello"; s = s + 42; s"#)
-            .unwrap(),
-        "hello42"
-    );
+    assert_eq!(engine.eval::<String>(r#"let s = "hello"; s = s + 42; s"#).unwrap(), "hello42");
 }
 
 #[cfg(not(feature = "only_i32"))]
@@ -35,9 +30,7 @@ fn test_ops_other_number_types() {
         EvalAltResult::ErrorFunctionNotFound(f, ..) if f.starts_with("== (u16,")
     ));
 
-    assert!(!engine
-        .eval_with_scope::<bool>(&mut scope, r#"x == "hello""#)
-        .unwrap());
+    assert!(!engine.eval_with_scope::<bool>(&mut scope, r#"x == "hello""#).unwrap());
 }
 
 #[test]
@@ -54,12 +47,7 @@ fn test_ops_strings() {
 fn test_ops_precedence() {
     let engine = Engine::new();
 
-    assert_eq!(
-        engine
-            .eval::<INT>("let x = 0; if x == 10 || true { x = 1} x")
-            .unwrap(),
-        1
-    );
+    assert_eq!(engine.eval::<INT>("let x = 0; if x == 10 || true { x = 1} x").unwrap(), 1);
 }
 
 #[test]
@@ -78,15 +66,8 @@ fn test_ops_custom_types() {
         .register_fn("new_ts2", || Test2)
         .register_fn("==", |_: Test1, _: Test2| true);
 
-    assert!(engine
-        .eval::<bool>("let x = new_ts1(); let y = new_ts2(); x == y")
-        .unwrap());
-
-    assert!(engine
-        .eval::<bool>("let x = new_ts1(); let y = new_ts2(); x != y")
-        .unwrap());
-
+    assert!(engine.eval::<bool>("let x = new_ts1(); let y = new_ts2(); x == y").unwrap());
+    assert!(engine.eval::<bool>("let x = new_ts1(); let y = new_ts2(); x != y").unwrap());
     assert!(!engine.eval::<bool>("let x = new_ts1(); x == ()").unwrap());
-
     assert!(engine.eval::<bool>("let x = new_ts1(); x != ()").unwrap());
 }

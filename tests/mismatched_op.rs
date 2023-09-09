@@ -42,9 +42,7 @@ fn test_mismatched_op_custom_type() {
 
     let mut engine = Engine::new();
 
-    engine
-        .register_type_with_name::<TestStruct>("TestStruct")
-        .register_fn("new_ts", TestStruct::new);
+    engine.register_type_with_name::<TestStruct>("TestStruct").register_fn("new_ts", TestStruct::new);
 
     assert!(!engine.eval::<bool>("new_ts() == 42").unwrap());
 

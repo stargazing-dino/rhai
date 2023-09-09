@@ -14,7 +14,6 @@ use std::{any::type_name, mem};
 /// Options for calling a script-defined function via [`Engine::call_fn_with_options`].
 #[derive(Debug, Hash)]
 #[non_exhaustive]
-#[must_use]
 pub struct CallFnOptions<'t> {
     /// A value for binding to the `this` pointer (if any). Default [`None`].
     pub this_ptr: Option<&'t mut Dynamic>,
@@ -36,6 +35,7 @@ impl Default for CallFnOptions<'_> {
 impl<'a> CallFnOptions<'a> {
     /// Create a default [`CallFnOptions`].
     #[inline(always)]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             this_ptr: None,
@@ -46,24 +46,28 @@ impl<'a> CallFnOptions<'a> {
     }
     /// Bind to the `this` pointer.
     #[inline(always)]
+    #[must_use]
     pub fn bind_this_ptr(mut self, value: &'a mut Dynamic) -> Self {
         self.this_ptr = Some(value);
         self
     }
     /// Set the custom state of this evaluation run (if any).
     #[inline(always)]
+    #[must_use]
     pub fn with_tag(mut self, value: impl Variant + Clone) -> Self {
         self.tag = Some(Dynamic::from(value));
         self
     }
     /// Set whether to evaluate the [`AST`] to load necessary modules before calling the function.
     #[inline(always)]
+    #[must_use]
     pub const fn eval_ast(mut self, value: bool) -> Self {
         self.eval_ast = value;
         self
     }
     /// Set whether to rewind the [`Scope`] after the function call.
     #[inline(always)]
+    #[must_use]
     pub const fn rewind_scope(mut self, value: bool) -> Self {
         self.rewind_scope = value;
         self

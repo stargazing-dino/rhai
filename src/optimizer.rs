@@ -171,10 +171,11 @@ fn optimize_stmt_block(
         |s| matches!(s, Stmt::Block(block, ..) if !block.iter().any(Stmt::is_block_dependent)),
     ) {
         let (first, second) = statements.split_at_mut(n);
-        let stmt = second[0].take();
-        let mut stmts = match stmt {
-            Stmt::Block(block, ..) => block,
-            stmt => unreachable!("Stmt::Block expected but gets {:?}", stmt),
+        let mut stmt = second[0].take();
+        let stmts = if let Stmt::Block(ref mut block, ..) = stmt {
+            block.statements_mut()
+        } else {
+            unreachable!("Stmt::Block expected but gets {:?}", stmt)
         };
         statements = first
             .iter_mut()
@@ -471,10 +472,15 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         Stmt::If(x, ..) => {
             let FlowControl { expr, body, branch } = &mut **x;
             optimize_expr(expr, state, false);
-            let statements = body.take_statements();
-            **body = optimize_stmt_block(statements, state, preserve_result, true, false);
-            let statements = branch.take_statements();
-            **branch = optimize_stmt_block(statements, state, preserve_result, true, false);
+            *body.statements_mut() =
+                optimize_stmt_block(body.take_statements(), state, preserve_result, true, false);
+            *branch.statements_mut() = optimize_stmt_block(
+                branch.take_statements(),
+                state,
+                preserve_result,
+                true,
+                false,
+            );
         }
 
         // switch const { ... }
@@ -721,17 +727,20 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             if let Expr::BoolConstant(true, pos) = expr {
                 *expr = Expr::Unit(*pos);
             }
-            **body = optimize_stmt_block(body.take_statements(), state, false, true, false);
+            *body.statements_mut() =
+                optimize_stmt_block(body.take_statements(), state, false, true, false);
         }
         // do { block } while|until expr
         Stmt::Do(x, ..) => {
             optimize_expr(&mut x.expr, state, false);
-            *x.body = optimize_stmt_block(x.body.take_statements(), state, false, true, false);
+            *x.body.statements_mut() =
+                optimize_stmt_block(x.body.take_statements(), state, false, true, false);
         }
         // for id in expr { block }
         Stmt::For(x, ..) => {
             optimize_expr(&mut x.2.expr, state, false);
-            *x.2.body = optimize_stmt_block(x.2.body.take_statements(), state, false, true, false);
+            *x.2.body.statements_mut() =
+                optimize_stmt_block(x.2.body.take_statements(), state, false, true, false);
         }
         // let id = expr;
         Stmt::Var(x, options, ..) if !options.contains(ASTFlags::CONSTANT) => {
@@ -771,8 +780,10 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         }
         // try { try_block } catch ( var ) { catch_block }
         Stmt::TryCatch(x, ..) => {
-            *x.body = optimize_stmt_block(x.body.take_statements(), state, false, true, false);
-            *x.branch = optimize_stmt_block(x.branch.take_statements(), state, false, true, false);
+            *x.body.statements_mut() =
+                optimize_stmt_block(x.body.take_statements(), state, false, true, false);
+            *x.branch.statements_mut() =
+                optimize_stmt_block(x.branch.take_statements(), state, false, true, false);
         }
 
         // expr(stmt)
@@ -781,7 +792,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             match expr.as_mut() {
                 Expr::Stmt(block) if !block.is_empty() => {
                     let mut stmt_block = *mem::take(block);
-                    *stmt_block =
+                    *stmt_block.statements_mut() =
                         optimize_stmt_block(stmt_block.take_statements(), state, true, true, false);
                     *stmt = stmt_block.into();
                 }
@@ -832,7 +843,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             let orig_len = x.len();
 
             if state.propagate_constants {
-                x.retain(|(v, _)| state.find_literal_constant(v).is_none());
+                x.retain(|(v, _)| state.find_literal_constant(v.as_str()).is_none());
 
                 if x.len() != orig_len {
                     state.set_dirty();
@@ -869,10 +880,10 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         }
         // { stmt; ... } - do not count promotion as dirty because it gets turned back into an array
         Expr::Stmt(x) => {
-            ***x = optimize_stmt_block(x.take_statements(), state, true, true, false);
+            *x.statements_mut() = optimize_stmt_block(x.take_statements(), state, true, true, false);
 
             // { Stmt(Expr) } - promote
-            if let [ Stmt::Expr(e) ] = &mut ****x { state.set_dirty(); *expr = e.take(); }
+            if let [ Stmt::Expr(e) ] = x.statements_mut().as_mut() { state.set_dirty(); *expr = e.take(); }
         }
         // ()?.rhs
         #[cfg(not(feature = "no_object"))]
@@ -1366,10 +1377,14 @@ impl Engine {
 
                 for fn_def in functions {
                     let mut fn_def = crate::func::shared_take_or_clone(fn_def);
-                    // Optimize the function body
-                    let body = fn_def.body.take_statements();
 
-                    *fn_def.body = self.optimize_top_level(body, scope, lib2, optimization_level);
+                    // Optimize the function body
+                    *fn_def.body.statements_mut() = self.optimize_top_level(
+                        fn_def.body.take_statements(),
+                        scope,
+                        lib2,
+                        optimization_level,
+                    );
 
                     module.set_script_fn(fn_def);
                 }

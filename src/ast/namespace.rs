@@ -5,11 +5,7 @@ use crate::ast::Ident;
 use crate::{Position, StaticVec};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{
-    fmt,
-    num::NonZeroUsize,
-    ops::{Deref, DerefMut},
-};
+use std::{fmt, num::NonZeroUsize};
 
 /// _(internals)_ A chain of [module][crate::Module] names to namespace-qualify a variable or function call.
 /// Exported under the `internals` feature only.
@@ -22,9 +18,12 @@ use std::{
 /// A [`StaticVec`] is used because the vast majority of namespace-qualified access contains only
 /// one level, and it is wasteful to always allocate a [`Vec`] with one element.
 #[derive(Clone, Eq, PartialEq, Default, Hash)]
+#[non_exhaustive]
 pub struct Namespace {
-    path: StaticVec<Ident>,
-    index: Option<NonZeroUsize>,
+    /// Path segments.
+    pub path: StaticVec<Ident>,
+    /// Cached index into the current stack of imported [modules][crate::Module], if any.
+    pub index: Option<NonZeroUsize>,
 }
 
 impl fmt::Debug for Namespace {
@@ -67,22 +66,6 @@ impl fmt::Display for Namespace {
     }
 }
 
-impl Deref for Namespace {
-    type Target = StaticVec<Ident>;
-
-    #[inline(always)]
-    fn deref(&self) -> &Self::Target {
-        &self.path
-    }
-}
-
-impl DerefMut for Namespace {
-    #[inline(always)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.path
-    }
-}
-
 impl From<Vec<Ident>> for Namespace {
     #[inline]
     fn from(mut path: Vec<Ident>) -> Self {
@@ -108,26 +91,11 @@ impl Namespace {
         index: None,
         path: StaticVec::new_const(),
     };
-
-    /// Create a new [`Namespace`].
+    /// Is this [`Namespace`] empty?
     #[inline(always)]
     #[must_use]
-    pub fn new(root: impl Into<Ident>) -> Self {
-        let mut path = StaticVec::new_const();
-        path.push(root.into());
-
-        Self { index: None, path }
-    }
-    /// Get the [`Scope`][crate::Scope] index offset.
-    #[inline(always)]
-    #[must_use]
-    pub(crate) const fn index(&self) -> Option<NonZeroUsize> {
-        self.index
-    }
-    /// Set the [`Scope`][crate::Scope] index offset.
-    #[inline(always)]
-    pub(crate) fn set_index(&mut self, index: Option<NonZeroUsize>) {
-        self.index = index;
+    pub fn is_empty(&self) -> bool {
+        self.path.is_empty()
     }
     /// Get the [position][Position] of this [`Namespace`].
     ///

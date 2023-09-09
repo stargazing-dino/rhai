@@ -4,12 +4,7 @@ use rhai::{Engine, INT};
 fn test_comments() {
     let engine = Engine::new();
 
-    assert_eq!(
-        engine
-            .eval::<INT>("let x = 42; x // I am a single line comment, yay!")
-            .unwrap(),
-        42
-    );
+    assert_eq!(engine.eval::<INT>("let x = 42; x // I am a single line comment, yay!").unwrap(), 42);
 
     assert_eq!(
         engine
@@ -45,10 +40,7 @@ fn test_comments_doc() {
         )
         .unwrap();
 
-    assert_eq!(
-        ast.iter_functions().next().unwrap().comments[0],
-        "/// Hello world"
-    );
+    assert_eq!(ast.iter_functions().next().unwrap().comments[0], "/// Hello world");
 
     assert!(engine
         .compile(
@@ -84,15 +76,9 @@ fn test_comments_doc() {
         .unwrap();
 
     #[cfg(not(feature = "no_position"))]
-    assert_eq!(
-        ast.iter_functions().next().unwrap().comments[0],
-        "/** Hello world\n** how are you?\n**/"
-    );
+    assert_eq!(ast.iter_functions().next().unwrap().comments[0], "/** Hello world\n** how are you?\n**/");
     #[cfg(feature = "no_position")]
-    assert_eq!(
-        ast.iter_functions().next().unwrap().comments[0],
-        "/** Hello world\n                ** how are you?\n                **/",
-    );
+    assert_eq!(ast.iter_functions().next().unwrap().comments[0], "/** Hello world\n                ** how are you?\n                **/",);
 
     assert!(engine
         .compile(

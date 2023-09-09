@@ -5,13 +5,26 @@ use crate::Identifier;
 use std::prelude::v1::*;
 use std::{any::type_name, collections::BTreeMap};
 
-/// _(internals)_ Information for a custom type.
+/// _(internals)_ Information for a registered custom type.
 /// Exported under the `internals` feature only.
-#[derive(Debug, Eq, PartialEq, Clone, Hash, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+#[non_exhaustive]
 pub struct CustomTypeInfo {
+    /// Rust name of the custom type.
+    pub type_name: Identifier,
     /// Friendly display name of the custom type.
     pub display_name: Identifier,
     /// Comments.
+    ///
+    /// Block doc-comments are kept in separate strings.
+    ///
+    /// Line doc-comments are merged, with line-breaks, into a single string without a final
+    /// termination line-break.
+    ///
+    /// Leading white-spaces are stripped, each string always starting with the corresponding
+    /// doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments starts with `///`.
     #[cfg(feature = "metadata")]
     pub comments: Box<[crate::SmartString]>,
 }
@@ -42,14 +55,14 @@ impl CustomTypesCollection {
     /// Register a custom type.
     #[inline(always)]
     pub fn add(&mut self, type_name: impl Into<Identifier>, name: impl Into<Identifier>) {
-        self.add_raw(
-            type_name,
-            CustomTypeInfo {
-                display_name: name.into(),
-                #[cfg(feature = "metadata")]
-                comments: <_>::default(),
-            },
-        );
+        let type_name = type_name.into();
+        let custom_type = CustomTypeInfo {
+            type_name: type_name.clone(),
+            display_name: name.into(),
+            #[cfg(feature = "metadata")]
+            comments: <_>::default(),
+        };
+        self.add_raw(type_name, custom_type);
     }
     /// Register a custom type with doc-comments.
     /// Exported under the `metadata` feature only.
@@ -61,13 +74,13 @@ impl CustomTypesCollection {
         name: impl Into<Identifier>,
         comments: impl IntoIterator<Item = C>,
     ) {
-        self.add_raw(
-            type_name,
-            CustomTypeInfo {
-                display_name: name.into(),
-                comments: comments.into_iter().map(Into::into).collect(),
-            },
-        );
+        let type_name = type_name.into();
+        let custom_type = CustomTypeInfo {
+            type_name: type_name.clone(),
+            display_name: name.into(),
+            comments: comments.into_iter().map(Into::into).collect(),
+        };
+        self.add_raw(type_name, custom_type);
     }
     /// Register a custom type.
     #[inline(always)]
@@ -75,6 +88,7 @@ impl CustomTypesCollection {
         self.add_raw(
             type_name::<T>(),
             CustomTypeInfo {
+                type_name: type_name::<T>().into(),
                 display_name: name.into(),
                 #[cfg(feature = "metadata")]
                 comments: <_>::default(),
@@ -89,6 +103,7 @@ impl CustomTypesCollection {
         self.add_raw(
             type_name::<T>(),
             CustomTypeInfo {
+                type_name: type_name::<T>().into(),
                 display_name: name.into(),
                 #[cfg(feature = "metadata")]
                 comments: comments.iter().map(|&s| s.into()).collect(),

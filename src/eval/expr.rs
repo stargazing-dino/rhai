@@ -25,7 +25,7 @@ impl Engine {
 
         // Qualified - check if the root module is directly indexed
         if !global.always_search_scope {
-            if let Some(index) = namespace.index() {
+            if let Some(index) = namespace.index {
                 let offset = global.num_imports() - index.get();
 
                 if let m @ Some(_) = global.get_shared_import(offset) {
@@ -86,14 +86,14 @@ impl Engine {
 
                     // global::VARIABLE
                     #[cfg(not(feature = "no_function"))]
-                    if ns.len() == 1 && ns.root() == crate::engine::KEYWORD_GLOBAL {
+                    if ns.path.len() == 1 && ns.root() == crate::engine::KEYWORD_GLOBAL {
                         if let Some(ref constants) = global.constants {
                             if let Some(value) =
                                 crate::func::locked_write(constants).get_mut(var_name.as_str())
                             {
                                 let mut target: Target = value.clone().into();
                                 // Module variables are constant
-                                target.set_access_mode(AccessMode::ReadOnly);
+                                target.as_mut().set_access_mode(AccessMode::ReadOnly);
                                 return Ok(target);
                             }
                         }
@@ -390,7 +390,9 @@ impl Engine {
                     .and_then(|r| self.check_data_size(r, expr.start_position()))
             }
 
-            Expr::Stmt(x) => self.eval_stmt_block(global, caches, scope, this_ptr, x, true),
+            Expr::Stmt(x) => {
+                self.eval_stmt_block(global, caches, scope, this_ptr, x.statements(), true)
+            }
 
             #[cfg(not(feature = "no_index"))]
             Expr::Index(..) => {

@@ -7,14 +7,7 @@ fn test_number_literal() {
     assert_eq!(engine.eval::<INT>("42").unwrap(), 42);
 
     #[cfg(not(feature = "no_object"))]
-    assert_eq!(
-        engine.eval::<String>("42.type_of()").unwrap(),
-        if cfg!(feature = "only_i32") {
-            "i32"
-        } else {
-            "i64"
-        }
-    );
+    assert_eq!(engine.eval::<String>("42.type_of()").unwrap(), if cfg!(feature = "only_i32") { "i32" } else { "i64" });
 }
 
 #[test]
@@ -26,10 +19,7 @@ fn test_hex_literal() {
     assert_eq!(engine.eval::<INT>("let x = 0xff; x").unwrap(), 255);
 
     #[cfg(not(feature = "only_i32"))]
-    assert_eq!(
-        engine.eval::<INT>("let x = 0xffffffffffffffff; x").unwrap(),
-        -1
-    );
+    assert_eq!(engine.eval::<INT>("let x = 0xffffffffffffffff; x").unwrap(), -1);
     #[cfg(feature = "only_i32")]
     assert_eq!(engine.eval::<INT>("let x = 0xffffffff; x").unwrap(), -1);
 }
@@ -49,24 +39,10 @@ fn test_binary_literal() {
 
     assert_eq!(engine.eval::<INT>("let x = 0b1111; x").unwrap(), 15);
     assert_eq!(engine.eval::<INT>("let x = 0B1111; x").unwrap(), 15);
-    assert_eq!(
-        engine
-            .eval::<INT>("let x = 0b0011_1100_1010_0101; x")
-            .unwrap(),
-        15525
-    );
+    assert_eq!(engine.eval::<INT>("let x = 0b0011_1100_1010_0101; x").unwrap(), 15525);
+
     #[cfg(not(feature = "only_i32"))]
-    assert_eq!(
-        engine.eval::<INT>(
-            "let x = 0b11111111_11111111_11111111_11111111_11111111_11111111_11111111_11111111; x"
-        ).unwrap(),
-        -1
-    );
+    assert_eq!(engine.eval::<INT>("let x = 0b11111111_11111111_11111111_11111111_11111111_11111111_11111111_11111111; x").unwrap(), -1);
     #[cfg(feature = "only_i32")]
-    assert_eq!(
-        engine
-            .eval::<INT>("let x = 0b11111111_11111111_11111111_11111111; x")
-            .unwrap(),
-        -1
-    );
+    assert_eq!(engine.eval::<INT>("let x = 0b11111111_11111111_11111111_11111111; x").unwrap(), -1);
 }

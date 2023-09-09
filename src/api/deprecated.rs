@@ -25,7 +25,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`run_file`][Engine::run_file] instead.
+    /// This method is deprecated.
+    /// Use [`run_file`][Engine::run_file] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `run_file` instead")]
@@ -43,7 +44,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`run_file_with_scope`][Engine::run_file_with_scope] instead.
+    /// This method is deprecated.
+    /// Use [`run_file_with_scope`][Engine::run_file_with_scope] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `run_file_with_scope` instead")]
@@ -59,7 +61,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`run`][Engine::run] instead.
+    /// This method is deprecated.
+    /// Use [`run`][Engine::run] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `run` instead")]
@@ -73,7 +76,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`run_with_scope`][Engine::run_with_scope] instead.
+    /// This method is deprecated.
+    /// Use [`run_with_scope`][Engine::run_with_scope] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `run_with_scope` instead")]
@@ -87,7 +91,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`run_ast`][Engine::run_ast] instead.
+    /// This method is deprecated.
+    /// Use [`run_ast`][Engine::run_ast] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `run_ast` instead")]
@@ -101,7 +106,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`run_ast_with_scope`][Engine::run_ast_with_scope] instead.
+    /// This method is deprecated.
+    /// Use [`run_ast_with_scope`][Engine::run_ast_with_scope] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `run_ast_with_scope` instead")]
@@ -118,7 +124,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`call_fn_with_options`][Engine::call_fn_with_options] instead.
+    /// This method is deprecated.
+    /// Use [`call_fn_with_options`][Engine::call_fn_with_options] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `call_fn_with_options` instead")]
@@ -142,7 +149,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`call_fn_with_options`][Engine::call_fn_with_options] instead.
+    /// This method is deprecated.
+    /// Use [`call_fn_with_options`][Engine::call_fn_with_options] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.12.0", note = "use `call_fn_with_options` instead")]
@@ -181,7 +189,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`register_fn`][Engine::register_fn] instead.
+    /// This method is deprecated.
+    /// Use [`register_fn`][Engine::register_fn] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `register_fn` instead")]
@@ -201,7 +210,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`register_get`][Engine::register_get] instead.
+    /// This method is deprecated.
+    /// Use [`register_get`][Engine::register_get] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `register_get` instead")]
@@ -220,7 +230,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`register_set`][Engine::register_set] instead.
+    /// This method is deprecated.
+    /// Use [`register_set`][Engine::register_set] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `register_set` instead")]
@@ -241,7 +252,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`register_indexer_get`][Engine::register_indexer_get] instead.
+    /// This method is deprecated.
+    /// Use [`register_indexer_get`][Engine::register_indexer_get] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `register_indexer_get` instead")]
@@ -264,7 +276,8 @@ impl Engine {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`register_indexer_set`][Engine::register_indexer_set] instead.
+    /// This method is deprecated.
+    /// Use [`register_indexer_set`][Engine::register_indexer_set] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `register_indexer_set` instead")]
@@ -340,7 +353,8 @@ impl Dynamic {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`into_string`][Dynamic::into_string] instead.
+    /// This method is deprecated.
+    /// Use [`into_string`][Dynamic::into_string] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `into_string` instead")]
@@ -354,7 +368,8 @@ impl Dynamic {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`into_immutable_string`][Dynamic::into_immutable_string] instead.
+    /// This method is deprecated.
+    /// Use [`into_immutable_string`][Dynamic::into_immutable_string] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.1.0", note = "use `into_immutable_string` instead")]
@@ -389,7 +404,8 @@ impl NativeCallContext<'_> {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`call_fn_raw`][NativeCallContext::call_fn_raw] instead.
+    /// This method is deprecated.
+    /// Use [`call_fn_raw`][NativeCallContext::call_fn_raw] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.2.0", note = "use `call_fn_raw` instead")]
@@ -418,7 +434,8 @@ impl FnPtr {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`curry().len()`][`FnPtr::curry`] instead.
+    /// This method is deprecated.
+    /// Use [`curry().len()`][`FnPtr::curry`] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.8.0", note = "use `curry().len()` instead")]
@@ -436,8 +453,8 @@ impl FnPtr {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`call_within_context`][FnPtr::call_within_context] or
-    /// [`call_raw`][FnPtr::call_raw] instead.
+    /// This method is deprecated.
+    /// Use [`call_within_context`][FnPtr::call_within_context] or [`call_raw`][FnPtr::call_raw] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(
@@ -461,7 +478,8 @@ impl crate::Expression<'_> {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use [`get_string_value`][crate::Expression::get_string_value] instead.
+    /// This method is deprecated.
+    /// Use [`get_string_value`][crate::Expression::get_string_value] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.4.0", note = "use `get_string_value` instead")]
@@ -481,7 +499,8 @@ impl Position {
     ///
     /// # Deprecated
     ///
-    /// This function is deprecated. Use [`new`][Position::new] (which panics when `line` is zero) instead.
+    /// This function is deprecated.
+    /// Use [`new`][Position::new] (which panics when `line` is zero) instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.6.0", note = "use `new` instead")]
@@ -502,7 +521,8 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use `with_fn` instead.
+    /// This method is deprecated.
+    /// Use [`with_fn`][`TypeBuilder::with_fn`] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `with_fn` instead")]
@@ -528,7 +548,8 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use `with_get` instead.
+    /// This method is deprecated.
+    /// Use [`with_get`][`TypeBuilder::with_get`] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `with_get` instead")]
@@ -548,7 +569,8 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use `with_set` instead.
+    /// This method is deprecated.
+    /// Use [`with_set`][`TypeBuilder::with_set`] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `with_set` instead")]
@@ -570,7 +592,8 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use `with_indexer_get` instead.
+    /// This method is deprecated.
+    /// Use [`with_indexer_get`][`TypeBuilder::with_indexer_get`] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `with_indexer_get` instead")]
@@ -589,7 +612,8 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use `with_indexer_set` instead.
+    /// This method is deprecated.
+    /// Use [`with_indexer_set`][`TypeBuilder::with_indexer_set`] instead.
     ///
     /// This method will be removed in the next major version.
     #[deprecated(since = "1.9.1", note = "use `with_indexer_set` instead")]
@@ -608,7 +632,8 @@ impl Module {
     ///
     /// # Deprecated
     ///
-    /// This method is deprecated. Use `new` instead.
+    /// This method is deprecated.
+    /// Use [`new`][`Module::new`] instead.
     ///
     /// This method will be removed in the next major version.
     #[inline(always)]
@@ -616,6 +641,24 @@ impl Module {
     #[deprecated(since = "1.12.0", note = "use `new` instead")]
     pub const fn with_capacity(_capacity: usize) -> Self {
         Self::new()
+    }
+
+    /// Get the display name of a registered custom type.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated.
+    /// Use [`get_custom_type_display_by_name`][`Module::get_custom_type_display_by_name`] instead.
+    ///
+    /// This method will be removed in the next major version.
+    #[inline(always)]
+    #[must_use]
+    #[deprecated(
+        since = "1.16.0",
+        note = "use `get_custom_type_display_by_name` instead"
+    )]
+    pub fn get_custom_type(&self, type_name: &str) -> Option<&str> {
+        self.get_custom_type_display_by_name(type_name)
     }
 }
 

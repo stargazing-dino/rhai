@@ -10,15 +10,9 @@ fn test_chars() {
     assert_eq!(engine.eval::<char>(r"'\u2764'").unwrap(), '❤');
 
     #[cfg(not(feature = "no_index"))]
-    {
-        assert_eq!(engine.eval::<char>(r#"let x="hello"; x[2]"#).unwrap(), 'l');
-        assert_eq!(
-            engine
-                .eval::<String>(r#"let y="hello"; y[2]='$'; y"#)
-                .unwrap(),
-            "he$lo"
-        );
-    }
+    assert_eq!(engine.eval::<char>(r#"let x="hello"; x[2]"#).unwrap(), 'l');
+    #[cfg(not(feature = "no_index"))]
+    assert_eq!(engine.eval::<String>(r#"let y="hello"; y[2]='$'; y"#).unwrap(), "he$lo");
 
     assert!(engine.eval::<char>(r"'\uhello'").is_err());
     assert!(engine.eval::<char>("''").is_err());
