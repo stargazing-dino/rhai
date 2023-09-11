@@ -1,6 +1,12 @@
 Rhai Release Notes
 ==================
 
+Version 1.16.1
+==============
+
+Fixes compilation error when using the `serde` feature with `metadata`.
+
+
 Version 1.16.0
 ==============
 
