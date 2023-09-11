@@ -723,27 +723,6 @@ impl Default for Stmt {
     }
 }
 
-impl From<StmtBlock> for Stmt {
-    #[inline(always)]
-    fn from(block: StmtBlock) -> Self {
-        Self::Block(block.into())
-    }
-}
-
-impl<T: IntoIterator<Item = Self>> From<(T, Position, Position)> for Stmt {
-    #[inline(always)]
-    fn from(value: (T, Position, Position)) -> Self {
-        StmtBlock::new(value.0, value.1, value.2).into()
-    }
-}
-
-impl<T: IntoIterator<Item = Self>> From<(T, Span)> for Stmt {
-    #[inline(always)]
-    fn from(value: (T, Span)) -> Self {
-        StmtBlock::new_with_span(value.0, value.1).into()
-    }
-}
-
 impl Stmt {
     /// Is this statement [`Noop`][Stmt::Noop]?
     #[inline(always)]
