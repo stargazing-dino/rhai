@@ -13,8 +13,10 @@ use crate::tokenizer::{
     is_reserved_keyword_or_symbol, is_valid_function_name, is_valid_identifier, Token, TokenStream,
     TokenizerControl,
 };
-use crate::types::dynamic::{AccessMode, Union};
-use crate::types::StringsInterner;
+use crate::types::{
+    dynamic::{AccessMode, Union},
+    StringsInterner,
+};
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
     Identifier, ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position,
@@ -2072,10 +2074,10 @@ impl Engine {
 
         match lhs {
             // this = rhs
-            Expr::ThisPtr(_) => Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into())),
+            Expr::ThisPtr(_) => Ok(Stmt::Assignment((op_info, BinaryExpr { lhs, rhs }).into())),
             // var (non-indexed) = rhs
             Expr::Variable(ref x, None, _) if x.0.is_none() => {
-                Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
+                Ok(Stmt::Assignment((op_info, BinaryExpr { lhs, rhs }).into()))
             }
             // var (indexed) = rhs
             Expr::Variable(ref x, i, var_pos) => {
@@ -2091,7 +2093,7 @@ impl Engine {
                     .access_mode()
                 {
                     AccessMode::ReadWrite => {
-                        Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
+                        Ok(Stmt::Assignment((op_info, BinaryExpr { lhs, rhs }).into()))
                     }
                     // Constant values cannot be assigned to
                     AccessMode::ReadOnly => {
@@ -2113,7 +2115,7 @@ impl Engine {
                     match x.lhs {
                         // var[???] = rhs, this[???] = rhs, var.??? = rhs, this.??? = rhs
                         Expr::Variable(..) | Expr::ThisPtr(..) => {
-                            Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
+                            Ok(Stmt::Assignment((op_info, BinaryExpr { lhs, rhs }).into()))
                         }
                         // expr[???] = rhs, expr.??? = rhs
                         ref expr => {
@@ -3106,15 +3108,17 @@ impl Engine {
         };
         let mut settings = settings.level_up_with_position(brace_start_pos)?;
 
-        let mut statements = StaticVec::new_const();
+        let mut block = StmtBlock::empty(settings.pos);
 
         if settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
             let stmt = self.parse_expr_stmt(input, state, lib, settings)?;
-            statements.push(stmt);
+            block.statements_mut().push(stmt);
 
             // Must end with }
             return match input.next().expect(NEVER_ENDS) {
-                (Token::RightBrace, pos) => Ok((statements, settings.pos, pos).into()),
+                (Token::RightBrace, pos) => {
+                    Ok(Stmt::Block(StmtBlock::new(block, settings.pos, pos).into()))
+                }
                 (Token::LexError(err), pos) => Err(err.into_err(pos)),
                 (.., pos) => Err(PERR::MissingToken(
                     Token::LeftBrace.into(),
@@ -3156,7 +3160,7 @@ impl Engine {
             // See if it needs a terminating semicolon
             let need_semicolon = !stmt.is_self_terminated();
 
-            statements.push(stmt);
+            block.statements_mut().push(stmt);
 
             match input.peek().expect(NEVER_ENDS) {
                 // { ... stmt }
@@ -3191,7 +3195,9 @@ impl Engine {
         #[cfg(not(feature = "no_module"))]
         state.imports.truncate(orig_imports_len);
 
-        Ok((statements, settings.pos, end_pos).into())
+        Ok(Stmt::Block(
+            StmtBlock::new(block, settings.pos, end_pos).into(),
+        ))
     }
 
     /// Parse an expression as a statement.

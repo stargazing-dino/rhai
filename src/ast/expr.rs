@@ -30,16 +30,6 @@ pub struct BinaryExpr {
     pub rhs: Expr,
 }
 
-impl From<(Expr, Expr)> for BinaryExpr {
-    #[inline(always)]
-    fn from(value: (Expr, Expr)) -> Self {
-        Self {
-            lhs: value.0,
-            rhs: value.1,
-        }
-    }
-}
-
 /// _(internals)_ A custom syntax expression.
 /// Exported under the `internals` feature only.
 ///
