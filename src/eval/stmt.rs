@@ -330,7 +330,6 @@ impl Engine {
                     let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
 
                     let is_temp_result = !target.is_ref();
-                    let var_name = x.3.as_str();
 
                     #[cfg(not(feature = "no_closure"))]
                     // Also handle case where target is a `Dynamic` shared value
@@ -340,7 +339,7 @@ impl Engine {
                     // Cannot assign to temp result from expression
                     if is_temp_result {
                         return Err(ERR::ErrorAssignmentToConstant(
-                            var_name.to_string(),
+                            x.3.to_string(),
                             lhs.position(),
                         )
                         .into());

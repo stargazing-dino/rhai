@@ -62,7 +62,7 @@ impl fmt::Display for ScriptFnDef {
             self.name,
             self.params
                 .iter()
-                .map(|s| s.as_str())
+                .map(ImmutableString::as_str)
                 .collect::<FnArgsVec<_>>()
                 .join(", ")
         )
@@ -115,10 +115,7 @@ pub struct ScriptFnMetadata<'a> {
     ///
     /// Each line in non-block doc-comments starts with `///`.
     #[cfg(feature = "metadata")]
-    #[cfg_attr(
-        feature = "serde",
-        serde(default, skip_serializing_if = "Vec::is_empty")
-    )]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comments: Vec<&'a str>,
 }
 
@@ -156,10 +153,10 @@ impl<'a> From<&'a ScriptFnDef> for ScriptFnMetadata<'a> {
     fn from(value: &'a ScriptFnDef) -> Self {
         Self {
             name: &value.name,
-            params: value.params.iter().map(|s| s.as_str()).collect(),
+            params: value.params.iter().map(ImmutableString::as_str).collect(),
             access: value.access,
             #[cfg(not(feature = "no_object"))]
-            this_type: value.this_type.as_ref().map(|s| s.as_str()),
+            this_type: value.this_type.as_deref(),
             #[cfg(feature = "metadata")]
             comments: value.comments.iter().map(<_>::as_ref).collect(),
         }

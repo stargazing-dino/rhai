@@ -343,10 +343,9 @@ impl<'de> Deserializer<'de> for DynamicDeserializer<'de> {
     }
 
     fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
-        self.0.downcast_ref::<ImmutableString>().map_or_else(
-            || self.type_error(),
-            |x| visitor.visit_borrowed_str(x.as_str()),
-        )
+        self.0
+            .downcast_ref::<ImmutableString>()
+            .map_or_else(|| self.type_error(), |x| visitor.visit_borrowed_str(x))
     }
 
     fn deserialize_string<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
@@ -454,7 +453,7 @@ impl<'de> Deserializer<'de> for DynamicDeserializer<'de> {
         visitor: V,
     ) -> RhaiResultOf<V::Value> {
         match self.0.read_lock::<ImmutableString>() {
-            Some(s) => visitor.visit_enum(s.as_str().into_deserializer()),
+            Some(s) => visitor.visit_enum(s.into_deserializer()),
             None => {
                 #[cfg(not(feature = "no_object"))]
                 return self.0.downcast_ref::<crate::Map>().map_or_else(

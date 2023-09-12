@@ -223,7 +223,7 @@ impl<'e, 's> ParseState<'e, 's> {
     pub fn find_module(&self, name: &str) -> Option<NonZeroUsize> {
         self.imports
             .iter()
-            .rposition(|n| n.as_str() == name)
+            .rposition(|n| n == name)
             .and_then(|i| NonZeroUsize::new(i + 1))
     }
 
@@ -382,9 +382,9 @@ impl Expr {
             Self::Variable(x, ..) if !x.1.is_empty() => unreachable!("qualified property"),
             Self::Variable(x, .., pos) => {
                 let ident = x.3.clone();
-                let getter = state.get_interned_getter(ident.as_str());
+                let getter = state.get_interned_getter(&ident);
                 let hash_get = calc_fn_hash(None, &getter, 1);
-                let setter = state.get_interned_setter(ident.as_str());
+                let setter = state.get_interned_setter(&ident);
                 let hash_set = calc_fn_hash(None, &setter, 2);
 
                 Self::Property(
@@ -523,7 +523,7 @@ fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position
         // Variable name
         (Token::Identifier(s), pos) => Ok((*s, pos)),
         // Reserved keyword
-        (Token::Reserved(s), pos) if is_valid_identifier(s.as_str()) => {
+        (Token::Reserved(s), pos) if is_valid_identifier(&s) => {
             Err(PERR::Reserved(s.to_string()).into_err(pos))
         }
         // Bad identifier
@@ -664,7 +664,7 @@ impl Engine {
                     if settings.has_option(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
-                        && !state.global_imports.iter().any(|m| m.as_str() == root)
+                        && !state.global_imports.iter().any(|m| m == root)
                         && !self.global_sub_modules.contains_key(root)
                     {
                         return Err(
@@ -731,7 +731,7 @@ impl Engine {
                         if settings.has_option(LangOptions::STRICT_VAR)
                             && index.is_none()
                             && !is_global
-                            && !state.global_imports.iter().any(|m| m.as_str() == root)
+                            && !state.global_imports.iter().any(|m| m == root)
                             && !self.global_sub_modules.contains_key(root)
                         {
                             return Err(
@@ -1055,7 +1055,7 @@ impl Engine {
                 (Token::InterpolatedString(..), pos) => {
                     return Err(PERR::PropertyExpected.into_err(pos))
                 }
-                (Token::Reserved(s), pos) if is_valid_identifier(s.as_str()) => {
+                (Token::Reserved(s), pos) if is_valid_identifier(&s) => {
                     return Err(PERR::Reserved(s.to_string()).into_err(pos));
                 }
                 (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -1919,7 +1919,7 @@ impl Engine {
                     if settings.has_option(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
-                        && !state.global_imports.iter().any(|m| m.as_str() == root)
+                        && !state.global_imports.iter().any(|m| m == root)
                         && !self.global_sub_modules.contains_key(root)
                     {
                         return Err(
@@ -2181,8 +2181,10 @@ impl Engine {
             // lhs.Fn() or lhs.eval()
             (.., Expr::FnCall(f, func_pos))
                 if f.args.is_empty()
-                    && [crate::engine::KEYWORD_FN_PTR, crate::engine::KEYWORD_EVAL]
-                        .contains(&f.name.as_str()) =>
+                    && matches!(
+                        &*f.name,
+                        crate::engine::KEYWORD_FN_PTR | crate::engine::KEYWORD_EVAL
+                    ) =>
             {
                 let err_msg = format!(
                     "'{}' should not be called in method style. Try {}(...);",
@@ -2437,7 +2439,7 @@ impl Engine {
                 }
 
                 #[cfg(not(feature = "no_custom_syntax"))]
-                Token::Custom(s) if self.is_custom_keyword(s.as_str()) => {
+                Token::Custom(s) if self.is_custom_keyword(&s) => {
                     op_base.hashes = if native_only {
                         FnCallHashes::from_native_only(calc_fn_hash(None, &s, 2))
                     } else {
@@ -2634,7 +2636,7 @@ impl Engine {
         tokens.shrink_to_fit();
 
         let self_terminated = matches!(
-            required_token.as_str(),
+            &*required_token,
             // It is self-terminating if the last symbol is a block
             CUSTOM_SYNTAX_MARKER_BLOCK |
             // If the last symbol is `;` or `}`, it is self-terminating
@@ -3653,7 +3655,7 @@ impl Engine {
                 match input.next().expect(NEVER_ENDS) {
                     (Token::RightParen, ..) => break,
                     (Token::Identifier(s), pos) => {
-                        if params.iter().any(|(p, _)| p.as_str() == *s) {
+                        if params.iter().any(|(p, _)| p == &*s) {
                             return Err(
                                 PERR::FnDuplicatedParam(name.into(), s.to_string()).into_err(pos)
                             );
@@ -3785,7 +3787,7 @@ impl Engine {
                 match input.next().expect(NEVER_ENDS) {
                     (Token::Pipe, ..) => break,
                     (Token::Identifier(s), pos) => {
-                        if params_list.iter().any(|p| p.as_str() == *s) {
+                        if params_list.iter().any(|p| p == &*s) {
                             return Err(
                                 PERR::FnDuplicatedParam(String::new(), s.to_string()).into_err(pos)
                             );

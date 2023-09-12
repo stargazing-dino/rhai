@@ -134,7 +134,7 @@ impl GlobalRuntimeState {
     #[inline]
     #[must_use]
     pub fn find_import(&self, name: &str) -> Option<usize> {
-        self.imports.iter().rposition(|key| key.as_str() == name)
+        self.imports.iter().rposition(|key| key == name)
     }
     /// Push an imported [module][crate::Module] onto the stack.
     ///
@@ -266,7 +266,7 @@ impl GlobalRuntimeState {
     #[inline(always)]
     #[must_use]
     pub fn source(&self) -> Option<&str> {
-        self.source.as_ref().map(|s| s.as_str())
+        self.source.as_deref()
     }
     /// Get the current source.
     #[inline(always)]

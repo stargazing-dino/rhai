@@ -323,7 +323,7 @@ impl Engine {
         name: impl AsRef<str>,
         get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, C, V, L> + SendSync + 'static,
     ) -> &mut Self {
-        self.register_fn(crate::engine::make_getter(name.as_ref()).as_str(), get_fn)
+        self.register_fn(crate::engine::make_getter(name.as_ref()), get_fn)
     }
     /// Register a setter function for a member of a registered type with the [`Engine`].
     ///
@@ -373,7 +373,7 @@ impl Engine {
         name: impl AsRef<str>,
         set_fn: impl RegisterNativeFunction<(Mut<T>, V), 2, C, (), L> + SendSync + 'static,
     ) -> &mut Self {
-        self.register_fn(crate::engine::make_setter(name.as_ref()).as_str(), set_fn)
+        self.register_fn(crate::engine::make_setter(name.as_ref()), set_fn)
     }
     /// Short-hand for registering both getter and setter functions
     /// of a registered type with the [`Engine`].

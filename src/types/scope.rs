@@ -675,7 +675,7 @@ impl Scope<'_> {
     pub(crate) fn get_entry_by_index(
         &mut self,
         index: usize,
-    ) -> (&Identifier, &Dynamic, &[ImmutableString]) {
+    ) -> (&str, &Dynamic, &[ImmutableString]) {
         if self.aliases.len() <= index {
             self.aliases.resize(index + 1, <_>::default());
         }

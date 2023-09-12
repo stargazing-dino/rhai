@@ -124,7 +124,7 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
             is_anonymous: crate::parser::is_anonymous_fn(&info.metadata.name),
             typ,
             #[cfg(not(feature = "no_object"))]
-            this_type: info.metadata.this_type.as_ref().map(|s| s.as_str()),
+            this_type: info.metadata.this_type.as_deref(),
             num_params: info.metadata.num_params,
             params: info
                 .metadata

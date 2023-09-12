@@ -88,7 +88,7 @@ impl FnPtr {
     #[inline(always)]
     #[must_use]
     pub fn fn_name(&self) -> &str {
-        self.fn_name_raw().as_str()
+        self.fn_name_raw()
     }
     /// Get the name of the function.
     #[inline(always)]

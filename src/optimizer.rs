@@ -119,7 +119,7 @@ impl<'a> OptimizerState<'a> {
         self.variables
             .iter()
             .rev()
-            .find(|(n, _)| n.as_str() == name)
+            .find(|(n, _)| n == name)
             .and_then(|(_, value)| value.as_ref())
     }
     /// Call a registered function
@@ -899,11 +899,10 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         Expr::Dot(x, ..) if !_chaining => match (&mut x.lhs, &mut x.rhs) {
             // map.string
             (Expr::Map(m, pos), Expr::Property(p, ..)) if m.0.iter().all(|(.., x)| x.is_pure()) => {
-                let prop = p.2.as_str();
                 // Map literal where everything is pure - promote the indexed item.
                 // All other items can be thrown away.
                 state.set_dirty();
-                *expr = mem::take(&mut m.0).into_iter().find(|(x, ..)| x.as_str() == prop)
+                *expr = mem::take(&mut m.0).into_iter().find(|(x, ..)| x.name == p.2)
                             .map_or_else(|| Expr::Unit(*pos), |(.., mut expr)| { expr.set_position(*pos); expr });
             }
             // var.rhs or this.rhs
@@ -966,7 +965,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 // Map literal where everything is pure - promote the indexed item.
                 // All other items can be thrown away.
                 state.set_dirty();
-                *expr = mem::take(&mut m.0).into_iter().find(|(x, ..)| x.as_str() == s.as_str())
+                *expr = mem::take(&mut m.0).into_iter().find(|(x, ..)| x.name == s)
                             .map_or_else(|| Expr::Unit(*pos), |(.., mut expr)| { expr.set_position(*pos); expr });
             }
             // int[int]

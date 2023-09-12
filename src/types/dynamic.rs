@@ -1603,7 +1603,7 @@ impl Dynamic {
     /// Returns [`None`] if the cast fails, or if the value is shared.
     #[inline]
     #[must_use]
-    pub(crate) fn downcast_mut<T: Any + Clone>(&mut self) -> Option<&mut T> {
+    pub(crate) fn downcast_mut<T: Any + Clone + ?Sized>(&mut self) -> Option<&mut T> {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
 
         if TypeId::of::<T>() == TypeId::of::<INT>() {
@@ -2163,12 +2163,6 @@ impl<S: Into<ImmutableString>> From<S> for Dynamic {
     #[inline(always)]
     fn from(value: S) -> Self {
         Self(Union::Str(value.into(), DEFAULT_TAG_VALUE, ReadWrite))
-    }
-}
-impl From<&ImmutableString> for Dynamic {
-    #[inline(always)]
-    fn from(value: &ImmutableString) -> Self {
-        value.clone().into()
     }
 }
 impl FromStr for Dynamic {
