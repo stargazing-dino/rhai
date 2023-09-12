@@ -33,7 +33,7 @@ mod string_functions {
             return string.clone();
         }
 
-        let mut buf = SmartString::from(string.as_str());
+        let mut buf = string.as_raw().clone();
         buf.push_str(&s);
         buf.into()
     }
@@ -45,7 +45,7 @@ mod string_functions {
             return;
         }
 
-        let mut buf = SmartString::from(string.as_str());
+        let mut buf = string.as_raw().clone();
         buf.push_str(&s);
         *string = buf.into();
     }
@@ -127,7 +127,7 @@ mod string_functions {
                 }
                 .into()
             } else {
-                let mut x = SmartString::from(string.as_str());
+                let mut x = string.as_raw().clone();
                 x.push_str(s.as_ref());
                 x.into()
             }
@@ -138,7 +138,7 @@ mod string_functions {
                 return;
             }
 
-            let mut s = SmartString::from(string.as_str());
+            let mut s = string.as_raw().clone();
             s.push_str(&String::from_utf8_lossy(&utf8));
             *string = s.into();
         }
@@ -1484,7 +1484,7 @@ mod string_functions {
                 if abs_index as u64 > MAX_USIZE_INT as u64 {
                     return vec![
                         ctx.engine().const_empty_string().into(),
-                        string.as_str().into(),
+                        string.clone().into(),
                     ];
                 }
                 let abs_index = abs_index as usize;
@@ -1493,7 +1493,7 @@ mod string_functions {
                 if abs_index > num_chars {
                     vec![
                         ctx.engine().const_empty_string().into(),
-                        string.as_str().into(),
+                        string.clone().into(),
                     ]
                 } else {
                     let prefix: String = string.chars().take(num_chars - abs_index).collect();
@@ -1502,7 +1502,7 @@ mod string_functions {
                 }
             } else if index > MAX_USIZE_INT {
                 vec![
-                    string.as_str().into(),
+                    string.clone().into(),
                     ctx.engine().const_empty_string().into(),
                 ]
             } else {

@@ -266,3 +266,44 @@ Undeniable logic:
         "Undeniable logic:\n1) Hello, 42 worlds!\n2) If 123 > 42 then it is true!\n",
     );
 }
+
+#[test]
+fn test_immutable_string() {
+    let x: ImmutableString = "hello".into();
+    assert_eq!(x, "hello");
+    assert!(x == "hello");
+    assert!(&x == "hello");
+    assert!("hello" == x);
+    assert!("hello" == &x);
+
+    let s2 = String::from("hello");
+    let s3: ImmutableString = s2.clone().into();
+    assert_eq!(s2, s3);
+    let s3: ImmutableString = (&s2).into();
+    assert_eq!(s2, s3);
+
+    assert!(x == s2);
+    assert!(&x == s2);
+    assert!(x == &s2);
+    assert!(&x == &s2);
+
+    assert!(s2 == x);
+    assert!(&s2 == x);
+    assert!(s2 == &x);
+    assert!(&s2 == &x);
+
+    assert!(x >= s2);
+    assert!(&x >= s2);
+    assert!(x >= &s2);
+    assert!(&x >= &s2);
+
+    assert!(s2 >= x);
+    assert!(&s2 >= x);
+    assert!(s2 >= &x);
+    assert!(&s2 >= &x);
+
+    let _sx: String = x.clone().into();
+    let _sx: String = (&x).into();
+    let _ssx: Box<str> = x.clone().into();
+    let _ssx: Box<str> = (&x).into();
+}

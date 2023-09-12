@@ -142,9 +142,12 @@ impl Engine {
             Expr::Variable(v, None, ..) => {
                 // Scripted function with the same name
                 #[cfg(not(feature = "no_function"))]
-                if let Some(fn_def) = global.lib.iter().flat_map(|m| m.iter_script_fn()).find_map(
-                    |(_, _, f, _, func)| if f == v.3.as_str() { Some(func) } else { None },
-                ) {
+                if let Some(fn_def) = global
+                    .lib
+                    .iter()
+                    .flat_map(|m| m.iter_script_fn())
+                    .find_map(|(_, _, f, _, func)| if f == &v.3 { Some(func) } else { None })
+                {
                     let mut fn_ptr = crate::FnPtr::new_unchecked(v.3.clone(), Vec::new());
                     fn_ptr.set_fn_def(Some(fn_def.clone()));
                     let val: Dynamic = fn_ptr.into();

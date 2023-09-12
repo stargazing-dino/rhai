@@ -241,7 +241,7 @@ impl fmt::Display for ParseErrorType {
             Self::AssignmentToInvalidLHS(s) => f.write_str(s),
 
             Self::LiteralTooLarge(typ, max) => write!(f, "{typ} exceeds the maximum limit ({max})"),
-            Self::Reserved(s) if is_valid_identifier(s.as_str()) => write!(f, "'{s}' is a reserved keyword"),
+            Self::Reserved(s) if is_valid_identifier(s) => write!(f, "'{s}' is a reserved keyword"),
             Self::Reserved(s) => write!(f, "'{s}' is a reserved symbol"),
             Self::UnexpectedEOF => f.write_str("Script is incomplete"),
             Self::WrongSwitchIntegerCase => f.write_str("Numeric switch case cannot follow a range case"),

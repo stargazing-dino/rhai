@@ -399,11 +399,9 @@ impl Engine {
 
             // Run external function
             let is_method = func.is_method();
-            let src = source.as_ref().map(|s| s.as_str());
-
             let context = func
                 .has_context()
-                .then(|| (self, name, src, &*global, pos).into());
+                .then(|| (self, name, source.as_deref(), &*global, pos).into());
 
             let mut _result = if !func.is_pure() && !args.is_empty() && args[0].is_read_only() {
                 // If function is not pure, there must be at least one argument
@@ -832,7 +830,6 @@ impl Engine {
                         .map(|v| (v, false))
                     }
                     _ => {
-                        let name = fn_name.as_str();
                         let is_ref_mut = target.is_ref();
 
                         // Add the first argument with the object pointer
@@ -841,25 +838,28 @@ impl Engine {
                         // Recalculate hash
                         let num_args = args.len();
 
-                        let new_hash = if !is_anon && !is_valid_function_name(name) {
-                            FnCallHashes::from_native_only(calc_fn_hash(None, name, num_args))
+                        let new_hash = if !is_anon && !is_valid_function_name(&fn_name) {
+                            FnCallHashes::from_native_only(calc_fn_hash(None, &fn_name, num_args))
                         } else {
                             #[cfg(not(feature = "no_function"))]
                             {
                                 FnCallHashes::from_script_and_native(
-                                    calc_fn_hash(None, name, num_args - 1),
-                                    calc_fn_hash(None, name, num_args),
+                                    calc_fn_hash(None, &fn_name, num_args - 1),
+                                    calc_fn_hash(None, &fn_name, num_args),
                                 )
                             }
                             #[cfg(feature = "no_function")]
                             {
-                                FnCallHashes::from_native_only(calc_fn_hash(None, name, num_args))
+                                FnCallHashes::from_native_only(calc_fn_hash(
+                                    None, &fn_name, num_args,
+                                ))
                             }
                         };
 
                         // Map it to name(args) in function-call style
                         self.exec_fn_call(
-                            global, caches, None, name, None, new_hash, args, is_ref_mut, true, pos,
+                            global, caches, None, &fn_name, None, new_hash, args, is_ref_mut, true,
+                            pos,
                         )
                     }
                 }

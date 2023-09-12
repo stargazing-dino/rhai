@@ -1621,9 +1621,9 @@ pub mod array_functions {
         }
         if type_id == TypeId::of::<ImmutableString>() {
             array.sort_by(|a, b| {
-                let a = a.read_lock::<ImmutableString>().expect("`ImmutableString`");
-                let b = b.read_lock::<ImmutableString>().expect("`ImmutableString`");
-                a.as_str().cmp(b.as_str())
+                let a = &*a.read_lock::<ImmutableString>().expect("`ImmutableString`");
+                let b = &*b.read_lock::<ImmutableString>().expect("`ImmutableString`");
+                a.cmp(b)
             });
             return Ok(());
         }

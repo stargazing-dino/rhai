@@ -480,7 +480,7 @@ impl Expr {
                 let mut map = x.1.clone();
 
                 for (k, v) in &x.0 {
-                    *map.get_mut(k.name.as_str()).unwrap() = v.get_literal_value().unwrap();
+                    *map.get_mut(k.as_str()).unwrap() = v.get_literal_value().unwrap();
                 }
 
                 Dynamic::from_map(map)
@@ -580,7 +580,7 @@ impl Expr {
         match self {
             #[cfg(not(feature = "no_module"))]
             Self::Variable(x, ..) if _non_qualified && !x.1.is_empty() => None,
-            Self::Variable(x, ..) => Some(x.3.as_str()),
+            Self::Variable(x, ..) => Some(&x.3),
             _ => None,
         }
     }
