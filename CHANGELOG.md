@@ -10,6 +10,11 @@ Potentially breaking changes
 * `ImmutableString` now derefs to `&str` instead of `&SmartString`. Normally this should not be a breaking change.
 * Traits implemented by `ImmutableString` are cleaned up.  However, I cannot guarantee that there are absolutely no breaking changes, although I try to be careful.
 
+Enhancements
+------------
+
+* Added `to_int` method for characters.
+
 
 Version 1.16.2
 ==============
