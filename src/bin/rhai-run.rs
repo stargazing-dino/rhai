@@ -9,7 +9,7 @@ fn eprint_error(input: &str, mut err: EvalAltResult) {
 
         eprintln!("{line_no}{}", lines[line - 1]);
 
-        for (i, err_line) in err_msg.to_string().split('\n').enumerate() {
+        for (i, err_line) in err_msg.to_string().lines().enumerate() {
             // Display position marker
             println!(
                 "{0:>1$}{err_line}",
@@ -20,7 +20,7 @@ fn eprint_error(input: &str, mut err: EvalAltResult) {
         eprintln!();
     }
 
-    let lines: Vec<_> = input.split('\n').collect();
+    let lines: Vec<_> = input.lines().collect();
 
     // Print error
     let pos = err.take_position();
