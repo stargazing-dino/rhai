@@ -22,6 +22,7 @@ def_package! {
 
         combine_with_exported_module!(lib, "print_debug", print_debug_functions);
         combine_with_exported_module!(lib, "number_formatting", number_formatting);
+        combine_with_exported_module!(lib, "char", char_functions);
 
         // Register characters iterator
         #[cfg(not(feature = "no_index"))]
@@ -431,5 +432,13 @@ mod number_formatting {
                 to_binary(value)
             }
         }
+    }
+}
+
+#[export_module]
+mod char_functions {
+    /// Convert the Unicode character into a 32-bit integer value.
+    pub fn to_int(ch: char) -> INT {
+        (ch as u32) as INT
     }
 }
