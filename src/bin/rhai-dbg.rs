@@ -84,7 +84,7 @@ fn print_current_source(
 
 /// Pretty-print error.
 fn print_error(input: &str, mut err: EvalAltResult) {
-    let lines: Vec<_> = input.trim().split('\n').collect();
+    let lines: Vec<_> = input.trim().lines().collect();
     let pos = err.take_position();
 
     let line_no = if lines.len() > 1 {
@@ -105,7 +105,7 @@ fn print_error(input: &str, mut err: EvalAltResult) {
         // Specific position - print line text
         println!("{line_no}{}", lines[pos.line().unwrap() - 1]);
 
-        for (i, err_line) in err.to_string().split('\n').enumerate() {
+        for (i, err_line) in err.to_string().lines().enumerate() {
             // Display position marker
             println!(
                 "\x1b[31m{0:>1$}{err_line}\x1b[39m",
@@ -604,7 +604,7 @@ fn main() {
     let (ast, script) = load_script(&engine);
 
     // Hook up debugger
-    let lines: Vec<_> = script.trim().split('\n').map(|s| s.to_string()).collect();
+    let lines: Vec<_> = script.trim().lines().map(|s| s.to_string()).collect();
 
     #[allow(deprecated)]
     engine.register_debugger(

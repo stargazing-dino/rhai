@@ -498,7 +498,7 @@ fn unindent_block_comment(comment: String, pos: usize) -> String {
     }
 
     let offset = comment
-        .split('\n')
+        .lines()
         .skip(1)
         .map(|s| s.len() - s.trim_start().len())
         .min()
@@ -510,7 +510,7 @@ fn unindent_block_comment(comment: String, pos: usize) -> String {
     }
 
     comment
-        .split('\n')
+        .lines()
         .enumerate()
         .map(|(i, s)| if i > 0 { &s[offset..] } else { s })
         .collect::<Vec<_>>()
@@ -3716,27 +3716,33 @@ impl Engine {
         parent: &mut ParseState,
         lib: &FnLib,
         fn_expr: Expr,
-        externals: FnArgsVec<Ident>,
+        externals: impl AsRef<[Ident]> + IntoIterator<Item = Ident>,
         pos: Position,
     ) -> Expr {
         // If there are no captured variables, no need to curry
-        if externals.is_empty() {
+        if externals.as_ref().is_empty() {
             return fn_expr;
         }
 
-        let num_externals = externals.len();
-        let mut args = Vec::with_capacity(externals.len() + 1);
+        let num_externals = externals.as_ref().len();
+        let mut args = Vec::with_capacity(externals.as_ref().len() + 1);
 
         args.push(fn_expr);
 
-        args.extend(externals.iter().cloned().map(|Ident { name, pos }| {
-            let (index, is_func) = parent.access_var(&name, lib, pos);
-            let idx = match index {
-                Some(n) if !is_func => u8::try_from(n.get()).ok().and_then(NonZeroU8::new),
-                _ => None,
-            };
-            Expr::Variable((index, <_>::default(), 0, name).into(), idx, pos)
-        }));
+        args.extend(
+            externals
+                .as_ref()
+                .iter()
+                .cloned()
+                .map(|Ident { name, pos }| {
+                    let (index, is_func) = parent.access_var(&name, lib, pos);
+                    let idx = match index {
+                        Some(n) if !is_func => u8::try_from(n.get()).ok().and_then(NonZeroU8::new),
+                        _ => None,
+                    };
+                    Expr::Variable((index, <_>::default(), 0, name).into(), idx, pos)
+                }),
+        );
 
         let expr = FnCallExpr {
             namespace: Namespace::NONE,
@@ -3834,11 +3840,7 @@ impl Engine {
                 FnArgsVec::new_const(),
             )
         } else {
-            let externals = state
-                .external_vars
-                .iter()
-                .cloned()
-                .collect::<FnArgsVec<_>>();
+            let externals: FnArgsVec<_> = state.external_vars.clone().into();
 
             let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
             params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));
