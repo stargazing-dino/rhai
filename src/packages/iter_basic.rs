@@ -181,7 +181,7 @@ impl CharsStream {
     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn new(string: &str, from: INT, len: INT) -> Self {
         if len <= 0 || from > MAX_USIZE_INT {
-            return Self(IntoIter::default());
+            return Self(Vec::new().into_iter());
         }
         let len = len.min(MAX_USIZE_INT) as usize;
 
