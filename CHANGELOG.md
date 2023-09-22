@@ -1,6 +1,12 @@
 Rhai Release Notes
 ==================
 
+Version 1.16.2
+==============
+
+Fixes compilation error when importing multiple modules.
+
+
 Version 1.16.1
 ==============
 

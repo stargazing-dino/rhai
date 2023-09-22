@@ -221,6 +221,7 @@ impl<'e, 's> ParseState<'e, 's> {
     pub fn find_module(&self, name: &str) -> Option<NonZeroUsize> {
         self.imports
             .iter()
+            .rev()
             .rposition(|n| n.as_str() == name)
             .and_then(|i| NonZeroUsize::new(i + 1))
     }
