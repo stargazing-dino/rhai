@@ -58,7 +58,7 @@ pub struct ParseState<'e, 's> {
     /// Encapsulates a local stack with variable names to simulate an actual runtime scope.
     pub stack: Scope<'e>,
     /// Size of the local variables stack upon entry of the current block scope.
-    pub block_stack_len: usize,
+    pub frame_pointer: usize,
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
     #[cfg(not(feature = "no_closure"))]
     pub external_vars: Vec<Ident>,
@@ -89,7 +89,7 @@ impl fmt::Debug for ParseState<'_, '_> {
             .field("external_constants_scope", &self.external_constants)
             .field("global", &self.global)
             .field("stack", &self.stack)
-            .field("block_stack_len", &self.block_stack_len);
+            .field("frame_pointer", &self.frame_pointer);
 
         #[cfg(not(feature = "no_closure"))]
         f.field("external_vars", &self.external_vars)
@@ -122,7 +122,7 @@ impl<'e, 's> ParseState<'e, 's> {
             external_constants,
             global: None,
             stack: Scope::new(),
-            block_stack_len: 0,
+            frame_pointer: 0,
             #[cfg(not(feature = "no_module"))]
             imports: Vec::new(),
             #[cfg(not(feature = "no_module"))]
@@ -2961,7 +2961,7 @@ impl Engine {
                 #[cfg(not(feature = "no_module"))]
                 offset if !state.stack.get_entry_by_index(offset).2.is_empty() => None,
                 // Defined in parent block
-                offset if offset < state.block_stack_len => None,
+                offset if offset < state.frame_pointer => None,
                 offset => Some(offset),
             }
         } else {
@@ -3131,8 +3131,8 @@ impl Engine {
             };
         }
 
-        let prev_entry_stack_len = state.block_stack_len;
-        state.block_stack_len = state.stack.len();
+        let prev_frame_pointer = state.frame_pointer;
+        state.frame_pointer = state.stack.len();
 
         #[cfg(not(feature = "no_module"))]
         let orig_imports_len = state.imports.len();
@@ -3192,8 +3192,8 @@ impl Engine {
             }
         };
 
-        state.stack.rewind(state.block_stack_len);
-        state.block_stack_len = prev_entry_stack_len;
+        state.stack.rewind(state.frame_pointer);
+        state.frame_pointer = prev_frame_pointer;
 
         #[cfg(not(feature = "no_module"))]
         state.imports.truncate(orig_imports_len);

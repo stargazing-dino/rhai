@@ -1,7 +1,7 @@
 //! Module defining script expressions.
 
 use super::{ASTFlags, ASTNode, Ident, Namespace, Stmt, StmtBlock};
-use crate::engine::{KEYWORD_FN_PTR, OP_EXCLUSIVE_RANGE, OP_INCLUSIVE_RANGE};
+use crate::engine::KEYWORD_FN_PTR;
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
 use crate::{
@@ -508,6 +508,9 @@ impl Expr {
 
             // Binary operators
             Self::FnCall(x, ..) if !x.is_qualified() && x.args.len() == 2 => {
+                pub const OP_EXCLUSIVE_RANGE: &str = Token::ExclusiveRange.literal_syntax();
+                pub const OP_INCLUSIVE_RANGE: &str = Token::InclusiveRange.literal_syntax();
+
                 match x.name.as_str() {
                     // x..y
                     OP_EXCLUSIVE_RANGE => match (&x.args[0], &x.args[1]) {
@@ -820,7 +823,7 @@ impl Expr {
     pub fn walk<'a>(
         &'a self,
         path: &mut Vec<ASTNode<'a>>,
-        on_node: &mut impl FnMut(&[ASTNode]) -> bool,
+        on_node: &mut (impl FnMut(&[ASTNode]) -> bool + ?Sized),
     ) -> bool {
         // Push the current node onto the path
         path.push(self.into());

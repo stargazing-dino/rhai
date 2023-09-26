@@ -28,6 +28,8 @@ use std::{
 };
 
 /// Level of optimization performed.
+///
+/// Not available under `no_optimize`.
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default, Hash)]
 #[non_exhaustive]
 pub enum OptimizationLevel {

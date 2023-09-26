@@ -57,12 +57,6 @@ pub const OP_CONTAINS: &str = "contains";
 /// Standard not operator.
 pub const OP_NOT: &str = Token::Bang.literal_syntax();
 
-/// Standard exclusive range operator.
-pub const OP_EXCLUSIVE_RANGE: &str = Token::ExclusiveRange.literal_syntax();
-
-/// Standard inclusive range operator.
-pub const OP_INCLUSIVE_RANGE: &str = Token::InclusiveRange.literal_syntax();
-
 /// Separator for namespaces.
 #[cfg(not(feature = "no_module"))]
 pub const NAMESPACE_SEPARATOR: &str = Token::DoubleColon.literal_syntax();

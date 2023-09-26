@@ -9,6 +9,7 @@ Potentially breaking changes
 
 * `ImmutableString` now derefs to `&str` instead of `&SmartString`. Normally this should not be a breaking change.
 * Traits implemented by `ImmutableString` are cleaned up.  However, I cannot guarantee that there are absolutely no breaking changes, although I try to be careful.
+* `EvalContext::new`, `FloatWrapper` and `ConditionalExpr` are now exported only under `internals`.
 
 Enhancements
 ------------

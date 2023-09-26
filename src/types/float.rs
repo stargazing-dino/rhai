@@ -11,7 +11,8 @@ use std::{
 
 use num_traits::float::FloatCore as Float;
 
-/// A type that wraps a floating-point number and implements [`Hash`].
+/// _(internals)_ A type that wraps a floating-point number and implements [`Hash`].
+/// Exported under the `internals` feature only.
 ///
 /// Not available under `no_float`.
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd)]

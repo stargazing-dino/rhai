@@ -2097,7 +2097,7 @@ impl Dynamic {
     #[inline]
     #[allow(clippy::only_used_in_recursion)]
     pub fn deep_scan(&mut self, mut filter: impl FnMut(&mut Self)) {
-        fn scan_inner(value: &mut Dynamic, filter: &mut impl FnMut(&mut Dynamic)) {
+        fn scan_inner(value: &mut Dynamic, filter: &mut (impl FnMut(&mut Dynamic) + ?Sized)) {
             filter(value);
 
             match &mut value.0 {

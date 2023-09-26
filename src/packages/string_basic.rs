@@ -12,7 +12,14 @@ use crate::Array;
 #[cfg(not(feature = "no_object"))]
 use crate::Map;
 
+/// Standard pretty-print function.
+///
+/// This function is called to convert any type into text format for display.
 pub const FUNC_TO_STRING: &str = "to_string";
+
+/// Standard debug-print function.
+///
+/// This function is called to convert any type into text format suitable for debugging.
 pub const FUNC_TO_DEBUG: &str = "to_debug";
 
 def_package! {

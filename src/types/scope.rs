@@ -21,14 +21,6 @@ pub const MIN_SCOPE_ENTRIES: usize = 8;
 /// Currently the lifetime parameter is not used, but it is not guaranteed to remain unused for
 /// future versions. Until then, `'static` can be used.
 ///
-/// # Constant Generic Parameter
-///
-/// There is a constant generic parameter that indicates how many entries to keep inline.
-/// As long as the number of entries does not exceed this limit, no allocations occur.
-/// The default is 8.
-///
-/// A larger value makes [`Scope`] larger, but reduces the chance of allocations.
-///
 /// # Thread Safety
 ///
 /// Currently, [`Scope`] is neither [`Send`] nor [`Sync`]. Turn on the `sync` feature to make it

@@ -882,7 +882,7 @@ impl AST {
     #[cfg(not(feature = "internals"))]
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
-    pub(crate) fn walk(&self, on_node: &mut impl FnMut(&[ASTNode]) -> bool) -> bool {
+    pub(crate) fn walk(&self, on_node: &mut (impl FnMut(&[ASTNode]) -> bool + ?Sized)) -> bool {
         self._walk(on_node)
     }
     /// _(internals)_ Recursively walk the [`AST`], including function bodies (if any).
@@ -890,12 +890,12 @@ impl AST {
     /// Exported under the `internals` feature only.
     #[cfg(feature = "internals")]
     #[inline(always)]
-    pub fn walk(&self, on_node: &mut impl FnMut(&[ASTNode]) -> bool) -> bool {
+    pub fn walk(&self, on_node: &mut (impl FnMut(&[ASTNode]) -> bool + ?Sized)) -> bool {
         self._walk(on_node)
     }
     /// Recursively walk the [`AST`], including function bodies (if any).
     /// Return `false` from the callback to terminate the walk.
-    fn _walk(&self, on_node: &mut impl FnMut(&[ASTNode]) -> bool) -> bool {
+    fn _walk(&self, on_node: &mut (impl FnMut(&[ASTNode]) -> bool + ?Sized)) -> bool {
         let path = &mut Vec::new();
 
         for stmt in self.statements() {
