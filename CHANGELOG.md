@@ -11,6 +11,11 @@ Potentially breaking changes
 * Traits implemented by `ImmutableString` are cleaned up.  However, I cannot guarantee that there are absolutely no breaking changes, although I try to be careful.
 * `EvalContext::new`, `FloatWrapper` and `ConditionalExpr` are now exported only under `internals`.
 
+Deprecated API's
+----------------
+
+* `rhai::config::hashing::set_ahash_seed`, `rhai::config::hashing::get_ahash_seed` and the `RHAI_AHASH_SEED` environment variable are deprecated in favor of `rhai::config::hashing::set_hashing_seed`, `rhai::config::hashing::get_hashing_seed` and `RHAI_HASHING_SEED`.
+
 Enhancements
 ------------
 
