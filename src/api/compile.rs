@@ -123,7 +123,7 @@ impl Engine {
         collect_imports(&ast, &resolver, &mut imports);
 
         if !imports.is_empty() {
-            while let Some(path) = imports.iter().next() {
+            while let Some(path) = imports.pop_first() {
                 let path = path.clone();
 
                 match self
@@ -141,7 +141,6 @@ impl Engine {
 
                 let module = shared_take_or_clone(module);
 
-                imports.remove(&path);
                 resolver.insert(path, module);
             }
             ast.set_resolver(resolver);
@@ -203,11 +202,7 @@ impl Engine {
         scope: &Scope,
         scripts: impl AsRef<[S]>,
     ) -> ParseResult<AST> {
-        self.compile_with_scope_and_optimization_level(
-            Some(scope),
-            scripts,
-            self.optimization_level,
-        )
+        self.compile_scripts_with_scope_raw(Some(scope), scripts, self.optimization_level)
     }
     /// Join a list of strings and compile into an [`AST`] using own scope at a specific optimization level.
     ///
@@ -217,7 +212,7 @@ impl Engine {
     /// throughout the script _including_ functions. This allows functions to be optimized based on
     /// dynamic global constants.
     #[inline]
-    pub(crate) fn compile_with_scope_and_optimization_level<S: AsRef<str>>(
+    pub(crate) fn compile_scripts_with_scope_raw<S: AsRef<str>>(
         &self,
         scope: Option<&Scope>,
         scripts: impl AsRef<[S]>,
@@ -283,8 +278,6 @@ impl Engine {
     /// scope.push_constant("x", 10_i64);   // 'x' is a constant
     ///
     /// // Compile a script to an AST and store it for later evaluation.
-    /// // Notice that `Full` optimization is on, so constants are folded
-    /// // into function calls and operators.
     /// let ast = engine.compile_expression_with_scope(&mut scope,
     ///             "2 + (x + x) * 2"    // all 'x' are replaced with 10
     /// )?;

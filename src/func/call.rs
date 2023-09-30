@@ -1594,7 +1594,7 @@ impl Engine {
 
         // Compile the script text
         // No optimizations because we only run it once
-        let ast = self.compile_with_scope_and_optimization_level(
+        let ast = self.compile_scripts_with_scope_raw(
             None,
             [script],
             #[cfg(not(feature = "no_optimize"))]
