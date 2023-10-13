@@ -62,16 +62,16 @@ pub type TokenStream<'a> = Peekable<TokenIterator<'a>>;
 pub enum Token {
     /// An `INT` constant.
     IntegerConstant(INT),
-    /// A `FLOAT` constant.
+    /// A `FLOAT` constant, including its text representation.
     ///
     /// Reserved under the `no_float` feature.
     #[cfg(not(feature = "no_float"))]
-    FloatConstant(crate::types::FloatWrapper<crate::FLOAT>),
+    FloatConstant(Box<(crate::types::FloatWrapper<crate::FLOAT>, Identifier)>),
     /// A [`Decimal`][rust_decimal::Decimal] constant.
     ///
-    /// Requires the `decimal` feature.
+    /// Requires the `decimal` feature, including its text representation.
     #[cfg(feature = "decimal")]
-    DecimalConstant(Box<rust_decimal::Decimal>),
+    DecimalConstant(Box<(rust_decimal::Decimal, Identifier)>),
     /// An identifier.
     Identifier(Box<Identifier>),
     /// A character constant.
@@ -284,9 +284,9 @@ impl fmt::Display for Token {
         match self {
             IntegerConstant(i) => write!(f, "{i}"),
             #[cfg(not(feature = "no_float"))]
-            FloatConstant(v) => write!(f, "{v}"),
+            FloatConstant(v) => write!(f, "{}", v.0),
             #[cfg(feature = "decimal")]
-            DecimalConstant(d) => write!(f, "{d}"),
+            DecimalConstant(d) => write!(f, "{}", d.0),
             StringConstant(s) => write!(f, r#""{s}""#),
             InterpolatedString(..) => f.write_str("string"),
             CharConstant(c) => write!(f, "{c}"),
@@ -1714,51 +1714,48 @@ fn get_next_token_inner(
                 }
 
                 // Parse number
-                let token = radix_base.map_or_else(
-                    || {
+                let token = if let Some(radix) = radix_base {
+                    let result = &result[2..];
+
+                    UNSIGNED_INT::from_str_radix(result, radix)
+                        .map(|v| v as INT)
+                        .map_or_else(
+                            |_| Token::LexError(LERR::MalformedNumber(result.to_string()).into()),
+                            Token::IntegerConstant,
+                        )
+                } else {
+                    (|| {
                         let num = INT::from_str(&result).map(Token::IntegerConstant);
 
                         // If integer parsing is unnecessary, try float instead
                         #[cfg(not(feature = "no_float"))]
-                        let num = num.or_else(|_| {
-                            crate::types::FloatWrapper::from_str(&result).map(Token::FloatConstant)
-                        });
+                        if num.is_err() {
+                            if let Ok(v) = crate::types::FloatWrapper::from_str(&result) {
+                                return Token::FloatConstant((v, result).into());
+                            }
+                        }
 
                         // Then try decimal
                         #[cfg(feature = "decimal")]
-                        let num = num.or_else(|_| {
-                            rust_decimal::Decimal::from_str(&result)
-                                .map(Box::new)
-                                .map(Token::DecimalConstant)
-                        });
+                        if num.is_err() {
+                            if let Ok(v) = rust_decimal::Decimal::from_str(&result) {
+                                return Token::DecimalConstant((v, result).into());
+                            }
+                        }
 
                         // Then try decimal in scientific notation
                         #[cfg(feature = "decimal")]
-                        let num = num.or_else(|_| {
-                            rust_decimal::Decimal::from_scientific(&result)
-                                .map(Box::new)
-                                .map(Token::DecimalConstant)
-                        });
+                        if num.is_err() {
+                            if let Ok(v) = rust_decimal::Decimal::from_scientific(&result) {
+                                return Token::DecimalConstant((v, result).into());
+                            }
+                        }
 
                         num.unwrap_or_else(|_| {
                             Token::LexError(LERR::MalformedNumber(result.to_string()).into())
                         })
-                    },
-                    |radix| {
-                        let result = &result[2..];
-
-                        UNSIGNED_INT::from_str_radix(result, radix)
-                            .map(|v| v as INT)
-                            .map_or_else(
-                                |_| {
-                                    Token::LexError(
-                                        LERR::MalformedNumber(result.to_string()).into(),
-                                    )
-                                },
-                                Token::IntegerConstant,
-                            )
-                    },
-                );
+                    })()
+                };
 
                 return Some((token, num_pos));
             }

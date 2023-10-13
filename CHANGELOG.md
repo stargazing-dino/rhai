@@ -20,6 +20,7 @@ Enhancements
 ------------
 
 * Added `to_int` method for characters.
+* `Token::FloatConstant` and `Token::DecimalConstant` now carry the original text representation for use in, say, a _token mapper_.
 
 
 Version 1.16.2

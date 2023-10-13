@@ -1387,15 +1387,15 @@ impl Engine {
             },
             #[cfg(not(feature = "no_float"))]
             Token::FloatConstant(x) => {
-                let x = *x;
+                let x = x.0;
                 input.next();
                 Expr::FloatConstant(x, settings.pos)
             }
             #[cfg(feature = "decimal")]
             Token::DecimalConstant(x) => {
-                let x = (**x).into();
+                let x = x.0;
                 input.next();
-                Expr::DynamicConstant(Box::new(x), settings.pos)
+                Expr::DynamicConstant(Box::new(x.into()), settings.pos)
             }
 
             // { - block statement as expression
@@ -2588,8 +2588,8 @@ impl Engine {
                 #[cfg(not(feature = "no_float"))]
                 CUSTOM_SYNTAX_MARKER_FLOAT => match input.next().expect(NEVER_ENDS) {
                     (Token::FloatConstant(f), pos) => {
-                        inputs.push(Expr::FloatConstant(f, pos));
-                        segments.push(f.to_string().into());
+                        inputs.push(Expr::FloatConstant(f.0, pos));
+                        segments.push(f.1.into());
                         tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_FLOAT));
                     }
                     (.., pos) => {
