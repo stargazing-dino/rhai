@@ -50,18 +50,10 @@ use std::{
 pub struct ImmutableString(Shared<SmartString>);
 
 impl Deref for ImmutableString {
-    type Target = SmartString;
+    type Target = str;
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl AsRef<SmartString> for ImmutableString {
-    #[inline(always)]
-    #[must_use]
-    fn as_ref(&self) -> &SmartString {
         &self.0
     }
 }
@@ -74,10 +66,10 @@ impl AsRef<str> for ImmutableString {
     }
 }
 
-impl Borrow<SmartString> for ImmutableString {
+impl AsRef<SmartString> for ImmutableString {
     #[inline(always)]
     #[must_use]
-    fn borrow(&self) -> &SmartString {
+    fn as_ref(&self) -> &SmartString {
         &self.0
     }
 }
@@ -86,7 +78,22 @@ impl Borrow<str> for ImmutableString {
     #[inline(always)]
     #[must_use]
     fn borrow(&self) -> &str {
-        self.as_str()
+        &self.0
+    }
+}
+
+impl Borrow<SmartString> for ImmutableString {
+    #[inline(always)]
+    #[must_use]
+    fn borrow(&self) -> &SmartString {
+        &self.0
+    }
+}
+
+impl From<&Self> for ImmutableString {
+    #[inline(always)]
+    fn from(value: &Self) -> Self {
+        Self(value.0.clone())
     }
 }
 
@@ -97,6 +104,7 @@ impl From<&str> for ImmutableString {
         Self(value.into())
     }
 }
+
 impl From<Box<str>> for ImmutableString {
     #[inline(always)]
     fn from(value: Box<str>) -> Self {
@@ -133,13 +141,38 @@ impl From<SmartString> for ImmutableString {
 impl From<&ImmutableString> for SmartString {
     #[inline(always)]
     fn from(value: &ImmutableString) -> Self {
-        value.as_str().into()
+        value.0.as_ref().clone()
     }
 }
 impl From<ImmutableString> for SmartString {
     #[inline(always)]
     fn from(mut value: ImmutableString) -> Self {
-        std::mem::take(shared_make_mut(&mut value.0))
+        let _ = value.make_mut(); // Make sure it is unique reference
+        shared_take(value.0) // Should succeed
+    }
+}
+impl From<&ImmutableString> for String {
+    #[inline(always)]
+    fn from(value: &ImmutableString) -> Self {
+        value.0.as_ref().to_string()
+    }
+}
+impl From<ImmutableString> for String {
+    #[inline(always)]
+    fn from(value: ImmutableString) -> Self {
+        value.into_owned()
+    }
+}
+impl From<&ImmutableString> for Box<str> {
+    #[inline(always)]
+    fn from(value: &ImmutableString) -> Self {
+        value.0.as_str().into()
+    }
+}
+impl From<ImmutableString> for Box<str> {
+    #[inline(always)]
+    fn from(value: ImmutableString) -> Self {
+        value.0.as_str().into()
     }
 }
 
@@ -274,25 +307,25 @@ impl Add<ImmutableString> for &ImmutableString {
     }
 }
 
-impl AddAssign<&Self> for ImmutableString {
-    #[inline]
-    fn add_assign(&mut self, rhs: &Self) {
-        if !rhs.is_empty() {
-            if self.is_empty() {
-                self.0 = rhs.0.clone();
-            } else {
-                self.make_mut().push_str(rhs.as_str());
-            }
-        }
-    }
-}
-
 impl AddAssign<Self> for ImmutableString {
     #[inline]
     fn add_assign(&mut self, rhs: Self) {
         if !rhs.is_empty() {
             if self.is_empty() {
                 self.0 = rhs.0;
+            } else {
+                self.make_mut().push_str(&rhs);
+            }
+        }
+    }
+}
+
+impl AddAssign<&Self> for ImmutableString {
+    #[inline]
+    fn add_assign(&mut self, rhs: &Self) {
+        if !rhs.is_empty() {
+            if self.is_empty() {
+                self.0 = rhs.0.clone();
             } else {
                 self.make_mut().push_str(rhs.as_str());
             }
@@ -441,12 +474,12 @@ impl Sub for &ImmutableString {
     }
 }
 
-impl SubAssign<&Self> for ImmutableString {
+impl SubAssign<Self> for ImmutableString {
     #[inline]
-    fn sub_assign(&mut self, rhs: &Self) {
+    fn sub_assign(&mut self, rhs: Self) {
         if !rhs.is_empty() {
             if self.is_empty() {
-                self.0 = rhs.0.clone();
+                self.0 = rhs.0;
             } else {
                 let rhs: SmartString = self.replace(rhs.as_str(), "").into();
                 self.0 = rhs.into();
@@ -455,12 +488,12 @@ impl SubAssign<&Self> for ImmutableString {
     }
 }
 
-impl SubAssign<Self> for ImmutableString {
+impl SubAssign<&Self> for ImmutableString {
     #[inline]
-    fn sub_assign(&mut self, rhs: Self) {
+    fn sub_assign(&mut self, rhs: &Self) {
         if !rhs.is_empty() {
             if self.is_empty() {
-                self.0 = rhs.0;
+                self.0 = rhs.0.clone();
             } else {
                 let rhs: SmartString = self.replace(rhs.as_str(), "").into();
                 self.0 = rhs.into();
@@ -575,10 +608,24 @@ impl SubAssign<char> for ImmutableString {
     }
 }
 
-impl<S: AsRef<str>> PartialEq<S> for ImmutableString {
+impl<S: AsRef<str> + ?Sized> PartialEq<S> for ImmutableString {
     #[inline(always)]
     fn eq(&self, other: &S) -> bool {
         self.as_str().eq(other.as_ref())
+    }
+}
+
+impl PartialEq<str> for &ImmutableString {
+    #[inline(always)]
+    fn eq(&self, other: &str) -> bool {
+        self.as_str().eq(other)
+    }
+}
+
+impl PartialEq<String> for &ImmutableString {
+    #[inline(always)]
+    fn eq(&self, other: &String) -> bool {
+        self.as_str().eq(other.as_str())
     }
 }
 
@@ -589,16 +636,49 @@ impl PartialEq<ImmutableString> for str {
     }
 }
 
-impl PartialEq<ImmutableString> for String {
+impl PartialEq<ImmutableString> for &str {
     #[inline(always)]
     fn eq(&self, other: &ImmutableString) -> bool {
-        self.eq(other.as_str())
+        (*self).eq(other.as_str())
     }
 }
 
-impl<S: AsRef<str>> PartialOrd<S> for ImmutableString {
+impl PartialEq<ImmutableString> for String {
+    #[inline(always)]
+    fn eq(&self, other: &ImmutableString) -> bool {
+        self.as_str().eq(other.as_str())
+    }
+}
+
+impl PartialEq<&ImmutableString> for String {
+    #[inline(always)]
+    fn eq(&self, other: &&ImmutableString) -> bool {
+        self.as_str().eq(other.as_str())
+    }
+}
+
+impl PartialEq<ImmutableString> for &String {
+    #[inline(always)]
+    fn eq(&self, other: &ImmutableString) -> bool {
+        self.as_str().eq(other.as_str())
+    }
+}
+
+impl<S: AsRef<str> + ?Sized> PartialOrd<S> for ImmutableString {
     fn partial_cmp(&self, other: &S) -> Option<Ordering> {
         self.as_str().partial_cmp(other.as_ref())
+    }
+}
+
+impl PartialOrd<str> for &ImmutableString {
+    fn partial_cmp(&self, other: &str) -> Option<Ordering> {
+        self.as_str().partial_cmp(other)
+    }
+}
+
+impl PartialOrd<String> for &ImmutableString {
+    fn partial_cmp(&self, other: &String) -> Option<Ordering> {
+        self.as_str().partial_cmp(other.as_str())
     }
 }
 
@@ -609,7 +689,28 @@ impl PartialOrd<ImmutableString> for str {
     }
 }
 
+impl PartialOrd<ImmutableString> for &str {
+    #[inline(always)]
+    fn partial_cmp(&self, other: &ImmutableString) -> Option<Ordering> {
+        (*self).partial_cmp(other.as_str())
+    }
+}
+
 impl PartialOrd<ImmutableString> for String {
+    #[inline(always)]
+    fn partial_cmp(&self, other: &ImmutableString) -> Option<Ordering> {
+        self.as_str().partial_cmp(other.as_str())
+    }
+}
+
+impl PartialOrd<&ImmutableString> for String {
+    #[inline(always)]
+    fn partial_cmp(&self, other: &&ImmutableString) -> Option<Ordering> {
+        self.as_str().partial_cmp(other.as_str())
+    }
+}
+
+impl PartialOrd<ImmutableString> for &String {
     #[inline(always)]
     fn partial_cmp(&self, other: &ImmutableString) -> Option<Ordering> {
         self.as_str().partial_cmp(other.as_str())
@@ -622,6 +723,18 @@ impl ImmutableString {
     #[must_use]
     pub fn new() -> Self {
         Self(SmartString::new_const().into())
+    }
+    /// Get the string slice.
+    #[inline(always)]
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+    /// Get the string slice.
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn as_raw(&self) -> &SmartString {
+        &self.0
     }
     /// Strong count of references to the underlying string.
     pub(crate) fn strong_count(&self) -> usize {

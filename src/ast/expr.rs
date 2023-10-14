@@ -1,7 +1,7 @@
 //! Module defining script expressions.
 
 use super::{ASTFlags, ASTNode, Ident, Namespace, Stmt, StmtBlock};
-use crate::engine::{KEYWORD_FN_PTR, OP_EXCLUSIVE_RANGE, OP_INCLUSIVE_RANGE};
+use crate::engine::KEYWORD_FN_PTR;
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
 use crate::{
@@ -28,16 +28,6 @@ pub struct BinaryExpr {
     pub lhs: Expr,
     /// RHS expression.
     pub rhs: Expr,
-}
-
-impl From<(Expr, Expr)> for BinaryExpr {
-    #[inline(always)]
-    fn from(value: (Expr, Expr)) -> Self {
-        Self {
-            lhs: value.0,
-            rhs: value.1,
-        }
-    }
 }
 
 /// _(internals)_ A custom syntax expression.
@@ -490,7 +480,7 @@ impl Expr {
                 let mut map = x.1.clone();
 
                 for (k, v) in &x.0 {
-                    *map.get_mut(k.name.as_str()).unwrap() = v.get_literal_value().unwrap();
+                    *map.get_mut(k.as_str()).unwrap() = v.get_literal_value().unwrap();
                 }
 
                 Dynamic::from_map(map)
@@ -518,6 +508,9 @@ impl Expr {
 
             // Binary operators
             Self::FnCall(x, ..) if !x.is_qualified() && x.args.len() == 2 => {
+                pub const OP_EXCLUSIVE_RANGE: &str = Token::ExclusiveRange.literal_syntax();
+                pub const OP_INCLUSIVE_RANGE: &str = Token::InclusiveRange.literal_syntax();
+
                 match x.name.as_str() {
                     // x..y
                     OP_EXCLUSIVE_RANGE => match (&x.args[0], &x.args[1]) {
@@ -590,7 +583,7 @@ impl Expr {
         match self {
             #[cfg(not(feature = "no_module"))]
             Self::Variable(x, ..) if _non_qualified && !x.1.is_empty() => None,
-            Self::Variable(x, ..) => Some(x.3.as_str()),
+            Self::Variable(x, ..) => Some(&x.3),
             _ => None,
         }
     }
@@ -830,7 +823,7 @@ impl Expr {
     pub fn walk<'a>(
         &'a self,
         path: &mut Vec<ASTNode<'a>>,
-        on_node: &mut impl FnMut(&[ASTNode]) -> bool,
+        on_node: &mut (impl FnMut(&[ASTNode]) -> bool + ?Sized),
     ) -> bool {
         // Push the current node onto the path
         path.push(self.into());

@@ -1,12 +1,12 @@
-//! Variable definition information.
+//! Variable declaration information.
 
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
-/// Information on a variable definition.
+/// Information on a variable declaration.
 #[derive(Debug, Clone, Hash)]
 pub struct VarDefInfo<'a> {
-    /// Name of the variable to be defined.
+    /// Name of the variable to be declared.
     name: &'a str,
     /// `true` if the statement is `const`, otherwise it is `let`.
     is_const: bool,
@@ -33,7 +33,7 @@ impl<'a> VarDefInfo<'a> {
             will_shadow,
         }
     }
-    /// Name of the variable to be defined.
+    /// Name of the variable to be declared.
     #[inline(always)]
     #[must_use]
     pub const fn name(&self) -> &str {
@@ -50,6 +50,12 @@ impl<'a> VarDefInfo<'a> {
     #[must_use]
     pub const fn nesting_level(&self) -> usize {
         self.nesting_level
+    }
+    /// `true` if the variable is declared at global level (i.e. nesting level zero).
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_global_level(&self) -> bool {
+        self.nesting_level == 0
     }
     /// Will the variable _shadow_ an existing variable?
     #[inline(always)]

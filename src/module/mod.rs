@@ -352,7 +352,7 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn id(&self) -> Option<&str> {
-        self.id.as_ref().map(|s| s.as_str())
+        self.id.as_deref()
     }
 
     /// Get the ID of the [`Module`] as an [`Identifier`], if any.
@@ -1935,7 +1935,7 @@ impl Module {
                                 f.metadata.namespace,
                                 f.metadata.access,
                                 f.func.is_script(),
-                                f.metadata.name.as_str(),
+                                &f.metadata.name,
                                 f.metadata.num_params,
                             )
                         })
@@ -1978,7 +1978,7 @@ impl Module {
                         filter(
                             f.metadata.namespace,
                             f.metadata.access,
-                            f.metadata.name.as_str(),
+                            &f.metadata.name,
                             f.metadata.num_params,
                         )
                     } else {
@@ -2421,7 +2421,7 @@ impl Module {
                 } else {
                     let hash_fn = calc_native_fn_hash(
                         path.iter().copied(),
-                        f.metadata.name.as_str(),
+                        &f.metadata.name,
                         &f.metadata.param_types,
                     );
 

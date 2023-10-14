@@ -77,7 +77,7 @@ pub struct NativeCallContext<'a> {
     pos: Position,
 }
 
-/// _(internals)_ Context of a native Rust function call.
+/// _(internals)_ Context of a native Rust function call, intended for persistence.
 /// Exported under the `internals` feature only.
 ///
 /// # WARNING - Volatile Type

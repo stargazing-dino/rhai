@@ -21,7 +21,28 @@ pub struct EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
 }
 
 impl<'a, 's, 'ps, 'g, 'c, 't> EvalContext<'a, 's, 'ps, 'g, 'c, 't> {
+    /// _(internals)_ Create a new [`EvalContext`].
+    /// Exported under the `internals` feature only.
+    #[cfg(not(feature = "internals"))]
+    #[inline(always)]
+    #[must_use]
+    pub(crate) fn new(
+        engine: &'a Engine,
+        global: &'g mut GlobalRuntimeState,
+        caches: &'c mut Caches,
+        scope: &'s mut Scope<'ps>,
+        this_ptr: Option<&'t mut Dynamic>,
+    ) -> Self {
+        Self {
+            engine,
+            global,
+            caches,
+            scope,
+            this_ptr,
+        }
+    }
     /// Create a new [`EvalContext`].
+    #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
     pub fn new(

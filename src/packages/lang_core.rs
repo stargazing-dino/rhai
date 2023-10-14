@@ -273,7 +273,7 @@ fn collect_fn_metadata(
                 "comments".into(),
                 func.comments
                     .iter()
-                    .map(|s| engine.get_interned_string(s.as_str()).into())
+                    .map(|s| engine.get_interned_string(s).into())
                     .collect::<Array>()
                     .into(),
             );

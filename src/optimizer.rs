@@ -28,6 +28,8 @@ use std::{
 };
 
 /// Level of optimization performed.
+///
+/// Not available under `no_optimize`.
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default, Hash)]
 #[non_exhaustive]
 pub enum OptimizationLevel {
@@ -119,7 +121,7 @@ impl<'a> OptimizerState<'a> {
         self.variables
             .iter()
             .rev()
-            .find(|(n, _)| n.as_str() == name)
+            .find(|(n, _)| n == name)
             .and_then(|(_, value)| value.as_ref())
     }
     /// Call a registered function
@@ -427,12 +429,15 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
 
             *stmt = if preserve_result {
                 // -> { expr, Noop }
-                (
-                    [Stmt::Expr(expr.into()), Stmt::Noop(pos)],
-                    pos,
-                    Position::NONE,
+                Stmt::Block(
+                    StmtBlock::new(
+                        [Stmt::Expr(expr.into()), Stmt::Noop(pos)],
+                        pos,
+                        Position::NONE,
+                    )
+                    .into(),
                 )
-                    .into()
+                .into()
             } else {
                 // -> expr
                 Stmt::Expr(expr.into())
@@ -456,7 +461,9 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             let body = x.branch.take_statements();
             *stmt = match optimize_stmt_block(body, state, preserve_result, true, false) {
                 statements if statements.is_empty() => Stmt::Noop(x.branch.position()),
-                statements => (statements, x.branch.span()).into(),
+                statements => {
+                    Stmt::Block(StmtBlock::new_with_span(statements, x.branch.span()).into())
+                }
             }
         }
         // if true { if_block } else { else_block } -> if_block
@@ -465,7 +472,9 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             let body = x.body.take_statements();
             *stmt = match optimize_stmt_block(body, state, preserve_result, true, false) {
                 statements if statements.is_empty() => Stmt::Noop(x.body.position()),
-                statements => (statements, x.body.span()).into(),
+                statements => {
+                    Stmt::Block(StmtBlock::new_with_span(statements, x.body.span()).into())
+                }
             }
         }
         // if expr { if_block } else { else_block }
@@ -626,7 +635,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                     optimize_stmt(&mut def_stmt, state, true);
                     *stmt = def_stmt;
                 }
-                _ => *stmt = StmtBlock::empty(*pos).into(),
+                _ => *stmt = Stmt::Block(StmtBlock::empty(*pos).into()),
             }
         }
         // switch
@@ -751,32 +760,28 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         Stmt::Import(x, ..) => optimize_expr(&mut x.0, state, false),
         // { block }
         Stmt::Block(block) => {
-            let span = block.span();
-            let statements = block.take_statements().into_vec().into();
-            let mut block = optimize_stmt_block(statements, state, preserve_result, true, false);
+            let mut stmts =
+                optimize_stmt_block(block.take_statements(), state, preserve_result, true, false);
 
-            match block.as_mut_slice() {
+            match stmts.as_mut_slice() {
                 [] => {
                     state.set_dirty();
-                    *stmt = Stmt::Noop(span.start());
+                    *stmt = Stmt::Noop(block.span().start());
                 }
                 // Only one statement which is not block-dependent - promote
                 [s] if !s.is_block_dependent() => {
                     state.set_dirty();
                     *stmt = s.take();
                 }
-                _ => *stmt = (block, span).into(),
+                _ => *block.statements_mut() = stmts,
             }
         }
         // try { pure try_block } catch ( var ) { catch_block } -> try_block
         Stmt::TryCatch(x, ..) if x.body.iter().all(Stmt::is_pure) => {
             // If try block is pure, there will never be any exceptions
             state.set_dirty();
-            *stmt = (
-                optimize_stmt_block(x.body.take_statements(), state, false, true, false),
-                x.body.span(),
-            )
-                .into();
+            *x.body.statements_mut() =
+                optimize_stmt_block(x.body.take_statements(), state, false, true, false);
         }
         // try { try_block } catch ( var ) { catch_block }
         Stmt::TryCatch(x, ..) => {
@@ -791,10 +796,10 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             state.set_dirty();
             match expr.as_mut() {
                 Expr::Stmt(block) if !block.is_empty() => {
-                    let mut stmt_block = *mem::take(block);
-                    *stmt_block.statements_mut() =
-                        optimize_stmt_block(stmt_block.take_statements(), state, true, true, false);
-                    *stmt = stmt_block.into();
+                    let mut stmts_blk = mem::take(block.as_mut());
+                    *stmts_blk.statements_mut() =
+                        optimize_stmt_block(stmts_blk.take_statements(), state, true, true, false);
+                    *stmt = Stmt::Block(stmts_blk.into());
                 }
                 Expr::Stmt(..) => *stmt = Stmt::Noop(expr.position()),
                 _ => unreachable!("`Expr::Stmt`"),
@@ -896,11 +901,10 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         Expr::Dot(x, ..) if !_chaining => match (&mut x.lhs, &mut x.rhs) {
             // map.string
             (Expr::Map(m, pos), Expr::Property(p, ..)) if m.0.iter().all(|(.., x)| x.is_pure()) => {
-                let prop = p.2.as_str();
                 // Map literal where everything is pure - promote the indexed item.
                 // All other items can be thrown away.
                 state.set_dirty();
-                *expr = mem::take(&mut m.0).into_iter().find(|(x, ..)| x.as_str() == prop)
+                *expr = mem::take(&mut m.0).into_iter().find(|(x, ..)| x.name == p.2)
                             .map_or_else(|| Expr::Unit(*pos), |(.., mut expr)| { expr.set_position(*pos); expr });
             }
             // var.rhs or this.rhs
@@ -963,7 +967,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 // Map literal where everything is pure - promote the indexed item.
                 // All other items can be thrown away.
                 state.set_dirty();
-                *expr = mem::take(&mut m.0).into_iter().find(|(x, ..)| x.as_str() == s.as_str())
+                *expr = mem::take(&mut m.0).into_iter().find(|(x, ..)| x.name == s)
                             .map_or_else(|| Expr::Unit(*pos), |(.., mut expr)| { expr.set_position(*pos); expr });
             }
             // int[int]

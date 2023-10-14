@@ -19,7 +19,7 @@ pub struct FnResolutionCacheEntry {
 /// _(internals)_ A function resolution cache with a bloom filter.
 /// Exported under the `internals` feature only.
 ///
-/// The bloom filter is used to rapidly check whether a function hash has never been encountered.
+/// The [bloom filter][`BloomFilterU64`] is used to rapidly check whether a function hash has never been encountered.
 /// It enables caching a hash only during the second encounter to avoid "one-hit wonders".
 #[derive(Debug, Clone, Default)]
 pub struct FnResolutionCache {

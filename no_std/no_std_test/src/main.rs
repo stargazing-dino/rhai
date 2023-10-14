@@ -35,7 +35,7 @@ fn foo(_: core::alloc::Layout) -> ! {
 
 #[panic_handler]
 #[lang = "panic_impl"]
-extern "C" fn rust_begin_panic(_: &core::panic::PanicInfo) -> ! {
+fn rust_begin_panic(_: &core::panic::PanicInfo) -> ! {
     core::intrinsics::abort();
 }
 

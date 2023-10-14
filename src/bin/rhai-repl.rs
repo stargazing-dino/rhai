@@ -11,7 +11,7 @@ const HISTORY_FILE: &str = ".rhai-repl-history";
 
 /// Pretty-print error.
 fn print_error(input: &str, mut err: EvalAltResult) {
-    let lines: Vec<_> = input.split('\n').collect();
+    let lines: Vec<_> = input.lines().collect();
     let pos = err.take_position();
 
     let line_no = if lines.len() > 1 {
@@ -32,7 +32,7 @@ fn print_error(input: &str, mut err: EvalAltResult) {
         // Specific position - print line text
         println!("{line_no}{}", lines[pos.line().unwrap() - 1]);
 
-        for (i, err_line) in err.to_string().split('\n').enumerate() {
+        for (i, err_line) in err.to_string().lines().enumerate() {
             // Display position marker
             println!(
                 "{0:>1$}{err_line}",
@@ -411,7 +411,7 @@ fn main() {
             "exit" | "quit" => break, // quit
             "history" => {
                 for (i, h) in rl.history().iter().enumerate() {
-                    match &h.split('\n').collect::<Vec<_>>()[..] {
+                    match &h.lines().collect::<Vec<_>>()[..] {
                         [line] => println!("[{}] {line}", history_offset + i),
                         lines => {
                             for (x, line) in lines.iter().enumerate() {

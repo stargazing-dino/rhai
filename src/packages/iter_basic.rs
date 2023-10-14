@@ -12,6 +12,7 @@ use std::{
     fmt::Debug,
     iter::{ExactSizeIterator, FusedIterator},
     ops::{Range, RangeInclusive},
+    vec::IntoIter,
 };
 
 #[cfg(not(feature = "no_float"))]
@@ -173,19 +174,26 @@ impl ExactSizeIterator for BitRange {
 }
 
 // String iterator over characters
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct CharsStream(Vec<char>, usize);
+#[derive(Debug, Clone)]
+pub struct CharsStream(IntoIter<char>);
 
 impl CharsStream {
     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn new(string: &str, from: INT, len: INT) -> Self {
         if len <= 0 || from > MAX_USIZE_INT {
-            return Self(Vec::new(), 0);
+            return Self(Vec::new().into_iter());
         }
         let len = len.min(MAX_USIZE_INT) as usize;
 
         if from >= 0 {
-            return Self(string.chars().skip(from as usize).take(len).collect(), 0);
+            return Self(
+                string
+                    .chars()
+                    .skip(from as usize)
+                    .take(len)
+                    .collect::<Vec<_>>()
+                    .into_iter(),
+            );
         }
 
         let abs_from = from.unsigned_abs() as usize;
@@ -195,36 +203,37 @@ impl CharsStream {
         } else {
             num_chars - abs_from
         };
-        Self(string.chars().skip(offset).take(len).collect(), 0)
+        Self(
+            string
+                .chars()
+                .skip(offset)
+                .take(len)
+                .collect::<Vec<_>>()
+                .into_iter(),
+        )
     }
 }
 
 impl Iterator for CharsStream {
     type Item = char;
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.1 >= self.0.len() {
-            return None;
-        }
-
-        let ch = self.0[self.1];
-        self.1 += 1;
-        Some(ch)
+        self.0.next()
     }
 
-    #[inline]
+    #[inline(always)]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let remaining = self.0.len() - self.1;
-        (remaining, Some(remaining))
+        self.0.size_hint()
     }
 }
 
 impl FusedIterator for CharsStream {}
 
 impl ExactSizeIterator for CharsStream {
-    #[inline]
+    #[inline(always)]
     fn len(&self) -> usize {
-        self.0.len() - self.1
+        self.0.len()
     }
 }
 

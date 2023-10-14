@@ -173,7 +173,8 @@ impl fmt::Debug for OpAssignment {
     }
 }
 
-/// An expression with a condition.
+/// _(internals)_ An expression with a condition.
+/// Exported under the `internals` feature only.
 ///
 /// The condition may simply be [`Expr::BoolConstant`] with `true` if there is actually no condition.
 #[derive(Debug, Clone, Default, Hash)]
@@ -723,27 +724,6 @@ impl Default for Stmt {
     }
 }
 
-impl From<StmtBlock> for Stmt {
-    #[inline(always)]
-    fn from(block: StmtBlock) -> Self {
-        Self::Block(block.into())
-    }
-}
-
-impl<T: IntoIterator<Item = Self>> From<(T, Position, Position)> for Stmt {
-    #[inline(always)]
-    fn from(value: (T, Position, Position)) -> Self {
-        StmtBlock::new(value.0, value.1, value.2).into()
-    }
-}
-
-impl<T: IntoIterator<Item = Self>> From<(T, Span)> for Stmt {
-    #[inline(always)]
-    fn from(value: (T, Span)) -> Self {
-        StmtBlock::new_with_span(value.0, value.1).into()
-    }
-}
-
 impl Stmt {
     /// Is this statement [`Noop`][Stmt::Noop]?
     #[inline(always)]
@@ -1038,7 +1018,7 @@ impl Stmt {
     pub fn walk<'a>(
         &'a self,
         path: &mut Vec<ASTNode<'a>>,
-        on_node: &mut impl FnMut(&[ASTNode]) -> bool,
+        on_node: &mut (impl FnMut(&[ASTNode]) -> bool + ?Sized),
     ) -> bool {
         // Push the current node onto the path
         path.push(self.into());

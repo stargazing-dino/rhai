@@ -45,7 +45,7 @@ impl Ident {
     #[inline(always)]
     #[must_use]
     pub fn as_str(&self) -> &str {
-        self.name.as_str()
+        &self.name
     }
     /// Is the identifier empty?
     #[inline(always)]

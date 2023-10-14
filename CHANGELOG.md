@@ -1,6 +1,28 @@
 Rhai Release Notes
 ==================
 
+Version 1.17.0
+==============
+
+Potentially breaking changes
+----------------------------
+
+* `ImmutableString` now derefs to `&str` instead of `&SmartString`. Normally this should not be a breaking change.
+* Traits implemented by `ImmutableString` are cleaned up.  However, I cannot guarantee that there are absolutely no breaking changes, although I try to be careful.
+* `EvalContext::new`, `FloatWrapper` and `ConditionalExpr` are now exported only under `internals`.
+
+Deprecated API's
+----------------
+
+* `rhai::config::hashing::set_ahash_seed`, `rhai::config::hashing::get_ahash_seed` and the `RHAI_AHASH_SEED` environment variable are deprecated in favor of `rhai::config::hashing::set_hashing_seed`, `rhai::config::hashing::get_hashing_seed` and `RHAI_HASHING_SEED`.
+
+Enhancements
+------------
+
+* Added `to_int` method for characters.
+* `Token::FloatConstant` and `Token::DecimalConstant` now carry the original text representation for use in, say, a _token mapper_.
+
+
 Version 1.16.2
 ==============
 

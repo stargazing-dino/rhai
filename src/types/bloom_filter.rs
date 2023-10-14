@@ -13,8 +13,9 @@ const USIZE_BITS: usize = mem::size_of::<usize>() * 8;
 /// Number of `usize` values required for 256 bits.
 const SIZE: usize = 256 / USIZE_BITS;
 
-/// A simple bloom filter implementation for `u64` hash values only - i.e. all 64 bits are assumed
+/// _(internals)_ A simple bloom filter implementation for `u64` hash values only - i.e. all 64 bits are assumed
 /// to be relatively random.
+/// Exported under the `internals` feature only.
 ///
 /// For this reason, the implementation is simplistic - it just looks at the least significant byte
 /// of the `u64` hash value and sets the corresponding bit in a 256-long bit vector.

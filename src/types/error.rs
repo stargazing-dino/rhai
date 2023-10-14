@@ -445,7 +445,7 @@ impl EvalAltResult {
                     #[cfg(feature = "no_index")]
                     tokens
                         .iter()
-                        .map(|s| s.as_str())
+                        .map(String::as_str)
                         .collect::<Vec<_>>()
                         .join(" ")
                         .into(),

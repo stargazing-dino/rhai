@@ -17,7 +17,7 @@ impl Serialize for Dynamic {
         match self.0 {
             Union::Unit(..) => ser.serialize_unit(),
             Union::Bool(x, ..) => ser.serialize_bool(x),
-            Union::Str(ref s, ..) => ser.serialize_str(s.as_str()),
+            Union::Str(ref s, ..) => ser.serialize_str(s),
             Union::Char(c, ..) => ser.serialize_char(c),
 
             #[cfg(not(feature = "only_i32"))]
@@ -60,8 +60,7 @@ impl Serialize for Dynamic {
             #[cfg(not(feature = "no_object"))]
             Union::Map(ref m, ..) => {
                 let mut map = ser.serialize_map(Some(m.len()))?;
-                m.iter()
-                    .try_for_each(|(k, v)| map.serialize_entry(k.as_str(), v))?;
+                m.iter().try_for_each(|(k, v)| map.serialize_entry(k, v))?;
                 map.end()
             }
             Union::FnPtr(ref f, ..) => ser.serialize_str(f.fn_name()),
@@ -83,7 +82,7 @@ impl Serialize for Dynamic {
 impl Serialize for ImmutableString {
     #[inline(always)]
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-        ser.serialize_str(self.as_str())
+        ser.serialize_str(&self)
     }
 }
 

@@ -107,10 +107,10 @@ impl Expression<'_> {
         match self.0 {
             #[cfg(not(feature = "no_module"))]
             Expr::Variable(x, ..) if !x.1.is_empty() => None,
-            Expr::Variable(x, ..) => Some(x.3.as_str()),
+            Expr::Variable(x, ..) => Some(&x.3),
             #[cfg(not(feature = "no_function"))]
             Expr::ThisPtr(..) => Some(crate::engine::KEYWORD_THIS),
-            Expr::StringConstant(x, ..) => Some(x.as_str()),
+            Expr::StringConstant(x, ..) => Some(&x),
             _ => None,
         }
     }

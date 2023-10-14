@@ -379,6 +379,27 @@ impl Dynamic {
     }
 }
 
+impl AST {
+    /// _(internals)_ Get the internal [`Module`][crate::Module] containing all script-defined functions.
+    /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_function`.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated. Use [`shared_lib`][AST::shared_lib] instead.
+    ///
+    /// This method will be removed in the next major version.
+    #[deprecated(since = "1.3.0", note = "use `shared_lib` instead")]
+    #[cfg(feature = "internals")]
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    #[must_use]
+    pub fn lib(&self) -> &crate::Module {
+        self.shared_lib()
+    }
+}
+
 impl NativeCallContext<'_> {
     /// Create a new [`NativeCallContext`].
     ///
@@ -1254,5 +1275,38 @@ pub mod deprecated_array_functions {
         filter: &str,
     ) -> RhaiResultOf<Array> {
         retain(ctx, array, FnPtr::new(filter)?)
+    }
+}
+
+pub mod config {
+    pub mod hashing {
+        /// Set the hashing seed. This is used to hash functions etc.
+        ///
+        /// # Deprecated
+        ///
+        /// This method is deprecated.
+        /// Use [`set_hashing_seed`][crate::config::hashing::set_hashing_seed] instead.
+        ///
+        /// This method will be removed in the next major version.
+        #[deprecated(since = "1.17.0", note = "use `set_hashing_seed` instead")]
+        #[inline(always)]
+        pub fn set_ahash_seed(new_seed: Option<[u64; 4]>) -> Result<(), Option<[u64; 4]>> {
+            crate::config::hashing::set_hashing_seed(new_seed)
+        }
+
+        /// Get the current hashing Seed.
+        ///
+        /// # Deprecated
+        ///
+        /// This method is deprecated.
+        /// Use [`get_hashing_seed`][crate::config::hashing::get_hashing_seed] instead.
+        ///
+        /// This method will be removed in the next major version.
+        #[deprecated(since = "1.17.0", note = "use `get_hashing_seed` instead")]
+        #[inline]
+        #[must_use]
+        pub fn get_ahash_seed() -> &'static Option<[u64; 4]> {
+            crate::config::hashing::get_hashing_seed()
+        }
     }
 }

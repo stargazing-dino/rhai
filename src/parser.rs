@@ -13,8 +13,10 @@ use crate::tokenizer::{
     is_reserved_keyword_or_symbol, is_valid_function_name, is_valid_identifier, Token, TokenStream,
     TokenizerControl,
 };
-use crate::types::dynamic::{AccessMode, Union};
-use crate::types::StringsInterner;
+use crate::types::{
+    dynamic::{AccessMode, Union},
+    StringsInterner,
+};
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
     Identifier, ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position,
@@ -56,7 +58,7 @@ pub struct ParseState<'e, 's> {
     /// Encapsulates a local stack with variable names to simulate an actual runtime scope.
     pub stack: Scope<'e>,
     /// Size of the local variables stack upon entry of the current block scope.
-    pub block_stack_len: usize,
+    pub frame_pointer: usize,
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
     #[cfg(not(feature = "no_closure"))]
     pub external_vars: Vec<Ident>,
@@ -87,7 +89,7 @@ impl fmt::Debug for ParseState<'_, '_> {
             .field("external_constants_scope", &self.external_constants)
             .field("global", &self.global)
             .field("stack", &self.stack)
-            .field("block_stack_len", &self.block_stack_len);
+            .field("frame_pointer", &self.frame_pointer);
 
         #[cfg(not(feature = "no_closure"))]
         f.field("external_vars", &self.external_vars)
@@ -120,7 +122,7 @@ impl<'e, 's> ParseState<'e, 's> {
             external_constants,
             global: None,
             stack: Scope::new(),
-            block_stack_len: 0,
+            frame_pointer: 0,
             #[cfg(not(feature = "no_module"))]
             imports: Vec::new(),
             #[cfg(not(feature = "no_module"))]
@@ -222,7 +224,7 @@ impl<'e, 's> ParseState<'e, 's> {
         self.imports
             .iter()
             .rev()
-            .rposition(|n| n.as_str() == name)
+            .rposition(|n| n == name)
             .and_then(|i| NonZeroUsize::new(i + 1))
     }
 
@@ -381,9 +383,9 @@ impl Expr {
             Self::Variable(x, ..) if !x.1.is_empty() => unreachable!("qualified property"),
             Self::Variable(x, .., pos) => {
                 let ident = x.3.clone();
-                let getter = state.get_interned_getter(ident.as_str());
+                let getter = state.get_interned_getter(&ident);
                 let hash_get = calc_fn_hash(None, &getter, 1);
-                let setter = state.get_interned_setter(ident.as_str());
+                let setter = state.get_interned_setter(&ident);
                 let hash_set = calc_fn_hash(None, &setter, 2);
 
                 Self::Property(
@@ -497,7 +499,7 @@ fn unindent_block_comment(comment: String, pos: usize) -> String {
     }
 
     let offset = comment
-        .split('\n')
+        .lines()
         .skip(1)
         .map(|s| s.len() - s.trim_start().len())
         .min()
@@ -509,7 +511,7 @@ fn unindent_block_comment(comment: String, pos: usize) -> String {
     }
 
     comment
-        .split('\n')
+        .lines()
         .enumerate()
         .map(|(i, s)| if i > 0 { &s[offset..] } else { s })
         .collect::<Vec<_>>()
@@ -522,7 +524,7 @@ fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position
         // Variable name
         (Token::Identifier(s), pos) => Ok((*s, pos)),
         // Reserved keyword
-        (Token::Reserved(s), pos) if is_valid_identifier(s.as_str()) => {
+        (Token::Reserved(s), pos) if is_valid_identifier(&s) => {
             Err(PERR::Reserved(s.to_string()).into_err(pos))
         }
         // Bad identifier
@@ -663,7 +665,7 @@ impl Engine {
                     if settings.has_option(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
-                        && !state.global_imports.iter().any(|m| m.as_str() == root)
+                        && !state.global_imports.iter().any(|m| m == root)
                         && !self.global_sub_modules.contains_key(root)
                     {
                         return Err(
@@ -730,7 +732,7 @@ impl Engine {
                         if settings.has_option(LangOptions::STRICT_VAR)
                             && index.is_none()
                             && !is_global
-                            && !state.global_imports.iter().any(|m| m.as_str() == root)
+                            && !state.global_imports.iter().any(|m| m == root)
                             && !self.global_sub_modules.contains_key(root)
                         {
                             return Err(
@@ -1054,7 +1056,7 @@ impl Engine {
                 (Token::InterpolatedString(..), pos) => {
                     return Err(PERR::PropertyExpected.into_err(pos))
                 }
-                (Token::Reserved(s), pos) if is_valid_identifier(s.as_str()) => {
+                (Token::Reserved(s), pos) if is_valid_identifier(&s) => {
                     return Err(PERR::Reserved(s.to_string()).into_err(pos));
                 }
                 (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -1385,15 +1387,15 @@ impl Engine {
             },
             #[cfg(not(feature = "no_float"))]
             Token::FloatConstant(x) => {
-                let x = *x;
+                let x = x.0;
                 input.next();
                 Expr::FloatConstant(x, settings.pos)
             }
             #[cfg(feature = "decimal")]
             Token::DecimalConstant(x) => {
-                let x = (**x).into();
+                let x = x.0;
                 input.next();
-                Expr::DynamicConstant(Box::new(x), settings.pos)
+                Expr::DynamicConstant(Box::new(x.into()), settings.pos)
             }
 
             // { - block statement as expression
@@ -1918,7 +1920,7 @@ impl Engine {
                     if settings.has_option(LangOptions::STRICT_VAR)
                         && index.is_none()
                         && !is_global
-                        && !state.global_imports.iter().any(|m| m.as_str() == root)
+                        && !state.global_imports.iter().any(|m| m == root)
                         && !self.global_sub_modules.contains_key(root)
                     {
                         return Err(
@@ -2073,10 +2075,10 @@ impl Engine {
 
         match lhs {
             // this = rhs
-            Expr::ThisPtr(_) => Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into())),
+            Expr::ThisPtr(_) => Ok(Stmt::Assignment((op_info, BinaryExpr { lhs, rhs }).into())),
             // var (non-indexed) = rhs
             Expr::Variable(ref x, None, _) if x.0.is_none() => {
-                Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
+                Ok(Stmt::Assignment((op_info, BinaryExpr { lhs, rhs }).into()))
             }
             // var (indexed) = rhs
             Expr::Variable(ref x, i, var_pos) => {
@@ -2092,7 +2094,7 @@ impl Engine {
                     .access_mode()
                 {
                     AccessMode::ReadWrite => {
-                        Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
+                        Ok(Stmt::Assignment((op_info, BinaryExpr { lhs, rhs }).into()))
                     }
                     // Constant values cannot be assigned to
                     AccessMode::ReadOnly => {
@@ -2114,7 +2116,7 @@ impl Engine {
                     match x.lhs {
                         // var[???] = rhs, this[???] = rhs, var.??? = rhs, this.??? = rhs
                         Expr::Variable(..) | Expr::ThisPtr(..) => {
-                            Ok(Stmt::Assignment((op_info, (lhs, rhs).into()).into()))
+                            Ok(Stmt::Assignment((op_info, BinaryExpr { lhs, rhs }).into()))
                         }
                         // expr[???] = rhs, expr.??? = rhs
                         ref expr => {
@@ -2180,8 +2182,10 @@ impl Engine {
             // lhs.Fn() or lhs.eval()
             (.., Expr::FnCall(f, func_pos))
                 if f.args.is_empty()
-                    && [crate::engine::KEYWORD_FN_PTR, crate::engine::KEYWORD_EVAL]
-                        .contains(&f.name.as_str()) =>
+                    && matches!(
+                        &*f.name,
+                        crate::engine::KEYWORD_FN_PTR | crate::engine::KEYWORD_EVAL
+                    ) =>
             {
                 let err_msg = format!(
                     "'{}' should not be called in method style. Try {}(...);",
@@ -2436,7 +2440,7 @@ impl Engine {
                 }
 
                 #[cfg(not(feature = "no_custom_syntax"))]
-                Token::Custom(s) if self.is_custom_keyword(s.as_str()) => {
+                Token::Custom(s) if self.is_custom_keyword(&s) => {
                     op_base.hashes = if native_only {
                         FnCallHashes::from_native_only(calc_fn_hash(None, &s, 2))
                     } else {
@@ -2584,8 +2588,8 @@ impl Engine {
                 #[cfg(not(feature = "no_float"))]
                 CUSTOM_SYNTAX_MARKER_FLOAT => match input.next().expect(NEVER_ENDS) {
                     (Token::FloatConstant(f), pos) => {
-                        inputs.push(Expr::FloatConstant(f, pos));
-                        segments.push(f.to_string().into());
+                        inputs.push(Expr::FloatConstant(f.0, pos));
+                        segments.push(f.1.into());
                         tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_FLOAT));
                     }
                     (.., pos) => {
@@ -2633,7 +2637,7 @@ impl Engine {
         tokens.shrink_to_fit();
 
         let self_terminated = matches!(
-            required_token.as_str(),
+            &*required_token,
             // It is self-terminating if the last symbol is a block
             CUSTOM_SYNTAX_MARKER_BLOCK |
             // If the last symbol is `;` or `}`, it is self-terminating
@@ -2957,7 +2961,7 @@ impl Engine {
                 #[cfg(not(feature = "no_module"))]
                 offset if !state.stack.get_entry_by_index(offset).2.is_empty() => None,
                 // Defined in parent block
-                offset if offset < state.block_stack_len => None,
+                offset if offset < state.frame_pointer => None,
                 offset => Some(offset),
             }
         } else {
@@ -3107,15 +3111,17 @@ impl Engine {
         };
         let mut settings = settings.level_up_with_position(brace_start_pos)?;
 
-        let mut statements = StaticVec::new_const();
+        let mut block = StmtBlock::empty(settings.pos);
 
         if settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
             let stmt = self.parse_expr_stmt(input, state, lib, settings)?;
-            statements.push(stmt);
+            block.statements_mut().push(stmt);
 
             // Must end with }
             return match input.next().expect(NEVER_ENDS) {
-                (Token::RightBrace, pos) => Ok((statements, settings.pos, pos).into()),
+                (Token::RightBrace, pos) => {
+                    Ok(Stmt::Block(StmtBlock::new(block, settings.pos, pos).into()))
+                }
                 (Token::LexError(err), pos) => Err(err.into_err(pos)),
                 (.., pos) => Err(PERR::MissingToken(
                     Token::LeftBrace.into(),
@@ -3125,8 +3131,8 @@ impl Engine {
             };
         }
 
-        let prev_entry_stack_len = state.block_stack_len;
-        state.block_stack_len = state.stack.len();
+        let prev_frame_pointer = state.frame_pointer;
+        state.frame_pointer = state.stack.len();
 
         #[cfg(not(feature = "no_module"))]
         let orig_imports_len = state.imports.len();
@@ -3157,7 +3163,7 @@ impl Engine {
             // See if it needs a terminating semicolon
             let need_semicolon = !stmt.is_self_terminated();
 
-            statements.push(stmt);
+            block.statements_mut().push(stmt);
 
             match input.peek().expect(NEVER_ENDS) {
                 // { ... stmt }
@@ -3186,13 +3192,15 @@ impl Engine {
             }
         };
 
-        state.stack.rewind(state.block_stack_len);
-        state.block_stack_len = prev_entry_stack_len;
+        state.stack.rewind(state.frame_pointer);
+        state.frame_pointer = prev_frame_pointer;
 
         #[cfg(not(feature = "no_module"))]
         state.imports.truncate(orig_imports_len);
 
-        Ok((statements, settings.pos, end_pos).into())
+        Ok(Stmt::Block(
+            StmtBlock::new(block, settings.pos, end_pos).into(),
+        ))
     }
 
     /// Parse an expression as a statement.
@@ -3648,7 +3656,7 @@ impl Engine {
                 match input.next().expect(NEVER_ENDS) {
                     (Token::RightParen, ..) => break,
                     (Token::Identifier(s), pos) => {
-                        if params.iter().any(|(p, _)| p.as_str() == *s) {
+                        if params.iter().any(|(p, _)| p == &*s) {
                             return Err(
                                 PERR::FnDuplicatedParam(name.into(), s.to_string()).into_err(pos)
                             );
@@ -3709,27 +3717,33 @@ impl Engine {
         parent: &mut ParseState,
         lib: &FnLib,
         fn_expr: Expr,
-        externals: FnArgsVec<Ident>,
+        externals: impl AsRef<[Ident]> + IntoIterator<Item = Ident>,
         pos: Position,
     ) -> Expr {
         // If there are no captured variables, no need to curry
-        if externals.is_empty() {
+        if externals.as_ref().is_empty() {
             return fn_expr;
         }
 
-        let num_externals = externals.len();
-        let mut args = Vec::with_capacity(externals.len() + 1);
+        let num_externals = externals.as_ref().len();
+        let mut args = Vec::with_capacity(externals.as_ref().len() + 1);
 
         args.push(fn_expr);
 
-        args.extend(externals.iter().cloned().map(|Ident { name, pos }| {
-            let (index, is_func) = parent.access_var(&name, lib, pos);
-            let idx = match index {
-                Some(n) if !is_func => u8::try_from(n.get()).ok().and_then(NonZeroU8::new),
-                _ => None,
-            };
-            Expr::Variable((index, <_>::default(), 0, name).into(), idx, pos)
-        }));
+        args.extend(
+            externals
+                .as_ref()
+                .iter()
+                .cloned()
+                .map(|Ident { name, pos }| {
+                    let (index, is_func) = parent.access_var(&name, lib, pos);
+                    let idx = match index {
+                        Some(n) if !is_func => u8::try_from(n.get()).ok().and_then(NonZeroU8::new),
+                        _ => None,
+                    };
+                    Expr::Variable((index, <_>::default(), 0, name).into(), idx, pos)
+                }),
+        );
 
         let expr = FnCallExpr {
             namespace: Namespace::NONE,
@@ -3780,7 +3794,7 @@ impl Engine {
                 match input.next().expect(NEVER_ENDS) {
                     (Token::Pipe, ..) => break,
                     (Token::Identifier(s), pos) => {
-                        if params_list.iter().any(|p| p.as_str() == *s) {
+                        if params_list.iter().any(|p| p == &*s) {
                             return Err(
                                 PERR::FnDuplicatedParam(String::new(), s.to_string()).into_err(pos)
                             );
@@ -3827,11 +3841,7 @@ impl Engine {
                 FnArgsVec::new_const(),
             )
         } else {
-            let externals = state
-                .external_vars
-                .iter()
-                .cloned()
-                .collect::<FnArgsVec<_>>();
+            let externals: FnArgsVec<_> = state.external_vars.clone().into();
 
             let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
             params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));

@@ -330,11 +330,11 @@ impl Debugger {
                 #[cfg(not(feature = "no_position"))]
                 BreakPoint::AtPosition { source, pos, .. } if pos.is_beginning_of_line() => {
                     node.position().line().unwrap_or(0) == pos.line().unwrap()
-                        && _src == source.as_ref().map(|s| s.as_str())
+                        && _src == source.as_deref()
                 }
                 #[cfg(not(feature = "no_position"))]
                 BreakPoint::AtPosition { source, pos, .. } => {
-                    node.position() == *pos && _src == source.as_ref().map(|s| s.as_str())
+                    node.position() == *pos && _src == source.as_deref()
                 }
                 BreakPoint::AtFunctionName { name, .. } => match node {
                     ASTNode::Expr(Expr::FnCall(x, ..)) | ASTNode::Stmt(Stmt::FnCall(x, ..)) => {
@@ -503,11 +503,10 @@ impl Engine {
                 let orig_scope_len = scope.len();
 
                 let src = global.source_raw().cloned();
-                let src = src.as_ref().map(|s| s.as_str());
                 let context = EvalContext::new(self, global, caches, scope, this_ptr);
                 let (.., ref on_debugger) = *x;
 
-                let command = on_debugger(context, event, node, src, node.position());
+                let command = on_debugger(context, event, node, src.as_deref(), node.position());
 
                 if orig_scope_len != scope.len() {
                     // The scope is changed, always search from now on
