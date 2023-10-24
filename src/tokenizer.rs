@@ -264,12 +264,12 @@ pub enum Token {
     /// A comment block.
     Comment(Box<String>),
     /// A reserved symbol.
-    Reserved(Box<SmartString>),
+    Reserved(Box<Identifier>),
     /// A custom keyword.
     ///
     /// Not available under `no_custom_syntax`.
     #[cfg(not(feature = "no_custom_syntax"))]
-    Custom(Box<SmartString>),
+    Custom(Box<Identifier>),
     /// End of the input stream.
     /// Used as a placeholder for the end of input.
     EOF,

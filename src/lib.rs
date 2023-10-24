@@ -261,8 +261,12 @@ pub mod debugger {
 #[cfg(not(feature = "internals"))]
 type Identifier = SmartString;
 
-/// An identifier in Rhai. [`SmartString`](https://crates.io/crates/smartstring) is used because most
-/// identifiers are ASCII and short, fewer than 23 characters, so they can be stored inline.
+/// An identifier in Rhai.
+///
+/// Identifiers are assumed to be all-ASCII and short with few exceptions.
+///
+/// [`SmartString`](https://crates.io/crates/smartstring) is used as the underlying storage type
+/// because most identifiers can be stored inline.
 #[cfg(feature = "internals")]
 pub type Identifier = SmartString;
 
