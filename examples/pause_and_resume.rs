@@ -1,10 +1,16 @@
 //! An advanced example showing how to pause/resume/stop an `Engine` via an MPSC channel.
 
+#[cfg(feature = "unchecked")]
+fn main() {
+    panic!("This example does not run under 'unchecked'.");
+}
+
 use rhai::{Dynamic, Engine};
 
 #[cfg(feature = "sync")]
 use std::sync::Mutex;
 
+#[cfg(not(feature = "unchecked"))]
 fn main() {
     let (tx, rx) = std::sync::mpsc::channel::<String>();
 
@@ -54,21 +60,33 @@ fn main() {
                     Err(_) if paused => (),
                     Err(_) => return None,
                 }
+
+                std::thread::sleep(std::time::Duration::from_millis(100));
             }
         });
 
         // Run script
         let _ = engine
             .run(
-                "
+                r#"
                     let counter = 0;
 
                     loop {
+                        print("[Script] One Potato...");
+                        sleep(1);
+
                         counter += 1;
+
+                        print("[Script] Two Potatoes...");
+                        sleep(1);
+
                         print(`[Script] Boring Counter: ${counter}...`);
                         sleep(1);
+
+                        print("[Script] Three Potatoes...");
+                        sleep(1);
                     }
-                ",
+                "#,
             )
             .expect_err("Error expected");
 
