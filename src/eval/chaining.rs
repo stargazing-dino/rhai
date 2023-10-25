@@ -3,12 +3,12 @@
 
 use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, BinaryExpr, Expr, OpAssignment};
-use crate::config::hashing::OnceCell;
 use crate::engine::{FN_IDX_GET, FN_IDX_SET};
 use crate::eval::search_namespace;
 use crate::types::dynamic::Union;
 use crate::{
-    calc_fn_hash, Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, ERR,
+    calc_fn_hash, Dynamic, Engine, FnArgsVec, OnceCell, Position, RhaiResult, RhaiResultOf, Scope,
+    ERR,
 };
 use std::hash::Hash;
 #[cfg(feature = "no_std")]

@@ -220,6 +220,12 @@ type ExclusiveRange = std::ops::Range<INT>;
 /// An inclusive integer range.
 type InclusiveRange = std::ops::RangeInclusive<INT>;
 
+#[cfg(feature = "std")]
+use once_cell::sync::OnceCell;
+
+#[cfg(not(feature = "std"))]
+use once_cell::race::OnceBox as OnceCell;
+
 #[allow(deprecated)]
 pub use api::build_type::{CustomType, TypeBuilder};
 #[cfg(not(feature = "no_custom_syntax"))]

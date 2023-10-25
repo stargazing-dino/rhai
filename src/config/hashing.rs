@@ -19,12 +19,7 @@
 //! ```
 
 use super::hashing_env;
-
-#[cfg(feature = "std")]
-pub use once_cell::sync::OnceCell;
-
-#[cfg(not(feature = "std"))]
-pub use once_cell::race::OnceBox as OnceCell;
+use crate::OnceCell;
 
 static HASHING_SEED: OnceCell<Option<[u64; 4]>> = OnceCell::new();
 
