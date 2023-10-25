@@ -11,8 +11,8 @@ use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token};
 use crate::types::dynamic::Union;
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString,
-    OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, Shared, SmartString, ERR,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString, Position,
+    RhaiResult, RhaiResultOf, Scope, Shared, SmartString, ERR,
 };
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
@@ -1598,7 +1598,7 @@ impl Engine {
             None,
             [script],
             #[cfg(not(feature = "no_optimize"))]
-            OptimizationLevel::None,
+            crate::OptimizationLevel::None,
             #[cfg(feature = "no_optimize")]
             <_>::default(),
         )?;

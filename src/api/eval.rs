@@ -5,9 +5,7 @@ use crate::func::native::locked_write;
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
 use crate::types::StringsInterner;
-use crate::{
-    Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
-};
+use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -137,7 +135,7 @@ impl Engine {
                 state,
                 |_| {},
                 #[cfg(not(feature = "no_optimize"))]
-                OptimizationLevel::None,
+                crate::OptimizationLevel::None,
                 #[cfg(feature = "no_optimize")]
                 <_>::default(),
             )?

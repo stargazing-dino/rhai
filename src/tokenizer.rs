@@ -9,7 +9,6 @@ use std::{
     cell::RefCell,
     char, fmt,
     iter::{FusedIterator, Peekable},
-    num::NonZeroUsize,
     rc::Rc,
     str::{Chars, FromStr},
 };
@@ -1150,7 +1149,7 @@ pub struct TokenizeState {
     ///
     /// Not available under `unchecked`.
     #[cfg(not(feature = "unchecked"))]
-    pub max_string_len: Option<NonZeroUsize>,
+    pub max_string_len: Option<std::num::NonZeroUsize>,
     /// Can the next token be a unary operator?
     pub next_token_cannot_be_unary: bool,
     /// Shared object to allow controlling the tokenizer externally.
@@ -2704,7 +2703,7 @@ impl Engine {
                 engine: self,
                 state: TokenizeState {
                     #[cfg(not(feature = "unchecked"))]
-                    max_string_len: NonZeroUsize::new(self.max_string_size()),
+                    max_string_len: std::num::NonZeroUsize::new(self.max_string_size()),
                     next_token_cannot_be_unary: false,
                     tokenizer_control: buffer,
                     comment_level: 0,

@@ -19,8 +19,8 @@ use crate::types::{
 };
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
-    Identifier, ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position,
-    Scope, Shared, SmartString, StaticVec, VarDefInfo, AST, PERR,
+    ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position, Scope,
+    Shared, SmartString, StaticVec, VarDefInfo, AST, PERR,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -355,10 +355,10 @@ impl ParseSettings {
 #[cfg(not(feature = "no_function"))]
 #[inline]
 #[must_use]
-pub fn make_anonymous_fn(hash: u64) -> Identifier {
+pub fn make_anonymous_fn(hash: u64) -> crate::Identifier {
     use std::fmt::Write;
 
-    let mut buf = Identifier::new_const();
+    let mut buf = crate::Identifier::new_const();
     write!(&mut buf, "{}{hash:016x}", crate::engine::FN_ANONYMOUS).unwrap();
     buf
 }
@@ -1022,7 +1022,7 @@ impl Engine {
         settings.pos = eat_token(input, &Token::MapStart);
 
         let mut map = StaticVec::<(Ident, Expr)>::new();
-        let mut template = std::collections::BTreeMap::<Identifier, crate::Dynamic>::new();
+        let mut template = std::collections::BTreeMap::<crate::Identifier, crate::Dynamic>::new();
 
         loop {
             const MISSING_RBRACE: &str = "to end this object map literal";
@@ -1756,7 +1756,7 @@ impl Engine {
         _options: ChainingFlags,
     ) -> ParseResult<Expr> {
         // Break just in case `lhs` is `Expr::Dot` or `Expr::Index`
-        let mut parent_options = ASTFlags::BREAK;
+        let mut _parent_options = ASTFlags::BREAK;
 
         // Tail processing all possible postfix operators
         loop {
@@ -1872,7 +1872,7 @@ impl Engine {
                     let rhs =
                         self.parse_primary(input, state, lib, settings.level_up()?, options)?;
 
-                    Self::make_dot_expr(state, expr, rhs, parent_options, op_flags, tail_pos)?
+                    Self::make_dot_expr(state, expr, rhs, _parent_options, op_flags, tail_pos)?
                 }
                 // Unknown postfix operator
                 (expr, token) => {
@@ -1881,7 +1881,7 @@ impl Engine {
             };
 
             // The chain is now extended
-            parent_options = ASTFlags::empty();
+            _parent_options = ASTFlags::empty();
         }
 
         // Optimize chain where the root expression is another chain
@@ -3586,7 +3586,7 @@ impl Engine {
         lib: &mut FnLib,
         settings: ParseSettings,
         access: crate::FnAccess,
-        #[cfg(feature = "metadata")] comments: impl IntoIterator<Item = Identifier>,
+        #[cfg(feature = "metadata")] comments: impl IntoIterator<Item = crate::Identifier>,
     ) -> ParseResult<ScriptFnDef> {
         let settings = settings.level_up()?;
 

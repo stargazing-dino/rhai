@@ -32,6 +32,7 @@ pub struct FnResolutionCache {
 impl FnResolutionCache {
     /// Clear the [`FnResolutionCache`].
     #[inline(always)]
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.map.clear();
         self.filter.clear();

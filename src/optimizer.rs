@@ -376,6 +376,14 @@ fn optimize_stmt_block(
     statements
 }
 
+impl StmtBlock {
+    #[inline(always)]
+    #[must_use]
+    fn take_statements(&mut self) -> StmtBlockContainer {
+        mem::take(self.statements_mut())
+    }
+}
+
 /// Optimize a [statement][Stmt].
 fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: bool) {
     #[inline(always)]

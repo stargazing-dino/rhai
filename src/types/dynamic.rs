@@ -1844,7 +1844,7 @@ impl Dynamic {
     /// Return `true` if the [`Dynamic`] holds a [`FnPtr`].
     #[inline]
     #[must_use]
-    pub(crate) fn is_fnptr(&self) -> bool {
+    pub fn is_fnptr(&self) -> bool {
         match self.0 {
             Union::FnPtr(..) => true,
             #[cfg(not(feature = "no_closure"))]
