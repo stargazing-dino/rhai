@@ -361,7 +361,7 @@ fn collect_fn_metadata(
             }
         }
 
-        for (ns, m) in ctx.iter_imports_raw() {
+        for (ns, m) in ctx.global_runtime_state().iter_imports_raw() {
             scan_module(engine, &mut list, ns, m, filter);
         }
     }

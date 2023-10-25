@@ -3,6 +3,7 @@
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::native::locked_write;
 use crate::parser::ParseState;
+use crate::tokenizer::lex_raw;
 use crate::types::StringsInterner;
 use crate::{Engine, RhaiResultOf, Scope, AST};
 #[cfg(feature = "no_std")]
@@ -59,7 +60,7 @@ impl Engine {
     pub fn run_with_scope(&self, scope: &mut Scope, script: &str) -> RhaiResultOf<()> {
         let scripts = [script];
         let ast = {
-            let (stream, tc) = self.lex_raw(&scripts, self.token_mapper.as_deref());
+            let (stream, tc) = lex_raw(self, &scripts, self.token_mapper.as_deref());
 
             let mut interner;
             let mut guard;

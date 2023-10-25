@@ -8,7 +8,6 @@ use std::{
     borrow::Borrow,
     fmt,
     hash::Hash,
-    mem,
     ops::{Add, AddAssign},
     ptr,
 };
@@ -244,12 +243,12 @@ impl AST {
     pub const fn statements(&self) -> &[Stmt] {
         &self.body
     }
-    /// Extract the statements.
-    #[allow(dead_code)]
+    /// Get the statements.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn take_statements(&mut self) -> Box<[Stmt]> {
-        mem::take(&mut self.body)
+    #[allow(dead_code)]
+    pub(crate) fn statements_mut(&mut self) -> &mut Box<[Stmt]> {
+        &mut self.body
     }
     /// Does this [`AST`] contain script-defined functions?
     ///

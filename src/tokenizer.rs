@@ -1113,18 +1113,6 @@ impl Token {
         matches!(self, Self::Reserved(..))
     }
 
-    /// Convert a token into a function name, if possible.
-    #[cfg(not(feature = "no_function"))]
-    #[inline]
-    pub(crate) fn into_function_name_for_override(self) -> Result<SmartString, Self> {
-        match self {
-            #[cfg(not(feature = "no_custom_syntax"))]
-            Self::Custom(s) if is_valid_function_name(&s) => Ok(*s),
-            Self::Identifier(s) if is_valid_function_name(&s) => Ok(*s),
-            _ => Err(self),
-        }
-    }
-
     /// Is this token a custom keyword?
     #[cfg(not(feature = "no_custom_syntax"))]
     #[inline(always)]
@@ -2663,7 +2651,7 @@ impl Engine {
         &'a self,
         inputs: impl IntoIterator<Item = &'a (impl AsRef<str> + 'a)>,
     ) -> (TokenIterator<'a>, TokenizerControl) {
-        self.lex_raw(inputs, None)
+        lex_raw(self, inputs, None)
     }
     /// _(internals)_ Tokenize an input text stream with a mapping function.
     /// Exported under the `internals` feature only.
@@ -2679,48 +2667,49 @@ impl Engine {
         inputs: impl IntoIterator<Item = &'a (impl AsRef<str> + 'a)>,
         token_mapper: &'a OnParseTokenCallback,
     ) -> (TokenIterator<'a>, TokenizerControl) {
-        self.lex_raw(inputs, Some(token_mapper))
+        lex_raw(self, inputs, Some(token_mapper))
     }
-    /// Tokenize an input text stream with an optional mapping function.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there are no input streams.
-    #[inline]
-    #[must_use]
-    pub(crate) fn lex_raw<'a>(
-        &'a self,
-        inputs: impl IntoIterator<Item = &'a (impl AsRef<str> + 'a)>,
-        token_mapper: Option<&'a OnParseTokenCallback>,
-    ) -> (TokenIterator<'a>, TokenizerControl) {
-        let buffer: TokenizerControl = RefCell::new(TokenizerControlBlock::new()).into();
-        let buffer2 = buffer.clone();
+}
 
-        let mut input_streams = inputs.into_iter().map(|s| s.as_ref().chars().peekable());
+/// Tokenize an input text stream with an optional mapping function.
+///
+/// # Panics
+///
+/// Panics if there are no input streams.
+#[inline]
+#[must_use]
+pub fn lex_raw<'a>(
+    engine: &'a Engine,
+    inputs: impl IntoIterator<Item = &'a (impl AsRef<str> + 'a)>,
+    token_mapper: Option<&'a OnParseTokenCallback>,
+) -> (TokenIterator<'a>, TokenizerControl) {
+    let buffer: TokenizerControl = RefCell::new(TokenizerControlBlock::new()).into();
+    let buffer2 = buffer.clone();
 
-        (
-            TokenIterator {
-                engine: self,
-                state: TokenizeState {
-                    #[cfg(not(feature = "unchecked"))]
-                    max_string_len: std::num::NonZeroUsize::new(self.max_string_size()),
-                    next_token_cannot_be_unary: false,
-                    tokenizer_control: buffer,
-                    comment_level: 0,
-                    include_comments: false,
-                    is_within_text_terminated_by: None,
-                    last_token: None,
-                },
-                pos: Position::new(1, 0),
-                stream: MultiInputsStream {
-                    buf: [None, None],
-                    stream: input_streams.next().unwrap(),
-                    extra_streams: input_streams.collect(),
-                    index: 0,
-                },
-                token_mapper,
+    let mut input_streams = inputs.into_iter().map(|s| s.as_ref().chars().peekable());
+
+    (
+        TokenIterator {
+            engine,
+            state: TokenizeState {
+                #[cfg(not(feature = "unchecked"))]
+                max_string_len: std::num::NonZeroUsize::new(engine.max_string_size()),
+                next_token_cannot_be_unary: false,
+                tokenizer_control: buffer,
+                comment_level: 0,
+                include_comments: false,
+                is_within_text_terminated_by: None,
+                last_token: None,
             },
-            buffer2,
-        )
-    }
+            pos: Position::new(1, 0),
+            stream: MultiInputsStream {
+                buf: [None, None],
+                stream: input_streams.next().unwrap(),
+                extra_streams: input_streams.collect(),
+                index: 0,
+            },
+            token_mapper,
+        },
+        buffer2,
+    )
 }

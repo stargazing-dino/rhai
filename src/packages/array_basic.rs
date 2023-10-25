@@ -245,7 +245,7 @@ pub mod array_functions {
         if _ctx.engine().max_array_size() > 0 {
             let pad = len - array.len();
             let (a, m, s) = crate::eval::calc_array_sizes(array);
-            let (ax, mx, sx) = item.calc_data_sizes(true);
+            let (ax, mx, sx) = crate::eval::calc_data_sizes(&item, true);
 
             _ctx.engine()
                 .throw_on_size((a + pad + ax * pad, m + mx * pad, s + sx * pad))?;

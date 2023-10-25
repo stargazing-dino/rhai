@@ -2,6 +2,7 @@
 
 use crate::func::native::locked_write;
 use crate::parser::{ParseResult, ParseState};
+use crate::tokenizer::lex_raw;
 use crate::types::StringsInterner;
 use crate::{Engine, OptimizationLevel, Scope, AST};
 #[cfg(feature = "no_std")]
@@ -218,7 +219,7 @@ impl Engine {
         scripts: impl AsRef<[S]>,
         optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
-        let (stream, tc) = self.lex_raw(scripts.as_ref(), self.token_mapper.as_deref());
+        let (stream, tc) = lex_raw(self, scripts.as_ref(), self.token_mapper.as_deref());
 
         let mut interner;
         let mut guard;
@@ -297,7 +298,7 @@ impl Engine {
         script: impl AsRef<str>,
     ) -> ParseResult<AST> {
         let scripts = [script];
-        let (stream, t) = self.lex_raw(&scripts, self.token_mapper.as_deref());
+        let (stream, t) = lex_raw(self, &scripts, self.token_mapper.as_deref());
 
         let mut interner;
         let mut guard;

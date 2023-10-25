@@ -730,12 +730,6 @@ impl ImmutableString {
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
-    /// Get the string slice.
-    #[inline(always)]
-    #[must_use]
-    pub(crate) fn as_raw(&self) -> &SmartString {
-        &self.0
-    }
     /// Strong count of references to the underlying string.
     pub(crate) fn strong_count(&self) -> usize {
         Shared::strong_count(&self.0)

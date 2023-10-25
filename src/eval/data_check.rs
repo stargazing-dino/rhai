@@ -92,32 +92,30 @@ pub fn calc_map_sizes(map: &crate::Map) -> (usize, usize, usize) {
     (ax, mx, sx)
 }
 
-impl Dynamic {
-    /// Recursively calculate the sizes of a value.
-    ///
-    /// Sizes returned are `(` [`Array`][crate::Array], [`Map`][crate::Map] and [`String`] `)`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if any interior data is shared (should never happen).
-    #[inline]
-    pub(crate) fn calc_data_sizes(&self, _top: bool) -> (usize, usize, usize) {
-        match self.0 {
-            #[cfg(not(feature = "no_index"))]
-            Union::Array(ref arr, ..) => calc_array_sizes(arr),
-            #[cfg(not(feature = "no_index"))]
-            Union::Blob(ref blob, ..) => (blob.len(), 0, 0),
-            #[cfg(not(feature = "no_object"))]
-            Union::Map(ref map, ..) => calc_map_sizes(map),
-            Union::Str(ref s, ..) => (0, 0, s.len()),
-            #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) if _top => self.read_lock::<Self>().unwrap().calc_data_sizes(true),
-            #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => {
-                unreachable!("shared values discovered within data: {}", self)
-            }
-            _ => (0, 0, 0),
+/// Recursively calculate the sizes of a value.
+///
+/// Sizes returned are `(` [`Array`][crate::Array], [`Map`][crate::Map] and [`String`] `)`.
+///
+/// # Panics
+///
+/// Panics if any interior data is shared (should never happen).
+#[inline]
+pub fn calc_data_sizes(value: &Dynamic, _top: bool) -> (usize, usize, usize) {
+    match value.0 {
+        #[cfg(not(feature = "no_index"))]
+        Union::Array(ref arr, ..) => calc_array_sizes(arr),
+        #[cfg(not(feature = "no_index"))]
+        Union::Blob(ref blob, ..) => (blob.len(), 0, 0),
+        #[cfg(not(feature = "no_object"))]
+        Union::Map(ref map, ..) => calc_map_sizes(map),
+        Union::Str(ref s, ..) => (0, 0, s.len()),
+        #[cfg(not(feature = "no_closure"))]
+        Union::Shared(..) if _top => calc_data_sizes(&*value.read_lock::<Dynamic>().unwrap(), true),
+        #[cfg(not(feature = "no_closure"))]
+        Union::Shared(..) => {
+            unreachable!("shared values discovered within data: {}", value)
         }
+        _ => (0, 0, 0),
     }
 }
 
@@ -176,7 +174,7 @@ impl Engine {
             return Ok(value);
         }
 
-        let sizes = value.borrow().calc_data_sizes(true);
+        let sizes = calc_data_sizes(value.borrow(), true);
 
         self.throw_on_size(sizes)
             .map_err(|err| err.fill_position(pos))?;

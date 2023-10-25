@@ -33,7 +33,7 @@ mod string_functions {
             return string.clone();
         }
 
-        let mut buf = string.as_raw().clone();
+        let mut buf = <ImmutableString as AsRef<SmartString>>::as_ref(string).clone();
         buf.push_str(&s);
         buf.into()
     }
@@ -45,7 +45,7 @@ mod string_functions {
             return;
         }
 
-        let mut buf = string.as_raw().clone();
+        let mut buf = <ImmutableString as AsRef<SmartString>>::as_ref(string).clone();
         buf.push_str(&s);
         *string = buf.into();
     }
@@ -127,7 +127,7 @@ mod string_functions {
                 }
                 .into()
             } else {
-                let mut x = string.as_raw().clone();
+                let mut x = <ImmutableString as AsRef<SmartString>>::as_ref(string).clone();
                 x.push_str(s.as_ref());
                 x.into()
             }
@@ -138,7 +138,7 @@ mod string_functions {
                 return;
             }
 
-            let mut s = string.as_raw().clone();
+            let mut s = <ImmutableString as AsRef<SmartString>>::as_ref(string).clone();
             s.push_str(&String::from_utf8_lossy(&utf8));
             *string = s.into();
         }

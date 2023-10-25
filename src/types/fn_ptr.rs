@@ -5,8 +5,8 @@ use crate::func::EncapsulatedEnviron;
 use crate::tokenizer::{is_reserved_keyword_or_symbol, is_valid_function_name, Token};
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, FnArgsVec, FuncArgs, ImmutableString, NativeCallContext, ParseErrorType,
-    Position, RhaiError, RhaiResult, RhaiResultOf, Shared, StaticVec, AST, ERR,
+    Dynamic, Engine, FnArgsVec, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError,
+    RhaiResult, RhaiResultOf, Shared, StaticVec, AST, ERR, PERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -546,10 +546,7 @@ impl TryFrom<ImmutableString> for FnPtr {
         } else if is_reserved_keyword_or_symbol(&value).0
             || Token::lookup_symbol_from_syntax(&value).is_some()
         {
-            Err(
-                ERR::ErrorParsing(ParseErrorType::Reserved(value.to_string()), Position::NONE)
-                    .into(),
-            )
+            Err(ERR::ErrorParsing(PERR::Reserved(value.to_string()), Position::NONE).into())
         } else {
             Err(ERR::ErrorFunctionNotFound(value.to_string(), Position::NONE).into())
         }

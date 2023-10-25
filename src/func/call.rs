@@ -7,7 +7,7 @@ use crate::engine::{
     KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_FN_PTR_CALL, KEYWORD_FN_PTR_CURRY,
     KEYWORD_IS_DEF_VAR, KEYWORD_PRINT, KEYWORD_TYPE_OF,
 };
-use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
+use crate::eval::{search_namespace, Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token};
 use crate::types::dynamic::Union;
 use crate::{
@@ -1341,7 +1341,7 @@ impl Engine {
                 }
 
                 let mut target =
-                    self.search_namespace(global, caches, scope, this_ptr, first_expr)?;
+                    search_namespace(self, global, caches, scope, this_ptr, first_expr)?;
 
                 if target.as_ref().is_read_only() {
                     target = target.into_owned();
@@ -1438,7 +1438,7 @@ impl Engine {
                     arg_values.push(value.flatten());
                 }
 
-                let target = self.search_namespace(global, caches, scope, this_ptr, first_expr)?;
+                let target = search_namespace(self, global, caches, scope, this_ptr, first_expr)?;
 
                 if target.is_shared() || target.is_temp_value() {
                     arg_values[0] = target.take_or_clone().flatten();
@@ -1466,8 +1466,7 @@ impl Engine {
         }
 
         // Search for the root namespace
-        let module = self
-            .search_imports(global, namespace)
+        let module = crate::eval::search_imports(self, global, namespace)
             .ok_or_else(|| ERR::ErrorModuleNotFound(namespace.to_string(), namespace.position()))?;
 
         // First search script-defined functions in namespace (can override built-in)

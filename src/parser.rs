@@ -42,6 +42,15 @@ const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 /// The message: `TokenStream` never ends
 const NEVER_ENDS: &str = "`Token`";
 
+impl PERR {
+    /// Make a [`ParseError`] using the current type and position.
+    #[cold]
+    #[inline(never)]
+    fn into_err(self, pos: Position) -> ParseError {
+        ParseError(self.into(), pos)
+    }
+}
+
 /// _(internals)_ A type that encapsulates the current state of the parser.
 /// Exported under the `internals` feature only.
 pub struct ParseState<'e, 's> {
@@ -3629,10 +3638,12 @@ impl Engine {
             }
         };
 
-        let name = match token.into_function_name_for_override() {
-            Ok(r) => r,
-            Err(Token::Reserved(s)) => return Err(PERR::Reserved(s.to_string()).into_err(pos)),
-            Err(_) => return Err(PERR::FnMissingName.into_err(pos)),
+        let name = match token {
+            #[cfg(not(feature = "no_custom_syntax"))]
+            Token::Custom(s) if is_valid_function_name(&s) => *s,
+            Token::Identifier(s) if is_valid_function_name(&s) => *s,
+            Token::Reserved(s) => return Err(PERR::Reserved(s.to_string()).into_err(pos)),
+            _ => return Err(PERR::FnMissingName.into_err(pos)),
         };
 
         let no_params = match input.peek().expect(NEVER_ENDS) {
@@ -3922,7 +3933,8 @@ impl Engine {
         statements.push(Stmt::Expr(expr.into()));
 
         #[cfg(not(feature = "no_optimize"))]
-        return Ok(self.optimize_into_ast(
+        return Ok(crate::optimizer::optimize_into_ast(
+            self,
             state.external_constants,
             statements,
             #[cfg(not(feature = "no_function"))]
@@ -4008,7 +4020,8 @@ impl Engine {
         let (statements, _lib) = self.parse_global_level(input, state, |_| {})?;
 
         #[cfg(not(feature = "no_optimize"))]
-        return Ok(self.optimize_into_ast(
+        return Ok(crate::optimizer::optimize_into_ast(
+            self,
             state.external_constants,
             statements,
             #[cfg(not(feature = "no_function"))]

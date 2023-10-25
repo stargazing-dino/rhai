@@ -5,6 +5,7 @@ use crate::ast::{
     ASTFlags, BinaryExpr, ConditionalExpr, Expr, FlowControl, OpAssignment, Stmt,
     SwitchCasesCollection,
 };
+use crate::eval::search_namespace;
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::tokenizer::Token;
 use crate::types::dynamic::{AccessMode, Union};
@@ -13,16 +14,14 @@ use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
-impl Dynamic {
-    /// If the value is a string, intern it.
-    #[inline(always)]
-    fn intern_string(self, engine: &Engine) -> Self {
-        match self.0 {
-            Union::Str(..) => engine
-                .get_interned_string(self.into_immutable_string().expect("`ImmutableString`"))
-                .into(),
-            _ => self,
-        }
+/// If the value is a string, intern it.
+#[inline(always)]
+fn intern_string(value: Dynamic, engine: &Engine) -> Dynamic {
+    match value.0 {
+        Union::Str(..) => engine
+            .get_interned_string(value.into_immutable_string().expect("`ImmutableString`"))
+            .into(),
+        _ => value,
     }
 }
 
@@ -327,7 +326,7 @@ impl Engine {
 
                     self.track_operation(global, lhs.position())?;
 
-                    let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
+                    let mut target = search_namespace(self, global, caches, scope, this_ptr, lhs)?;
 
                     let is_temp_result = !target.is_ref();
 
@@ -351,10 +350,8 @@ impl Engine {
                     {
                         let rhs_val = self
                             .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), rhs)?
-                            .flatten()
-                            .intern_string(self);
-
-                        let _new_val = Some((rhs_val, op_info));
+                            .flatten();
+                        let _new_val = Some((intern_string(rhs_val, self), op_info));
 
                         // Must be either `var[index] op= val` or `var.prop op= val`.
                         // The return value of any op-assignment (should be `()`) is thrown away and not used.
@@ -437,10 +434,10 @@ impl Engine {
                 }
 
                 // Evaluate initial value
-                let mut value = self
+                let value = self
                     .eval_expr(global, caches, scope, this_ptr, expr)?
-                    .flatten()
-                    .intern_string(self);
+                    .flatten();
+                let mut value = intern_string(value, self);
 
                 let _alias = if !rewind_scope {
                     // Put global constants into global module
