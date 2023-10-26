@@ -211,14 +211,6 @@ impl Engine {
 
         Ok(self)
     }
-    /// Is a keyword registered as a custom keyword?
-    ///
-    /// Not available under `no_custom_syntax`.
-    #[cfg(not(feature = "no_custom_syntax"))]
-    #[inline(always)]
-    pub(crate) fn is_custom_keyword(&self, keyword: &str) -> bool {
-        self.custom_keywords.contains_key(keyword)
-    }
 
     /// Get the default value of the custom state for each evaluation run.
     #[inline(always)]

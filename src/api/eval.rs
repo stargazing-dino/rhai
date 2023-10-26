@@ -240,10 +240,8 @@ impl Engine {
         global.lib.push(ast.shared_lib().clone());
 
         #[cfg(not(feature = "no_module"))]
-        let orig_embedded_module_resolver = mem::replace(
-            &mut global.embedded_module_resolver,
-            ast.resolver().cloned(),
-        );
+        let orig_embedded_module_resolver =
+            mem::replace(&mut global.embedded_module_resolver, ast.resolver.clone());
 
         defer! { global => move |g| {
             #[cfg(not(feature = "no_module"))]

@@ -224,10 +224,8 @@ impl Engine {
         global.lib.push(ast.shared_lib().clone());
 
         #[cfg(not(feature = "no_module"))]
-        let orig_embedded_module_resolver = std::mem::replace(
-            &mut global.embedded_module_resolver,
-            ast.resolver().cloned(),
-        );
+        let orig_embedded_module_resolver =
+            std::mem::replace(&mut global.embedded_module_resolver, ast.resolver.clone());
 
         let rewind_scope = options.rewind_scope;
 

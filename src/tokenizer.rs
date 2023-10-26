@@ -2516,7 +2516,7 @@ impl<'a> Iterator for TokenIterator<'a> {
             Some((Token::Reserved(s), pos)) => (match
                 (s.as_str(),
                     #[cfg(not(feature = "no_custom_syntax"))]
-                    self.engine.is_custom_keyword(&s),
+                    self.engine.custom_keywords.contains_key(&*s),
                     #[cfg(feature = "no_custom_syntax")]
                     false
                 )
@@ -2562,12 +2562,12 @@ impl<'a> Iterator for TokenIterator<'a> {
             }, pos),
             // Custom keyword
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((Token::Identifier(s), pos)) if self.engine.is_custom_keyword(&s) => {
+            Some((Token::Identifier(s), pos)) if self.engine.custom_keywords.contains_key(&*s) => {
                 (Token::Custom(s), pos)
             }
             // Custom keyword/symbol - must be disabled
             #[cfg(not(feature = "no_custom_syntax"))]
-            Some((token, pos)) if token.is_literal() && self.engine.is_custom_keyword(token.literal_syntax()) => {
+            Some((token, pos)) if token.is_literal() && self.engine.custom_keywords.contains_key(token.literal_syntax()) => {
                 if self.engine.is_symbol_disabled(token.literal_syntax()) {
                     // Disabled standard keyword/symbol
                     (Token::Custom(Box::new(token.literal_syntax().into())), pos)

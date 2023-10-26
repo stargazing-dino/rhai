@@ -260,8 +260,8 @@ impl Engine {
     #[inline(never)]
     #[must_use]
     pub(crate) fn make_type_mismatch_err<T>(&self, typ: &str, pos: Position) -> RhaiError {
-        let t = self.map_type_name(type_name::<T>()).into();
-        ERR::ErrorMismatchDataType(t, typ.into(), pos).into()
+        ERR::ErrorMismatchDataType(self.map_type_name(type_name::<T>()).into(), typ.into(), pos)
+            .into()
     }
 
     /// Compact a script to eliminate insignificant whitespaces and comments.

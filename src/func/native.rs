@@ -277,7 +277,7 @@ impl<'a> NativeCallContext<'a> {
     #[cfg(not(feature = "no_function"))]
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &crate::Module> {
-        self.global.lib.iter().map(AsRef::as_ref)
+        self.global.lib.iter().map(<_>::as_ref)
     }
     /// _(internals)_ The current stack of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.

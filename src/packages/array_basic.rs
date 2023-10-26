@@ -1270,7 +1270,13 @@ pub mod array_functions {
     /// print(x);       // prints "[1, 2, 3, 4, 3, 2, 1]"
     /// ```
     pub fn dedup(ctx: NativeCallContext, array: &mut Array) {
-        let comparer = FnPtr::new_unchecked(OP_EQUALS, Vec::new());
+        let comparer = FnPtr {
+            name: ctx.engine().get_interned_string(OP_EQUALS),
+            curry: Vec::new(),
+            environ: None,
+            #[cfg(not(feature = "no_function"))]
+            fn_def: None,
+        };
         dedup_by_comparer(ctx, array, comparer);
     }
     /// Remove duplicated _consecutive_ elements from the array that return `true` when applied the

@@ -2246,7 +2246,7 @@ impl Module {
 
             value.deep_scan(|v| {
                 if let Some(fn_ptr) = v.downcast_mut::<crate::FnPtr>() {
-                    fn_ptr.set_encapsulated_environ(Some(environ.clone()));
+                    fn_ptr.environ = Some(environ.clone());
                 }
             });
 

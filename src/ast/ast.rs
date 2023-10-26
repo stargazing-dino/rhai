@@ -28,10 +28,10 @@ pub struct AST {
     lib: crate::SharedModule,
     /// Embedded module resolver, if any.
     #[cfg(not(feature = "no_module"))]
-    resolver: Option<crate::Shared<crate::module::resolvers::StaticModuleResolver>>,
+    pub(crate) resolver: Option<crate::Shared<crate::module::resolvers::StaticModuleResolver>>,
     /// [`AST`] documentation.
     #[cfg(feature = "metadata")]
-    doc: crate::SmartString,
+    pub(crate) doc: crate::SmartString,
 }
 
 impl Default for AST {
@@ -206,28 +206,6 @@ impl AST {
     pub fn doc(&self) -> &str {
         &self.doc
     }
-    /// Get a mutable reference to the documentation.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    #[must_use]
-    #[allow(dead_code)]
-    pub(crate) fn doc_mut(&mut self) -> &mut crate::SmartString {
-        &mut self.doc
-    }
-    /// Set the documentation.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    pub(crate) fn set_doc(&mut self, doc: impl Into<crate::SmartString>) {
-        self.doc = doc.into();
-    }
-    /// Clear the documentation.
-    /// Exported under the `metadata` feature only.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    pub fn clear_doc(&mut self) -> &mut Self {
-        self.doc.clear();
-        self
-    }
     /// Get the statements.
     #[cfg(not(feature = "internals"))]
     #[inline(always)]
@@ -278,16 +256,6 @@ impl AST {
     pub const fn shared_lib(&self) -> &crate::SharedModule {
         &self.lib
     }
-    /// Get the embedded [module resolver][crate::ModuleResolver].
-    #[cfg(not(feature = "internals"))]
-    #[cfg(not(feature = "no_module"))]
-    #[inline(always)]
-    #[must_use]
-    pub(crate) const fn resolver(
-        &self,
-    ) -> Option<&crate::Shared<crate::module::resolvers::StaticModuleResolver>> {
-        self.resolver.as_ref()
-    }
     /// _(internals)_ Get the embedded [module resolver][crate::ModuleResolver].
     /// Exported under the `internals` feature only.
     ///
@@ -300,16 +268,6 @@ impl AST {
         &self,
     ) -> Option<&crate::Shared<crate::module::resolvers::StaticModuleResolver>> {
         self.resolver.as_ref()
-    }
-    /// Set the embedded [module resolver][crate::ModuleResolver].
-    #[cfg(not(feature = "no_module"))]
-    #[inline(always)]
-    pub(crate) fn set_resolver(
-        &mut self,
-        resolver: impl Into<crate::Shared<crate::module::resolvers::StaticModuleResolver>>,
-    ) -> &mut Self {
-        self.resolver = Some(resolver.into());
-        self
     }
     /// Clone the [`AST`]'s functions into a new [`AST`].
     /// No statements are cloned.
@@ -574,23 +532,18 @@ impl AST {
 
         #[cfg(not(feature = "no_module"))]
         match (
-            self.resolver().map_or(true, |r| r.is_empty()),
-            other.resolver().map_or(true, |r| r.is_empty()),
+            self.resolver.as_deref().map_or(true, |r| r.is_empty()),
+            other.resolver.as_deref().map_or(true, |r| r.is_empty()),
         ) {
             (true, true) => (),
-            (false, true) => {
-                _ast.set_resolver(self.resolver().unwrap().clone());
-            }
-            (true, false) => {
-                _ast.set_resolver(other.resolver().unwrap().clone());
-            }
+            (false, true) => _ast.resolver = self.resolver.clone(),
+            (true, false) => _ast.resolver = other.resolver.clone(),
             (false, false) => {
-                let mut resolver = self.resolver().unwrap().as_ref().clone();
-                let other_resolver = other.resolver().unwrap().as_ref().clone();
-                for (k, v) in other_resolver {
-                    resolver.insert(k, crate::func::shared_take_or_clone(v));
+                let mut resolver = self.resolver.as_deref().unwrap().clone();
+                for (k, v) in other.resolver.as_deref().unwrap() {
+                    resolver.insert(k.clone(), v.as_ref().clone());
                 }
-                _ast.set_resolver(resolver);
+                _ast.resolver = Some(resolver.into());
             }
         }
 
@@ -673,13 +626,11 @@ impl AST {
     ) -> &mut Self {
         #[cfg(not(feature = "no_module"))]
         match (
-            self.resolver().map_or(true, |r| r.is_empty()),
-            other.resolver().map_or(true, |r| r.is_empty()),
+            self.resolver.as_deref().map_or(true, |r| r.is_empty()),
+            other.resolver.as_deref().map_or(true, |r| r.is_empty()),
         ) {
             (_, true) => (),
-            (true, false) => {
-                self.set_resolver(other.resolver.unwrap());
-            }
+            (true, false) => self.resolver = other.resolver.clone(),
             (false, false) => {
                 let resolver = crate::func::shared_make_mut(self.resolver.as_mut().unwrap());
                 let other_resolver = crate::func::shared_take_or_clone(other.resolver.unwrap());
@@ -876,14 +827,6 @@ impl AST {
             _ => None,
         })
     }
-    /// Recursively walk the [`AST`], including function bodies (if any).
-    /// Return `false` from the callback to terminate the walk.
-    #[cfg(not(feature = "internals"))]
-    #[cfg(not(feature = "no_module"))]
-    #[inline(always)]
-    pub(crate) fn walk(&self, on_node: &mut (impl FnMut(&[ASTNode]) -> bool + ?Sized)) -> bool {
-        self._walk(on_node)
-    }
     /// _(internals)_ Recursively walk the [`AST`], including function bodies (if any).
     /// Return `false` from the callback to terminate the walk.
     /// Exported under the `internals` feature only.
@@ -894,7 +837,7 @@ impl AST {
     }
     /// Recursively walk the [`AST`], including function bodies (if any).
     /// Return `false` from the callback to terminate the walk.
-    fn _walk(&self, on_node: &mut (impl FnMut(&[ASTNode]) -> bool + ?Sized)) -> bool {
+    pub(crate) fn _walk(&self, on_node: &mut (impl FnMut(&[ASTNode]) -> bool + ?Sized)) -> bool {
         let path = &mut Vec::new();
 
         for stmt in self.statements() {

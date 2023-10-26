@@ -135,7 +135,7 @@ impl Engine {
 
         #[cfg(not(feature = "no_module"))]
         {
-            global.embedded_module_resolver = ast.resolver().cloned();
+            global.embedded_module_resolver = ast.resolver.clone();
         }
 
         let _ = self.eval_global_statements(global, caches, scope, ast.statements(), true)?;

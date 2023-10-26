@@ -71,9 +71,13 @@ pub fn search_scope_only<'s>(
                 .flat_map(|m| m.iter_script_fn())
                 .find_map(|(_, _, f, _, func)| if f == &v.3 { Some(func) } else { None })
             {
-                let mut fn_ptr = crate::FnPtr::new_unchecked(v.3.clone(), Vec::new());
-                fn_ptr.set_fn_def(Some(fn_def.clone()));
-                let val: Dynamic = fn_ptr.into();
+                let val: Dynamic = crate::FnPtr {
+                    name: v.3.clone(),
+                    curry: Vec::new(),
+                    environ: None,
+                    fn_def: Some(fn_def.clone()),
+                }
+                .into();
                 return Ok(val.into());
             }
 

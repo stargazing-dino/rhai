@@ -2449,7 +2449,7 @@ impl Engine {
                 }
 
                 #[cfg(not(feature = "no_custom_syntax"))]
-                Token::Custom(s) if self.is_custom_keyword(&s) => {
+                Token::Custom(s) if self.custom_keywords.contains_key(&*s) => {
                     op_base.hashes = if native_only {
                         FnCallHashes::from_native_only(calc_fn_hash(None, &s, 2))
                     } else {
@@ -3884,8 +3884,13 @@ impl Engine {
             comments: <_>::default(),
         });
 
-        let mut fn_ptr = crate::FnPtr::new_unchecked(fn_name, Vec::new());
-        fn_ptr.set_fn_def(Some(script.clone()));
+        let fn_ptr = crate::FnPtr {
+            name: fn_name,
+            curry: Vec::new(),
+            environ: None,
+            #[cfg(not(feature = "no_function"))]
+            fn_def: Some(script.clone()),
+        };
         let expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), settings.pos);
 
         #[cfg(not(feature = "no_closure"))]

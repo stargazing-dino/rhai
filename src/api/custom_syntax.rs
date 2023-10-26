@@ -263,7 +263,7 @@ impl Engine {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if (self.is_symbol_disabled(s)
                         || token.as_ref().map_or(false, Token::is_reserved))
-                        && !self.is_custom_keyword(s)
+                        && !self.custom_keywords.contains_key(s)
                     {
                         self.custom_keywords.insert(s.into(), None);
                     }
@@ -289,7 +289,7 @@ impl Engine {
                     // Make it a custom keyword/symbol if it is disabled or reserved
                     if self.is_symbol_disabled(s)
                         || (token.as_ref().map_or(false, Token::is_reserved)
-                            && !self.is_custom_keyword(s))
+                            && !self.custom_keywords.contains_key(s))
                     {
                         self.custom_keywords.insert(s.into(), None);
                     }

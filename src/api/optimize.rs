@@ -64,7 +64,9 @@ impl Engine {
         );
 
         #[cfg(feature = "metadata")]
-        _new_ast.set_doc(std::mem::take(ast.doc_mut()));
+        {
+            _new_ast.doc = std::mem::take(&mut ast.doc);
+        }
 
         _new_ast
     }

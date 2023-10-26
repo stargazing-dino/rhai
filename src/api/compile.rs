@@ -100,7 +100,7 @@ impl Engine {
             resolver: &StaticModuleResolver,
             imports: &mut BTreeSet<crate::Identifier>,
         ) {
-            ast.walk(&mut |path| match path.last().unwrap() {
+            ast._walk(&mut |path| match path.last().unwrap() {
                 // Collect all `import` statements with a string constant path
                 ASTNode::Stmt(Stmt::Import(x, ..)) => match x.0 {
                     Expr::StringConstant(ref s, ..)
@@ -144,7 +144,7 @@ impl Engine {
 
                 resolver.insert(path, module);
             }
-            ast.set_resolver(resolver);
+            ast.resolver = Some(resolver.into());
         }
 
         Ok(ast)
@@ -234,7 +234,10 @@ impl Engine {
         let state = &mut ParseState::new(scope, interned_strings, tc);
         let mut _ast = self.parse(stream.peekable(), state, optimization_level)?;
         #[cfg(feature = "metadata")]
-        _ast.set_doc(&state.tokenizer_control.borrow().global_comments);
+        {
+            let global_comments = &state.tokenizer_control.borrow().global_comments;
+            _ast.doc = global_comments.into();
+        }
         Ok(_ast)
     }
     /// Compile a string containing an expression into an [`AST`],

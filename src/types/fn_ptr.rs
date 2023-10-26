@@ -23,11 +23,11 @@ use std::{
 /// to be passed onto a function during a call.
 #[derive(Clone)]
 pub struct FnPtr {
-    name: ImmutableString,
-    curry: Vec<Dynamic>,
-    environ: Option<Shared<EncapsulatedEnviron>>,
+    pub(crate) name: ImmutableString,
+    pub(crate) curry: Vec<Dynamic>,
+    pub(crate) environ: Option<Shared<EncapsulatedEnviron>>,
     #[cfg(not(feature = "no_function"))]
-    fn_def: Option<Shared<crate::ast::ScriptFnDef>>,
+    pub(crate) fn_def: Option<Shared<crate::ast::ScriptFnDef>>,
 }
 
 impl Hash for FnPtr {
@@ -71,19 +71,6 @@ impl FnPtr {
     pub fn new(name: impl Into<ImmutableString>) -> RhaiResultOf<Self> {
         name.into().try_into()
     }
-    /// Create a new function pointer without checking its parameters.
-    #[inline(always)]
-    #[must_use]
-    #[allow(dead_code)]
-    pub(crate) fn new_unchecked(name: impl Into<ImmutableString>, curry: Vec<Dynamic>) -> Self {
-        Self {
-            name: name.into(),
-            curry,
-            environ: None,
-            #[cfg(not(feature = "no_function"))]
-            fn_def: None,
-        }
-    }
     /// Get the name of the function.
     #[inline(always)]
     #[must_use]
@@ -95,33 +82,6 @@ impl FnPtr {
     #[must_use]
     pub(crate) const fn fn_name_raw(&self) -> &ImmutableString {
         &self.name
-    }
-    /// Get the underlying data of the function pointer.
-    #[cfg(not(feature = "no_function"))]
-    #[inline(always)]
-    #[must_use]
-    pub(crate) fn take_data(
-        self,
-    ) -> (
-        ImmutableString,
-        Vec<Dynamic>,
-        Option<Shared<EncapsulatedEnviron>>,
-        Option<Shared<crate::ast::ScriptFnDef>>,
-    ) {
-        (self.name, self.curry, self.environ, self.fn_def)
-    }
-    /// Get the underlying data of the function pointer.
-    #[cfg(feature = "no_function")]
-    #[inline(always)]
-    #[must_use]
-    pub(crate) fn take_data(
-        self,
-    ) -> (
-        ImmutableString,
-        Vec<Dynamic>,
-        Option<Shared<EncapsulatedEnviron>>,
-    ) {
-        (self.name, self.curry, self.environ)
     }
     /// Get the curried arguments.
     #[inline(always)]
@@ -306,7 +266,7 @@ impl FnPtr {
                     caches,
                     &mut crate::Scope::new(),
                     this_ptr,
-                    self.encapsulated_environ().map(AsRef::as_ref),
+                    self.environ.as_deref(),
                     fn_def,
                     args,
                     true,
@@ -323,35 +283,6 @@ impl FnPtr {
         }
 
         context.call_fn_raw(self.fn_name(), is_method, is_method, args)
-    }
-    /// Get a reference to the [encapsulated environment][EncapsulatedEnviron].
-    #[inline(always)]
-    #[must_use]
-    #[allow(dead_code)]
-    pub(crate) const fn encapsulated_environ(&self) -> Option<&Shared<EncapsulatedEnviron>> {
-        self.environ.as_ref()
-    }
-    /// Set a reference to the [encapsulated environment][EncapsulatedEnviron].
-    #[inline(always)]
-    #[allow(dead_code)]
-    pub(crate) fn set_encapsulated_environ(
-        &mut self,
-        value: Option<impl Into<Shared<EncapsulatedEnviron>>>,
-    ) {
-        self.environ = value.map(Into::into);
-    }
-    /// Get a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
-    #[cfg(not(feature = "no_function"))]
-    #[inline(always)]
-    #[must_use]
-    pub(crate) const fn fn_def(&self) -> Option<&Shared<crate::ast::ScriptFnDef>> {
-        self.fn_def.as_ref()
-    }
-    /// Set a reference to the linked [`ScriptFnDef`][crate::ast::ScriptFnDef].
-    #[cfg(not(feature = "no_function"))]
-    #[inline(always)]
-    pub(crate) fn set_fn_def(&mut self, value: Option<impl Into<Shared<crate::ast::ScriptFnDef>>>) {
-        self.fn_def = value.map(Into::into);
     }
 
     /// Make a call to a function pointer with either a specified number of arguments, or with extra
@@ -389,7 +320,8 @@ impl FnPtr {
         }
     }
     /// _(internals)_ Make a call to a function pointer with either a specified number of arguments,
-    /// or with extra arguments attached. Exported under the `internals` feature only.
+    /// or with extra arguments attached.
+    /// Exported under the `internals` feature only.
     ///
     /// If `this_ptr` is provided, it is first provided to script-defined functions bound to `this`.
     ///
@@ -433,7 +365,7 @@ impl FnPtr {
         move_this_ptr_to_args: usize,
     ) -> RhaiResult {
         #[cfg(not(feature = "no_function"))]
-        if let Some(arity) = self.fn_def().map(|f| f.params.len()) {
+        if let Some(arity) = self.fn_def.as_deref().map(|f| f.params.len()) {
             if arity == N + self.curry().len() {
                 return self.call_raw(ctx, this_ptr, args);
             }
