@@ -445,7 +445,6 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                     )
                     .into(),
                 )
-                .into()
             } else {
                 // -> expr
                 Stmt::Expr(expr.into())
@@ -662,7 +661,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
             optimize_expr(match_expr, state, false);
 
             // Optimize blocks
-            for b in expressions.iter_mut() {
+            for b in &mut *expressions {
                 optimize_expr(&mut b.condition, state, false);
                 optimize_expr(&mut b.expr, state, false);
 

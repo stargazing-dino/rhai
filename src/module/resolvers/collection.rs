@@ -105,7 +105,7 @@ impl ModuleResolversCollection {
     /// The other [`ModuleResolversCollection`] is consumed.
     #[inline]
     pub fn append(&mut self, other: Self) -> &mut Self {
-        self.0.extend(other.0.into_iter());
+        self.0.extend(other.0);
         self
     }
 }

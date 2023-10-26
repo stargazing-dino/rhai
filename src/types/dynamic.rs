@@ -184,7 +184,7 @@ impl Dynamic {
     #[must_use]
     pub const fn tag(&self) -> Tag {
         match self.0 {
-            Union::Unit(_, tag, _)
+            Union::Unit((), tag, _)
             | Union::Bool(_, tag, _)
             | Union::Str(_, tag, _)
             | Union::Char(_, tag, _)
@@ -209,7 +209,7 @@ impl Dynamic {
     /// Attach arbitrary data to this [`Dynamic`].
     pub fn set_tag(&mut self, value: Tag) -> &mut Self {
         match self.0 {
-            Union::Unit(_, ref mut tag, _)
+            Union::Unit((), ref mut tag, _)
             | Union::Bool(_, ref mut tag, _)
             | Union::Str(_, ref mut tag, _)
             | Union::Char(_, ref mut tag, _)

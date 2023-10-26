@@ -731,6 +731,8 @@ impl ImmutableString {
         self.0.as_str()
     }
     /// Strong count of references to the underlying string.
+    #[inline(always)]
+    #[must_use]
     pub fn strong_count(&self) -> usize {
         Shared::strong_count(&self.0)
     }

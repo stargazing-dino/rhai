@@ -13,9 +13,9 @@ pub use std::{any::TypeId, mem};
 /// Result of a Rhai function.
 pub type RhaiResult = crate::RhaiResult;
 
-#[cfg(not(features = "no_module"))]
+#[cfg(not(feature = "no_module"))]
 pub use rhai_codegen::*;
-#[cfg(features = "no_module")]
+#[cfg(feature = "no_module")]
 pub use rhai_codegen::{export_fn, register_exported_fn};
 
 /// Trait implemented by a _plugin function_.

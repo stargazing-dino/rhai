@@ -867,7 +867,7 @@ impl Expr {
                 }
             }
             Self::FnCall(x, ..) => {
-                for e in x.args.iter() {
+                for e in &*x.args {
                     if !e.walk(path, on_node) {
                         return false;
                     }
@@ -875,7 +875,7 @@ impl Expr {
             }
             #[cfg(not(feature = "no_custom_syntax"))]
             Self::Custom(x, ..) => {
-                for e in x.inputs.iter() {
+                for e in &*x.inputs {
                     if !e.walk(path, on_node) {
                         return false;
                     }

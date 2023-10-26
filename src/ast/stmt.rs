@@ -1105,7 +1105,7 @@ impl Stmt {
                 }
             }
             Self::FnCall(x, ..) => {
-                for s in x.args.iter() {
+                for s in &*x.args {
                     if !s.walk(path, on_node) {
                         return false;
                     }

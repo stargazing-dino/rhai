@@ -459,7 +459,7 @@ impl Engine {
                     "method call in dot chain should not be namespace-qualified"
                 );
 
-                for expr in x.args.iter() {
+                for expr in &*x.args {
                     let arg_value =
                         self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
                     idx_values.push(arg_value.0.flatten());
@@ -488,7 +488,7 @@ impl Engine {
                             "method call in dot chain should not be namespace-qualified"
                         );
 
-                        for expr in x.args.iter() {
+                        for expr in &*x.args {
                             let tp = this_ptr.as_deref_mut();
                             let arg_value = self.get_arg_value(global, caches, scope, tp, expr)?;
                             _arg_values.push(arg_value.0.flatten());

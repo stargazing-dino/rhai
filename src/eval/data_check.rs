@@ -110,7 +110,7 @@ pub fn calc_data_sizes(value: &Dynamic, _top: bool) -> (usize, usize, usize) {
         Union::Map(ref map, ..) => calc_map_sizes(map),
         Union::Str(ref s, ..) => (0, 0, s.len()),
         #[cfg(not(feature = "no_closure"))]
-        Union::Shared(..) if _top => calc_data_sizes(&*value.read_lock::<Dynamic>().unwrap(), true),
+        Union::Shared(..) if _top => calc_data_sizes(&value.read_lock::<Dynamic>().unwrap(), true),
         #[cfg(not(feature = "no_closure"))]
         Union::Shared(..) => {
             unreachable!("shared values discovered within data: {}", value)

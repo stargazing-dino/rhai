@@ -69,7 +69,7 @@ pub fn search_scope_only<'s>(
                 .lib
                 .iter()
                 .flat_map(|m| m.iter_script_fn())
-                .find_map(|(_, _, f, _, func)| if f == &v.3 { Some(func) } else { None })
+                .find_map(|(_, _, f, _, func)| if f == v.3 { Some(func) } else { None })
             {
                 let val: Dynamic = crate::FnPtr {
                     name: v.3.clone(),

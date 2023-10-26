@@ -445,7 +445,7 @@ mod number_formatting {
 #[export_module]
 mod char_functions {
     /// Convert the Unicode character into a 32-bit integer value.
-    pub fn to_int(ch: char) -> INT {
+    pub const fn to_int(ch: char) -> INT {
         (ch as u32) as INT
     }
 }

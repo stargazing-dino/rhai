@@ -82,7 +82,7 @@ impl Serialize for Dynamic {
 impl Serialize for ImmutableString {
     #[inline(always)]
     fn serialize<S: Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
-        ser.serialize_str(&self)
+        ser.serialize_str(self)
     }
 }
 

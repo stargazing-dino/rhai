@@ -110,7 +110,7 @@ impl Expression<'_> {
             Expr::Variable(x, ..) => Some(&x.3),
             #[cfg(not(feature = "no_function"))]
             Expr::ThisPtr(..) => Some(crate::engine::KEYWORD_THIS),
-            Expr::StringConstant(x, ..) => Some(&x),
+            Expr::StringConstant(x, ..) => Some(x),
             _ => None,
         }
     }

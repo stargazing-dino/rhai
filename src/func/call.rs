@@ -1062,7 +1062,7 @@ impl Engine {
                     },
                 ) = (false, fn_ptr);
 
-                curry.extend(extra_curry.into_iter());
+                curry.extend(extra_curry);
 
                 // Linked to scripted function - short-circuit
                 #[cfg(not(feature = "no_function"))]

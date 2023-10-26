@@ -139,7 +139,7 @@ mod map_functions {
             return;
         }
 
-        map.extend(map2.into_iter());
+        map.extend(map2);
     }
     /// Make a copy of the object map, add all property values of another object map
     /// (existing property values of the same names are replaced), then returning it.
@@ -164,7 +164,7 @@ mod map_functions {
         }
 
         let mut map1 = map1;
-        map1.extend(map2.into_iter());
+        map1.extend(map2);
         map1
     }
     /// Add all property values of another object map into the object map.
