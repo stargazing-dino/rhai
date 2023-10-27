@@ -38,10 +38,13 @@ use crate::{Dynamic, Engine, Identifier};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
+/// Default limits.
 pub mod default_limits {
     #[cfg(not(feature = "unchecked"))]
+    #[cfg(feature = "internals")]
     pub use super::limits::default_limits::*;
 
+    /// Maximum number of parameters in functions with [`Dynamic`] support.
     pub const MAX_DYNAMIC_PARAMETERS: usize = 16;
 }
 
