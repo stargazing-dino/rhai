@@ -13,10 +13,8 @@ pub use std::{any::TypeId, mem};
 /// Result of a Rhai function.
 pub type RhaiResult = crate::RhaiResult;
 
-#[cfg(not(feature = "no_module"))]
+/// Re-export the codegen namespace.
 pub use rhai_codegen::*;
-#[cfg(feature = "no_module")]
-pub use rhai_codegen::{export_fn, register_exported_fn};
 
 /// Trait implemented by a _plugin function_.
 ///
