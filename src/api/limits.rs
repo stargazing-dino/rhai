@@ -8,17 +8,31 @@ use std::prelude::v1::*;
 
 #[cfg(debug_assertions)]
 pub mod default_limits {
+    /// Maximum levels of function calls.
+    ///
+    /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     pub const MAX_CALL_STACK_DEPTH: usize = 8;
+    /// Maximum levels of expressions.
     pub const MAX_EXPR_DEPTH: usize = 32;
+    /// Maximum levels of expressions in function bodies.
+    ///
+    /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     pub const MAX_FUNCTION_EXPR_DEPTH: usize = 16;
 }
 #[cfg(not(debug_assertions))]
 pub mod default_limits {
+    /// Maximum levels of function calls.
+    ///
+    /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     pub const MAX_CALL_STACK_DEPTH: usize = 64;
+    /// Maximum levels of expressions.
     pub const MAX_EXPR_DEPTH: usize = 64;
+    /// Maximum levels of expressions in function bodies.
+    ///
+    /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     pub const MAX_FUNCTION_EXPR_DEPTH: usize = 32;
 }

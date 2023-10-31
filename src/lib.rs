@@ -220,6 +220,12 @@ type ExclusiveRange = std::ops::Range<INT>;
 /// An inclusive integer range.
 type InclusiveRange = std::ops::RangeInclusive<INT>;
 
+#[cfg(feature = "std")]
+use once_cell::sync::OnceCell;
+
+#[cfg(not(feature = "std"))]
+use once_cell::race::OnceBox as OnceCell;
+
 #[allow(deprecated)]
 pub use api::build_type::{CustomType, TypeBuilder};
 #[cfg(not(feature = "no_custom_syntax"))]
@@ -261,8 +267,12 @@ pub mod debugger {
 #[cfg(not(feature = "internals"))]
 type Identifier = SmartString;
 
-/// An identifier in Rhai. [`SmartString`](https://crates.io/crates/smartstring) is used because most
-/// identifiers are ASCII and short, fewer than 23 characters, so they can be stored inline.
+/// An identifier in Rhai.
+///
+/// Identifiers are assumed to be all-ASCII and short with few exceptions.
+///
+/// [`SmartString`](https://crates.io/crates/smartstring) is used as the underlying storage type
+/// because most identifiers can be stored inline.
 #[cfg(feature = "internals")]
 pub type Identifier = SmartString;
 
@@ -343,6 +353,9 @@ pub use tokenizer::{
 
 #[cfg(feature = "internals")]
 pub use parser::ParseState;
+
+#[cfg(feature = "internals")]
+pub use api::default_limits;
 
 #[cfg(feature = "internals")]
 pub use ast::{

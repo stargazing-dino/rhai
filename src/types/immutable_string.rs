@@ -730,14 +730,10 @@ impl ImmutableString {
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
-    /// Get the string slice.
+    /// Strong count of references to the underlying string.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn as_raw(&self) -> &SmartString {
-        &self.0
-    }
-    /// Strong count of references to the underlying string.
-    pub(crate) fn strong_count(&self) -> usize {
+    pub fn strong_count(&self) -> usize {
         Shared::strong_count(&self.0)
     }
     /// Consume the [`ImmutableString`] and convert it into a [`String`].
@@ -755,12 +751,13 @@ impl ImmutableString {
     /// If there are other references to the same string, a cloned copy is used.
     #[inline(always)]
     #[must_use]
-    pub(crate) fn make_mut(&mut self) -> &mut SmartString {
+    pub fn make_mut(&mut self) -> &mut SmartString {
         shared_make_mut(&mut self.0)
     }
-    /// Return a mutable reference to the [`SmartString`] wrapped by the [`ImmutableString`].
+    /// Return a mutable reference to the [`SmartString`] wrapped by the [`ImmutableString`]
+    /// if there are no other outstanding references to it.
     #[inline(always)]
-    pub(crate) fn get_mut(&mut self) -> Option<&mut SmartString> {
+    pub fn get_mut(&mut self) -> Option<&mut SmartString> {
         shared_get_mut(&mut self.0)
     }
     /// Returns `true` if the two [`ImmutableString`]'s point to the same allocation.

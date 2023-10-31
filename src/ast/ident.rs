@@ -20,7 +20,10 @@ impl fmt::Debug for Ident {
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.name)?;
-        self.pos.debug_print(f)
+        if !self.pos.is_none() {
+            write!(f, " @ {:?}", self.pos)?;
+        }
+        Ok(())
     }
 }
 

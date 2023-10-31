@@ -8,21 +8,24 @@ mod global_state;
 mod stmt;
 mod target;
 
-pub use cache::{Caches, FnResolutionCache, FnResolutionCacheEntry};
-#[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-pub use chaining::ChainType;
+#[allow(unused_imports)]
+pub use cache::FnResolutionCache;
+pub use cache::{Caches, FnResolutionCacheEntry};
 #[cfg(not(feature = "unchecked"))]
 #[cfg(not(feature = "no_index"))]
 pub use data_check::calc_array_sizes;
 #[cfg(not(feature = "unchecked"))]
-#[cfg(not(feature = "no_object"))]
-pub use data_check::calc_map_sizes;
+pub use data_check::calc_data_sizes;
 #[cfg(feature = "debugging")]
 pub use debugger::{
     BreakPoint, CallStackFrame, Debugger, DebuggerCommand, DebuggerEvent, DebuggerStatus,
     OnDebuggerCallback, OnDebuggingInit,
 };
 pub use eval_context::EvalContext;
+#[cfg(not(feature = "no_module"))]
+pub use expr::search_imports;
+pub use expr::search_namespace;
+
 pub use global_state::GlobalRuntimeState;
 #[cfg(not(feature = "no_module"))]
 #[cfg(not(feature = "no_function"))]

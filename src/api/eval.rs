@@ -3,11 +3,10 @@
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::native::locked_write;
 use crate::parser::ParseState;
+use crate::tokenizer::lex_raw;
 use crate::types::dynamic::Variant;
 use crate::types::StringsInterner;
-use crate::{
-    Dynamic, Engine, OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR,
-};
+use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -127,7 +126,7 @@ impl Engine {
                 &mut interner
             };
 
-            let (stream, tc) = self.lex_raw(&scripts, self.token_mapper.as_deref());
+            let (stream, tc) = lex_raw(self, &scripts, self.token_mapper.as_deref());
 
             let state = &mut ParseState::new(Some(scope), interned_strings, tc);
 
@@ -137,7 +136,7 @@ impl Engine {
                 state,
                 |_| {},
                 #[cfg(not(feature = "no_optimize"))]
-                OptimizationLevel::None,
+                crate::OptimizationLevel::None,
                 #[cfg(feature = "no_optimize")]
                 <_>::default(),
             )?
@@ -241,10 +240,8 @@ impl Engine {
         global.lib.push(ast.shared_lib().clone());
 
         #[cfg(not(feature = "no_module"))]
-        let orig_embedded_module_resolver = mem::replace(
-            &mut global.embedded_module_resolver,
-            ast.resolver().cloned(),
-        );
+        let orig_embedded_module_resolver =
+            mem::replace(&mut global.embedded_module_resolver, ast.resolver.clone());
 
         defer! { global => move |g| {
             #[cfg(not(feature = "no_module"))]

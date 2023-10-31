@@ -74,11 +74,6 @@ impl Position {
     pub const fn or_else(self, pos: Self) -> Self {
         pos
     }
-    /// Print this [`Position`] for debug purposes.
-    #[inline(always)]
-    pub(crate) fn debug_print(self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Ok(())
-    }
 }
 
 impl fmt::Display for Position {

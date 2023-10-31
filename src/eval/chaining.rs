@@ -3,11 +3,12 @@
 
 use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, BinaryExpr, Expr, OpAssignment};
-use crate::config::hashing::OnceCell;
 use crate::engine::{FN_IDX_GET, FN_IDX_SET};
+use crate::eval::search_namespace;
 use crate::types::dynamic::Union;
 use crate::{
-    calc_fn_hash, Dynamic, Engine, FnArgsVec, Position, RhaiResult, RhaiResultOf, Scope, ERR,
+    calc_fn_hash, Dynamic, Engine, FnArgsVec, OnceCell, Position, RhaiResult, RhaiResultOf, Scope,
+    ERR,
 };
 use std::hash::Hash;
 #[cfg(feature = "no_std")]
@@ -413,7 +414,7 @@ impl Engine {
                 #[cfg(feature = "debugging")]
                 self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), lhs)?;
 
-                let target = &mut self.search_namespace(global, caches, scope, this_ptr, lhs)?;
+                let target = &mut search_namespace(self, global, caches, scope, this_ptr, lhs)?;
 
                 self.eval_dot_index_chain_raw(
                     global, caches, scope2, None, lhs, expr, target, rhs, idx_values, new_val,
@@ -458,7 +459,7 @@ impl Engine {
                     "method call in dot chain should not be namespace-qualified"
                 );
 
-                for expr in x.args.iter() {
+                for expr in &*x.args {
                     let arg_value =
                         self.get_arg_value(global, caches, scope, this_ptr.as_deref_mut(), expr)?;
                     idx_values.push(arg_value.0.flatten());
@@ -487,7 +488,7 @@ impl Engine {
                             "method call in dot chain should not be namespace-qualified"
                         );
 
-                        for expr in x.args.iter() {
+                        for expr in &*x.args {
                             let tp = this_ptr.as_deref_mut();
                             let arg_value = self.get_arg_value(global, caches, scope, tp, expr)?;
                             _arg_values.push(arg_value.0.flatten());

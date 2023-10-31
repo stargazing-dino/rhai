@@ -7,12 +7,12 @@ use crate::engine::{
     KEYWORD_DEBUG, KEYWORD_EVAL, KEYWORD_FN_PTR, KEYWORD_FN_PTR_CALL, KEYWORD_FN_PTR_CURRY,
     KEYWORD_IS_DEF_VAR, KEYWORD_PRINT, KEYWORD_TYPE_OF,
 };
-use crate::eval::{Caches, FnResolutionCacheEntry, GlobalRuntimeState};
+use crate::eval::{search_namespace, Caches, FnResolutionCacheEntry, GlobalRuntimeState};
 use crate::tokenizer::{is_valid_function_name, Token};
 use crate::types::dynamic::Union;
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString,
-    OptimizationLevel, Position, RhaiResult, RhaiResultOf, Scope, Shared, SmartString, ERR,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString, Position,
+    RhaiResult, RhaiResultOf, Scope, Shared, SmartString, ERR,
 };
 #[cfg(feature = "no_std")]
 use hashbrown::hash_map::Entry;
@@ -744,14 +744,14 @@ impl Engine {
 
                 let _fn_def = ();
                 #[cfg(not(feature = "no_function"))]
-                let _fn_def = fn_ptr.fn_def();
+                let _fn_def = fn_ptr.fn_def.as_deref();
 
                 match _fn_def {
                     // Linked to scripted function - short-circuit
                     #[cfg(not(feature = "no_function"))]
                     Some(fn_def) if fn_def.params.len() == args.len() => {
                         let scope = &mut Scope::new();
-                        let environ = fn_ptr.encapsulated_environ().map(<_>::as_ref);
+                        let environ = fn_ptr.environ.as_ref().map(<_>::as_ref);
 
                         self.call_script_fn(
                             global, caches, scope, None, environ, fn_def, args, true, pos,
@@ -801,13 +801,20 @@ impl Engine {
                 })?;
 
                 #[cfg(not(feature = "no_function"))]
-                let (is_anon, (fn_name, fn_curry, environ, fn_def)) =
-                    (fn_ptr.is_anonymous(), fn_ptr.take_data());
+                let (
+                    is_anon,
+                    FnPtr {
+                        name,
+                        curry,
+                        environ,
+                        fn_def,
+                    },
+                ) = (fn_ptr.is_anonymous(), fn_ptr);
                 #[cfg(feature = "no_function")]
-                let (is_anon, (fn_name, fn_curry, _), fn_def) = (false, fn_ptr.take_data(), ());
+                let (is_anon, FnPtr { name, curry, .. }, fn_def) = (false, fn_ptr, ());
 
                 // Adding the curried arguments and the remaining arguments
-                let mut curry = fn_curry.into_iter().collect::<FnArgsVec<_>>();
+                let mut curry = curry.into_iter().collect::<FnArgsVec<_>>();
                 let args = &mut FnArgsVec::with_capacity(curry.len() + call_args.len());
                 args.extend(curry.iter_mut());
                 args.extend(call_args.iter_mut().skip(1));
@@ -838,27 +845,25 @@ impl Engine {
                         // Recalculate hash
                         let num_args = args.len();
 
-                        let new_hash = if !is_anon && !is_valid_function_name(&fn_name) {
-                            FnCallHashes::from_native_only(calc_fn_hash(None, &fn_name, num_args))
+                        let new_hash = if !is_anon && !is_valid_function_name(&name) {
+                            FnCallHashes::from_native_only(calc_fn_hash(None, &name, num_args))
                         } else {
                             #[cfg(not(feature = "no_function"))]
                             {
                                 FnCallHashes::from_script_and_native(
-                                    calc_fn_hash(None, &fn_name, num_args - 1),
-                                    calc_fn_hash(None, &fn_name, num_args),
+                                    calc_fn_hash(None, &name, num_args - 1),
+                                    calc_fn_hash(None, &name, num_args),
                                 )
                             }
                             #[cfg(feature = "no_function")]
                             {
-                                FnCallHashes::from_native_only(calc_fn_hash(
-                                    None, &fn_name, num_args,
-                                ))
+                                FnCallHashes::from_native_only(calc_fn_hash(None, &name, num_args))
                             }
                         };
 
                         // Map it to name(args) in function-call style
                         self.exec_fn_call(
-                            global, caches, None, &fn_name, None, new_hash, args, is_ref_mut, true,
+                            global, caches, None, &name, None, new_hash, args, is_ref_mut, true,
                             pos,
                         )
                     }
@@ -917,16 +922,13 @@ impl Engine {
 
                             let _fn_def = ();
                             #[cfg(not(feature = "no_function"))]
-                            let _fn_def = fn_ptr.fn_def();
+                            let _fn_def = fn_ptr.fn_def.as_deref();
 
                             match _fn_def {
                                 // Linked to scripted function
                                 #[cfg(not(feature = "no_function"))]
                                 Some(fn_def) if fn_def.params.len() == call_args.len() => {
-                                    _linked = Some((
-                                        fn_def.clone(),
-                                        fn_ptr.encapsulated_environ().cloned(),
-                                    ))
+                                    _linked = Some((fn_def.clone(), fn_ptr.environ.clone()))
                                 }
                                 _ => {
                                     let _is_anon = false;
@@ -1020,11 +1022,11 @@ impl Engine {
         let mut args_expr = args_expr;
         let mut num_args = usize::from(first_arg.is_some()) + args_expr.len();
         let mut curry = FnArgsVec::new_const();
-        let mut name = fn_name;
+        let mut fn_name = fn_name;
         let mut hashes = hashes;
         let redirected; // Handle call() - Redirect function call
 
-        match name {
+        match fn_name {
             _ if op_token.is_some() => (),
 
             // Handle call(fn_ptr, ...)
@@ -1041,12 +1043,26 @@ impl Engine {
                 })?;
 
                 #[cfg(not(feature = "no_function"))]
-                let (is_anon, (fn_name, fn_curry, _environ, fn_def)) =
-                    (fn_ptr.is_anonymous(), fn_ptr.take_data());
+                let (
+                    is_anon,
+                    FnPtr {
+                        name,
+                        curry: extra_curry,
+                        environ,
+                        fn_def,
+                    },
+                ) = (fn_ptr.is_anonymous(), fn_ptr);
                 #[cfg(feature = "no_function")]
-                let (is_anon, (fn_name, fn_curry, _environ)) = (false, fn_ptr.take_data());
+                let (
+                    is_anon,
+                    FnPtr {
+                        name,
+                        curry: extra_curry,
+                        ..
+                    },
+                ) = (false, fn_ptr);
 
-                curry.extend(fn_curry.into_iter());
+                curry.extend(extra_curry);
 
                 // Linked to scripted function - short-circuit
                 #[cfg(not(feature = "no_function"))]
@@ -1064,7 +1080,7 @@ impl Engine {
                         }
                         let args = &mut arg_values.iter_mut().collect::<FnArgsVec<_>>();
                         let scope = &mut Scope::new();
-                        let environ = _environ.as_deref();
+                        let environ = environ.as_deref();
 
                         return self.call_script_fn(
                             global, caches, scope, None, environ, &fn_def, args, true, pos,
@@ -1073,8 +1089,8 @@ impl Engine {
                 }
 
                 // Redirect function name
-                redirected = fn_name;
-                name = &redirected;
+                redirected = name;
+                fn_name = &redirected;
 
                 // Shift the arguments
                 first_arg = args_expr.get(0);
@@ -1086,10 +1102,10 @@ impl Engine {
                 // Recalculate hash
                 let args_len = num_args + curry.len();
 
-                hashes = if !is_anon && !is_valid_function_name(name) {
-                    FnCallHashes::from_native_only(calc_fn_hash(None, name, args_len))
+                hashes = if !is_anon && !is_valid_function_name(fn_name) {
+                    FnCallHashes::from_native_only(calc_fn_hash(None, fn_name, args_len))
                 } else {
-                    FnCallHashes::from_hash(calc_fn_hash(None, name, args_len))
+                    FnCallHashes::from_hash(calc_fn_hash(None, fn_name, args_len))
                 };
             }
 
@@ -1292,7 +1308,7 @@ impl Engine {
 
             return self
                 .exec_fn_call(
-                    global, caches, scope, name, op_token, hashes, &mut args, is_ref_mut, false,
+                    global, caches, scope, fn_name, op_token, hashes, &mut args, is_ref_mut, false,
                     pos,
                 )
                 .map(|(v, ..)| v);
@@ -1341,7 +1357,7 @@ impl Engine {
                 }
 
                 let mut target =
-                    self.search_namespace(global, caches, scope, this_ptr, first_expr)?;
+                    search_namespace(self, global, caches, scope, this_ptr, first_expr)?;
 
                 if target.as_ref().is_read_only() {
                     target = target.into_owned();
@@ -1370,7 +1386,7 @@ impl Engine {
         args.extend(arg_values.iter_mut());
 
         self.exec_fn_call(
-            global, caches, None, name, op_token, hashes, &mut args, is_ref_mut, false, pos,
+            global, caches, None, fn_name, op_token, hashes, &mut args, is_ref_mut, false, pos,
         )
         .map(|(v, ..)| v)
     }
@@ -1438,7 +1454,7 @@ impl Engine {
                     arg_values.push(value.flatten());
                 }
 
-                let target = self.search_namespace(global, caches, scope, this_ptr, first_expr)?;
+                let target = search_namespace(self, global, caches, scope, this_ptr, first_expr)?;
 
                 if target.is_shared() || target.is_temp_value() {
                     arg_values[0] = target.take_or_clone().flatten();
@@ -1466,8 +1482,7 @@ impl Engine {
         }
 
         // Search for the root namespace
-        let module = self
-            .search_imports(global, namespace)
+        let module = crate::eval::search_imports(self, global, namespace)
             .ok_or_else(|| ERR::ErrorModuleNotFound(namespace.to_string(), namespace.position()))?;
 
         // First search script-defined functions in namespace (can override built-in)
@@ -1598,7 +1613,7 @@ impl Engine {
             None,
             [script],
             #[cfg(not(feature = "no_optimize"))]
-            OptimizationLevel::None,
+            crate::OptimizationLevel::None,
             #[cfg(feature = "no_optimize")]
             <_>::default(),
         )?;

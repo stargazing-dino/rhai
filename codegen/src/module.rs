@@ -302,7 +302,7 @@ impl Module {
             // Regenerate the module with the new content added.
             Ok(quote! {
                 #(#mod_attrs)*
-                #[allow(clippy::needless_pass_by_value)]
+                #[allow(clippy::needless_pass_by_value, clippy::needless_pass_by_ref_mut)]
                 #mod_vis mod #mod_name {
                     #(#orig_content)*
                     #(#inner_modules)*
@@ -313,7 +313,6 @@ impl Module {
             // Regenerate the original module as-is.
             Ok(quote! {
                 #(#mod_attrs)*
-                #[allow(clippy::needless_pass_by_value)]
                 #mod_vis mod #mod_name {
                     #(#orig_content)*
                 }

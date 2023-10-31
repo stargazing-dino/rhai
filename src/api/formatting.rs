@@ -1,6 +1,7 @@
 //! Module that provide formatting services to the [`Engine`].
 use crate::packages::iter_basic::{BitRange, CharsStream, StepRange};
 use crate::parser::{ParseResult, ParseState};
+use crate::tokenizer::lex_raw;
 use crate::types::StringsInterner;
 use crate::{
     Engine, ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, Position, RhaiError,
@@ -259,8 +260,8 @@ impl Engine {
     #[inline(never)]
     #[must_use]
     pub(crate) fn make_type_mismatch_err<T>(&self, typ: &str, pos: Position) -> RhaiError {
-        let t = self.map_type_name(type_name::<T>()).into();
-        ERR::ErrorMismatchDataType(t, typ.into(), pos).into()
+        ERR::ErrorMismatchDataType(self.map_type_name(type_name::<T>()).into(), typ.into(), pos)
+            .into()
     }
 
     /// Compact a script to eliminate insignificant whitespaces and comments.
@@ -274,7 +275,7 @@ impl Engine {
     #[inline]
     pub fn compact_script(&self, script: impl AsRef<str>) -> ParseResult<String> {
         let scripts = [script];
-        let (mut stream, tc) = self.lex_raw(&scripts, self.token_mapper.as_deref());
+        let (mut stream, tc) = lex_raw(self, &scripts, self.token_mapper.as_deref());
         tc.borrow_mut().compressed = Some(String::new());
         stream.state.last_token = Some(SmartString::new_const());
         let mut interner = StringsInterner::new();

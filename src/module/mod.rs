@@ -241,6 +241,10 @@ impl fmt::Debug for Module {
 
         d.field("id", &self.id)
             .field(
+                "custom_types",
+                &self.custom_types.iter().map(|(k, _)| k).collect::<Vec<_>>(),
+            )
+            .field(
                 "modules",
                 &self
                     .modules
@@ -255,7 +259,8 @@ impl fmt::Debug for Module {
                     .iter_fn()
                     .map(|f| f.func.to_string())
                     .collect::<Vec<_>>(),
-            );
+            )
+            .field("flags", &self.flags);
 
         #[cfg(feature = "metadata")]
         d.field("doc", &self.doc);
@@ -1796,9 +1801,7 @@ impl Module {
         self.modules.extend(other.modules);
         self.variables.extend(other.variables);
         match self.functions {
-            Some(ref mut m) if other.functions.is_some() => {
-                m.extend(other.functions.unwrap().into_iter())
-            }
+            Some(ref mut m) if other.functions.is_some() => m.extend(other.functions.unwrap()),
             Some(_) => (),
             None => self.functions = other.functions,
         }
@@ -1831,9 +1834,7 @@ impl Module {
         }
         self.variables.extend(other.variables);
         match self.functions {
-            Some(ref mut m) if other.functions.is_some() => {
-                m.extend(other.functions.unwrap().into_iter())
-            }
+            Some(ref mut m) if other.functions.is_some() => m.extend(other.functions.unwrap()),
             Some(_) => (),
             None => self.functions = other.functions,
         }
@@ -1873,7 +1874,7 @@ impl Module {
         if let Some(ref functions) = other.functions {
             let others_len = functions.len();
 
-            for (&k, f) in functions.iter() {
+            for (&k, f) in functions {
                 let map = self
                     .functions
                     .get_or_insert_with(|| new_hash_map(FN_MAP_SIZE));
@@ -2246,7 +2247,7 @@ impl Module {
 
             value.deep_scan(|v| {
                 if let Some(fn_ptr) = v.downcast_mut::<crate::FnPtr>() {
-                    fn_ptr.set_encapsulated_environ(Some(environ.clone()));
+                    fn_ptr.environ = Some(environ.clone());
                 }
             });
 

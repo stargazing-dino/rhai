@@ -10,14 +10,14 @@ homepage = "https://github.com/rhaiscript/rhai/tree/no_std/no_std_test"
 repository = "https://github.com/rhaiscript/rhai"
 
 [dependencies]
-rhai = { path = "../../", features = [ "no_std" ], default_features = false }
+rhai = { path = "../../", features = ["no_std"], default_features = false }
 wee_alloc = { version = "0.4.5", default_features = false }
 
 [profile.dev]
 panic = "abort"
 
 [profile.release]
-opt-level = "z"             # optimize for size
+opt-level = "z"          # optimize for size
 debug = false
 rpath = false
 debug-assertions = false
@@ -34,3 +34,7 @@ inherits = "release"
 [profile.macos]
 inherits = "release"
 lto = "fat"
+
+# `ahash` has a problem preventing `no-std` builds.  Use this PR until it is fixed.
+[patch.crates-io]
+const-random = { git = "https://github.com/tkaitchuck/constrandom", rev = "refs/pull/31/head" }

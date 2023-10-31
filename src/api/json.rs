@@ -3,7 +3,7 @@
 
 use crate::func::native::locked_write;
 use crate::parser::{ParseSettingFlags, ParseState};
-use crate::tokenizer::Token;
+use crate::tokenizer::{lex_raw, Token};
 use crate::types::StringsInterner;
 use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf};
 #[cfg(feature = "no_std")]
@@ -63,7 +63,8 @@ impl Engine {
     pub fn parse_json(&self, json: impl AsRef<str>, has_null: bool) -> RhaiResultOf<Map> {
         let scripts = [json.as_ref()];
 
-        let (stream, tokenizer_control) = self.lex_raw(
+        let (stream, tokenizer_control) = lex_raw(
+            self,
             &scripts,
             Some(if has_null {
                 &|token, _, _| {

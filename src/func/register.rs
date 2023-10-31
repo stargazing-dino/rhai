@@ -8,7 +8,7 @@
 use super::call::FnCallArgs;
 use super::callable_function::CallableFunction;
 use super::native::{SendSync, Shared};
-use crate::types::dynamic::{DynamicWriteLock, Variant};
+use crate::types::dynamic::{DynamicWriteLock, Union, Variant};
 use crate::{Dynamic, Identifier, NativeCallContext, RhaiResultOf};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -50,8 +50,12 @@ pub fn by_ref<T: Variant + Clone>(data: &mut Dynamic) -> DynamicWriteLock<T> {
 pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
     if TypeId::of::<T>() == TypeId::of::<&str>() {
         // If T is `&str`, data must be `ImmutableString`, so map directly to it
-        data.flatten_in_place();
-        let ref_str = data.as_str_ref().expect("&str");
+        *data = data.take().flatten();
+
+        let ref_str = match data.0 {
+            Union::Str(ref s, ..) => s.as_str(),
+            _ => unreachable!(),
+        };
         // SAFETY: We already checked that `T` is `&str`, so it is safe to cast here.
         return unsafe { mem::transmute_copy::<_, T>(&ref_str) };
     }

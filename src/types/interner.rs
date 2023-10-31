@@ -158,7 +158,7 @@ impl StringsInterner {
 impl AddAssign<Self> for StringsInterner {
     #[inline(always)]
     fn add_assign(&mut self, rhs: Self) {
-        self.cache.extend(rhs.cache.into_iter());
+        self.cache.extend(rhs.cache);
     }
 }
 

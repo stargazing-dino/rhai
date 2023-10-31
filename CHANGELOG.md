@@ -10,6 +10,7 @@ Potentially breaking changes
 * `ImmutableString` now derefs to `&str` instead of `&SmartString`. Normally this should not be a breaking change.
 * Traits implemented by `ImmutableString` are cleaned up.  However, I cannot guarantee that there are absolutely no breaking changes, although I try to be careful.
 * `EvalContext::new`, `FloatWrapper` and `ConditionalExpr` are now exported only under `internals`.
+* `AST::clear_doc` is removed.
 
 Deprecated API's
 ----------------
@@ -21,6 +22,13 @@ Enhancements
 
 * Added `to_int` method for characters.
 * `Token::FloatConstant` and `Token::DecimalConstant` now carry the original text representation for use in, say, a _token mapper_.
+* `Dynamic::is_fnptr` is made a public API.
+
+
+Version 1.16.3
+==============
+
+Public fields of `VarDefInfo` is marked deprecated but still accessible.
 
 
 Version 1.16.2

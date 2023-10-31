@@ -252,15 +252,6 @@ impl<'a> NativeCallContext<'a> {
     pub fn iter_imports(&self) -> impl Iterator<Item = (&str, &crate::Module)> {
         self.global.iter_imports()
     }
-    /// Get an iterator over the current set of modules imported via `import` statements in reverse order.
-    #[cfg(not(feature = "no_module"))]
-    #[allow(dead_code)]
-    #[inline]
-    pub(crate) fn iter_imports_raw(
-        &self,
-    ) -> impl Iterator<Item = (&crate::ImmutableString, &crate::SharedModule)> {
-        self.global.iter_imports_raw()
-    }
     /// _(internals)_ The current [`GlobalRuntimeState`], if any.
     /// Exported under the `internals` feature only.
     ///
@@ -286,7 +277,7 @@ impl<'a> NativeCallContext<'a> {
     #[cfg(not(feature = "no_function"))]
     #[inline]
     pub fn iter_namespaces(&self) -> impl Iterator<Item = &crate::Module> {
-        self.global.lib.iter().map(AsRef::as_ref)
+        self.global.lib.iter().map(<_>::as_ref)
     }
     /// _(internals)_ The current stack of namespaces containing definitions of all script-defined functions.
     /// Exported under the `internals` feature only.

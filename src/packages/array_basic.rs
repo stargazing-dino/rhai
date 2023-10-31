@@ -245,7 +245,7 @@ pub mod array_functions {
         if _ctx.engine().max_array_size() > 0 {
             let pad = len - array.len();
             let (a, m, s) = crate::eval::calc_array_sizes(array);
-            let (ax, mx, sx) = item.calc_data_sizes(true);
+            let (ax, mx, sx) = crate::eval::calc_data_sizes(&item, true);
 
             _ctx.engine()
                 .throw_on_size((a + pad + ax * pad, m + mx * pad, s + sx * pad))?;
@@ -1270,7 +1270,13 @@ pub mod array_functions {
     /// print(x);       // prints "[1, 2, 3, 4, 3, 2, 1]"
     /// ```
     pub fn dedup(ctx: NativeCallContext, array: &mut Array) {
-        let comparer = FnPtr::new_unchecked(OP_EQUALS, Vec::new());
+        let comparer = FnPtr {
+            name: ctx.engine().get_interned_string(OP_EQUALS),
+            curry: Vec::new(),
+            environ: None,
+            #[cfg(not(feature = "no_function"))]
+            fn_def: None,
+        };
         dedup_by_comparer(ctx, array, comparer);
     }
     /// Remove duplicated _consecutive_ elements from the array that return `true` when applied the

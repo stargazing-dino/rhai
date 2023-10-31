@@ -183,15 +183,6 @@ pub enum ParseErrorType {
     LoopBreak,
 }
 
-impl ParseErrorType {
-    /// Make a [`ParseError`] using the current type and position.
-    #[cold]
-    #[inline(never)]
-    pub(crate) fn into_err(self, pos: Position) -> ParseError {
-        ParseError(self.into(), pos)
-    }
-}
-
 impl fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

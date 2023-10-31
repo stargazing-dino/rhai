@@ -184,7 +184,7 @@ impl Dynamic {
     #[must_use]
     pub const fn tag(&self) -> Tag {
         match self.0 {
-            Union::Unit(_, tag, _)
+            Union::Unit((), tag, _)
             | Union::Bool(_, tag, _)
             | Union::Str(_, tag, _)
             | Union::Char(_, tag, _)
@@ -209,7 +209,7 @@ impl Dynamic {
     /// Attach arbitrary data to this [`Dynamic`].
     pub fn set_tag(&mut self, value: Tag) -> &mut Self {
         match self.0 {
-            Union::Unit(_, ref mut tag, _)
+            Union::Unit((), ref mut tag, _)
             | Union::Bool(_, ref mut tag, _)
             | Union::Str(_, ref mut tag, _)
             | Union::Char(_, ref mut tag, _)
@@ -1182,7 +1182,9 @@ impl Dynamic {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
 
         #[cfg(not(feature = "no_closure"))]
-        self.flatten_in_place();
+        {
+            self = self.flatten();
+        }
 
         if TypeId::of::<T>() == TypeId::of::<Self>() {
             return Ok(reify! { self => !!! T });
@@ -1389,30 +1391,6 @@ impl Dynamic {
             ),
             _ => self,
         }
-    }
-    /// Flatten the [`Dynamic`] in place.
-    ///
-    /// If the [`Dynamic`] is not a shared value, it does nothing.
-    ///
-    /// If the [`Dynamic`] is a shared value, it is set to the shared value if there are no
-    /// outstanding references, or a cloned copy otherwise.
-    #[inline]
-    pub(crate) fn flatten_in_place(&mut self) -> &mut Self {
-        match self.0 {
-            #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref mut cell, ..) => {
-                let cell = mem::take(cell);
-                *self = crate::func::shared_try_take(cell).map_or_else(
-                    |ref cell| crate::func::locked_read(cell).clone(),
-                    #[cfg(not(feature = "sync"))]
-                    crate::Locked::into_inner,
-                    #[cfg(feature = "sync")]
-                    |value| value.into_inner().unwrap(),
-                );
-            }
-            _ => (),
-        }
-        self
     }
     /// Is the [`Dynamic`] a shared value that is locked?
     ///
@@ -1844,7 +1822,7 @@ impl Dynamic {
     /// Return `true` if the [`Dynamic`] holds a [`FnPtr`].
     #[inline]
     #[must_use]
-    pub(crate) fn is_fnptr(&self) -> bool {
+    pub fn is_fnptr(&self) -> bool {
         match self.0 {
             Union::FnPtr(..) => true,
             #[cfg(not(feature = "no_closure"))]
@@ -1958,22 +1936,6 @@ impl Dynamic {
                 Union::Char(c, ..) => Ok(c),
                 _ => Err(cell.type_name()),
             },
-            _ => Err(self.type_name()),
-        }
-    }
-
-    /// Cast the [`Dynamic`] as a string slice.
-    /// Returns the name of the actual type if the cast fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the value is shared.
-    #[inline]
-    pub(crate) fn as_str_ref(&self) -> Result<&str, &'static str> {
-        match self.0 {
-            Union::Str(ref s, ..) => Ok(s),
-            #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => panic!("as_str_ref() cannot be called on shared values"),
             _ => Err(self.type_name()),
         }
     }

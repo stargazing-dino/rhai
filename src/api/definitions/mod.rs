@@ -457,7 +457,8 @@ impl Module {
                     !f.metadata.name.contains('$') && !is_valid_function_name(&f.metadata.name);
 
                 #[cfg(not(feature = "no_custom_syntax"))]
-                let operator = operator || def.engine.is_custom_keyword(&f.metadata.name);
+                let operator =
+                    operator || def.engine.custom_keywords.contains_key(&f.metadata.name);
 
                 f.write_definition(writer, def, operator)?;
             }

@@ -19,8 +19,8 @@ use crate::types::{
 };
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
-    Identifier, ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position,
-    Scope, Shared, SmartString, StaticVec, VarDefInfo, AST, PERR,
+    ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position, Scope,
+    Shared, SmartString, StaticVec, VarDefInfo, AST, PERR,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -41,6 +41,15 @@ const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 
 /// The message: `TokenStream` never ends
 const NEVER_ENDS: &str = "`Token`";
+
+impl PERR {
+    /// Make a [`ParseError`] using the current type and position.
+    #[cold]
+    #[inline(never)]
+    fn into_err(self, pos: Position) -> ParseError {
+        ParseError(self.into(), pos)
+    }
+}
 
 /// _(internals)_ A type that encapsulates the current state of the parser.
 /// Exported under the `internals` feature only.
@@ -355,10 +364,10 @@ impl ParseSettings {
 #[cfg(not(feature = "no_function"))]
 #[inline]
 #[must_use]
-pub fn make_anonymous_fn(hash: u64) -> Identifier {
+pub fn make_anonymous_fn(hash: u64) -> crate::Identifier {
     use std::fmt::Write;
 
-    let mut buf = Identifier::new_const();
+    let mut buf = crate::Identifier::new_const();
     write!(&mut buf, "{}{hash:016x}", crate::engine::FN_ANONYMOUS).unwrap();
     buf
 }
@@ -1022,7 +1031,7 @@ impl Engine {
         settings.pos = eat_token(input, &Token::MapStart);
 
         let mut map = StaticVec::<(Ident, Expr)>::new();
-        let mut template = std::collections::BTreeMap::<Identifier, crate::Dynamic>::new();
+        let mut template = std::collections::BTreeMap::<crate::Identifier, crate::Dynamic>::new();
 
         loop {
             const MISSING_RBRACE: &str = "to end this object map literal";
@@ -1756,7 +1765,7 @@ impl Engine {
         _options: ChainingFlags,
     ) -> ParseResult<Expr> {
         // Break just in case `lhs` is `Expr::Dot` or `Expr::Index`
-        let mut parent_options = ASTFlags::BREAK;
+        let mut _parent_options = ASTFlags::BREAK;
 
         // Tail processing all possible postfix operators
         loop {
@@ -1872,7 +1881,7 @@ impl Engine {
                     let rhs =
                         self.parse_primary(input, state, lib, settings.level_up()?, options)?;
 
-                    Self::make_dot_expr(state, expr, rhs, parent_options, op_flags, tail_pos)?
+                    Self::make_dot_expr(state, expr, rhs, _parent_options, op_flags, tail_pos)?
                 }
                 // Unknown postfix operator
                 (expr, token) => {
@@ -1881,7 +1890,7 @@ impl Engine {
             };
 
             // The chain is now extended
-            parent_options = ASTFlags::empty();
+            _parent_options = ASTFlags::empty();
         }
 
         // Optimize chain where the root expression is another chain
@@ -2440,7 +2449,7 @@ impl Engine {
                 }
 
                 #[cfg(not(feature = "no_custom_syntax"))]
-                Token::Custom(s) if self.is_custom_keyword(&s) => {
+                Token::Custom(s) if self.custom_keywords.contains_key(&*s) => {
                     op_base.hashes = if native_only {
                         FnCallHashes::from_native_only(calc_fn_hash(None, &s, 2))
                     } else {
@@ -3586,7 +3595,7 @@ impl Engine {
         lib: &mut FnLib,
         settings: ParseSettings,
         access: crate::FnAccess,
-        #[cfg(feature = "metadata")] comments: impl IntoIterator<Item = Identifier>,
+        #[cfg(feature = "metadata")] comments: impl IntoIterator<Item = crate::Identifier>,
     ) -> ParseResult<ScriptFnDef> {
         let settings = settings.level_up()?;
 
@@ -3629,10 +3638,12 @@ impl Engine {
             }
         };
 
-        let name = match token.into_function_name_for_override() {
-            Ok(r) => r,
-            Err(Token::Reserved(s)) => return Err(PERR::Reserved(s.to_string()).into_err(pos)),
-            Err(_) => return Err(PERR::FnMissingName.into_err(pos)),
+        let name = match token {
+            #[cfg(not(feature = "no_custom_syntax"))]
+            Token::Custom(s) if is_valid_function_name(&s) => *s,
+            Token::Identifier(s) if is_valid_function_name(&s) => *s,
+            Token::Reserved(s) => return Err(PERR::Reserved(s.to_string()).into_err(pos)),
+            _ => return Err(PERR::FnMissingName.into_err(pos)),
         };
 
         let no_params = match input.peek().expect(NEVER_ENDS) {
@@ -3873,8 +3884,13 @@ impl Engine {
             comments: <_>::default(),
         });
 
-        let mut fn_ptr = crate::FnPtr::new_unchecked(fn_name, Vec::new());
-        fn_ptr.set_fn_def(Some(script.clone()));
+        let fn_ptr = crate::FnPtr {
+            name: fn_name,
+            curry: Vec::new(),
+            environ: None,
+            #[cfg(not(feature = "no_function"))]
+            fn_def: Some(script.clone()),
+        };
         let expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), settings.pos);
 
         #[cfg(not(feature = "no_closure"))]
@@ -3922,7 +3938,8 @@ impl Engine {
         statements.push(Stmt::Expr(expr.into()));
 
         #[cfg(not(feature = "no_optimize"))]
-        return Ok(self.optimize_into_ast(
+        return Ok(crate::optimizer::optimize_into_ast(
+            self,
             state.external_constants,
             statements,
             #[cfg(not(feature = "no_function"))]
@@ -4008,7 +4025,8 @@ impl Engine {
         let (statements, _lib) = self.parse_global_level(input, state, |_| {})?;
 
         #[cfg(not(feature = "no_optimize"))]
-        return Ok(self.optimize_into_ast(
+        return Ok(crate::optimizer::optimize_into_ast(
+            self,
             state.external_constants,
             statements,
             #[cfg(not(feature = "no_function"))]

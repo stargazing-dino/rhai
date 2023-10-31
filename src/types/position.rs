@@ -130,14 +130,6 @@ impl Position {
             self
         }
     }
-    /// Print this [`Position`] for debug purposes.
-    #[inline]
-    pub(crate) fn debug_print(self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if !self.is_none() {
-            write!(_f, " @ {self:?}")?;
-        }
-        Ok(())
-    }
 }
 
 impl Default for Position {

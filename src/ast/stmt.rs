@@ -480,12 +480,6 @@ impl StmtBlock {
     pub fn statements_mut(&mut self) -> &mut StmtBlockContainer {
         &mut self.block
     }
-    /// Extract the statements.
-    #[inline(always)]
-    #[must_use]
-    pub(crate) fn take_statements(&mut self) -> StmtBlockContainer {
-        mem::take(&mut self.block)
-    }
     /// Get an iterator over the statements of this statements block.
     #[inline(always)]
     pub fn iter(&self) -> impl Iterator<Item = &Stmt> {
@@ -1111,7 +1105,7 @@ impl Stmt {
                 }
             }
             Self::FnCall(x, ..) => {
-                for s in x.args.iter() {
+                for s in &*x.args {
                     if !s.walk(path, on_node) {
                         return false;
                     }

@@ -1,7 +1,7 @@
 //! Module that defines the script optimization API of [`Engine`].
 #![cfg(not(feature = "no_optimize"))]
 
-use crate::{Engine, OptimizationLevel, Scope, AST};
+use crate::{optimizer::optimize_into_ast, Engine, OptimizationLevel, Scope, AST};
 
 impl Engine {
     /// Control whether and how the [`Engine`] will optimize an [`AST`] after compilation.
@@ -51,9 +51,10 @@ impl Engine {
     ) -> AST {
         let mut ast = ast;
 
-        let mut _new_ast = self.optimize_into_ast(
+        let mut _new_ast = optimize_into_ast(
+            self,
             Some(scope),
-            ast.take_statements().to_vec().into(),
+            std::mem::take(ast.statements_mut()).to_vec().into(),
             #[cfg(not(feature = "no_function"))]
             ast.shared_lib()
                 .iter_fn()
@@ -63,7 +64,9 @@ impl Engine {
         );
 
         #[cfg(feature = "metadata")]
-        _new_ast.set_doc(std::mem::take(ast.doc_mut()));
+        {
+            _new_ast.doc = std::mem::take(&mut ast.doc);
+        }
 
         _new_ast
     }

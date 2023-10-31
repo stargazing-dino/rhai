@@ -38,10 +38,13 @@ use crate::{Dynamic, Engine, Identifier};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
+/// Default limits.
 pub mod default_limits {
     #[cfg(not(feature = "unchecked"))]
+    #[cfg(feature = "internals")]
     pub use super::limits::default_limits::*;
 
+    /// Maximum number of parameters in functions with [`Dynamic`] support.
     pub const MAX_DYNAMIC_PARAMETERS: usize = 16;
 }
 
@@ -210,14 +213,6 @@ impl Engine {
             .insert(keyword.into(), Some(precedence));
 
         Ok(self)
-    }
-    /// Is a keyword registered as a custom keyword?
-    ///
-    /// Not available under `no_custom_syntax`.
-    #[cfg(not(feature = "no_custom_syntax"))]
-    #[inline(always)]
-    pub(crate) fn is_custom_keyword(&self, keyword: &str) -> bool {
-        self.custom_keywords.contains_key(keyword)
     }
 
     /// Get the default value of the custom state for each evaluation run.

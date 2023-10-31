@@ -7,15 +7,48 @@ use std::prelude::v1::*;
 #[derive(Debug, Clone, Hash)]
 pub struct VarDefInfo<'a> {
     /// Name of the variable to be declared.
-    name: &'a str,
+    ///
+    /// # Deprecated API
+    ///
+    /// [`VarDefInfo`] fields will be private in the next major version. Use `name()` instead.
+    #[deprecated(
+        since = "1.16.0",
+        note = "`VarDefInfo` fields will be private in the next major version. Use `name()` instead."
+    )]
+    pub name: &'a str,
     /// `true` if the statement is `const`, otherwise it is `let`.
-    is_const: bool,
+    ///
+    /// # Deprecated API
+    ///
+    /// [`VarDefInfo`] fields will be private in the next major version. Use `is_const()` instead.
+    #[deprecated(
+        since = "1.16.0",
+        note = "`VarDefInfo` fields will be private in the next major version. Use `is_const()` instead."
+    )]
+    pub is_const: bool,
     /// The current nesting level, with zero being the global level.
-    nesting_level: usize,
+    ///
+    /// # Deprecated API
+    ///
+    /// [`VarDefInfo`] fields will be private in the next major version. Use `nesting_level()` instead.
+    #[deprecated(
+        since = "1.16.0",
+        note = "`VarDefInfo` fields will be private in the next major version. Use `nesting_level()` instead."
+    )]
+    pub nesting_level: usize,
     /// Will the variable _shadow_ an existing variable?
-    will_shadow: bool,
+    ///
+    /// # Deprecated API
+    ///
+    /// [`VarDefInfo`] fields will be private in the next major version. Use `will_shadow_other_variables()` instead.
+    #[deprecated(
+        since = "1.16.0",
+        note = "`VarDefInfo` fields will be private in the next major version. Use `will_shadow_other_variables()` instead."
+    )]
+    pub will_shadow: bool,
 }
 
+#[allow(deprecated)]
 impl<'a> VarDefInfo<'a> {
     /// Create a new [`VarDefInfo`].
     #[inline(always)]
