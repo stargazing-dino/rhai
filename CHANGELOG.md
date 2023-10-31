@@ -1,6 +1,12 @@
 Rhai Release Notes
 ==================
 
+Version 1.16.3
+==============
+
+Public fields of `VarDefInfo` is marked deprecated but still accessible.
+
+
 Version 1.16.2
 ==============
 
