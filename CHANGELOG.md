@@ -25,6 +25,12 @@ Enhancements
 * `Dynamic::is_fnptr` is made a public API.
 
 
+Version 1.16.3
+==============
+
+Public fields of `VarDefInfo` is marked deprecated but still accessible.
+
+
 Version 1.16.2
 ==============
 
