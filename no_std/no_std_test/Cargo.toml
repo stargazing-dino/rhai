@@ -34,7 +34,3 @@ inherits = "release"
 [profile.macos]
 inherits = "release"
 lto = "fat"
-
-# `ahash` has a problem preventing `no-std` builds.  Use this PR until it is fixed.
-[patch.crates-io]
-const-random = { git = "https://github.com/tkaitchuck/constrandom", rev = "refs/pull/31/head" }
