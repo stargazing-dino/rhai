@@ -31,6 +31,7 @@ use std::{
 ///
 /// Not available under `no_optimize`.
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default, Hash)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum OptimizationLevel {
     /// No optimization performed.
