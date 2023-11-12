@@ -1589,11 +1589,12 @@ impl Engine {
                                     .push(Expr::StringConstant(state.get_interned_string(*s), pos));
                             }
                         }
-                        (Token::LexError(err), pos)
-                            if matches!(*err, LexError::UnterminatedString) =>
-                        {
-                            return Err(err.into_err(pos))
-                        }
+                        (Token::LexError(err), pos) => match *err {
+                            LexError::UnterminatedString | LexError::StringTooLong(_) => {
+                                return Err(err.into_err(pos))
+                            }
+                            _ => unreachable!("improper lex error: {:?}", err),
+                        },
                         (token, ..) => unreachable!(
                             "string within an interpolated string literal expected but gets {:?}",
                             token

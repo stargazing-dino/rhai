@@ -18,7 +18,7 @@ use std::prelude::v1::*;
 static INDEXER_HASHES: OnceCell<(u64, u64)> = OnceCell::new();
 
 /// Get the pre-calculated index getter/setter hashes.
-#[inline(always)]
+#[inline]
 #[must_use]
 fn hash_idx() -> (u64, u64) {
     *INDEXER_HASHES.get_or_init(|| {

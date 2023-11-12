@@ -16,6 +16,10 @@ fn test_max_string_size() {
 
     assert_eq!(*engine.compile(r#"let x = "朝に紅顔、暮に白骨";"#).unwrap_err().err_type(), ParseErrorType::LiteralTooLarge("Length of string".to_string(), 10));
 
+    assert_eq!(*engine.compile("let x = `朝に紅顔、暮に白骨`;").unwrap_err().err_type(), ParseErrorType::LiteralTooLarge("Length of string".to_string(), 10));
+
+    assert_eq!(*engine.compile(r#"let x = `Say ${"Hi!"} and so be it.`;"#).unwrap_err().err_type(), ParseErrorType::LiteralTooLarge("Length of string".to_string(), 10));
+
     assert!(matches!(
         *engine
             .run(

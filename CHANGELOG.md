@@ -12,6 +12,11 @@ Potentially breaking changes
 * `EvalContext::new`, `FloatWrapper` and `ConditionalExpr` are now exported only under `internals`.
 * `AST::clear_doc` is removed.
 
+Bug fixes
+----------
+
+* Fixed crash when parsing multi-segment interpolated string longer than maximum.
+
 Deprecated API's
 ----------------
 
@@ -23,12 +28,12 @@ Enhancements
 * Added `to_int` method for characters.
 * `Token::FloatConstant` and `Token::DecimalConstant` now carry the original text representation for use in, say, a _token mapper_.
 * `Dynamic::is_fnptr` is made a public API.
-
+* `Scope::get_value_ref` and `Scope::get_value_mut` are added.
 
 Version 1.16.3
 ==============
 
-Public fields of `VarDefInfo` is marked deprecated but still accessible.
+Public fields of `VarDefInfo` are marked deprecated but still accessible.
 
 
 Version 1.16.2

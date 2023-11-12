@@ -484,15 +484,8 @@ impl Scope<'_> {
         self.names
             .iter()
             .rev() // Always search a Scope in reverse order
-            .enumerate()
-            .find_map(|(i, key)| {
-                if name == key {
-                    let index = len - 1 - i;
-                    Some(index)
-                } else {
-                    None
-                }
-            })
+            .position(|key| name == key)
+            .map(|i| len - 1 - i)
     }
     /// Get the value of an entry in the [`Scope`], starting from the last.
     ///
@@ -514,10 +507,80 @@ impl Scope<'_> {
         self.names
             .iter()
             .rev()
-            .enumerate()
-            .find(|(.., key)| &name == key)
-            .map(|(index, ..)| self.values[len - 1 - index].flatten_clone())
-            .and_then(Dynamic::try_cast)
+            .position(|key| &name == key)
+            .and_then(|i| self.values[len - 1 - i].flatten_clone().try_cast())
+    }
+    /// Get a reference the value of an entry in the [`Scope`], starting from the last.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is _shared_.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rhai::Scope;
+    ///
+    /// let mut my_scope = Scope::new();
+    ///
+    /// my_scope.push("x", 42_i64);
+    ///
+    /// let ptr = my_scope.get_value_ref::<i64>("x").expect("x should exist");
+    ///
+    /// assert_eq!(*ptr, 42);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn get_value_ref<T: Variant + Clone>(&self, name: &str) -> Option<&T> {
+        let len = self.len();
+
+        self.names
+            .iter()
+            .rev()
+            .position(|key| &name == key)
+            .and_then(|i| {
+                let v = &self.values[len - 1 - i];
+                #[cfg(not(feature = "no_closure"))]
+                assert!(!v.is_shared());
+                v.downcast_ref()
+            })
+    }
+    /// Get a mutable reference the value of an entry in the [`Scope`], starting from the last.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is _shared_.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rhai::Scope;
+    ///
+    /// let mut my_scope = Scope::new();
+    ///
+    /// my_scope.push("x", 42_i64);
+    ///
+    /// let ptr = my_scope.get_value_mut::<i64>("x").expect("x should exist");
+    ///
+    /// *ptr = 0;
+    ///
+    /// assert_eq!(my_scope.get_value::<i64>("x").expect("x should exist"), 0);
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn get_value_mut<T: Variant + Clone>(&mut self, name: &str) -> Option<&mut T> {
+        let len = self.len();
+
+        self.names
+            .iter_mut()
+            .rev()
+            .position(|key| &name == key)
+            .and_then(move |i| {
+                let v = &mut self.values[len - 1 - i];
+                #[cfg(not(feature = "no_closure"))]
+                assert!(!v.is_shared());
+                v.downcast_mut()
+            })
     }
     /// Check if the named entry in the [`Scope`] is constant.
     ///
