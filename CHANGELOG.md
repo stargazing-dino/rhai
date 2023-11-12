@@ -12,6 +12,11 @@ Potentially breaking changes
 * `EvalContext::new`, `FloatWrapper` and `ConditionalExpr` are now exported only under `internals`.
 * `AST::clear_doc` is removed.
 
+Bug fixes
+----------
+
+* Fixed crash when parsing multi-segment interpolated string longer than maximum.
+
 Deprecated API's
 ----------------
 
