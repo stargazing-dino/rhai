@@ -1480,7 +1480,7 @@ impl Dynamic {
     /// Get a reference of a specific type to the [`Dynamic`].
     /// Casting to [`Dynamic`] just returns a reference to it.
     ///
-    /// Returns [`None`] if the cast fails, or if the value is shared.
+    /// Returns [`None`] if the cast fails, or if the value is _shared_.
     #[inline]
     #[must_use]
     pub(crate) fn downcast_ref<T: Any + Clone + ?Sized>(&self) -> Option<&T> {
@@ -1578,7 +1578,7 @@ impl Dynamic {
     /// Get a mutable reference of a specific type to the [`Dynamic`].
     /// Casting to [`Dynamic`] just returns a mutable reference to it.
     ///
-    /// Returns [`None`] if the cast fails, or if the value is shared.
+    /// Returns [`None`] if the cast fails, or if the value is _shared_.
     #[inline]
     #[must_use]
     pub(crate) fn downcast_mut<T: Any + Clone + ?Sized>(&mut self) -> Option<&mut T> {
