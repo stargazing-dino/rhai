@@ -104,7 +104,7 @@ impl Serialize for Scope<'_> {
 
         let mut ser = ser.serialize_seq(Some(self.len()))?;
 
-        for (name, is_constant, value) in self.iter_raw() {
+        for (name, is_constant, value) in self.iter_inner() {
             let entry = ScopeEntry {
                 name,
                 value,

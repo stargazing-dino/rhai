@@ -75,7 +75,7 @@ pub struct Scope<'a> {
 
 impl fmt::Display for Scope<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (i, (name, constant, value)) in self.iter_raw().enumerate() {
+        for (i, (name, constant, value)) in self.iter_inner().enumerate() {
             #[cfg(not(feature = "no_closure"))]
             let value_is_shared = if value.is_shared() { " (shared)" } else { "" };
             #[cfg(feature = "no_closure")]
@@ -912,19 +912,17 @@ impl Scope<'_> {
     /// assert!(is_constant);
     /// assert_eq!(value.cast::<String>(), "hello");
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn iter(&self) -> impl Iterator<Item = (&str, bool, Dynamic)> {
-        self.iter_raw()
-            .map(|(name, constant, value)| (name, constant, value.flatten_clone()))
+        self.iter_inner()
+            .map(|(name, constant, value)| (name.as_str(), constant, value.flatten_clone()))
     }
     /// Get an iterator to entries in the [`Scope`].
     /// Shared values are not expanded.
-    #[inline]
+    #[inline(always)]
     pub fn iter_raw(&self) -> impl Iterator<Item = (&str, bool, &Dynamic)> {
-        self.names
-            .iter()
-            .zip(self.values.iter())
-            .map(|(name, value)| (name.as_str(), value.is_read_only(), value))
+        self.iter_rev_inner()
+            .map(|(name, constant, value)| (name.as_str(), constant, value))
     }
     /// Get an iterator to entries in the [`Scope`].
     /// Shared values are not expanded.

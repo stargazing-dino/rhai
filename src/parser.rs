@@ -2917,12 +2917,12 @@ impl Engine {
         // let name ...
         let (name, pos) = parse_var_name(input)?;
 
-        if !self.allow_shadowing() && state.stack.iter().any(|(v, ..)| v == name) {
+        if !self.allow_shadowing() && state.stack.get(&name).is_some() {
             return Err(PERR::VariableExists(name.into()).into_err(pos));
         }
 
         if let Some(ref filter) = self.def_var_filter {
-            let will_shadow = state.stack.iter().any(|(v, ..)| v == name);
+            let will_shadow = state.stack.get(&name).is_some();
 
             let global = state
                 .global
