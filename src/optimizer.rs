@@ -180,10 +180,9 @@ fn optimize_stmt_block(
     ) {
         let (first, second) = statements.split_at_mut(n);
         let mut stmt = second[0].take();
-        let stmts = if let Stmt::Block(ref mut block, ..) = stmt {
-            block.statements_mut()
-        } else {
-            unreachable!("Stmt::Block expected but gets {:?}", stmt)
+        let stmts = match stmt {
+            Stmt::Block(ref mut block, ..) => block.statements_mut(),
+            _ => unreachable!("Stmt::Block expected but gets {:?}", stmt),
         };
         statements = first
             .iter_mut()
@@ -242,17 +241,16 @@ fn optimize_stmt_block(
         let mut first_non_constant = statements
             .iter()
             .rev()
-            .enumerate()
-            .find_map(|(i, stmt)| match stmt {
-                stmt if !is_pure(stmt) => Some(i),
+            .position(|stmt| match stmt {
+                stmt if !is_pure(stmt) => true,
 
-                Stmt::Var(x, ..) if x.1.is_constant() => Some(i),
-                Stmt::Expr(e) if !e.is_constant() => Some(i),
+                Stmt::Var(x, ..) if x.1.is_constant() => true,
+                Stmt::Expr(e) if !e.is_constant() => true,
 
                 #[cfg(not(feature = "no_module"))]
-                Stmt::Import(x, ..) if !x.0.is_constant() => Some(i),
+                Stmt::Import(x, ..) if !x.0.is_constant() => true,
 
-                _ => None,
+                _ => false,
             })
             .map_or(0, |n| statements.len() - n - 1);
 

@@ -1931,7 +1931,7 @@ impl Module {
                 Some(ref mut m) => m.extend(
                     functions
                         .iter()
-                        .filter(|&(.., f)| {
+                        .filter(|(.., f)| {
                             _filter(
                                 f.metadata.namespace,
                                 f.metadata.access,

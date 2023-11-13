@@ -476,14 +476,15 @@ fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
 fn eat_token(input: &mut TokenStream, expected_token: &Token) -> Position {
     let (t, pos) = input.next().expect(NEVER_ENDS);
 
-    if &t != expected_token {
-        unreachable!(
-            "{} expected but gets {} at {}",
-            expected_token.literal_syntax(),
-            t.literal_syntax(),
-            pos
-        );
-    }
+    assert_eq!(
+        &t,
+        expected_token,
+        "{} expected but gets {} at {}",
+        expected_token.literal_syntax(),
+        t.literal_syntax(),
+        pos,
+    );
+
     pos
 }
 
@@ -3266,9 +3267,11 @@ impl Engine {
                     comments_pos = *pos;
                 }
 
-                if !crate::tokenizer::is_doc_comment(comment) {
-                    unreachable!("doc-comment expected but gets {:?}", comment);
-                }
+                assert!(
+                    crate::tokenizer::is_doc_comment(comment),
+                    "doc-comment expected but gets {:?}",
+                    comment
+                );
 
                 if !settings.has_flag(ParseSettingFlags::GLOBAL_LEVEL) {
                     return Err(PERR::WrongDocComment.into_err(comments_pos));

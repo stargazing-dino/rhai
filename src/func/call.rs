@@ -118,11 +118,10 @@ impl Drop for ArgBackup<'_> {
 pub fn ensure_no_data_race(fn_name: &str, args: &FnCallArgs, is_ref_mut: bool) -> RhaiResultOf<()> {
     match args
         .iter()
-        .enumerate()
         .skip(usize::from(is_ref_mut))
-        .find(|(.., a)| a.is_locked())
+        .position(|a| a.is_locked())
     {
-        Some((n, ..)) => Err(ERR::ErrorDataRace(
+        Some(n) => Err(ERR::ErrorDataRace(
             format!("argument #{} of function '{fn_name}'", n + 1),
             Position::NONE,
         )
@@ -1564,15 +1563,13 @@ impl Engine {
                     .and_then(|r| self.check_data_size(r, pos))
             }
 
-            Some(f) if f.is_native() => {
+            Some(f) => {
                 let func = f.get_native_fn().expect("native function");
                 let context = f
                     .has_context()
                     .then(|| (self, fn_name, module.id(), &*global, pos).into());
                 func(context, args).and_then(|r| self.check_data_size(r, pos))
             }
-
-            Some(f) => unreachable!("unknown function type: {:?}", f),
 
             None => Err(ERR::ErrorFunctionNotFound(
                 if namespace.is_empty() {

@@ -479,13 +479,11 @@ impl Scope<'_> {
     #[inline]
     #[must_use]
     pub(crate) fn search(&self, name: &str) -> Option<usize> {
-        let len = self.len();
-
         self.names
             .iter()
             .rev() // Always search a Scope in reverse order
             .position(|key| name == key)
-            .map(|i| len - 1 - i)
+            .map(|i| self.len() - 1 - i)
     }
     /// Get the value of an entry in the [`Scope`], starting from the last.
     ///
@@ -502,13 +500,11 @@ impl Scope<'_> {
     #[inline]
     #[must_use]
     pub fn get_value<T: Variant + Clone>(&self, name: &str) -> Option<T> {
-        let len = self.len();
-
         self.names
             .iter()
             .rev()
             .position(|key| &name == key)
-            .and_then(|i| self.values[len - 1 - i].flatten_clone().try_cast())
+            .and_then(|i| self.values[self.len() - 1 - i].flatten_clone().try_cast())
     }
     /// Get a reference the value of an entry in the [`Scope`], starting from the last.
     ///
@@ -532,14 +528,12 @@ impl Scope<'_> {
     #[inline]
     #[must_use]
     pub fn get_value_ref<T: Variant + Clone>(&self, name: &str) -> Option<&T> {
-        let len = self.len();
-
         self.names
             .iter()
             .rev()
             .position(|key| &name == key)
             .and_then(|i| {
-                let v = &self.values[len - 1 - i];
+                let v = &self.values[self.len() - 1 - i];
                 #[cfg(not(feature = "no_closure"))]
                 assert!(!v.is_shared());
                 v.downcast_ref()

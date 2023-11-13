@@ -2568,13 +2568,10 @@ impl<'a> Iterator for TokenIterator<'a> {
             // Custom keyword/symbol - must be disabled
             #[cfg(not(feature = "no_custom_syntax"))]
             Some((token, pos)) if token.is_literal() && self.engine.custom_keywords.contains_key(token.literal_syntax()) => {
-                if self.engine.is_symbol_disabled(token.literal_syntax()) {
-                    // Disabled standard keyword/symbol
-                    (Token::Custom(Box::new(token.literal_syntax().into())), pos)
-                } else {
-                    // Active standard keyword - should never be a custom keyword!
-                    unreachable!("{:?} is an active keyword", token)
-                }
+                // Active standard keyword should never be a custom keyword!
+                assert!(self.engine.is_symbol_disabled(token.literal_syntax()), "{:?} is an active keyword", token);
+
+                (Token::Custom(Box::new(token.literal_syntax().into())), pos)
             }
             // Disabled symbol
             Some((token, pos)) if token.is_literal() && self.engine.is_symbol_disabled(token.literal_syntax()) => {
