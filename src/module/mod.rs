@@ -2072,7 +2072,7 @@ impl Module {
                 f.metadata.access,
                 f.metadata.name.as_str(),
                 f.metadata.num_params,
-                f.func.get_script_fn_def().expect("script-defined function"),
+                f.func.get_script_fn_def().expect("`ScriptFnDef`"),
             )
         })
     }
@@ -2236,7 +2236,7 @@ impl Module {
             i -= 1;
 
             let (mut value, mut aliases) = if i >= orig_scope_len {
-                let (_, v, a) = scope.pop_entry().expect("not empty");
+                let (_, v, a) = scope.pop_entry().unwrap();
                 (v, a)
             } else {
                 let (_, v, a) = scope.get_entry_by_index(i);

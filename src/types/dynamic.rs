@@ -22,10 +22,6 @@ pub use std::time::Instant;
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 pub use instant::Instant;
 
-/// The message: data type was checked
-#[allow(dead_code)]
-const CHECKED: &str = "data type was checked";
-
 /// _(internals)_ Modes of access.
 /// Exported under the `internals` feature only.
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
@@ -129,7 +125,7 @@ impl<'d, T: Any + Clone> Deref for DynamicReadLock<'d, T> {
         match self.0 {
             DynamicReadLockInner::Reference(reference) => reference,
             #[cfg(not(feature = "no_closure"))]
-            DynamicReadLockInner::Guard(ref guard) => guard.downcast_ref().expect(CHECKED),
+            DynamicReadLockInner::Guard(ref guard) => guard.downcast_ref().unwrap(),
         }
     }
 }
@@ -163,7 +159,7 @@ impl<'d, T: Any + Clone> Deref for DynamicWriteLock<'d, T> {
         match self.0 {
             DynamicWriteLockInner::Reference(ref reference) => reference,
             #[cfg(not(feature = "no_closure"))]
-            DynamicWriteLockInner::Guard(ref guard) => guard.downcast_ref().expect(CHECKED),
+            DynamicWriteLockInner::Guard(ref guard) => guard.downcast_ref().unwrap(),
         }
     }
 }
@@ -174,7 +170,7 @@ impl<'d, T: Any + Clone> DerefMut for DynamicWriteLock<'d, T> {
         match self.0 {
             DynamicWriteLockInner::Reference(ref mut reference) => reference,
             #[cfg(not(feature = "no_closure"))]
-            DynamicWriteLockInner::Guard(ref mut guard) => guard.downcast_mut().expect(CHECKED),
+            DynamicWriteLockInner::Guard(ref mut guard) => guard.downcast_mut().unwrap(),
         }
     }
 }

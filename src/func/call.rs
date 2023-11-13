@@ -97,7 +97,7 @@ impl<'a> ArgBackup<'a> {
     /// exiting the current scope.  Otherwise it is undefined behavior as the shorter lifetime will leak.
     #[inline(always)]
     pub fn restore_first_arg(&mut self, args: &mut FnCallArgs<'a>) {
-        args[0] = self.orig_mut.take().expect("`Some`");
+        args[0] = self.orig_mut.take().unwrap();
     }
 }
 
@@ -307,19 +307,15 @@ impl Engine {
                     // Try all permutations with `Dynamic` wildcards
                     hash = calc_fn_hash_full(
                         hash_base,
-                        args.as_ref()
-                            .expect("no permutations")
-                            .iter()
-                            .enumerate()
-                            .map(|(i, a)| {
-                                let mask = 1usize << (num_args - i - 1);
-                                if bitmask & mask == 0 {
-                                    a.type_id()
-                                } else {
-                                    // Replace with `Dynamic`
-                                    TypeId::of::<Dynamic>()
-                                }
-                            }),
+                        args.as_ref().unwrap().iter().enumerate().map(|(i, a)| {
+                            let mask = 1usize << (num_args - i - 1);
+                            if bitmask & mask == 0 {
+                                a.type_id()
+                            } else {
+                                // Replace with `Dynamic`
+                                TypeId::of::<Dynamic>()
+                            }
+                        }),
                     );
 
                     bitmask += 1;
@@ -631,7 +627,7 @@ impl Engine {
                 debug_assert!(func.is_script());
 
                 let environ = func.get_encapsulated_environ();
-                let func = func.get_script_fn_def().expect("script-defined function");
+                let func = func.get_script_fn_def().expect("`ScriptFnDef`");
 
                 if func.body.is_empty() {
                     return Ok((Dynamic::UNIT, false));
@@ -732,7 +728,7 @@ impl Engine {
         let (result, updated) = match fn_name {
             // Handle fn_ptr.call(...)
             KEYWORD_FN_PTR_CALL if target.as_ref().is_fnptr() => {
-                let fn_ptr = target.as_ref().read_lock::<FnPtr>().expect("`FnPtr`");
+                let fn_ptr = target.as_ref().read_lock::<FnPtr>().unwrap();
 
                 // Arguments are passed as-is, adding the curried arguments
                 let mut curry = fn_ptr.curry().iter().cloned().collect::<FnArgsVec<_>>();
@@ -1367,7 +1363,7 @@ impl Engine {
                 } else {
                     // Turn it into a method call only if the object is not shared and not a simple value
                     is_ref_mut = true;
-                    let obj_ref = target.take_ref().expect("ref");
+                    let obj_ref = target.take_ref().unwrap();
                     args.push(obj_ref);
                 }
             }
@@ -1463,7 +1459,7 @@ impl Engine {
                     // func(x, ...) -> x.func(...)
                     let (first, rest) = arg_values.split_first_mut().unwrap();
                     first_arg_value = Some(first);
-                    let obj_ref = target.take_ref().expect("ref");
+                    let obj_ref = target.take_ref().unwrap();
                     args.push(obj_ref);
                     args.extend(rest.iter_mut());
                 }
@@ -1538,7 +1534,7 @@ impl Engine {
         match func {
             #[cfg(not(feature = "no_function"))]
             Some(func) if func.is_script() => {
-                let f = func.get_script_fn_def().expect("script-defined function");
+                let f = func.get_script_fn_def().expect("`ScriptFnDef`");
 
                 let environ = func.get_encapsulated_environ();
                 let scope = &mut Scope::new();
@@ -1555,7 +1551,7 @@ impl Engine {
             }
 
             Some(f) if f.is_plugin_fn() => {
-                let f = f.get_plugin_fn().expect("plugin function");
+                let f = f.get_plugin_fn().expect("`PluginFunction`");
                 let context = f
                     .has_context()
                     .then(|| (self, fn_name, module.id(), &*global, pos).into());

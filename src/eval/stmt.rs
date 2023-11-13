@@ -18,9 +18,7 @@ use std::prelude::v1::*;
 #[inline(always)]
 fn intern_string(value: Dynamic, engine: &Engine) -> Dynamic {
     match value.0 {
-        Union::Str(..) => engine
-            .get_interned_string(value.into_immutable_string().expect("`ImmutableString`"))
-            .into(),
+        Union::Str(s, ..) => engine.get_interned_string(s).into(),
         _ => value,
     }
 }

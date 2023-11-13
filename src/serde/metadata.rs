@@ -149,7 +149,7 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
                 #[cfg(not(feature = "no_function"))]
                 info.func
                     .get_script_fn_def()
-                    .expect("script-defined function")
+                    .expect("`ScriptFnDef`")
                     .comments
                     .iter()
                     .map(<_>::as_ref)

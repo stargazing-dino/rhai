@@ -40,7 +40,7 @@ type FnLib = StraightHashMap<Shared<ScriptFnDef>>;
 const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 
 /// The message: `TokenStream` never ends
-const NEVER_ENDS: &str = "`Token`";
+const NEVER_ENDS: &str = "`TokenStream` never ends";
 
 impl PERR {
     /// Make a [`ParseError`] using the current type and position.

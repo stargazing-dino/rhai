@@ -403,7 +403,9 @@ impl Scope<'_> {
     /// ```
     #[inline(always)]
     pub fn pop(&mut self) -> &mut Self {
-        self.names.pop().expect("not empty");
+        self.names
+            .pop()
+            .unwrap_or_else(|| panic!("`Scope` is empty"));
         self.values.truncate(self.names.len());
         self.aliases.truncate(self.names.len());
         self
@@ -414,10 +416,10 @@ impl Scope<'_> {
     pub(crate) fn pop_entry(&mut self) -> Option<(ImmutableString, Dynamic, Vec<ImmutableString>)> {
         self.values.pop().map(|value| {
             (
-                self.names.pop().expect("not empty"),
+                self.names.pop().unwrap(),
                 value,
                 if self.aliases.len() > self.values.len() {
-                    self.aliases.pop().expect("not empty").to_vec()
+                    self.aliases.pop().unwrap().to_vec()
                 } else {
                     Vec::new()
                 },

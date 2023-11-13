@@ -521,7 +521,9 @@ pub fn shared_try_take<T>(value: Shared<T>) -> Result<T, Shared<T>> {
 #[must_use]
 #[allow(dead_code)]
 pub fn shared_take<T>(value: Shared<T>) -> T {
-    shared_try_take(value).ok().expect("not shared")
+    shared_try_take(value)
+        .ok()
+        .unwrap_or_else(|| panic!("`value` is shared (i.e. has outstanding references)"))
 }
 
 /// _(internals)_ Lock a [`Locked`] resource for mutable access.

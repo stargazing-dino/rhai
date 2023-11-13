@@ -26,7 +26,7 @@ impl Engine {
             self.global_modules.push(global_namespace.into());
         }
 
-        Shared::get_mut(self.global_modules.first_mut().unwrap()).expect("not shared")
+        Shared::get_mut(self.global_modules.first_mut().unwrap()).unwrap()
     }
     /// Register a custom function with the [`Engine`].
     ///
@@ -749,8 +749,8 @@ impl Engine {
 
             if name.contains(separator) {
                 let mut iter = name.splitn(2, separator);
-                let sub_module = iter.next().expect("contains separator").trim();
-                let remainder = iter.next().expect("contains separator").trim();
+                let sub_module = iter.next().unwrap().trim();
+                let remainder = iter.next().unwrap().trim();
 
                 if root.is_empty() || !root.contains_key(sub_module) {
                     let mut m = Module::new();
@@ -758,7 +758,7 @@ impl Engine {
                     m.build_index();
                     root.insert(sub_module.into(), m.into());
                 } else {
-                    let m = root.remove(sub_module).expect("contains sub-module");
+                    let m = root.remove(sub_module).unwrap();
                     let mut m = crate::func::shared_take_or_clone(m);
                     register_static_module_raw(m.get_sub_modules_mut(), remainder, module);
                     m.build_index();
