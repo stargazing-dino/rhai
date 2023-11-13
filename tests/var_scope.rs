@@ -398,6 +398,7 @@ fn test_var_def_filter() {
     engine.run("let y = 42; { let z = y + 1; { let x = z + 1; } }").unwrap();
 }
 
+#[cfg(not(feature = "no_object"))]
 #[test]
 fn test_var_scope_cloning() {
     struct Foo {
