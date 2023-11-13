@@ -22,6 +22,7 @@ use crate::{
 use std::prelude::v1::*;
 use std::{
     any::TypeId,
+    borrow::Cow,
     convert::TryFrom,
     hash::{Hash, Hasher},
     mem,
@@ -49,12 +50,14 @@ pub enum OptimizationLevel {
 struct OptimizerState<'a> {
     /// Has the [`AST`] been changed during this pass?
     is_dirty: bool,
-    /// Stack of variables/constants for constants propagation.
-    variables: Vec<(ImmutableString, Option<Dynamic>)>,
+    /// Stack of variables/constants for constants propagation and strict variables checking.
+    variables: Vec<(ImmutableString, Option<Cow<'a, Dynamic>>)>,
     /// Activate constants propagation?
     propagate_constants: bool,
     /// [`Engine`] instance for eager function evaluation.
     engine: &'a Engine,
+    /// Optional [`Scope`].
+    scope: Option<&'a Scope<'a>>,
     /// The global runtime state.
     global: GlobalRuntimeState,
     /// Function resolution caches.
@@ -69,6 +72,7 @@ impl<'a> OptimizerState<'a> {
     pub fn new(
         engine: &'a Engine,
         lib: &'a [crate::SharedModule],
+        scope: Option<&'a Scope<'a>>,
         optimization_level: OptimizationLevel,
     ) -> Self {
         let mut _global = GlobalRuntimeState::new(engine);
@@ -84,6 +88,7 @@ impl<'a> OptimizerState<'a> {
             variables: Vec::new(),
             propagate_constants: true,
             engine,
+            scope,
             global: _global,
             caches: Caches::new(),
             optimization_level,
@@ -113,7 +118,7 @@ impl<'a> OptimizerState<'a> {
     ///
     /// `Some(value)` if literal constant (which can be used for constants propagation), `None` otherwise.
     #[inline(always)]
-    pub fn push_var(&mut self, name: ImmutableString, value: Option<Dynamic>) {
+    pub fn push_var<'x: 'a>(&mut self, name: ImmutableString, value: Option<Cow<'x, Dynamic>>) {
         self.variables.push((name, value));
     }
     /// Look up a literal constant from the variables stack.
@@ -123,7 +128,7 @@ impl<'a> OptimizerState<'a> {
             .iter()
             .rev()
             .find(|(n, _)| n == name)
-            .and_then(|(_, value)| value.as_ref())
+            .and_then(|(_, value)| value.as_deref())
     }
     /// Call a registered function
     #[inline]
@@ -220,7 +225,7 @@ fn optimize_stmt_block(
 
                     let value = if options.contains(ASTFlags::CONSTANT) && x.1.is_constant() {
                         // constant literal
-                        Some(x.1.get_literal_value().unwrap())
+                        Some(Cow::Owned(x.1.get_literal_value().unwrap()))
                     } else {
                         // variable
                         None
@@ -1327,21 +1332,29 @@ impl Engine {
         }
 
         // Set up the state
-        let mut state = OptimizerState::new(self, lib, optimization_level);
+        let mut state = OptimizerState::new(self, lib, scope, optimization_level);
 
         // Add constants from global modules
         self.global_modules
             .iter()
             .rev()
             .flat_map(|m| m.iter_var())
-            .for_each(|(name, value)| state.push_var(name.into(), Some(value.clone())));
+            .for_each(|(name, value)| state.push_var(name.into(), Some(Cow::Borrowed(value))));
 
         // Add constants and variables from the scope
-        scope
+        state
+            .scope
             .into_iter()
-            .flat_map(Scope::iter)
+            .flat_map(Scope::iter_inner)
             .for_each(|(name, constant, value)| {
-                state.push_var(name.into(), if constant { Some(value) } else { None });
+                state.push_var(
+                    name.into(),
+                    if constant {
+                        Some(Cow::Borrowed(value))
+                    } else {
+                        None
+                    },
+                );
             });
 
         optimize_stmt_block(statements, &mut state, true, false, true)

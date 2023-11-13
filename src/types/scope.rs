@@ -727,18 +727,15 @@ impl Scope<'_> {
     /// Panics if the index is out of bounds.
     #[inline(always)]
     #[allow(dead_code)]
-    pub(crate) fn get_entry_by_index(
-        &mut self,
-        index: usize,
-    ) -> (&str, &Dynamic, &[ImmutableString]) {
-        if self.aliases.len() <= index {
-            self.aliases.resize(index + 1, <_>::default());
-        }
-
+    pub(crate) fn get_entry_by_index(&self, index: usize) -> (&str, &Dynamic, &[ImmutableString]) {
         (
             &self.names[index],
             &self.values[index],
-            &self.aliases[index],
+            if self.aliases.len() > index {
+                &self.aliases[index]
+            } else {
+                &[]
+            },
         )
     }
     /// Remove the last entry in the [`Scope`] by the specified name and return its value.
@@ -929,15 +926,26 @@ impl Scope<'_> {
             .zip(self.values.iter())
             .map(|(name, value)| (name.as_str(), value.is_read_only(), value))
     }
+    /// Get an iterator to entries in the [`Scope`].
+    /// Shared values are not expanded.
+    #[inline]
+    pub(crate) fn iter_inner(&self) -> impl Iterator<Item = (&ImmutableString, bool, &Dynamic)> {
+        self.names
+            .iter()
+            .zip(self.values.iter())
+            .map(|(name, value)| (name, value.is_read_only(), value))
+    }
     /// Get a reverse iterator to entries in the [`Scope`].
     /// Shared values are not expanded.
     #[inline]
-    pub(crate) fn iter_rev_raw(&self) -> impl Iterator<Item = (&str, bool, &Dynamic)> {
+    pub(crate) fn iter_rev_inner(
+        &self,
+    ) -> impl Iterator<Item = (&ImmutableString, bool, &Dynamic)> {
         self.names
             .iter()
             .rev()
             .zip(self.values.iter().rev())
-            .map(|(name, value)| (name.as_str(), value.is_read_only(), value))
+            .map(|(name, value)| (name, value.is_read_only(), value))
     }
     /// Remove a range of entries within the [`Scope`].
     ///

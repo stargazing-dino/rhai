@@ -25,6 +25,7 @@ Deprecated API's
 Enhancements
 ------------
 
+* Avoid cloning values unless needed when performing constants propagation in optimization.
 * Added `to_int` method for characters.
 * `Token::FloatConstant` and `Token::DecimalConstant` now carry the original text representation for use in, say, a _token mapper_.
 * `Dynamic::is_fnptr` is made a public API.

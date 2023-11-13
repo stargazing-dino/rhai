@@ -153,9 +153,8 @@ impl<'e, 's> ParseState<'e, 's> {
 
         let index = self
             .stack
-            .iter_rev_raw()
-            .enumerate()
-            .find(|&(.., (n, ..))| {
+            .iter_rev_inner()
+            .position(|(n, ..)| {
                 if n == SCOPE_SEARCH_BARRIER_MARKER {
                     // Do not go beyond the barrier
                     hit_barrier = true;
@@ -164,7 +163,7 @@ impl<'e, 's> ParseState<'e, 's> {
                     n == name
                 }
             })
-            .map_or(0, |(i, ..)| i + 1);
+            .map_or(0, |i| i + 1);
 
         (index, hit_barrier)
     }
