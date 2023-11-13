@@ -339,7 +339,7 @@ impl Parse for ExportedFn {
         for arg in fn_all.sig.inputs.iter().skip(skip_slots + 1) {
             let ty = match arg {
                 syn::FnArg::Typed(syn::PatType { ref ty, .. }) => ty,
-                _ => panic!("internal error: receiver argument outside of first position!?"),
+                _ => unreachable!("receiver argument outside of first position!?"),
             };
             let is_ok = match flatten_type_groups(ty.as_ref()) {
                 syn::Type::Reference(syn::TypeReference {
@@ -749,7 +749,7 @@ impl ExportedFn {
                                     mem::take(args[#i]).into_immutable_string().unwrap()
                                 )
                             }
-                            _ => panic!("internal error: why wasn't this found earlier!?"),
+                            _ => unreachable!("why wasn't this found earlier!?"),
                         },
                         syn::Type::Path(ref p) if p.path == string_type_path => {
                             is_string = true;
@@ -791,7 +791,7 @@ impl ExportedFn {
                         );
                     }
                 }
-                syn::FnArg::Receiver(..) => panic!("internal error: how did this happen!?"),
+                syn::FnArg::Receiver(..) => unreachable!("how did this happen!?"),
             }
             if !is_ref {
                 unpack_exprs.push(syn::parse2::<syn::Expr>(quote! { #var }).unwrap());

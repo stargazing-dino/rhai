@@ -149,7 +149,7 @@ pub fn generate_body(
         let fn_input_types: Vec<_> = function
             .arg_list()
             .map(|fn_arg| match fn_arg {
-                syn::FnArg::Receiver(..) => panic!("internal error: receiver fn outside impl!?"),
+                syn::FnArg::Receiver(..) => unreachable!("receiver fn outside impl!?"),
                 syn::FnArg::Typed(syn::PatType { ref ty, .. }) => {
                     let arg_type = match flatten_type_groups(ty.as_ref()) {
                         syn::Type::Reference(syn::TypeReference {
@@ -162,7 +162,7 @@ pub fn generate_body(
                                 ImmutableString })
                                 .unwrap()
                             }
-                            _ => panic!("internal error: non-string shared reference!?"),
+                            _ => unreachable!("non-string shared reference!?"),
                         },
                         syn::Type::Path(ref p) if p.path == string_type_path => {
                             syn::parse2::<syn::Type>(quote! {
@@ -177,7 +177,7 @@ pub fn generate_body(
                             syn::Type::Path(ref p) => syn::parse2::<syn::Type>(quote! {
                             #p })
                             .unwrap(),
-                            _ => panic!("internal error: invalid mutable reference!?"),
+                            _ => unreachable!("invalid mutable reference!?"),
                         },
                         t => t.clone(),
                     };
