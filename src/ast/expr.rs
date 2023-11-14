@@ -175,8 +175,7 @@ impl FnCallHashes {
     #[inline(always)]
     #[must_use]
     pub fn script(&self) -> u64 {
-        debug_assert!(self.script.is_some());
-        self.script.unwrap()
+        self.script.expect("native-only hash")
     }
 }
 

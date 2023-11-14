@@ -349,19 +349,13 @@ impl Engine {
 
         // Check if function access already in the cache
         let local_entry = &mut None;
-
-        let func = self.resolve_fn(
-            global,
-            caches,
-            local_entry,
-            op_token,
-            hash,
-            Some(args),
-            true,
-        );
+        let a = Some(&mut *args);
+        let func = self.resolve_fn(global, caches, local_entry, op_token, hash, a, true);
 
         if let Some(FnResolutionCacheEntry { func, source }) = func {
             debug_assert!(func.is_native());
+
+            let is_method = func.is_method();
 
             // Push a new call stack frame
             #[cfg(feature = "debugging")]
@@ -373,7 +367,7 @@ impl Engine {
             let backup = &mut ArgBackup::new();
 
             // Calling non-method function but the first argument is a reference?
-            let swap = is_ref_mut && !func.is_method() && !args.is_empty();
+            let swap = is_ref_mut && !is_method && !args.is_empty();
 
             if swap {
                 // Clone the first argument
@@ -393,20 +387,20 @@ impl Engine {
             }
 
             // Run external function
-            let is_method = func.is_method();
             let context = func
                 .has_context()
                 .then(|| (self, name, source.as_deref(), &*global, pos).into());
 
-            let mut _result = if !func.is_pure() && !args.is_empty() && args[0].is_read_only() {
+            let mut _result = match func {
                 // If function is not pure, there must be at least one argument
-                Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
-            } else if let Some(f) = func.get_plugin_fn() {
-                f.call(context, args)
-            } else if let Some(f) = func.get_native_fn() {
-                f(context, args)
-            } else {
-                unreachable!();
+                f if !f.is_pure() && !args.is_empty() && args[0].is_read_only() => {
+                    Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
+                }
+                CallableFunction::Plugin { func } => func.call(context, args),
+                CallableFunction::Pure { func, .. } | CallableFunction::Method { func, .. } => {
+                    func(context, args)
+                }
+                _ => unreachable!("non-native function"),
             }
             .and_then(|r| self.check_data_size(r, pos))
             .map_err(|err| err.fill_position(pos));
@@ -622,52 +616,57 @@ impl Engine {
                 resolved = self.resolve_fn(global, caches, local_entry, None, hash, None, false);
             }
 
-            if let Some(FnResolutionCacheEntry { func, source }) = resolved.cloned() {
-                // Script function call
-                debug_assert!(func.is_script());
+            let Some(FnResolutionCacheEntry {
+                func: CallableFunction::Script { fn_def, environ },
+                source,
+            }) = resolved.cloned()
+            else {
+                unreachable!("Script function expected");
+            };
 
-                let environ = func.get_encapsulated_environ();
-                let func = func.get_script_fn_def().expect("`ScriptFnDef`");
+            let fn_def = &*fn_def;
+            let environ = environ.as_deref();
 
-                if func.body.is_empty() {
-                    return Ok((Dynamic::UNIT, false));
-                }
-
-                let mut empty_scope;
-                let scope = if let Some(scope) = _scope {
-                    scope
-                } else {
-                    empty_scope = Scope::new();
-                    &mut empty_scope
-                };
-
-                let orig_source = mem::replace(&mut global.source, source);
-                defer! { global => move |g| g.source = orig_source }
-
-                return if _is_method_call {
-                    // Method call of script function - map first argument to `this`
-                    let (first_arg, args) = args.split_first_mut().unwrap();
-                    let this_ptr = Some(&mut **first_arg);
-                    self.call_script_fn(
-                        global, caches, scope, this_ptr, environ, func, args, true, pos,
-                    )
-                } else {
-                    // Normal call of script function
-                    let backup = &mut ArgBackup::new();
-
-                    // The first argument is a reference?
-                    let swap = is_ref_mut && !args.is_empty();
-
-                    if swap {
-                        backup.change_first_arg_to_copy(args);
-                    }
-
-                    defer! { args = (args) if swap => move |a| backup.restore_first_arg(a) }
-
-                    self.call_script_fn(global, caches, scope, None, environ, func, args, true, pos)
-                }
-                .map(|r| (r, false));
+            if fn_def.body.is_empty() {
+                return Ok((Dynamic::UNIT, false));
             }
+
+            let mut empty_scope;
+            let scope = if let Some(scope) = _scope {
+                scope
+            } else {
+                empty_scope = Scope::new();
+                &mut empty_scope
+            };
+
+            let orig_source = mem::replace(&mut global.source, source);
+            defer! { global => move |g| g.source = orig_source }
+
+            return if _is_method_call {
+                // Method call of script function - map first argument to `this`
+                let (first_arg, args) = args.split_first_mut().unwrap();
+                let this_ptr = Some(&mut **first_arg);
+                self.call_script_fn(
+                    global, caches, scope, this_ptr, environ, fn_def, args, true, pos,
+                )
+            } else {
+                // Normal call of script function
+                let backup = &mut ArgBackup::new();
+
+                // The first argument is a reference?
+                let swap = is_ref_mut && !args.is_empty();
+
+                if swap {
+                    backup.change_first_arg_to_copy(args);
+                }
+
+                defer! { args = (args) if swap => move |a| backup.restore_first_arg(a) }
+
+                self.call_script_fn(
+                    global, caches, scope, None, environ, fn_def, args, true, pos,
+                )
+            }
+            .map(|r| (r, false));
         }
 
         // Native function call
@@ -775,17 +774,14 @@ impl Engine {
                 }
             }
 
-            // Handle obj.call()
-            KEYWORD_FN_PTR_CALL if call_args.is_empty() => {
-                return Err(self.make_type_mismatch_err::<FnPtr>(
-                    self.map_type_name(target.as_ref().type_name()),
-                    pos,
-                ))
-            }
-
             // Handle obj.call(fn_ptr, ...)
             KEYWORD_FN_PTR_CALL => {
-                debug_assert!(!call_args.is_empty());
+                if call_args.is_empty() {
+                    return Err(self.make_type_mismatch_err::<FnPtr>(
+                        self.map_type_name(target.as_ref().type_name()),
+                        pos,
+                    ));
+                }
 
                 // FnPtr call on object
                 let fn_ptr = call_args[0].take().try_cast_raw::<FnPtr>().map_err(|v| {
@@ -1532,39 +1528,45 @@ impl Engine {
         defer! { let orig_level = global.level; global.level += 1 }
 
         match func {
-            #[cfg(not(feature = "no_function"))]
-            Some(func) if func.is_script() => {
-                let f = func.get_script_fn_def().expect("`ScriptFnDef`");
-
-                let environ = func.get_encapsulated_environ();
-                let scope = &mut Scope::new();
-
-                let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
-                defer! { global => move |g| g.source = orig_source }
-
-                self.call_script_fn(global, caches, scope, None, environ, f, args, true, pos)
-            }
-
             Some(f) if !f.is_pure() && args[0].is_read_only() => {
                 // If function is not pure, there must be at least one argument
                 Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
             }
 
-            Some(f) if f.is_plugin_fn() => {
-                let f = f.get_plugin_fn().expect("`PluginFunction`");
-                let context = f
+            #[cfg(not(feature = "no_function"))]
+            Some(CallableFunction::Script { fn_def, environ }) => {
+                let environ = environ.as_deref();
+                let scope = &mut Scope::new();
+
+                let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
+                defer! { global => move |g| g.source = orig_source }
+
+                self.call_script_fn(
+                    global, caches, scope, None, environ, fn_def, args, true, pos,
+                )
+            }
+
+            Some(CallableFunction::Plugin { func }) => {
+                let context = func
                     .has_context()
                     .then(|| (self, fn_name, module.id(), &*global, pos).into());
-                f.call(context, args)
+                func.call(context, args)
                     .and_then(|r| self.check_data_size(r, pos))
             }
 
-            Some(f) => {
-                let func = f.get_native_fn().expect("native function");
-                let context = f
-                    .has_context()
-                    .then(|| (self, fn_name, module.id(), &*global, pos).into());
+            Some(CallableFunction::Pure {
+                func, has_context, ..
+            })
+            | Some(CallableFunction::Method {
+                func, has_context, ..
+            }) => {
+                let context =
+                    has_context.then(|| (self, fn_name, module.id(), &*global, pos).into());
                 func(context, args).and_then(|r| self.check_data_size(r, pos))
+            }
+
+            Some(CallableFunction::Iterator { .. }) => {
+                unreachable!("iterator functions should not occur here")
             }
 
             None => Err(ERR::ErrorFunctionNotFound(

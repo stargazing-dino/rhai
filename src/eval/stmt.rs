@@ -454,9 +454,10 @@ impl Engine {
                     }
 
                     export.then_some(var_name)
-                } else {
-                    assert!(!export, "exported variable not on global level");
+                } else if !export {
                     None
+                } else {
+                    unreachable!("exported variable not on global level");
                 };
 
                 match index {
