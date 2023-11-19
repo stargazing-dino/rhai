@@ -616,57 +616,55 @@ impl Engine {
                 resolved = self.resolve_fn(global, caches, local_entry, None, hash, None, false);
             }
 
-            let Some(FnResolutionCacheEntry {
-                func: CallableFunction::Script { fn_def, environ },
-                source,
-            }) = resolved.cloned()
-            else {
-                unreachable!("Script function expected");
-            };
+            if let Some(FnResolutionCacheEntry { func, source }) = resolved.cloned() {
+                let CallableFunction::Script { fn_def, environ } = func else {
+                    unreachable!("Script function expected");
+                };
 
-            let fn_def = &*fn_def;
-            let environ = environ.as_deref();
+                let fn_def = &*fn_def;
+                let environ = environ.as_deref();
 
-            if fn_def.body.is_empty() {
-                return Ok((Dynamic::UNIT, false));
-            }
-
-            let mut empty_scope;
-            let scope = if let Some(scope) = _scope {
-                scope
-            } else {
-                empty_scope = Scope::new();
-                &mut empty_scope
-            };
-
-            let orig_source = mem::replace(&mut global.source, source);
-            defer! { global => move |g| g.source = orig_source }
-
-            return if _is_method_call {
-                // Method call of script function - map first argument to `this`
-                let (first_arg, args) = args.split_first_mut().unwrap();
-                let this_ptr = Some(&mut **first_arg);
-                self.call_script_fn(
-                    global, caches, scope, this_ptr, environ, fn_def, args, true, pos,
-                )
-            } else {
-                // Normal call of script function
-                let backup = &mut ArgBackup::new();
-
-                // The first argument is a reference?
-                let swap = is_ref_mut && !args.is_empty();
-
-                if swap {
-                    backup.change_first_arg_to_copy(args);
+                if fn_def.body.is_empty() {
+                    return Ok((Dynamic::UNIT, false));
                 }
 
-                defer! { args = (args) if swap => move |a| backup.restore_first_arg(a) }
+                let mut empty_scope;
+                let scope = if let Some(scope) = _scope {
+                    scope
+                } else {
+                    empty_scope = Scope::new();
+                    &mut empty_scope
+                };
 
-                self.call_script_fn(
-                    global, caches, scope, None, environ, fn_def, args, true, pos,
-                )
+                let orig_source = mem::replace(&mut global.source, source);
+                defer! { global => move |g| g.source = orig_source }
+
+                return if _is_method_call {
+                    // Method call of script function - map first argument to `this`
+                    let (first_arg, args) = args.split_first_mut().unwrap();
+                    let this_ptr = Some(&mut **first_arg);
+                    self.call_script_fn(
+                        global, caches, scope, this_ptr, environ, fn_def, args, true, pos,
+                    )
+                } else {
+                    // Normal call of script function
+                    let backup = &mut ArgBackup::new();
+
+                    // The first argument is a reference?
+                    let swap = is_ref_mut && !args.is_empty();
+
+                    if swap {
+                        backup.change_first_arg_to_copy(args);
+                    }
+
+                    defer! { args = (args) if swap => move |a| backup.restore_first_arg(a) }
+
+                    self.call_script_fn(
+                        global, caches, scope, None, environ, fn_def, args, true, pos,
+                    )
+                }
+                .map(|r| (r, false));
             }
-            .map(|r| (r, false));
         }
 
         // Native function call
@@ -1528,11 +1526,6 @@ impl Engine {
         defer! { let orig_level = global.level; global.level += 1 }
 
         match func {
-            Some(f) if !f.is_pure() && args[0].is_read_only() => {
-                // If function is not pure, there must be at least one argument
-                Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
-            }
-
             #[cfg(not(feature = "no_function"))]
             Some(CallableFunction::Script { fn_def, environ }) => {
                 let environ = environ.as_deref();
@@ -1544,6 +1537,11 @@ impl Engine {
                 self.call_script_fn(
                     global, caches, scope, None, environ, fn_def, args, true, pos,
                 )
+            }
+
+            Some(f) if !f.is_pure() && args[0].is_read_only() => {
+                // If function is not pure, there must be at least one argument
+                Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
             }
 
             Some(CallableFunction::Plugin { func }) => {
