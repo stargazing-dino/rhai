@@ -17,6 +17,7 @@ Bug fixes
 
 * Fixed crash when parsing multi-segment interpolated string longer than maximum (found via fuzzing).
 * Fixed crash when parsing unterminated comment (found via fuzzing).
+* Fixed crash when parsing deeply-nested right-associated operators such as `**` (found via fuzzing).
 
 Deprecated API's
 ----------------

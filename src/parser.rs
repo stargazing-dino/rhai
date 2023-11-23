@@ -2366,7 +2366,7 @@ impl Engine {
             // If same precedence, then check if the operator binds right
             let rhs =
                 if (precedence == next_precedence && bind_right) || precedence < next_precedence {
-                    self.parse_binary_op(input, state, lib, settings, precedence, rhs)?
+                    self.parse_binary_op(input, state, lib, settings.level_up()?, precedence, rhs)?
                 } else {
                     // Otherwise bind to left (even if next operator has the same precedence)
                     rhs
