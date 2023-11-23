@@ -21,6 +21,8 @@ fn test_internal_fn() {
     assert_eq!(engine.eval::<INT>("fn mul2() { this * 2 } let x = 21; x.mul2()").unwrap(), 42);
     #[cfg(not(feature = "no_object"))]
     assert_eq!(engine.eval::<INT>("fn mul2() { this *= 2; } let x = 21; x.mul2(); x").unwrap(), 42);
+
+    assert!(engine.eval::<INT>("fn/*\0„").is_err());
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]

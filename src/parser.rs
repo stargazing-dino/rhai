@@ -199,10 +199,8 @@ impl<'e, 's> ParseState<'e, 's> {
         #[cfg(not(feature = "no_closure"))]
         if self.allow_capture {
             if !is_func_name && index == 0 && !self.external_vars.iter().any(|v| v.name == name) {
-                self.external_vars.push(Ident {
-                    name: name.into(),
-                    pos: _pos,
-                });
+                let name = self.interned_strings.get(name);
+                self.external_vars.push(Ident { name, pos: _pos });
             }
         } else {
             self.allow_capture = true;

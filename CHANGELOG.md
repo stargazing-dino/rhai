@@ -15,12 +15,18 @@ Potentially breaking changes
 Bug fixes
 ----------
 
-* Fixed crash when parsing multi-segment interpolated string longer than maximum.
+* Fixed crash when parsing multi-segment interpolated string longer than maximum (found via fuzzing).
+* Fixed crash when parsing unterminated comment (found via fuzzing).
 
 Deprecated API's
 ----------------
 
 * `rhai::config::hashing::set_ahash_seed`, `rhai::config::hashing::get_ahash_seed` and the `RHAI_AHASH_SEED` environment variable are deprecated in favor of `rhai::config::hashing::set_hashing_seed`, `rhai::config::hashing::get_hashing_seed` and `RHAI_HASHING_SEED`.
+
+New features
+------------
+
+* Fuzzing is now done via [Google OSS-Fuzz](https://github.com/google/oss-fuzz).
 
 Enhancements
 ------------
