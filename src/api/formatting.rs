@@ -14,7 +14,7 @@ use std::prelude::v1::*;
 /// Map the name of a standard type into a friendly form.
 #[inline]
 #[must_use]
-fn map_std_type_name(name: &str, shorthands: bool) -> &str {
+pub fn map_std_type_name(name: &str, shorthands: bool) -> &str {
     let name = name.trim();
 
     if name == type_name::<String>() {
