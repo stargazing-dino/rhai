@@ -567,7 +567,7 @@ fn optimize_combo_chain(expr: &mut Expr) {
         Expr::Dot(mut x, opt, pos) => match x.lhs.take() {
             #[cfg(not(feature = "no_index"))]
             Expr::Index(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Dot, Expr::Index),
-            Expr::Dot(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Dot, Expr::Index),
+            Expr::Dot(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Dot, Expr::Dot),
             _ => unreachable!("combo chain expected"),
         },
         _ => unreachable!("combo chain expected"),

@@ -24,6 +24,8 @@ fn test_map_indexing() {
     }
 
     assert_eq!(engine.eval::<INT>("let y = #{a: 1, b: 2, c: 3}; y.a = 5; y.a").unwrap(), 5);
+    assert_eq!(engine.eval::<INT>("let y = #{a: #{x:9, y:8, z:7}, b: 2, c: 3}; (y.a).z").unwrap(), 7);
+    assert_eq!(engine.eval::<INT>("let y = #{a: #{x:9, y:8, z:7}, b: 2, c: 3}; (y.a).z = 42; y.a.z").unwrap(), 42);
 
     engine.run("let y = #{a: 1, b: 2, c: 3}; y.z").unwrap();
 
