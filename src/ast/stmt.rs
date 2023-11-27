@@ -103,7 +103,8 @@ impl OpAssignment {
     #[must_use]
     #[inline(always)]
     pub fn new_op_assignment(name: &str, pos: Position) -> Self {
-        let op = Token::lookup_symbol_from_syntax(name).expect("operator");
+        let op = Token::lookup_symbol_from_syntax(name)
+            .unwrap_or_else(|| panic!("{} is not an op-assignment operator", name));
         Self::new_op_assignment_from_token(op, pos)
     }
     /// Create a new [`OpAssignment`] from a [`Token`].
@@ -115,7 +116,7 @@ impl OpAssignment {
     pub fn new_op_assignment_from_token(op_assign: Token, pos: Position) -> Self {
         let op = op_assign
             .get_base_op_from_assignment()
-            .expect("op-assignment operator");
+            .unwrap_or_else(|| panic!("{:?} is not an op-assignment operator", op_assign));
 
         let op_assign_syntax = op_assign.literal_syntax();
         let op_syntax = op.literal_syntax();
@@ -138,7 +139,8 @@ impl OpAssignment {
     #[must_use]
     #[inline(always)]
     pub fn new_op_assignment_from_base(name: &str, pos: Position) -> Self {
-        let op = Token::lookup_symbol_from_syntax(name).expect("operator");
+        let op = Token::lookup_symbol_from_syntax(name)
+            .unwrap_or_else(|| panic!("{} cannot be converted into an op-operator", name));
         Self::new_op_assignment_from_base_token(&op, pos)
     }
     /// Convert a [`Token`] into a new [`OpAssignment`].
@@ -149,7 +151,11 @@ impl OpAssignment {
     #[inline(always)]
     #[must_use]
     pub fn new_op_assignment_from_base_token(op: &Token, pos: Position) -> Self {
-        Self::new_op_assignment_from_token(op.convert_to_op_assignment().expect("operator"), pos)
+        Self::new_op_assignment_from_token(
+            op.convert_to_op_assignment()
+                .unwrap_or_else(|| panic!("{:?} cannot be converted into an op-operator", op)),
+            pos,
+        )
     }
 }
 

@@ -41,7 +41,7 @@ pub struct Mut<T>(T);
 #[inline(always)]
 pub fn by_ref<T: Variant + Clone>(data: &mut Dynamic) -> DynamicWriteLock<T> {
     // Directly cast the &mut Dynamic into DynamicWriteLock to access the underlying data.
-    data.write_lock::<T>().expect("checked")
+    data.write_lock::<T>().unwrap()
 }
 
 /// Dereference into value.
@@ -61,7 +61,7 @@ pub fn by_value<T: Variant + Clone>(data: &mut Dynamic) -> T {
     }
     if TypeId::of::<T>() == TypeId::of::<String>() {
         // If T is `String`, data must be `ImmutableString`, so map directly to it
-        return reify! { data.take().into_string().expect("`ImmutableString`") => !!! T };
+        return reify! { data.take().into_string().unwrap() => !!! T };
     }
 
     // We consume the argument and then replace it with () - the argument is not supposed to be used again.

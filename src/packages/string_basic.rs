@@ -48,9 +48,7 @@ pub fn print_with_func(
     value: &mut Dynamic,
 ) -> ImmutableString {
     match ctx.call_native_fn_raw(fn_name, true, &mut [value]) {
-        Ok(result) if result.is_string() => {
-            result.into_immutable_string().expect("`ImmutableString`")
-        }
+        Ok(result) if result.is_string() => result.into_immutable_string().unwrap(),
         Ok(result) => ctx.engine().map_type_name(result.type_name()).into(),
         Err(_) => {
             let mut buf = SmartString::new_const();

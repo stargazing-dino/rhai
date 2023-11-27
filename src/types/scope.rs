@@ -75,7 +75,7 @@ pub struct Scope<'a> {
 
 impl fmt::Display for Scope<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (i, (name, constant, value)) in self.iter_raw().enumerate() {
+        for (i, (name, constant, value)) in self.iter_inner().enumerate() {
             #[cfg(not(feature = "no_closure"))]
             let value_is_shared = if value.is_shared() { " (shared)" } else { "" };
             #[cfg(feature = "no_closure")]
@@ -403,7 +403,9 @@ impl Scope<'_> {
     /// ```
     #[inline(always)]
     pub fn pop(&mut self) -> &mut Self {
-        self.names.pop().expect("not empty");
+        self.names
+            .pop()
+            .unwrap_or_else(|| panic!("`Scope` is empty"));
         self.values.truncate(self.names.len());
         self.aliases.truncate(self.names.len());
         self
@@ -414,10 +416,10 @@ impl Scope<'_> {
     pub(crate) fn pop_entry(&mut self) -> Option<(ImmutableString, Dynamic, Vec<ImmutableString>)> {
         self.values.pop().map(|value| {
             (
-                self.names.pop().expect("not empty"),
+                self.names.pop().unwrap(),
                 value,
                 if self.aliases.len() > self.values.len() {
-                    self.aliases.pop().expect("not empty").to_vec()
+                    self.aliases.pop().unwrap().to_vec()
                 } else {
                     Vec::new()
                 },
@@ -479,13 +481,11 @@ impl Scope<'_> {
     #[inline]
     #[must_use]
     pub(crate) fn search(&self, name: &str) -> Option<usize> {
-        let len = self.len();
-
         self.names
             .iter()
             .rev() // Always search a Scope in reverse order
             .position(|key| name == key)
-            .map(|i| len - 1 - i)
+            .map(|i| self.len() - 1 - i)
     }
     /// Get the value of an entry in the [`Scope`], starting from the last.
     ///
@@ -502,13 +502,11 @@ impl Scope<'_> {
     #[inline]
     #[must_use]
     pub fn get_value<T: Variant + Clone>(&self, name: &str) -> Option<T> {
-        let len = self.len();
-
         self.names
             .iter()
             .rev()
             .position(|key| &name == key)
-            .and_then(|i| self.values[len - 1 - i].flatten_clone().try_cast())
+            .and_then(|i| self.values[self.len() - 1 - i].flatten_clone().try_cast())
     }
     /// Get a reference the value of an entry in the [`Scope`], starting from the last.
     ///
@@ -532,14 +530,12 @@ impl Scope<'_> {
     #[inline]
     #[must_use]
     pub fn get_value_ref<T: Variant + Clone>(&self, name: &str) -> Option<&T> {
-        let len = self.len();
-
         self.names
             .iter()
             .rev()
             .position(|key| &name == key)
             .and_then(|i| {
-                let v = &self.values[len - 1 - i];
+                let v = &self.values[self.len() - 1 - i];
                 #[cfg(not(feature = "no_closure"))]
                 assert!(!v.is_shared());
                 v.downcast_ref()
@@ -727,18 +723,15 @@ impl Scope<'_> {
     /// Panics if the index is out of bounds.
     #[inline(always)]
     #[allow(dead_code)]
-    pub(crate) fn get_entry_by_index(
-        &mut self,
-        index: usize,
-    ) -> (&str, &Dynamic, &[ImmutableString]) {
-        if self.aliases.len() <= index {
-            self.aliases.resize(index + 1, <_>::default());
-        }
-
+    pub(crate) fn get_entry_by_index(&self, index: usize) -> (&str, &Dynamic, &[ImmutableString]) {
         (
             &self.names[index],
             &self.values[index],
-            &self.aliases[index],
+            if self.aliases.len() > index {
+                &self.aliases[index]
+            } else {
+                &[]
+            },
         )
     }
     /// Remove the last entry in the [`Scope`] by the specified name and return its value.
@@ -915,29 +908,38 @@ impl Scope<'_> {
     /// assert!(is_constant);
     /// assert_eq!(value.cast::<String>(), "hello");
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn iter(&self) -> impl Iterator<Item = (&str, bool, Dynamic)> {
-        self.iter_raw()
-            .map(|(name, constant, value)| (name, constant, value.flatten_clone()))
+        self.iter_inner()
+            .map(|(name, constant, value)| (name.as_str(), constant, value.flatten_clone()))
+    }
+    /// Get an iterator to entries in the [`Scope`].
+    /// Shared values are not expanded.
+    #[inline(always)]
+    pub fn iter_raw(&self) -> impl Iterator<Item = (&str, bool, &Dynamic)> {
+        self.iter_rev_inner()
+            .map(|(name, constant, value)| (name.as_str(), constant, value))
     }
     /// Get an iterator to entries in the [`Scope`].
     /// Shared values are not expanded.
     #[inline]
-    pub fn iter_raw(&self) -> impl Iterator<Item = (&str, bool, &Dynamic)> {
+    pub(crate) fn iter_inner(&self) -> impl Iterator<Item = (&ImmutableString, bool, &Dynamic)> {
         self.names
             .iter()
             .zip(self.values.iter())
-            .map(|(name, value)| (name.as_str(), value.is_read_only(), value))
+            .map(|(name, value)| (name, value.is_read_only(), value))
     }
     /// Get a reverse iterator to entries in the [`Scope`].
     /// Shared values are not expanded.
     #[inline]
-    pub(crate) fn iter_rev_raw(&self) -> impl Iterator<Item = (&str, bool, &Dynamic)> {
+    pub(crate) fn iter_rev_inner(
+        &self,
+    ) -> impl Iterator<Item = (&ImmutableString, bool, &Dynamic)> {
         self.names
             .iter()
             .rev()
             .zip(self.values.iter().rev())
-            .map(|(name, value)| (name.as_str(), value.is_read_only(), value))
+            .map(|(name, value)| (name, value.is_read_only(), value))
     }
     /// Remove a range of entries within the [`Scope`].
     ///

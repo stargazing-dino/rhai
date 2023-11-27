@@ -21,6 +21,9 @@ fn test_comments() {
     );
 
     engine.run("/* Hello world */").unwrap();
+
+    #[cfg(not(feature = "no_function"))]
+    assert!(engine.compile("fn/*").is_err());
 }
 
 #[cfg(not(feature = "no_function"))]

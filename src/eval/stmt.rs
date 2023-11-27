@@ -18,9 +18,7 @@ use std::prelude::v1::*;
 #[inline(always)]
 fn intern_string(value: Dynamic, engine: &Engine) -> Dynamic {
     match value.0 {
-        Union::Str(..) => engine
-            .get_interned_string(value.into_immutable_string().expect("`ImmutableString`"))
-            .into(),
+        Union::Str(s, ..) => engine.get_interned_string(s).into(),
         _ => value,
     }
 }
@@ -455,15 +453,11 @@ impl Engine {
                         .insert(var_name.name.clone(), value.clone());
                     }
 
-                    if export {
-                        Some(var_name)
-                    } else {
-                        None
-                    }
-                } else if export {
-                    unreachable!("exported variable not on global level");
-                } else {
+                    export.then_some(var_name)
+                } else if !export {
                     None
+                } else {
+                    unreachable!("exported variable not on global level");
                 };
 
                 match index {
@@ -725,18 +719,18 @@ impl Engine {
                         self.track_operation(global, body.position())?;
                     }
                 } else {
-                    for (x, iter_value) in iter_func(iter_obj).enumerate() {
+                    for (i, iter_value) in iter_func(iter_obj).enumerate() {
                         // Increment counter
                         if let Some(counter_index) = counter_index {
                             // As the variable increments from 0, this should always work
                             // since any overflow will first be caught below.
-                            let index_value = x as INT;
+                            let index_value = i as INT;
 
                             #[cfg(not(feature = "unchecked"))]
                             #[allow(clippy::absurd_extreme_comparisons)]
                             if index_value > crate::MAX_USIZE_INT {
                                 return Err(ERR::ErrorArithmetic(
-                                    format!("for-loop counter overflow: {x}"),
+                                    format!("for-loop counter overflow: {i}"),
                                     counter.as_ref().unwrap().pos,
                                 )
                                 .into());

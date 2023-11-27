@@ -323,8 +323,8 @@ impl Debugger {
         self.break_points()
             .iter()
             .enumerate()
-            .filter(|&(.., bp)| bp.is_enabled())
-            .find(|&(.., bp)| match bp {
+            .filter(|(.., bp)| bp.is_enabled())
+            .find(|(.., bp)| match bp {
                 #[cfg(not(feature = "no_position"))]
                 BreakPoint::AtPosition { pos, .. } if pos.is_none() => false,
                 #[cfg(not(feature = "no_position"))]

@@ -39,9 +39,6 @@ type FnLib = StraightHashMap<Shared<ScriptFnDef>>;
 /// Invalid variable name that acts as a search barrier in a [`Scope`].
 const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
 
-/// The message: `TokenStream` never ends
-const NEVER_ENDS: &str = "`Token`";
-
 impl PERR {
     /// Make a [`ParseError`] using the current type and position.
     #[cold]
@@ -153,9 +150,8 @@ impl<'e, 's> ParseState<'e, 's> {
 
         let index = self
             .stack
-            .iter_rev_raw()
-            .enumerate()
-            .find(|&(.., (n, ..))| {
+            .iter_rev_inner()
+            .position(|(n, ..)| {
                 if n == SCOPE_SEARCH_BARRIER_MARKER {
                     // Do not go beyond the barrier
                     hit_barrier = true;
@@ -164,7 +160,7 @@ impl<'e, 's> ParseState<'e, 's> {
                     n == name
                 }
             })
-            .map_or(0, |(i, ..)| i + 1);
+            .map_or(0, |i| i + 1);
 
         (index, hit_barrier)
     }
@@ -203,10 +199,8 @@ impl<'e, 's> ParseState<'e, 's> {
         #[cfg(not(feature = "no_closure"))]
         if self.allow_capture {
             if !is_func_name && index == 0 && !self.external_vars.iter().any(|v| v.name == name) {
-                self.external_vars.push(Ident {
-                    name: name.into(),
-                    pos: _pos,
-                });
+                let name = self.interned_strings.get(name);
+                self.external_vars.push(Ident { name, pos: _pos });
             }
         } else {
             self.allow_capture = true;
@@ -451,7 +445,7 @@ fn ensure_not_statement_expr(
     input: &mut TokenStream,
     type_name: &(impl ToString + ?Sized),
 ) -> ParseResult<()> {
-    match input.peek().expect(NEVER_ENDS) {
+    match input.peek().unwrap() {
         (Token::LeftBrace, pos) => Err(PERR::ExprExpected(type_name.to_string()).into_err(*pos)),
         _ => Ok(()),
     }
@@ -459,7 +453,7 @@ fn ensure_not_statement_expr(
 
 /// Make sure that the next expression is not a mis-typed assignment (i.e. `a = b` instead of `a == b`).
 fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
-    match input.peek().expect(NEVER_ENDS) {
+    match input.peek().unwrap() {
         (token @ Token::Equals, pos) => Err(LexError::ImproperSymbol(
             token.literal_syntax().into(),
             "Possibly a typo of '=='?".into(),
@@ -475,22 +469,23 @@ fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
 ///
 /// Panics if the next token is not the expected one, or either tokens is not a literal symbol.
 fn eat_token(input: &mut TokenStream, expected_token: &Token) -> Position {
-    let (t, pos) = input.next().expect(NEVER_ENDS);
+    let (t, pos) = input.next().unwrap();
 
-    if &t != expected_token {
-        unreachable!(
-            "{} expected but gets {} at {}",
-            expected_token.literal_syntax(),
-            t.literal_syntax(),
-            pos
-        );
-    }
+    assert_eq!(
+        &t,
+        expected_token,
+        "{} expected but gets {} at {}",
+        expected_token.literal_syntax(),
+        t.literal_syntax(),
+        pos,
+    );
+
     pos
 }
 
 /// Match a particular [token][Token], consuming it if matched.
 fn match_token(input: &mut TokenStream, token: &Token) -> (bool, Position) {
-    let (t, pos) = input.peek().expect(NEVER_ENDS);
+    let (t, pos) = input.peek().unwrap();
     if t == token {
         (true, eat_token(input, token))
     } else {
@@ -529,7 +524,7 @@ fn unindent_block_comment(comment: String, pos: usize) -> String {
 
 /// Parse a variable name.
 fn parse_var_name(input: &mut TokenStream) -> ParseResult<(SmartString, Position)> {
-    match input.next().expect(NEVER_ENDS) {
+    match input.next().unwrap() {
         // Variable name
         (Token::Identifier(s), pos) => Ok((*s, pos)),
         // Reserved keyword
@@ -566,16 +561,16 @@ fn optimize_combo_chain(expr: &mut Expr) {
             Expr::Index(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Index, Expr::Index),
             #[cfg(not(feature = "no_object"))]
             Expr::Dot(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Index, Expr::Dot),
-            _ => panic!("combo chain expected"),
+            _ => unreachable!("combo chain expected"),
         },
         #[cfg(not(feature = "no_object"))]
         Expr::Dot(mut x, opt, pos) => match x.lhs.take() {
             #[cfg(not(feature = "no_index"))]
             Expr::Index(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Dot, Expr::Index),
             Expr::Dot(x2, opt2, pos2) => (x, opt, pos, x2, opt2, pos2, Expr::Dot, Expr::Index),
-            _ => panic!("combo chain expected"),
+            _ => unreachable!("combo chain expected"),
         },
-        _ => panic!("combo chain expected"),
+        _ => unreachable!("combo chain expected"),
     };
 
     // Rewrite the chains like this:
@@ -636,7 +631,7 @@ impl Engine {
         let (token, token_pos) = if no_args {
             &(Token::RightParen, Position::NONE)
         } else {
-            input.peek().expect(NEVER_ENDS)
+            input.peek().unwrap()
         };
 
         let mut _namespace = namespace;
@@ -714,13 +709,13 @@ impl Engine {
         let settings = settings.level_up()?;
 
         loop {
-            match input.peek().expect(NEVER_ENDS) {
+            match input.peek().unwrap() {
                 // id(...args, ) - handle trailing comma
                 (Token::RightParen, ..) => (),
                 _ => args.push(self.parse_expr(input, state, lib, settings)?),
             }
 
-            match input.peek().expect(NEVER_ENDS) {
+            match input.peek().unwrap() {
                 // id(...args)
                 (Token::RightParen, ..) => {
                     eat_token(input, &Token::RightParen);
@@ -904,15 +899,15 @@ impl Engine {
         }
 
         // Check if there is a closing bracket
-        match input.peek().expect(NEVER_ENDS) {
+        match input.peek().unwrap() {
             (Token::RightBracket, ..) => {
                 eat_token(input, &Token::RightBracket);
 
                 // Any more indexing following?
-                match input.peek().expect(NEVER_ENDS) {
+                match input.peek().unwrap() {
                     // If another indexing level, right-bind it
                     (Token::LeftBracket | Token::QuestionBracket, ..) => {
-                        let (token, pos) = input.next().expect(NEVER_ENDS);
+                        let (token, pos) = input.next().unwrap();
                         let prev_pos = settings.pos;
                         settings.pos = pos;
                         let settings = settings.level_up()?;
@@ -972,10 +967,10 @@ impl Engine {
                     "Size of array literal".into(),
                     self.max_array_size(),
                 )
-                .into_err(input.peek().expect(NEVER_ENDS).1));
+                .into_err(input.peek().unwrap().1));
             }
 
-            match input.peek().expect(NEVER_ENDS) {
+            match input.peek().unwrap() {
                 (Token::RightBracket, ..) => {
                     eat_token(input, &Token::RightBracket);
                     break;
@@ -990,7 +985,7 @@ impl Engine {
                 _ => array.push(self.parse_expr(input, state, lib, settings.level_up()?)?),
             }
 
-            match input.peek().expect(NEVER_ENDS) {
+            match input.peek().unwrap() {
                 (Token::Comma, ..) => {
                     eat_token(input, &Token::Comma);
                 }
@@ -1036,7 +1031,7 @@ impl Engine {
         loop {
             const MISSING_RBRACE: &str = "to end this object map literal";
 
-            match input.peek().expect(NEVER_ENDS) {
+            match input.peek().unwrap() {
                 (Token::RightBrace, ..) => {
                     eat_token(input, &Token::RightBrace);
                     break;
@@ -1050,7 +1045,7 @@ impl Engine {
                 _ => (),
             }
 
-            let (name, pos) = match input.next().expect(NEVER_ENDS) {
+            let (name, pos) = match input.next().unwrap() {
                 (Token::Identifier(..), pos)
                     if settings.has_flag(ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES) =>
                 {
@@ -1086,7 +1081,7 @@ impl Engine {
                 (.., pos) => return Err(PERR::PropertyExpected.into_err(pos)),
             };
 
-            match input.next().expect(NEVER_ENDS) {
+            match input.next().unwrap() {
                 (Token::Colon, ..) => (),
                 (Token::LexError(err), pos) => return Err(err.into_err(pos)),
                 (.., pos) => {
@@ -1104,7 +1099,7 @@ impl Engine {
                     "Number of properties in object map literal".into(),
                     self.max_map_size(),
                 )
-                .into_err(input.peek().expect(NEVER_ENDS).1));
+                .into_err(input.peek().unwrap().1));
             }
 
             let expr = self.parse_expr(input, state, lib, settings.level_up()?)?;
@@ -1113,7 +1108,7 @@ impl Engine {
             let name = state.get_interned_string(name);
             map.push((Ident { name, pos }, expr));
 
-            match input.peek().expect(NEVER_ENDS) {
+            match input.peek().unwrap() {
                 (Token::Comma, ..) => {
                     eat_token(input, &Token::Comma);
                 }
@@ -1153,7 +1148,7 @@ impl Engine {
 
         let item = self.parse_expr(input, state, lib, settings)?;
 
-        match input.next().expect(NEVER_ENDS) {
+        match input.next().unwrap() {
             (Token::LeftBrace, ..) => (),
             (Token::LexError(err), pos) => return Err(err.into_err(pos)),
             (.., pos) => {
@@ -1174,7 +1169,7 @@ impl Engine {
         loop {
             const MISSING_RBRACE: &str = "to end this switch block";
 
-            let (case_expr_list, condition) = match input.peek().expect(NEVER_ENDS) {
+            let (case_expr_list, condition) = match input.peek().unwrap() {
                 (Token::RightBrace, ..) => {
                     eat_token(input, &Token::RightBrace);
                     break;
@@ -1239,7 +1234,7 @@ impl Engine {
                 }
             };
 
-            match input.next().expect(NEVER_ENDS) {
+            match input.next().unwrap() {
                 (Token::DoubleArrow, ..) => (),
                 (Token::LexError(err), pos) => return Err(err.into_err(pos)),
                 (.., pos) => {
@@ -1318,7 +1313,7 @@ impl Engine {
                 }
             }
 
-            match input.peek().expect(NEVER_ENDS) {
+            match input.peek().unwrap() {
                 (Token::Comma, ..) => {
                     eat_token(input, &Token::Comma);
                 }
@@ -1364,7 +1359,7 @@ impl Engine {
         mut settings: ParseSettings,
         options: ChainingFlags,
     ) -> ParseResult<Expr> {
-        let (token, token_pos) = input.peek().expect(NEVER_ENDS);
+        let (token, token_pos) = input.peek().unwrap();
 
         settings.pos = *token_pos;
 
@@ -1384,7 +1379,7 @@ impl Engine {
             | Token::CharConstant(..)
             | Token::StringConstant(..)
             | Token::True
-            | Token::False => match input.next().expect(NEVER_ENDS).0 {
+            | Token::False => match input.next().unwrap().0 {
                 Token::IntegerConstant(x) => Expr::IntegerConstant(x, settings.pos),
                 Token::CharConstant(c) => Expr::CharConstant(c, settings.pos),
                 Token::StringConstant(s) => {
@@ -1421,7 +1416,7 @@ impl Engine {
 
                 let expr = self.parse_expr(input, state, lib, settings.level_up()?)?;
 
-                match input.next().expect(NEVER_ENDS) {
+                match input.next().unwrap() {
                     // ( ... )
                     (Token::RightParen, ..) => expr,
                     // ( <error>
@@ -1551,7 +1546,7 @@ impl Engine {
                 let mut segments = FnArgsVec::new_const();
                 let settings = settings.level_up()?;
 
-                match input.next().expect(NEVER_ENDS) {
+                match input.next().unwrap() {
                     (Token::InterpolatedString(s), ..) if s.is_empty() => (),
                     (Token::InterpolatedString(s), pos) => {
                         segments.push(Expr::StringConstant(state.get_interned_string(*s), pos))
@@ -1574,7 +1569,7 @@ impl Engine {
                     // Make sure to parse the following as text
                     state.tokenizer_control.borrow_mut().is_within_text = true;
 
-                    match input.next().expect(NEVER_ENDS) {
+                    match input.next().unwrap() {
                         (Token::StringConstant(s), pos) => {
                             if !s.is_empty() {
                                 segments
@@ -1626,7 +1621,7 @@ impl Engine {
                 if self.custom_syntax.contains_key(&**key) =>
             {
                 let (key, syntax) = self.custom_syntax.get_key_value(&**key).unwrap();
-                let (.., pos) = input.next().expect(NEVER_ENDS);
+                let (.., pos) = input.next().unwrap();
                 let settings = settings.level_up_with_position(pos)?;
                 self.parse_custom_syntax(input, state, lib, settings, key, syntax)?
             }
@@ -1635,12 +1630,12 @@ impl Engine {
             Token::Identifier(..) => {
                 let ns = Namespace::NONE;
 
-                let s = match input.next().expect(NEVER_ENDS) {
+                let s = match input.next().unwrap() {
                     (Token::Identifier(s), ..) => s,
                     token => unreachable!("Token::Identifier expected but gets {:?}", token),
                 };
 
-                match input.peek().expect(NEVER_ENDS) {
+                match input.peek().unwrap() {
                     // Function call
                     (Token::LeftParen | Token::Bang | Token::Unit, _) => {
                         // Once the identifier consumed we must enable next variables capturing
@@ -1699,12 +1694,12 @@ impl Engine {
             Token::Reserved(..) => {
                 let ns = Namespace::NONE;
 
-                let s = match input.next().expect(NEVER_ENDS) {
+                let s = match input.next().unwrap() {
                     (Token::Reserved(s), ..) => s,
                     token => unreachable!("Token::Reserved expected but gets {:?}", token),
                 };
 
-                match input.peek().expect(NEVER_ENDS).0 {
+                match input.peek().unwrap().0 {
                     // Function call is allowed to have reserved keyword
                     Token::LeftParen | Token::Bang | Token::Unit
                         if is_reserved_keyword_or_symbol(&s).1 =>
@@ -1733,7 +1728,7 @@ impl Engine {
                 }
             }
 
-            Token::LexError(..) => match input.next().expect(NEVER_ENDS) {
+            Token::LexError(..) => match input.next().unwrap() {
                 (Token::LexError(err), ..) => return Err(err.into_err(settings.pos)),
                 token => unreachable!("Token::LexError expected but gets {:?}", token),
             },
@@ -1741,7 +1736,7 @@ impl Engine {
             _ => return Err(LexError::UnexpectedInput(token.to_string()).into_err(settings.pos)),
         };
 
-        if !(state.expr_filter)(&input.peek().expect(NEVER_ENDS).0) {
+        if !(state.expr_filter)(&input.peek().unwrap().0) {
             return Ok(root_expr);
         }
 
@@ -1770,20 +1765,20 @@ impl Engine {
 
         // Tail processing all possible postfix operators
         loop {
-            let (tail_token, ..) = input.peek().expect(NEVER_ENDS);
+            let (tail_token, ..) = input.peek().unwrap();
 
             if !lhs.is_valid_postfix(tail_token) {
                 break;
             }
 
-            let (tail_token, tail_pos) = input.next().expect(NEVER_ENDS);
+            let (tail_token, tail_pos) = input.next().unwrap();
             settings.pos = tail_pos;
 
             lhs = match (lhs, tail_token) {
                 // Qualified function call with !
                 #[cfg(not(feature = "no_module"))]
                 (Expr::Variable(x, ..), Token::Bang) if !x.1.is_empty() => {
-                    return match input.peek().expect(NEVER_ENDS) {
+                    return match input.peek().unwrap() {
                         (Token::LeftParen | Token::Unit, ..) => {
                             Err(LexError::UnexpectedInput(Token::Bang.into()).into_err(tail_pos))
                         }
@@ -1796,7 +1791,7 @@ impl Engine {
                 }
                 // Function call with !
                 (Expr::Variable(x, .., pos), Token::Bang) => {
-                    match input.peek().expect(NEVER_ENDS) {
+                    match input.peek().unwrap() {
                         (Token::LeftParen | Token::Unit, ..) => (),
                         (_, pos) => {
                             return Err(PERR::MissingToken(
@@ -1807,7 +1802,7 @@ impl Engine {
                         }
                     }
 
-                    let no_args = input.next().expect(NEVER_ENDS).0 == Token::Unit;
+                    let no_args = input.next().unwrap().0 == Token::Unit;
 
                     let (.., ns, _, name) = *x;
                     settings.pos = pos;
@@ -1861,7 +1856,7 @@ impl Engine {
                 #[cfg(not(feature = "no_object"))]
                 (expr, op @ (Token::Period | Token::Elvis)) => {
                     // Expression after dot must start with an identifier
-                    match input.peek().expect(NEVER_ENDS) {
+                    match input.peek().unwrap() {
                         (Token::Identifier(..), ..) => {
                             // Prevents capturing of the object properties as vars: xxx.<var>
                             state.allow_capture = false;
@@ -1955,7 +1950,7 @@ impl Engine {
         lib: &mut FnLib,
         mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
-        let (token, token_pos) = input.peek().expect(NEVER_ENDS);
+        let (token, token_pos) = input.peek().unwrap();
 
         if !(state.expr_filter)(token) {
             return Err(LexError::UnexpectedInput(token.to_string()).into_err(*token_pos));
@@ -2094,7 +2089,7 @@ impl Engine {
             Expr::Variable(ref x, i, var_pos) => {
                 let (index, .., name) = &**x;
                 let index = i.map_or_else(
-                    || index.expect("either long or short index is `None`").get(),
+                    || index.expect("long or short index must be `Some`").get(),
                     |n| n.get() as usize,
                 );
 
@@ -2323,7 +2318,7 @@ impl Engine {
         let mut root = lhs;
 
         loop {
-            let (current_op, current_pos) = input.peek().expect(NEVER_ENDS);
+            let (current_op, current_pos) = input.peek().unwrap();
 
             if !(state.expr_filter)(current_op) {
                 return Ok(root);
@@ -2349,11 +2344,11 @@ impl Engine {
                 return Ok(root);
             }
 
-            let (op_token, pos) = input.next().expect(NEVER_ENDS);
+            let (op_token, pos) = input.next().unwrap();
 
             let rhs = self.parse_unary(input, state, lib, settings)?;
 
-            let (next_op, next_pos) = input.peek().expect(NEVER_ENDS);
+            let (next_op, next_pos) = input.peek().unwrap();
             let next_precedence = match next_op {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
@@ -2371,7 +2366,7 @@ impl Engine {
             // If same precedence, then check if the operator binds right
             let rhs =
                 if (precedence == next_precedence && bind_right) || precedence < next_precedence {
-                    self.parse_binary_op(input, state, lib, settings, precedence, rhs)?
+                    self.parse_binary_op(input, state, lib, settings.level_up()?, precedence, rhs)?
                 } else {
                     // Otherwise bind to left (even if next operator has the same precedence)
                     rhs
@@ -2506,7 +2501,7 @@ impl Engine {
         segments.push(required_token.clone());
 
         loop {
-            let (fwd_token, fwd_pos) = input.peek().expect(NEVER_ENDS);
+            let (fwd_token, fwd_pos) = input.peek().unwrap();
             settings.pos = *fwd_pos;
             let settings = settings.level_up()?;
 
@@ -2535,7 +2530,7 @@ impl Engine {
                     inputs.push(Expr::Variable((None, ns, 0, name).into(), None, pos));
                 }
                 CUSTOM_SYNTAX_MARKER_SYMBOL => {
-                    let (symbol, pos) = match input.next().expect(NEVER_ENDS) {
+                    let (symbol, pos) = match input.next().unwrap() {
                         // Standard symbol
                         (token, pos) if token.is_standard_symbol() => {
                             Ok((token.literal_syntax().into(), pos))
@@ -2571,7 +2566,7 @@ impl Engine {
                         stmt => unreachable!("Stmt::Block expected but gets {:?}", stmt),
                     }
                 }
-                CUSTOM_SYNTAX_MARKER_BOOL => match input.next().expect(NEVER_ENDS) {
+                CUSTOM_SYNTAX_MARKER_BOOL => match input.next().unwrap() {
                     (b @ (Token::True | Token::False), pos) => {
                         inputs.push(Expr::BoolConstant(b == Token::True, pos));
                         segments.push(state.get_interned_string(b.literal_syntax()));
@@ -2583,7 +2578,7 @@ impl Engine {
                         )
                     }
                 },
-                CUSTOM_SYNTAX_MARKER_INT => match input.next().expect(NEVER_ENDS) {
+                CUSTOM_SYNTAX_MARKER_INT => match input.next().unwrap() {
                     (Token::IntegerConstant(i), pos) => {
                         inputs.push(Expr::IntegerConstant(i, pos));
                         segments.push(i.to_string().into());
@@ -2596,7 +2591,7 @@ impl Engine {
                     }
                 },
                 #[cfg(not(feature = "no_float"))]
-                CUSTOM_SYNTAX_MARKER_FLOAT => match input.next().expect(NEVER_ENDS) {
+                CUSTOM_SYNTAX_MARKER_FLOAT => match input.next().unwrap() {
                     (Token::FloatConstant(f), pos) => {
                         inputs.push(Expr::FloatConstant(f.0, pos));
                         segments.push(f.1.into());
@@ -2609,7 +2604,7 @@ impl Engine {
                         )
                     }
                 },
-                CUSTOM_SYNTAX_MARKER_STRING => match input.next().expect(NEVER_ENDS) {
+                CUSTOM_SYNTAX_MARKER_STRING => match input.next().unwrap() {
                     (Token::StringConstant(s), pos) => {
                         let s = state.get_interned_string(*s);
                         inputs.push(Expr::StringConstant(s.clone(), pos));
@@ -2620,7 +2615,7 @@ impl Engine {
                         return Err(PERR::MissingSymbol("Expecting a string".into()).into_err(pos))
                     }
                 },
-                s => match input.next().expect(NEVER_ENDS) {
+                s => match input.next().unwrap() {
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
                     (Token::Identifier(t) | Token::Reserved(t) | Token::Custom(t), ..)
                         if *t == s =>
@@ -2675,7 +2670,7 @@ impl Engine {
         lib: &mut FnLib,
         mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
-        settings.pos = input.peek().expect(NEVER_ENDS).1;
+        settings.pos = input.peek().unwrap().1;
 
         // Parse expression normally.
         let precedence = Precedence::new(1);
@@ -2705,7 +2700,7 @@ impl Engine {
 
         // if guard { if_body } else ...
         let branch = if match_token(input, &Token::Else).0 {
-            match input.peek().expect(NEVER_ENDS) {
+            match input.peek().unwrap() {
                 // if guard { if_body } else if ...
                 (Token::If, ..) => self.parse_if(input, state, lib, settings)?,
                 // if guard { if_body } else { else-body }
@@ -2733,7 +2728,7 @@ impl Engine {
         let mut settings = settings.level_up()?;
 
         // while|loops ...
-        let (expr, token_pos) = match input.next().expect(NEVER_ENDS) {
+        let (expr, token_pos) = match input.next().unwrap() {
             (Token::While, pos) => {
                 ensure_not_statement_expr(input, "a boolean")?;
                 let expr = self
@@ -2774,7 +2769,7 @@ impl Engine {
 
         let body = self.parse_block(input, state, lib, settings)?.into();
 
-        let negated = match input.next().expect(NEVER_ENDS) {
+        let negated = match input.next().unwrap() {
             (Token::While, ..) => ASTFlags::empty(),
             (Token::Until, ..) => ASTFlags::NEGATED,
             (.., pos) => {
@@ -2850,7 +2845,7 @@ impl Engine {
         };
 
         // for name in ...
-        match input.next().expect(NEVER_ENDS) {
+        match input.next().unwrap() {
             (Token::In, ..) => (),
             (Token::LexError(err), pos) => return Err(err.into_err(pos)),
             (.., pos) => {
@@ -2913,17 +2908,17 @@ impl Engine {
         is_export: bool,
     ) -> ParseResult<Stmt> {
         // let/const... (specified in `var_type`)
-        settings.pos = input.next().expect(NEVER_ENDS).1;
+        settings.pos = input.next().unwrap().1;
 
         // let name ...
         let (name, pos) = parse_var_name(input)?;
 
-        if !self.allow_shadowing() && state.stack.iter().any(|(v, ..)| v == name) {
+        if !self.allow_shadowing() && state.stack.get(&name).is_some() {
             return Err(PERR::VariableExists(name.into()).into_err(pos));
         }
 
         if let Some(ref filter) = self.def_var_filter {
-            let will_shadow = state.stack.iter().any(|(v, ..)| v == name);
+            let will_shadow = state.stack.get(&name).is_some();
 
             let global = state
                 .global
@@ -3049,7 +3044,7 @@ impl Engine {
     ) -> ParseResult<Stmt> {
         settings.pos = eat_token(input, &Token::Export);
 
-        match input.peek().expect(NEVER_ENDS) {
+        match input.peek().unwrap() {
             (Token::Let, pos) => {
                 let pos = *pos;
                 let settings = settings.level_up()?;
@@ -3108,7 +3103,7 @@ impl Engine {
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // Must start with {
-        let brace_start_pos = match input.next().expect(NEVER_ENDS) {
+        let brace_start_pos = match input.next().unwrap() {
             (Token::LeftBrace, pos) => pos,
             (Token::LexError(err), pos) => return Err(err.into_err(pos)),
             (.., pos) => {
@@ -3128,7 +3123,7 @@ impl Engine {
             block.statements_mut().push(stmt);
 
             // Must end with }
-            return match input.next().expect(NEVER_ENDS) {
+            return match input.next().unwrap() {
                 (Token::RightBrace, pos) => {
                     Ok(Stmt::Block(StmtBlock::new(block, settings.pos, pos).into()))
                 }
@@ -3149,7 +3144,7 @@ impl Engine {
 
         let end_pos = loop {
             // Terminated?
-            match input.peek().expect(NEVER_ENDS) {
+            match input.peek().unwrap() {
                 (Token::RightBrace, ..) => break eat_token(input, &Token::RightBrace),
                 (Token::EOF, pos) => {
                     return Err(PERR::MissingToken(
@@ -3175,7 +3170,7 @@ impl Engine {
 
             block.statements_mut().push(stmt);
 
-            match input.peek().expect(NEVER_ENDS) {
+            match input.peek().unwrap() {
                 // { ... stmt }
                 (Token::RightBrace, ..) => break eat_token(input, &Token::RightBrace),
                 // { ... stmt;
@@ -3221,18 +3216,17 @@ impl Engine {
         lib: &mut FnLib,
         mut settings: ParseSettings,
     ) -> ParseResult<Stmt> {
-        settings.pos = input.peek().expect(NEVER_ENDS).1;
+        settings.pos = input.peek().unwrap().1;
 
         let expr = self.parse_expr(input, state, lib, settings)?;
 
-        let (op, pos) = match input.peek().expect(NEVER_ENDS) {
+        let (op, pos) = match input.peek().unwrap() {
             // var = ...
             (Token::Equals, ..) => (None, eat_token(input, &Token::Equals)),
             // var op= ...
-            (token, ..) if token.is_op_assignment() => input
-                .next()
-                .map(|(op, pos)| (Some(op), pos))
-                .expect(NEVER_ENDS),
+            (token, ..) if token.is_op_assignment() => {
+                input.next().map(|(op, pos)| (Some(op), pos)).unwrap()
+            }
             // Not op-assignment
             _ => return Ok(Stmt::Expr(expr.into())),
         };
@@ -3262,20 +3256,22 @@ impl Engine {
             let mut buf = SmartString::new_const();
 
             // Handle doc-comments.
-            while let (Token::Comment(ref comment), pos) = input.peek().expect(NEVER_ENDS) {
+            while let (Token::Comment(ref comment), pos) = input.peek().unwrap() {
                 if comments_pos.is_none() {
                     comments_pos = *pos;
                 }
 
-                if !crate::tokenizer::is_doc_comment(comment) {
-                    unreachable!("doc-comment expected but gets {:?}", comment);
-                }
+                debug_assert!(
+                    crate::tokenizer::is_doc_comment(comment),
+                    "doc-comment expected but gets {:?}",
+                    comment
+                );
 
                 if !settings.has_flag(ParseSettingFlags::GLOBAL_LEVEL) {
                     return Err(PERR::WrongDocComment.into_err(comments_pos));
                 }
 
-                match input.next().expect(NEVER_ENDS) {
+                match input.next().unwrap() {
                     (Token::Comment(comment), pos) => {
                         if comment.contains('\n') {
                             // Assume block comment
@@ -3293,7 +3289,7 @@ impl Engine {
                             buf.push_str(&comment);
                         }
 
-                        match input.peek().expect(NEVER_ENDS) {
+                        match input.peek().unwrap() {
                             (Token::Fn | Token::Private, ..) => break,
                             (Token::Comment(..), ..) => (),
                             _ => return Err(PERR::WrongDocComment.into_err(comments_pos)),
@@ -3310,7 +3306,7 @@ impl Engine {
             comments
         };
 
-        let (token, token_pos) = match input.peek().expect(NEVER_ENDS) {
+        let (token, token_pos) = match input.peek().unwrap() {
             (Token::EOF, pos) => return Ok(Stmt::Noop(*pos)),
             (x, pos) => (x, *pos),
         };
@@ -3342,7 +3338,7 @@ impl Engine {
                     crate::FnAccess::Public
                 };
 
-                match input.next().expect(NEVER_ENDS) {
+                match input.next().unwrap() {
                     (Token::Fn, pos) => {
                         // Build new parse state
                         let new_state = &mut ParseState::new(
@@ -3441,7 +3437,7 @@ impl Engine {
             {
                 let pos = eat_token(input, &Token::Break);
 
-                let expr = match input.peek().expect(NEVER_ENDS) {
+                let expr = match input.peek().unwrap() {
                     // `break` at <EOF>
                     (Token::EOF, ..) => None,
                     // `break` at end of block
@@ -3475,9 +3471,9 @@ impl Engine {
                         };
                         (flags, pos)
                     })
-                    .expect(NEVER_ENDS);
+                    .unwrap();
 
-                match input.peek().expect(NEVER_ENDS) {
+                match input.peek().unwrap() {
                     // `return`/`throw` at <EOF>
                     (Token::EOF, ..) => Ok(Stmt::Return(None, return_type, token_pos)),
                     // `return`/`throw` at end of block
@@ -3600,12 +3596,12 @@ impl Engine {
     ) -> ParseResult<ScriptFnDef> {
         let settings = settings.level_up()?;
 
-        let (token, pos) = input.next().expect(NEVER_ENDS);
+        let (token, pos) = input.next().unwrap();
 
         // Parse type for `this` pointer
         #[cfg(not(feature = "no_object"))]
         let ((token, pos), this_type) = {
-            let (next_token, next_pos) = input.peek().expect(NEVER_ENDS);
+            let (next_token, next_pos) = input.peek().unwrap();
 
             match token {
                 Token::StringConstant(s) if next_token == &Token::Period => {
@@ -3616,7 +3612,7 @@ impl Engine {
                         "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
                         _ => state.get_interned_string(*s),
                     };
-                    (input.next().expect(NEVER_ENDS), Some(s))
+                    (input.next().unwrap(), Some(s))
                 }
                 Token::StringConstant(..) => {
                     return Err(PERR::MissingToken(
@@ -3633,7 +3629,7 @@ impl Engine {
                         "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
                         _ => state.get_interned_string(*s),
                     };
-                    (input.next().expect(NEVER_ENDS), Some(s))
+                    (input.next().unwrap(), Some(s))
                 }
                 _ => ((token, pos), None),
             }
@@ -3647,7 +3643,7 @@ impl Engine {
             _ => return Err(PERR::FnMissingName.into_err(pos)),
         };
 
-        let no_params = match input.peek().expect(NEVER_ENDS) {
+        let no_params = match input.peek().unwrap() {
             (Token::LeftParen, ..) => {
                 eat_token(input, &Token::LeftParen);
                 match_token(input, &Token::RightParen).0
@@ -3665,7 +3661,7 @@ impl Engine {
             let sep_err = format!("to separate the parameters of function '{name}'");
 
             loop {
-                match input.next().expect(NEVER_ENDS) {
+                match input.next().unwrap() {
                     (Token::RightParen, ..) => break,
                     (Token::Identifier(s), pos) => {
                         if params.iter().any(|(p, _)| p == &*s) {
@@ -3688,7 +3684,7 @@ impl Engine {
                     }
                 }
 
-                match input.next().expect(NEVER_ENDS) {
+                match input.next().unwrap() {
                     (Token::RightParen, ..) => break,
                     (Token::Comma, ..) => (),
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -3700,7 +3696,7 @@ impl Engine {
         }
 
         // Parse function body
-        let body = match input.peek().expect(NEVER_ENDS) {
+        let body = match input.peek().unwrap() {
             (Token::LeftBrace, ..) => self.parse_block(input, state, lib, settings)?,
             (.., pos) => return Err(PERR::FnMissingBody(name.into()).into_err(*pos)),
         }
@@ -3801,9 +3797,9 @@ impl Engine {
         let settings = settings.level_up()?;
         let mut params_list = StaticVec::<ImmutableString>::new_const();
 
-        if input.next().expect(NEVER_ENDS).0 != Token::Or && !match_token(input, &Token::Pipe).0 {
+        if input.next().unwrap().0 != Token::Or && !match_token(input, &Token::Pipe).0 {
             loop {
-                match input.next().expect(NEVER_ENDS) {
+                match input.next().unwrap() {
                     (Token::Pipe, ..) => break,
                     (Token::Identifier(s), pos) => {
                         if params_list.iter().any(|p| p == &*s) {
@@ -3826,7 +3822,7 @@ impl Engine {
                     }
                 }
 
-                match input.next().expect(NEVER_ENDS) {
+                match input.next().unwrap() {
                     (Token::Pipe, ..) => break,
                     (Token::Comma, ..) => (),
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -3929,7 +3925,7 @@ impl Engine {
         #[cfg(feature = "no_function")]
         debug_assert!(functions.is_empty());
 
-        match input.peek().expect(NEVER_ENDS) {
+        match input.peek().unwrap() {
             (Token::EOF, ..) => (),
             // Return error if the expression doesn't end
             (token, pos) => return Err(LexError::UnexpectedInput(token.to_string()).into_err(*pos)),
@@ -3976,7 +3972,7 @@ impl Engine {
         };
         process_settings(&mut settings);
 
-        while input.peek().expect(NEVER_ENDS).0 != Token::EOF {
+        while input.peek().unwrap().0 != Token::EOF {
             let stmt = self.parse_stmt(&mut input, state, &mut functions, settings)?;
 
             if stmt.is_noop() {
@@ -3987,7 +3983,7 @@ impl Engine {
 
             statements.push(stmt);
 
-            match input.peek().expect(NEVER_ENDS) {
+            match input.peek().unwrap() {
                 // EOF
                 (Token::EOF, ..) => break,
                 // stmt ;

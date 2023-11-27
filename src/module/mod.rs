@@ -790,16 +790,14 @@ impl Module {
 
             // Catch hash collisions in testing environment only.
             #[cfg(feature = "testing-environ")]
-            if self
-                .all_variables
-                .as_ref()
-                .map_or(false, |f| f.contains_key(&hash_var))
-            {
-                panic!(
-                    "Hash {} already exists when registering variable {}",
-                    hash_var, ident
-                );
-            }
+            assert!(
+                self.all_variables
+                    .as_ref()
+                    .map_or(true, |map| !map.contains_key(&hash_var)),
+                "Hash {} already exists when registering variable {}",
+                hash_var,
+                ident
+            );
 
             self.all_variables
                 .get_or_insert_with(Default::default)
@@ -845,7 +843,7 @@ impl Module {
         // Catch hash collisions in testing environment only.
         #[cfg(feature = "testing-environ")]
         if let Some(f) = self.functions.as_ref().and_then(|f| f.get(&hash_script)) {
-            panic!(
+            unreachable!(
                 "Hash {} already exists when registering function {:#?}:\n{:#?}",
                 hash_script, fn_def, f
             );
@@ -1251,7 +1249,7 @@ impl Module {
         // Catch hash collisions in testing environment only.
         #[cfg(feature = "testing-environ")]
         if let Some(f) = self.functions.as_ref().and_then(|f| f.get(&hash_base)) {
-            panic!(
+            unreachable!(
                 "Hash {} already exists when registering function {}:\n{:#?}",
                 hash_base, name, f
             );
@@ -1931,7 +1929,7 @@ impl Module {
                 Some(ref mut m) => m.extend(
                     functions
                         .iter()
-                        .filter(|&(.., f)| {
+                        .filter(|(.., f)| {
                             _filter(
                                 f.metadata.namespace,
                                 f.metadata.access,
@@ -2074,7 +2072,7 @@ impl Module {
                 f.metadata.access,
                 f.metadata.name.as_str(),
                 f.metadata.num_params,
-                f.func.get_script_fn_def().expect("script-defined function"),
+                f.func.get_script_fn_def().expect("`ScriptFnDef`"),
             )
         })
     }
@@ -2238,7 +2236,7 @@ impl Module {
             i -= 1;
 
             let (mut value, mut aliases) = if i >= orig_scope_len {
-                let (_, v, a) = scope.pop_entry().expect("not empty");
+                let (_, v, a) = scope.pop_entry().unwrap();
                 (v, a)
             } else {
                 let (_, v, a) = scope.get_entry_by_index(i);
@@ -2374,7 +2372,7 @@ impl Module {
                         // Catch hash collisions in testing environment only.
                         #[cfg(feature = "testing-environ")]
                         if let Some(fx) = functions.get(&hash) {
-                            panic!(
+                            unreachable!(
                                 "Hash {} already exists when indexing function {:#?}:\n{:#?}",
                                 hash, f.func, fx
                             );
@@ -2411,7 +2409,7 @@ impl Module {
                         // Catch hash collisions in testing environment only.
                         #[cfg(feature = "testing-environ")]
                         if let Some(fx) = functions.get(&hash_script) {
-                            panic!(
+                            unreachable!(
                                 "Hash {} already exists when indexing function {:#?}:\n{:#?}",
                                 hash_script, f.func, fx
                             );
@@ -2429,7 +2427,7 @@ impl Module {
                     // Catch hash collisions in testing environment only.
                     #[cfg(feature = "testing-environ")]
                     if let Some(fx) = functions.get(&hash_fn) {
-                        panic!(
+                        unreachable!(
                             "Hash {} already exists when indexing function {:#?}:\n{:#?}",
                             hash_fn, f.func, fx
                         );

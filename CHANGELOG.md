@@ -15,16 +15,24 @@ Potentially breaking changes
 Bug fixes
 ----------
 
-* Fixed crash when parsing multi-segment interpolated string longer than maximum.
+* Fixed crash when parsing multi-segment interpolated string longer than maximum (found via fuzzing).
+* Fixed crash when parsing unterminated comment (found via fuzzing).
+* Fixed crash when parsing deeply-nested right-associated operators such as `**` (found via fuzzing).
 
 Deprecated API's
 ----------------
 
 * `rhai::config::hashing::set_ahash_seed`, `rhai::config::hashing::get_ahash_seed` and the `RHAI_AHASH_SEED` environment variable are deprecated in favor of `rhai::config::hashing::set_hashing_seed`, `rhai::config::hashing::get_hashing_seed` and `RHAI_HASHING_SEED`.
 
+New features
+------------
+
+* Fuzzing is now done via [Google OSS-Fuzz](https://github.com/google/oss-fuzz).
+
 Enhancements
 ------------
 
+* Avoid cloning values unless needed when performing constants propagation in optimization.
 * Added `to_int` method for characters.
 * `Token::FloatConstant` and `Token::DecimalConstant` now carry the original text representation for use in, say, a _token mapper_.
 * `Dynamic::is_fnptr` is made a public API.

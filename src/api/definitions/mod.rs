@@ -582,7 +582,7 @@ impl Scope<'_> {
     /// _(metadata, internals)_ Return definitions for all items inside the [`Scope`].
     fn write_definition(&self, writer: &mut dyn fmt::Write, def: &Definitions) -> fmt::Result {
         let mut first = true;
-        for (name, constant, value) in self.iter_raw() {
+        for (name, constant, value) in self.iter_inner() {
             if !first {
                 writer.write_str("\n\n")?;
             }

@@ -97,7 +97,7 @@ impl<'a> ArgBackup<'a> {
     /// exiting the current scope.  Otherwise it is undefined behavior as the shorter lifetime will leak.
     #[inline(always)]
     pub fn restore_first_arg(&mut self, args: &mut FnCallArgs<'a>) {
-        args[0] = self.orig_mut.take().expect("`Some`");
+        args[0] = self.orig_mut.take().unwrap();
     }
 }
 
@@ -118,11 +118,10 @@ impl Drop for ArgBackup<'_> {
 pub fn ensure_no_data_race(fn_name: &str, args: &FnCallArgs, is_ref_mut: bool) -> RhaiResultOf<()> {
     match args
         .iter()
-        .enumerate()
         .skip(usize::from(is_ref_mut))
-        .find(|(.., a)| a.is_locked())
+        .position(|a| a.is_locked())
     {
-        Some((n, ..)) => Err(ERR::ErrorDataRace(
+        Some(n) => Err(ERR::ErrorDataRace(
             format!("argument #{} of function '{fn_name}'", n + 1),
             Position::NONE,
         )
@@ -308,19 +307,15 @@ impl Engine {
                     // Try all permutations with `Dynamic` wildcards
                     hash = calc_fn_hash_full(
                         hash_base,
-                        args.as_ref()
-                            .expect("no permutations")
-                            .iter()
-                            .enumerate()
-                            .map(|(i, a)| {
-                                let mask = 1usize << (num_args - i - 1);
-                                if bitmask & mask == 0 {
-                                    a.type_id()
-                                } else {
-                                    // Replace with `Dynamic`
-                                    TypeId::of::<Dynamic>()
-                                }
-                            }),
+                        args.as_ref().unwrap().iter().enumerate().map(|(i, a)| {
+                            let mask = 1usize << (num_args - i - 1);
+                            if bitmask & mask == 0 {
+                                a.type_id()
+                            } else {
+                                // Replace with `Dynamic`
+                                TypeId::of::<Dynamic>()
+                            }
+                        }),
                     );
 
                     bitmask += 1;
@@ -354,19 +349,13 @@ impl Engine {
 
         // Check if function access already in the cache
         let local_entry = &mut None;
-
-        let func = self.resolve_fn(
-            global,
-            caches,
-            local_entry,
-            op_token,
-            hash,
-            Some(args),
-            true,
-        );
+        let a = Some(&mut *args);
+        let func = self.resolve_fn(global, caches, local_entry, op_token, hash, a, true);
 
         if let Some(FnResolutionCacheEntry { func, source }) = func {
             debug_assert!(func.is_native());
+
+            let is_method = func.is_method();
 
             // Push a new call stack frame
             #[cfg(feature = "debugging")]
@@ -378,7 +367,7 @@ impl Engine {
             let backup = &mut ArgBackup::new();
 
             // Calling non-method function but the first argument is a reference?
-            let swap = is_ref_mut && !func.is_method() && !args.is_empty();
+            let swap = is_ref_mut && !is_method && !args.is_empty();
 
             if swap {
                 // Clone the first argument
@@ -398,20 +387,20 @@ impl Engine {
             }
 
             // Run external function
-            let is_method = func.is_method();
             let context = func
                 .has_context()
                 .then(|| (self, name, source.as_deref(), &*global, pos).into());
 
-            let mut _result = if !func.is_pure() && !args.is_empty() && args[0].is_read_only() {
+            let mut _result = match func {
                 // If function is not pure, there must be at least one argument
-                Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
-            } else if let Some(f) = func.get_plugin_fn() {
-                f.call(context, args)
-            } else if let Some(f) = func.get_native_fn() {
-                f(context, args)
-            } else {
-                unreachable!();
+                f if !f.is_pure() && !args.is_empty() && args[0].is_read_only() => {
+                    Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
+                }
+                CallableFunction::Plugin { func } => func.call(context, args),
+                CallableFunction::Pure { func, .. } | CallableFunction::Method { func, .. } => {
+                    func(context, args)
+                }
+                _ => unreachable!("non-native function"),
             }
             .and_then(|r| self.check_data_size(r, pos))
             .map_err(|err| err.fill_position(pos));
@@ -628,13 +617,14 @@ impl Engine {
             }
 
             if let Some(FnResolutionCacheEntry { func, source }) = resolved.cloned() {
-                // Script function call
-                debug_assert!(func.is_script());
+                let CallableFunction::Script { fn_def, environ } = func else {
+                    unreachable!("Script function expected");
+                };
 
-                let environ = func.get_encapsulated_environ();
-                let func = func.get_script_fn_def().expect("script-defined function");
+                let fn_def = &*fn_def;
+                let environ = environ.as_deref();
 
-                if func.body.is_empty() {
+                if fn_def.body.is_empty() {
                     return Ok((Dynamic::UNIT, false));
                 }
 
@@ -654,7 +644,7 @@ impl Engine {
                     let (first_arg, args) = args.split_first_mut().unwrap();
                     let this_ptr = Some(&mut **first_arg);
                     self.call_script_fn(
-                        global, caches, scope, this_ptr, environ, func, args, true, pos,
+                        global, caches, scope, this_ptr, environ, fn_def, args, true, pos,
                     )
                 } else {
                     // Normal call of script function
@@ -669,7 +659,9 @@ impl Engine {
 
                     defer! { args = (args) if swap => move |a| backup.restore_first_arg(a) }
 
-                    self.call_script_fn(global, caches, scope, None, environ, func, args, true, pos)
+                    self.call_script_fn(
+                        global, caches, scope, None, environ, fn_def, args, true, pos,
+                    )
                 }
                 .map(|r| (r, false));
             }
@@ -733,7 +725,7 @@ impl Engine {
         let (result, updated) = match fn_name {
             // Handle fn_ptr.call(...)
             KEYWORD_FN_PTR_CALL if target.as_ref().is_fnptr() => {
-                let fn_ptr = target.as_ref().read_lock::<FnPtr>().expect("`FnPtr`");
+                let fn_ptr = target.as_ref().read_lock::<FnPtr>().unwrap();
 
                 // Arguments are passed as-is, adding the curried arguments
                 let mut curry = fn_ptr.curry().iter().cloned().collect::<FnArgsVec<_>>();
@@ -780,17 +772,14 @@ impl Engine {
                 }
             }
 
-            // Handle obj.call()
-            KEYWORD_FN_PTR_CALL if call_args.is_empty() => {
-                return Err(self.make_type_mismatch_err::<FnPtr>(
-                    self.map_type_name(target.as_ref().type_name()),
-                    pos,
-                ))
-            }
-
             // Handle obj.call(fn_ptr, ...)
             KEYWORD_FN_PTR_CALL => {
-                debug_assert!(!call_args.is_empty());
+                if call_args.is_empty() {
+                    return Err(self.make_type_mismatch_err::<FnPtr>(
+                        self.map_type_name(target.as_ref().type_name()),
+                        pos,
+                    ));
+                }
 
                 // FnPtr call on object
                 let fn_ptr = call_args[0].take().try_cast_raw::<FnPtr>().map_err(|v| {
@@ -1368,7 +1357,7 @@ impl Engine {
                 } else {
                     // Turn it into a method call only if the object is not shared and not a simple value
                     is_ref_mut = true;
-                    let obj_ref = target.take_ref().expect("ref");
+                    let obj_ref = target.take_ref().unwrap();
                     args.push(obj_ref);
                 }
             }
@@ -1464,7 +1453,7 @@ impl Engine {
                     // func(x, ...) -> x.func(...)
                     let (first, rest) = arg_values.split_first_mut().unwrap();
                     first_arg_value = Some(first);
-                    let obj_ref = target.take_ref().expect("ref");
+                    let obj_ref = target.take_ref().unwrap();
                     args.push(obj_ref);
                     args.extend(rest.iter_mut());
                 }
@@ -1538,16 +1527,16 @@ impl Engine {
 
         match func {
             #[cfg(not(feature = "no_function"))]
-            Some(func) if func.is_script() => {
-                let f = func.get_script_fn_def().expect("script-defined function");
-
-                let environ = func.get_encapsulated_environ();
+            Some(CallableFunction::Script { fn_def, environ }) => {
+                let environ = environ.as_deref();
                 let scope = &mut Scope::new();
 
                 let orig_source = mem::replace(&mut global.source, module.id_raw().cloned());
                 defer! { global => move |g| g.source = orig_source }
 
-                self.call_script_fn(global, caches, scope, None, environ, f, args, true, pos)
+                self.call_script_fn(
+                    global, caches, scope, None, environ, fn_def, args, true, pos,
+                )
             }
 
             Some(f) if !f.is_pure() && args[0].is_read_only() => {
@@ -1555,24 +1544,28 @@ impl Engine {
                 Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
             }
 
-            Some(f) if f.is_plugin_fn() => {
-                let f = f.get_plugin_fn().expect("plugin function");
-                let context = f
+            Some(CallableFunction::Plugin { func }) => {
+                let context = func
                     .has_context()
                     .then(|| (self, fn_name, module.id(), &*global, pos).into());
-                f.call(context, args)
+                func.call(context, args)
                     .and_then(|r| self.check_data_size(r, pos))
             }
 
-            Some(f) if f.is_native() => {
-                let func = f.get_native_fn().expect("native function");
-                let context = f
-                    .has_context()
-                    .then(|| (self, fn_name, module.id(), &*global, pos).into());
+            Some(CallableFunction::Pure {
+                func, has_context, ..
+            })
+            | Some(CallableFunction::Method {
+                func, has_context, ..
+            }) => {
+                let context =
+                    has_context.then(|| (self, fn_name, module.id(), &*global, pos).into());
                 func(context, args).and_then(|r| self.check_data_size(r, pos))
             }
 
-            Some(f) => unreachable!("unknown function type: {:?}", f),
+            Some(CallableFunction::Iterator { .. }) => {
+                unreachable!("iterator functions should not occur here")
+            }
 
             None => Err(ERR::ErrorFunctionNotFound(
                 if namespace.is_empty() {

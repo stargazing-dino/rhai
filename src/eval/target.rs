@@ -271,7 +271,7 @@ impl<'a> Target<'a> {
                     ))
                 })?;
 
-                let value = &mut *source.write_lock::<crate::INT>().expect("`INT`");
+                let value = &mut *source.write_lock::<crate::INT>().unwrap();
 
                 let index = *bit;
 
@@ -302,7 +302,7 @@ impl<'a> Target<'a> {
                 })?;
 
                 let new_value = (new_value << shift) & mask;
-                let value = &mut *source.write_lock::<crate::INT>().expect("`INT`");
+                let value = &mut *source.write_lock::<crate::INT>().unwrap();
 
                 *value &= !mask;
                 *value |= new_value;
@@ -322,7 +322,7 @@ impl<'a> Target<'a> {
                     ))
                 })?;
 
-                let value = &mut *source.write_lock::<crate::Blob>().expect("`Blob`");
+                let value = &mut *source.write_lock::<crate::Blob>().unwrap();
 
                 #[allow(clippy::cast_sign_loss)]
                 {
@@ -344,9 +344,7 @@ impl<'a> Target<'a> {
                     ))
                 })?;
 
-                let s = &mut *source
-                    .write_lock::<crate::ImmutableString>()
-                    .expect("`ImmutableString`");
+                let s = &mut *source.write_lock::<crate::ImmutableString>().unwrap();
 
                 *s = s
                     .chars()
@@ -367,7 +365,7 @@ impl<'a> From<&'a mut Dynamic> for Target<'a> {
         if value.is_shared() {
             // Cloning is cheap for a shared value
             let shared_value = value.clone();
-            let guard = value.write_lock::<Dynamic>().expect("`Dynamic`");
+            let guard = value.write_lock::<Dynamic>().unwrap();
             return Self::SharedValue {
                 guard,
                 shared_value,
