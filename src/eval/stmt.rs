@@ -72,7 +72,7 @@ impl Engine {
             let this_ptr = this_ptr.as_deref_mut();
 
             #[cfg(not(feature = "no_module"))]
-            let imports_len = global.num_imports();
+            let orig_imports_len = global.num_imports();
 
             let result =
                 self.eval_stmt(global, caches, scope, this_ptr, stmt, restore_orig_state)?;
@@ -83,7 +83,7 @@ impl Engine {
                 // Without global functions, the extra modules never affect function resolution.
                 if global
                     .scan_imports_raw()
-                    .skip(imports_len)
+                    .skip(orig_imports_len)
                     .any(|(.., m)| m.contains_indexed_global_functions())
                 {
                     // Different scenarios where the cache must be cleared - notice that this is

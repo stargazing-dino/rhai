@@ -210,6 +210,10 @@ impl Engine {
     }
 
     // Does a script-defined function exist?
+    ///
+    /// # Note
+    ///
+    /// If the scripted function is not found, this information is cached for future look-ups.
     #[must_use]
     pub(crate) fn has_script_fn(
         &self,
@@ -219,27 +223,27 @@ impl Engine {
     ) -> bool {
         let cache = caches.fn_resolution_cache_mut();
 
-        if let Some(result) = cache.map.get(&hash_script).map(Option::is_some) {
+        if let Some(result) = cache.dict.get(&hash_script).map(Option::is_some) {
             return result;
         }
 
         // First check script-defined functions
-        let r = global.lib.iter().any(|m| m.contains_fn(hash_script))
+        let res = global.lib.iter().any(|m| m.contains_fn(hash_script))
             // Then check the global namespace and packages
             || self.global_modules.iter().any(|m| m.contains_fn(hash_script));
 
         #[cfg(not(feature = "no_module"))]
-        let r = r ||
+        let res = res ||
             // Then check imported modules
             global.contains_qualified_fn(hash_script)
             // Then check sub-modules
             || self.global_sub_modules.values().any(|m| m.contains_qualified_fn(hash_script));
 
-        if !r && !cache.filter.is_absent_and_set(hash_script) {
+        if !res && !cache.filter.is_absent_and_set(hash_script) {
             // Do not cache "one-hit wonders"
-            cache.map.insert(hash_script, None);
+            cache.dict.insert(hash_script, None);
         }
 
-        r
+        res
     }
 }
