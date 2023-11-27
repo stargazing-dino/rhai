@@ -181,7 +181,7 @@ impl Engine {
 
         let cache = caches.fn_resolution_cache_mut();
 
-        match cache.map.entry(hash) {
+        match cache.dict.entry(hash) {
             Entry::Occupied(entry) => entry.into_mut().as_ref(),
             Entry::Vacant(entry) => {
                 let num_args = args.as_deref().map_or(0, FnCallArgs::len);
@@ -190,22 +190,24 @@ impl Engine {
                 let mut bitmask = 1usize; // Bitmask of which parameter to replace with `Dynamic`
 
                 loop {
+                    // First check scripted functions in the AST or embedded environments
                     #[cfg(not(feature = "no_function"))]
                     let func = _global
                         .lib
                         .iter()
                         .rev()
-                        .chain(self.global_modules.iter())
                         .find_map(|m| m.get_fn(hash).map(|f| (f, m.id_raw())));
                     #[cfg(feature = "no_function")]
                     let func = None;
 
+                    // Then check the global namespace
                     let func = func.or_else(|| {
                         self.global_modules
                             .iter()
                             .find_map(|m| m.get_fn(hash).map(|f| (f, m.id_raw())))
                     });
 
+                    // Then check imported modules for global functions, then global sub-modules for global functions
                     #[cfg(not(feature = "no_module"))]
                     let func = func
                         .or_else(|| _global.get_qualified_fn(hash, true))

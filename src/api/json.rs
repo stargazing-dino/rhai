@@ -5,7 +5,7 @@ use crate::func::native::locked_write;
 use crate::parser::{ParseSettingFlags, ParseState};
 use crate::tokenizer::{lex_raw, Token};
 use crate::types::StringsInterner;
-use crate::{Engine, LexError, Map, OptimizationLevel, RhaiResultOf};
+use crate::{Engine, LexError, Map, RhaiResultOf};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -134,7 +134,7 @@ impl Engine {
                 state,
                 |s| s.flags |= ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES,
                 #[cfg(not(feature = "no_optimize"))]
-                OptimizationLevel::None,
+                crate::OptimizationLevel::None,
                 #[cfg(feature = "no_optimize")]
                 <_>::default(),
             )?
