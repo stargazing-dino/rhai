@@ -58,23 +58,23 @@ pub fn calc_offset_len(length: usize, start: crate::INT, len: crate::INT) -> (us
 )]
 pub fn calc_index<E>(
     length: usize,
-    start: crate::INT,
+    index: crate::INT,
     negative_count_from_end: bool,
     err_func: impl FnOnce() -> Result<usize, E>,
 ) -> Result<usize, E> {
-    if start < 0 && negative_count_from_end {
-        let abs_start = start.unsigned_abs();
+    if length == 0 {
+        // Empty array, do nothing
+    } else if index < 0 {
+        if negative_count_from_end {
+            let abs_index = index.unsigned_abs();
 
-        #[allow(clippy::unnecessary_cast)]
-        return Ok(if abs_start as u64 > crate::MAX_USIZE_INT as u64 {
-            0
-        } else {
-            length - usize::min(abs_start as usize, length)
-        });
-    }
-
-    if start <= crate::MAX_USIZE_INT && (start as usize) < length {
-        return Ok(start as usize);
+            #[allow(clippy::unnecessary_cast)]
+            if abs_index as u64 <= crate::MAX_USIZE_INT as u64 && (abs_index as usize) <= length {
+                return Ok(length - (abs_index as usize));
+            }
+        }
+    } else if index <= crate::MAX_USIZE_INT && (index as usize) < length {
+        return Ok(index as usize);
     }
 
     err_func()

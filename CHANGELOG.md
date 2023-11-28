@@ -20,6 +20,8 @@ Bug fixes
 * Fixed crash when parsing deeply-nested right-associated operators such as `**` (found via fuzzing).
 * Fixed crash when parsing combo-chaining expressions such as `(a.b).c` (found via fuzzing).
 * Fixed crash when calling functions that have `Dynamic` parameters with more than 16 parameters (found via fuzzing).
+* Fixed crash when indexing into an empty array with negative index (found via fuzzing).
+* Indexing into an array with a negative index that is larger than the length of the array now returns an out-of-bounds error (similar to positive indices) instead of defaulting to the first element.
 
 Deprecated API's
 ----------------
