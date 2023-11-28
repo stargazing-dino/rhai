@@ -235,21 +235,23 @@ impl Engine {
                     }
 
                     // Check `Dynamic` parameters for functions with parameters
+                    let max_dynamic_count = usize::min(num_args, MAX_DYNAMIC_PARAMETERS);
+
                     if allow_dynamic && max_bitmask == 0 && num_args > 0 {
-                        let is_dynamic = self
+                        let has_dynamic = self
                             .global_modules
                             .iter()
                             .any(|m| m.may_contain_dynamic_fn(hash_base));
 
                         #[cfg(not(feature = "no_function"))]
-                        let is_dynamic = is_dynamic
+                        let has_dynamic = has_dynamic
                             || _global
                                 .lib
                                 .iter()
                                 .any(|m| m.may_contain_dynamic_fn(hash_base));
 
                         #[cfg(not(feature = "no_module"))]
-                        let is_dynamic = is_dynamic
+                        let has_dynamic = has_dynamic
                             || _global.may_contain_dynamic_fn(hash_base)
                             || self
                                 .global_sub_modules
@@ -257,8 +259,8 @@ impl Engine {
                                 .any(|m| m.may_contain_dynamic_fn(hash_base));
 
                         // Set maximum bitmask when there are dynamic versions of the function
-                        if is_dynamic {
-                            max_bitmask = 1usize << usize::min(num_args, MAX_DYNAMIC_PARAMETERS);
+                        if has_dynamic {
+                            max_bitmask = 1usize << max_dynamic_count;
                         }
                     }
 
@@ -310,12 +312,13 @@ impl Engine {
                     hash = calc_fn_hash_full(
                         hash_base,
                         args.as_ref().unwrap().iter().enumerate().map(|(i, a)| {
-                            let mask = 1usize << (num_args - i - 1);
-                            if bitmask & mask == 0 {
-                                a.type_id()
-                            } else {
+                            if i < max_dynamic_count
+                                && bitmask & (1usize << (max_dynamic_count - i - 1)) != 0
+                            {
                                 // Replace with `Dynamic`
                                 TypeId::of::<Dynamic>()
+                            } else {
+                                a.type_id()
                             }
                         }),
                     );
@@ -1490,7 +1493,8 @@ impl Engine {
         //        (expected because closures cannot be qualified).
         if func.is_none() && !args.is_empty() {
             let num_args = args.len();
-            let max_bitmask = 1usize << usize::min(num_args, MAX_DYNAMIC_PARAMETERS);
+            let max_dynamic_count = usize::min(num_args, MAX_DYNAMIC_PARAMETERS);
+            let max_bitmask = 1usize << max_dynamic_count;
             let mut bitmask = 1usize; // Bitmask of which parameter to replace with `Dynamic`
 
             // Try all permutations with `Dynamic` wildcards
@@ -1498,12 +1502,13 @@ impl Engine {
                 let hash_qualified_fn = calc_fn_hash_full(
                     hash,
                     args.iter().enumerate().map(|(i, a)| {
-                        let mask = 1usize << (num_args - i - 1);
-                        if bitmask & mask == 0 {
-                            a.type_id()
-                        } else {
+                        if i < max_dynamic_count
+                            && bitmask & (1usize << (max_dynamic_count - i - 1)) != 0
+                        {
                             // Replace with `Dynamic`
                             TypeId::of::<Dynamic>()
+                        } else {
+                            a.type_id()
                         }
                     }),
                 );
