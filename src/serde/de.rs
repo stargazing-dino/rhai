@@ -36,7 +36,7 @@ impl<'de> DynamicDeserializer<'de> {
     #[cold]
     #[inline(always)]
     fn type_error<T>(&self) -> RhaiResultOf<T> {
-        self.type_error_str(&map_std_type_name(type_name::<T>(), false))
+        self.type_error_str(map_std_type_name(type_name::<T>(), false))
     }
     /// Shortcut for a type conversion error.
     #[cold]
@@ -377,7 +377,7 @@ impl<'de> Deserializer<'de> for DynamicDeserializer<'de> {
     fn deserialize_unit<V: Visitor<'de>>(self, visitor: V) -> RhaiResultOf<V::Value> {
         self.0
             .downcast_ref::<()>()
-            .map_or_else(|| self.type_error(), |_| visitor.visit_unit())
+            .map_or_else(|| self.type_error(), |()| visitor.visit_unit())
     }
 
     fn deserialize_unit_struct<V: Visitor<'de>>(
