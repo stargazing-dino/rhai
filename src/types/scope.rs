@@ -505,7 +505,7 @@ impl Scope<'_> {
         self.names
             .iter()
             .rev()
-            .position(|key| &name == key)
+            .position(|key| name == key)
             .and_then(|i| self.values[self.len() - 1 - i].flatten_clone().try_cast())
     }
     /// Get a reference the value of an entry in the [`Scope`], starting from the last.
@@ -533,7 +533,7 @@ impl Scope<'_> {
         self.names
             .iter()
             .rev()
-            .position(|key| &name == key)
+            .position(|key| name == key)
             .and_then(|i| {
                 let v = &self.values[self.len() - 1 - i];
                 #[cfg(not(feature = "no_closure"))]
@@ -570,7 +570,7 @@ impl Scope<'_> {
         self.names
             .iter_mut()
             .rev()
-            .position(|key| &name == key)
+            .position(|key| name == key)
             .and_then(move |i| {
                 let v = &mut self.values[len - 1 - i];
                 #[cfg(not(feature = "no_closure"))]

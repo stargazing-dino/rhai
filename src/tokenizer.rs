@@ -1481,7 +1481,7 @@ fn scan_block_comment(
 /// Test if the given character is a hex character.
 #[inline(always)]
 const fn is_hex_digit(c: char) -> bool {
-    matches!(c, 'a'..='f' | 'A'..='F' | '0'..='9')
+    c.is_ascii_hexdigit()
 }
 
 /// Test if the given character is a numeric digit (i.e. 0-9).

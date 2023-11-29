@@ -174,7 +174,11 @@ impl fmt::Debug for Engine {
         #[cfg(not(feature = "unchecked"))]
         f.field("progress", &self.progress.is_some());
 
-        f.field("options", &self.options);
+        f.field("options", &self.options)
+            .field("default_tag", &self.def_tag);
+
+        #[cfg(not(feature = "no_optimize"))]
+        f.field("optimization_level", &self.optimization_level);
 
         #[cfg(not(feature = "unchecked"))]
         f.field("limits", &self.limits);

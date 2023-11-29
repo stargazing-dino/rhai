@@ -116,18 +116,16 @@ impl Drop for ArgBackup<'_> {
 #[cfg(not(feature = "no_closure"))]
 #[inline]
 pub fn ensure_no_data_race(fn_name: &str, args: &FnCallArgs, is_ref_mut: bool) -> RhaiResultOf<()> {
-    match args
-        .iter()
+    args.iter()
         .skip(usize::from(is_ref_mut))
         .position(|a| a.is_locked())
-    {
-        Some(n) => Err(ERR::ErrorDataRace(
-            format!("argument #{} of function '{fn_name}'", n + 1),
-            Position::NONE,
-        )
-        .into()),
-        _ => Ok(()),
-    }
+        .map_or(Ok(()), |n| {
+            Err(ERR::ErrorDataRace(
+                format!("argument #{} of function '{fn_name}'", n + 1),
+                Position::NONE,
+            )
+            .into())
+        })
 }
 
 /// Is a function name an anonymous function?
@@ -1087,7 +1085,7 @@ impl Engine {
                 fn_name = &redirected;
 
                 // Shift the arguments
-                first_arg = args_expr.get(0);
+                first_arg = args_expr.first();
                 if !args_expr.is_empty() {
                     args_expr = &args_expr[1..];
                 }
@@ -1411,7 +1409,7 @@ impl Engine {
         // See if the first argument is a variable.
         // If so, convert to method-call style in order to leverage potential
         // &mut first argument and avoid cloning the value.
-        match args_expr.get(0) {
+        match args_expr.first() {
             Some(_first_expr @ Expr::ThisPtr(pos)) if has_non_shared_this_ptr => {
                 self.track_operation(global, *pos)?;
 
@@ -1559,12 +1557,14 @@ impl Engine {
                     .and_then(|r| self.check_data_size(r, pos))
             }
 
-            Some(CallableFunction::Pure {
-                func, has_context, ..
-            })
-            | Some(CallableFunction::Method {
-                func, has_context, ..
-            }) => {
+            Some(
+                CallableFunction::Pure {
+                    func, has_context, ..
+                }
+                | CallableFunction::Method {
+                    func, has_context, ..
+                },
+            ) => {
                 let context =
                     has_context.then(|| (self, fn_name, module.id(), &*global, pos).into());
                 func(context, args).and_then(|r| self.check_data_size(r, pos))
