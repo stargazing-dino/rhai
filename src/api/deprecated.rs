@@ -398,6 +398,19 @@ impl AST {
     pub fn lib(&self) -> &crate::Module {
         self.shared_lib()
     }
+    /// Clear the documentation.
+    /// Exported under the `metadata` feature only.
+    ///
+    /// # Deprecated
+    ///
+    /// This method will be removed in the next major version.
+    #[deprecated(since = "1.17.0")]
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn clear_doc(&mut self) -> &mut Self {
+        self.doc.clear();
+        self
+    }
 }
 
 impl NativeCallContext<'_> {

@@ -4,34 +4,33 @@ Rhai Release Notes
 Version 1.17.0
 ==============
 
+In this version, fuzzing via [Google OSS-Fuzz](https://github.com/google/oss-fuzz) is used to flush
+out hidden bugs and edge cases. This should result in higher code quality, better stability and
+improved security.
+
 Potentially breaking changes
 ----------------------------
 
 * `ImmutableString` now derefs to `&str` instead of `&SmartString`. Normally this should not be a breaking change.
-* Traits implemented by `ImmutableString` are cleaned up.  However, I cannot guarantee that there are absolutely no breaking changes, although I try to be careful.
-* `EvalContext::new`, `FloatWrapper` and `ConditionalExpr` are now exported only under `internals`.
-* `AST::clear_doc` is removed.
-
-Bug fixes
-----------
-
-* Fixed crash when parsing multi-segment interpolated string longer than maximum (found via fuzzing).
-* Fixed crash when parsing unterminated comment (found via fuzzing).
-* Fixed crash when parsing deeply-nested right-associated operators such as `**` (found via fuzzing).
-* Fixed crash when parsing combo-chaining expressions such as `(a.b).c` (found via fuzzing).
-* Fixed crash when calling functions that have `Dynamic` parameters with more than 16 parameters (found via fuzzing).
-* Fixed crash when indexing into an empty array with negative index (found via fuzzing).
-* Indexing into an array with a negative index that is larger than the length of the array now returns an out-of-bounds error (similar to positive indices) instead of defaulting to the first element.
+* Traits implemented by `ImmutableString` are cleaned up. Normally this should not be a breaking change.
+* `EvalContext::new`, `FloatWrapper` and `ConditionalExpr` are now gated under `internals`.
 
 Deprecated API's
 ----------------
 
 * `rhai::config::hashing::set_ahash_seed`, `rhai::config::hashing::get_ahash_seed` and the `RHAI_AHASH_SEED` environment variable are deprecated in favor of `rhai::config::hashing::set_hashing_seed`, `rhai::config::hashing::get_hashing_seed` and `RHAI_HASHING_SEED`.
+* `AST::clear_doc` is deprecated.
 
-New features
-------------
+Fixes to bugs found via fuzzing
+-------------------------------
 
-* Fuzzing is now done via [Google OSS-Fuzz](https://github.com/google/oss-fuzz).
+* Fixed crash when parsing multi-segment interpolated string longer than maximum.
+* Fixed crash when parsing unterminated comment.
+* Fixed crash when parsing deeply-nested right-associated operators such as `**`.
+* Fixed crash when parsing combo-chaining expressions such as `(a.b).c`.
+* Fixed crash when calling functions that have `Dynamic` parameters with more than 16 parameters.
+* Fixed crash when indexing into an empty array with negative index.
+* Indexing into an array with a negative index that is larger than the length of the array now returns an out-of-bounds error (similar to positive indices) instead of defaulting to the first element.
 
 Enhancements
 ------------
@@ -41,6 +40,7 @@ Enhancements
 * `Token::FloatConstant` and `Token::DecimalConstant` now carry the original text representation for use in, say, a _token mapper_.
 * `Dynamic::is_fnptr` is made a public API.
 * `Scope::get_value_ref` and `Scope::get_value_mut` are added.
+
 
 Version 1.16.3
 ==============
