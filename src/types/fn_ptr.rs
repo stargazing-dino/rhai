@@ -49,17 +49,16 @@ impl fmt::Debug for FnPtr {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ff = &mut f.debug_tuple("Fn");
+        let func = "Fn";
+        #[cfg(not(feature = "no_function"))]
+        let func = if self.fn_def.is_some() { "Fn*" } else { func };
+
+        let ff = &mut f.debug_tuple(func);
         ff.field(&self.name);
         self.curry.iter().for_each(|curry| {
             ff.field(curry);
         });
         ff.finish()?;
-
-        #[cfg(not(feature = "no_function"))]
-        if let Some(ref fn_def) = self.fn_def {
-            write!(f, ": {fn_def}")?;
-        }
 
         Ok(())
     }

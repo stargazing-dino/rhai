@@ -57,18 +57,18 @@ pub struct Limits {
     #[cfg(not(feature = "no_function"))]
     pub function_expr_depth: Option<NonZeroUsize>,
     /// Maximum number of operations allowed to run.
-    pub operations: Option<NonZeroU64>,
+    pub num_operations: Option<NonZeroU64>,
     /// Maximum number of variables allowed at any instant.
     ///
     /// Set to zero to effectively disable creating variables.
-    pub variables: usize,
+    pub num_variables: usize,
     /// Maximum number of [modules][crate::Module] allowed to load.
     ///
     /// Set to zero to effectively disable loading any [module][crate::Module].
     ///
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
-    pub modules: usize,
+    pub num_modules: usize,
     /// Maximum length of a [string][crate::ImmutableString].
     pub string_len: Option<NonZeroUsize>,
     /// Maximum length of an [array][crate::Array].
@@ -95,10 +95,10 @@ impl Limits {
             expr_depth: NonZeroUsize::new(default_limits::MAX_EXPR_DEPTH),
             #[cfg(not(feature = "no_function"))]
             function_expr_depth: NonZeroUsize::new(default_limits::MAX_FUNCTION_EXPR_DEPTH),
-            operations: None,
-            variables: usize::MAX,
+            num_operations: None,
+            num_variables: usize::MAX,
             #[cfg(not(feature = "no_module"))]
-            modules: usize::MAX,
+            num_modules: usize::MAX,
             string_len: None,
             #[cfg(not(feature = "no_index"))]
             array_size: None,
@@ -165,7 +165,7 @@ impl Engine {
     /// Not available under `unchecked`.
     #[inline(always)]
     pub fn set_max_operations(&mut self, operations: u64) -> &mut Self {
-        self.limits.operations = NonZeroU64::new(operations);
+        self.limits.num_operations = NonZeroU64::new(operations);
         self
     }
     /// The maximum number of operations allowed for a script to run (0 for unlimited).
@@ -174,7 +174,7 @@ impl Engine {
     #[inline]
     #[must_use]
     pub const fn max_operations(&self) -> u64 {
-        match self.limits.operations {
+        match self.limits.num_operations {
             Some(n) => n.get(),
             None => 0,
         }
@@ -184,7 +184,7 @@ impl Engine {
     /// Not available under `unchecked`.
     #[inline(always)]
     pub fn set_max_variables(&mut self, modules: usize) -> &mut Self {
-        self.limits.variables = modules;
+        self.limits.num_variables = modules;
         self
     }
     /// The maximum number of imported variables allowed for a script at any instant.
@@ -193,7 +193,7 @@ impl Engine {
     #[inline(always)]
     #[must_use]
     pub const fn max_variables(&self) -> usize {
-        self.limits.variables
+        self.limits.num_variables
     }
     /// Set the maximum number of imported [modules][crate::Module] allowed for a script.
     ///
@@ -201,7 +201,7 @@ impl Engine {
     #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     pub fn set_max_modules(&mut self, modules: usize) -> &mut Self {
-        self.limits.modules = modules;
+        self.limits.num_modules = modules;
         self
     }
     /// The maximum number of imported [modules][crate::Module] allowed for a script.
@@ -211,7 +211,7 @@ impl Engine {
     #[must_use]
     pub const fn max_modules(&self) -> usize {
         #[cfg(not(feature = "no_module"))]
-        return self.limits.modules;
+        return self.limits.num_modules;
         #[cfg(feature = "no_module")]
         return 0;
     }

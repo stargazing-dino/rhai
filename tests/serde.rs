@@ -1,6 +1,5 @@
 #![cfg(feature = "serde")]
 
-use rhai::plugin::*;
 use rhai::{
     serde::{from_dynamic, to_dynamic},
     Dynamic, Engine, ImmutableString, Scope, INT,
