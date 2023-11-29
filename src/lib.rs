@@ -90,7 +90,7 @@
 #![allow(clippy::absurd_extreme_comparisons)] // On `only_i32`, `MAX_USIZE_INT` < `INT::MAX` because `usize` == `u32` and `INT` == `i64`
 #![allow(clippy::wildcard_imports)] // Wildcard imports are used to import the plugins prelude
 #![allow(clippy::enum_glob_use)] // Sometimes useful to import all `Tokens` etc.
-#![allow(clippy::no_effect_underscore_binding)] // Underscored variables may be  used by code within feature guards
+#![allow(clippy::no_effect_underscore_binding)] // Underscored variables may be used by code within feature guards
 #![allow(clippy::semicolon_if_nothing_returned)] // One-liner `match` cases are sometimes formatted as multi-line blocks
 
 #[cfg(feature = "no_std")]
