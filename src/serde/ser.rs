@@ -15,7 +15,7 @@ use num_traits::FromPrimitive;
 /// Serializer for [`Dynamic`][crate::Dynamic].
 pub struct DynamicSerializer {
     /// Buffer to hold a temporary key.
-    key: Identifier,
+    _key: Identifier,
     /// Buffer to hold a temporary value.
     value: Dynamic,
 }
@@ -25,7 +25,7 @@ impl DynamicSerializer {
     #[must_use]
     pub const fn new(value: Dynamic) -> Self {
         Self {
-            key: Identifier::new_const(),
+            _key: Identifier::new_const(),
             value,
         }
     }
@@ -570,7 +570,7 @@ impl SerializeMap for DynamicSerializer {
         #[cfg(not(feature = "no_object"))]
         {
             let key = _key.serialize(&mut *self)?;
-            self.key = key
+            self._key = key
                 .into_immutable_string()
                 .map_err(|typ| {
                     ERR::ErrorMismatchDataType("string".into(), typ.into(), Position::NONE)
@@ -590,7 +590,7 @@ impl SerializeMap for DynamicSerializer {
     fn serialize_value<T: ?Sized + Serialize>(&mut self, _value: &T) -> RhaiResultOf<()> {
         #[cfg(not(feature = "no_object"))]
         {
-            let key = std::mem::take(&mut self.key);
+            let key = std::mem::take(&mut self._key);
             let value = _value.serialize(&mut *self)?;
             let map = self.value.downcast_mut::<crate::Map>().unwrap();
             map.insert(key, value);

@@ -359,7 +359,8 @@ impl Engine {
             #[cfg(not(feature = "no_object"))]
             (Expr::Property(..), ChainType::Dotting) => (),
             #[cfg(not(feature = "no_object"))]
-            (Expr::Property(..), ..) => {
+            #[cfg(not(feature = "no_index"))]
+            (Expr::Property(..), ChainType::Indexing) => {
                 unreachable!("unexpected Expr::Property for indexing")
             }
             // Short-circuit for indexing with literal: {expr}[1]

@@ -176,7 +176,7 @@ impl GlobalRuntimeState {
     /// Not available under `no_module`.
     #[cfg(not(feature = "no_module"))]
     #[inline]
-    pub(crate) fn iter_imports_raw(
+    pub fn iter_imports_raw(
         &self,
     ) -> impl Iterator<Item = (&ImmutableString, &crate::SharedModule)> {
         self.imports.iter().rev().zip(self.modules.iter().rev())
