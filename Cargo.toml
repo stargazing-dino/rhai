@@ -68,6 +68,8 @@ internals = []
 debugging = ["internals"]
 ## Features and dependencies required by `bin` tools: `decimal`, `metadata`, `serde`, `debugging` and [`rustyline`](https://crates.io/crates/rustyline).
 bin-features = ["decimal", "metadata", "serde", "debugging", "rustyline"]
+## Enable fuzzing via the [`arbitrary`](https://crates.io/crates/arbitrary) crate.
+fuzz = ["arbitrary", "rust_decimal/rust-fuzz"]
 
 #! ### System Configuration Features
 
