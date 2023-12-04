@@ -42,10 +42,10 @@ fn check_struct_sizes() {
         return;
     }
 
-    assert_eq!(size_of::<Scope>(), 72);
+    assert_eq!(size_of::<Scope>(), 24);
     assert_eq!(
         size_of::<FnPtr>(),
-        48 - if cfg!(feature = "no_function") {
+        32 - if cfg!(feature = "no_function") {
             WORD_SIZE
         } else {
             0
