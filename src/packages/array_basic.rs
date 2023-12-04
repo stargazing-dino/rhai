@@ -5,7 +5,6 @@ use crate::engine::OP_EQUALS;
 use crate::eval::{calc_index, calc_offset_len};
 use crate::module::ModuleFlags;
 use crate::plugin::*;
-
 use crate::{
     def_package, Array, Dynamic, ExclusiveRange, FnPtr, InclusiveRange, NativeCallContext,
     Position, RhaiResultOf, ERR, INT, MAX_USIZE_INT,
@@ -13,6 +12,7 @@ use crate::{
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{any::TypeId, cmp::Ordering, mem};
+use thin_vec::ThinVec;
 
 def_package! {
     /// Package of basic array utilities.
@@ -1272,7 +1272,7 @@ pub mod array_functions {
     pub fn dedup(ctx: NativeCallContext, array: &mut Array) {
         let comparer = FnPtr {
             name: ctx.engine().get_interned_string(OP_EQUALS),
-            curry: Vec::new(),
+            curry: ThinVec::new(),
             environ: None,
             #[cfg(not(feature = "no_function"))]
             fn_def: None,

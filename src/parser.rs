@@ -31,6 +31,7 @@ use std::{
     hash::{Hash, Hasher},
     num::{NonZeroU8, NonZeroUsize},
 };
+use thin_vec::ThinVec;
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
@@ -956,7 +957,7 @@ impl Engine {
         // [ ...
         settings.pos = eat_token(input, &Token::LeftBracket);
 
-        let mut array = FnArgsVec::new_const();
+        let mut array = ThinVec::new();
 
         loop {
             const MISSING_RBRACKET: &str = "to end this array literal";
@@ -1010,7 +1011,7 @@ impl Engine {
 
         array.shrink_to_fit();
 
-        Ok(Expr::Array(array.into(), settings.pos))
+        Ok(Expr::Array(array, settings.pos))
     }
 
     /// Parse a map literal.
@@ -1543,7 +1544,7 @@ impl Engine {
 
             // Interpolated string
             Token::InterpolatedString(..) => {
-                let mut segments = FnArgsVec::new_const();
+                let mut segments = ThinVec::new();
                 let settings = settings.level_up()?;
 
                 match input.next().unwrap() {
@@ -1601,7 +1602,7 @@ impl Engine {
                     Expr::StringConstant(state.get_interned_string(""), settings.pos)
                 } else {
                     segments.shrink_to_fit();
-                    Expr::InterpolatedString(segments.into(), settings.pos)
+                    Expr::InterpolatedString(segments, settings.pos)
                 }
             }
 
@@ -3883,7 +3884,7 @@ impl Engine {
 
         let fn_ptr = crate::FnPtr {
             name: fn_name,
-            curry: Vec::new(),
+            curry: ThinVec::new(),
             environ: None,
             #[cfg(not(feature = "no_function"))]
             fn_def: Some(script.clone()),

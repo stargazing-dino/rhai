@@ -381,7 +381,7 @@ mod f32_functions {
                 "Number raised to too large an index: {x} ** {y}"
             )))
         } else {
-            #[allow(clippy::cast_possible_truncation)]
+            #[allow(clippy::cast_possible_truncation, clippy::unnecessary_cast)]
             Ok(x.powi(y as i32))
         }
     }
