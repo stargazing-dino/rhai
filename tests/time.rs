@@ -118,5 +118,6 @@ fn test_timestamp_op() {
     );
 
     // Check edge case for crashes
+    #[cfg(not(feature = "unchecked"))]
     let _ = engine.run("timestamp()-24>>-60");
 }
