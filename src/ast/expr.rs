@@ -5,8 +5,8 @@ use crate::engine::KEYWORD_FN_PTR;
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
 use crate::{
-    calc_fn_hash, Dynamic, FnArgsVec, FnPtr, Identifier, ImmutableString, Position, SmartString,
-    StaticVec, INT,
+    calc_fn_hash, Dynamic, FnPtr, Identifier, ImmutableString, Position, SmartString, StaticVec,
+    INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -19,6 +19,7 @@ use std::{
     mem,
     num::{NonZeroU8, NonZeroUsize},
 };
+use thin_vec::ThinVec;
 
 /// _(internals)_ A binary expression.
 /// Exported under the `internals` feature only.
@@ -266,9 +267,9 @@ pub enum Expr {
     /// [String][ImmutableString] constant.
     StringConstant(ImmutableString, Position),
     /// An interpolated [string][ImmutableString].
-    InterpolatedString(Box<FnArgsVec<Expr>>, Position),
+    InterpolatedString(ThinVec<Expr>, Position),
     /// [ expr, ... ]
-    Array(Box<FnArgsVec<Expr>>, Position),
+    Array(ThinVec<Expr>, Position),
     /// #{ name:expr, ... }
     Map(
         Box<(StaticVec<(Ident, Expr)>, BTreeMap<Identifier, Dynamic>)>,

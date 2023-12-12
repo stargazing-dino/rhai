@@ -19,6 +19,7 @@ categories = ["no-std", "embedded", "wasm", "parser-implementations"]
 
 [dependencies]
 smallvec = { version = "1.7.0", default-features = false, features = ["union", "const_new", "const_generics"] }
+thin-vec = { version = "0.2.13", default-features = false }
 ahash = { version = "0.8.2", default-features = false, features = ["compile-time-rng"] }
 num-traits = { version = "0.2.0", default-features = false }
 once_cell = { version = "1.7.0", default-features = false, features = ["race"] }
@@ -68,6 +69,8 @@ internals = []
 debugging = ["internals"]
 ## Features and dependencies required by `bin` tools: `decimal`, `metadata`, `serde`, `debugging` and [`rustyline`](https://crates.io/crates/rustyline).
 bin-features = ["decimal", "metadata", "serde", "debugging", "rustyline"]
+## Enable fuzzing via the [`arbitrary`](https://crates.io/crates/arbitrary) crate.
+fuzz = ["arbitrary", "rust_decimal/rust-fuzz"]
 
 #! ### System Configuration Features
 

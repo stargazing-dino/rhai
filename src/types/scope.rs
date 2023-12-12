@@ -9,6 +9,7 @@ use std::{
     iter::{Extend, FromIterator},
     marker::PhantomData,
 };
+use thin_vec::ThinVec;
 
 /// Minimum number of entries in the [`Scope`] to avoid reallocations.
 pub const MIN_SCOPE_ENTRIES: usize = 8;
@@ -61,14 +62,14 @@ pub const MIN_SCOPE_ENTRIES: usize = 8;
 #[derive(Debug, Hash, Default)]
 pub struct Scope<'a> {
     /// Current value of the entry.
-    values: Vec<Dynamic>,
+    values: ThinVec<Dynamic>,
     /// Name of the entry.
-    names: Vec<ImmutableString>,
+    names: ThinVec<ImmutableString>,
     /// Aliases of the entry.
     ///
     /// This `Vec` is not filled until needed because aliases are used rarely
     /// (only for `export` statements).
-    aliases: Vec<Box<[ImmutableString]>>,
+    aliases: ThinVec<Box<[ImmutableString]>>,
     /// Phantom to keep the lifetime parameter in order not to break existing code.
     dummy: PhantomData<&'a ()>,
 }
@@ -176,11 +177,11 @@ impl Scope<'_> {
     /// ```
     #[inline(always)]
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            values: Vec::new(),
-            names: Vec::new(),
-            aliases: Vec::new(),
+            values: ThinVec::new(),
+            names: ThinVec::new(),
+            aliases: ThinVec::new(),
             dummy: PhantomData,
         }
     }
@@ -200,9 +201,9 @@ impl Scope<'_> {
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            values: Vec::with_capacity(capacity),
-            names: Vec::with_capacity(capacity),
-            aliases: Vec::new(),
+            values: ThinVec::with_capacity(capacity),
+            names: ThinVec::with_capacity(capacity),
+            aliases: ThinVec::new(),
             dummy: PhantomData,
         }
     }

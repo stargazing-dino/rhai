@@ -80,7 +80,7 @@ impl<'a> OptimizerState<'a> {
 
         #[cfg(not(feature = "no_function"))]
         {
-            _global.lib = _lib.to_vec();
+            _global.lib = _lib.into();
         }
 
         Self {

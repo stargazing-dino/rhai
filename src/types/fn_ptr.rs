@@ -18,13 +18,14 @@ use std::{
     mem,
     ops::{Index, IndexMut},
 };
+use thin_vec::ThinVec;
 
 /// A general function pointer, which may carry additional (i.e. curried) argument values
 /// to be passed onto a function during a call.
 #[derive(Clone)]
 pub struct FnPtr {
     pub(crate) name: ImmutableString,
-    pub(crate) curry: Vec<Dynamic>,
+    pub(crate) curry: ThinVec<Dynamic>,
     pub(crate) environ: Option<Shared<EncapsulatedEnviron>>,
     #[cfg(not(feature = "no_function"))]
     pub(crate) fn_def: Option<Shared<crate::ast::ScriptFnDef>>,
@@ -469,7 +470,7 @@ impl TryFrom<ImmutableString> for FnPtr {
         if is_valid_function_name(&value) {
             Ok(Self {
                 name: value,
-                curry: Vec::new(),
+                curry: ThinVec::new(),
                 environ: None,
                 #[cfg(not(feature = "no_function"))]
                 fn_def: None,
@@ -492,7 +493,7 @@ impl<T: Into<Shared<crate::ast::ScriptFnDef>>> From<T> for FnPtr {
 
         Self {
             name: fn_def.name.clone(),
-            curry: Vec::new(),
+            curry: ThinVec::new(),
             environ: None,
             fn_def: Some(fn_def),
         }

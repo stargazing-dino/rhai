@@ -73,7 +73,7 @@ pub fn search_scope_only<'s>(
             {
                 let val: Dynamic = crate::FnPtr {
                     name: v.3.clone(),
-                    curry: Vec::new(),
+                    curry: thin_vec::ThinVec::new(),
                     environ: None,
                     fn_def: Some(fn_def.clone()),
                 }
