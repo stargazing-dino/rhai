@@ -30,7 +30,8 @@ Fixes to bugs found via fuzzing
 * Fixed crash when parsing combo-chaining expressions such as `(a.b).c`.
 * Fixed crash when calling functions that have `Dynamic` parameters with more than 16 parameters.
 * Fixed crash when indexing into an empty array with negative index.
-* Indexing into an array with a negative index that is larger than the length of the array now returns an out-of-bounds error (similar to positive indices) instead of defaulting to the first element.
+* Indexing into an array with a negative index that is larger than the length of the array now throws an out-of-bounds error (similar to positive indices) instead of defaulting to the first element.
+* Fixed edge-case crash in timestamp functions.
 
 Enhancements
 ------------
