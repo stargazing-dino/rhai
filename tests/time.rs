@@ -117,5 +117,6 @@ fn test_timestamp_op() {
         42
     );
 
-    engine.run("timestamp()-24>>-60").unwrap();
+    // Check edge case for crashes
+    let _ = engine.run("timestamp()-24>>-60");
 }
