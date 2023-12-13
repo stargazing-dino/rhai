@@ -221,7 +221,7 @@ fn format_dynamic_as_json(result: &mut String, value: &Dynamic) {
             result.push(']');
         }
         #[cfg(not(feature = "no_closure"))]
-        Union::Shared(ref v, _, _) => format_dynamic_as_json(result, &*v.borrow()),
+        Union::Shared(ref v, _, _) => format_dynamic_as_json(result, &*crate::func::locked_read(v)),
         _ => write!(result, "{value:?}").unwrap(),
     }
 }

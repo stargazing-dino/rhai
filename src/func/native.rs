@@ -526,7 +526,7 @@ pub fn shared_take<T>(value: Shared<T>) -> T {
         .unwrap_or_else(|| panic!("`value` is shared (i.e. has outstanding references)"))
 }
 
-/// _(internals)_ Lock a [`Locked`] resource for mutable access.
+/// _(internals)_ Lock a [`Locked`] resource for immutable access.
 /// Exported under the `internals` feature only.
 #[inline(always)]
 #[must_use]
