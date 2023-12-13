@@ -218,6 +218,10 @@ fn test_map_json() {
                 .len(),
             11
         );
+
+        assert_eq!(engine.eval::<String>("#{a:[#{b:42}]}.to_json()").unwrap(), r#"{"a":[{"b":42}]}"#);
+        assert_eq!(engine.eval::<String>(r#"#{a:[Fn("abc")]}.to_json()"#).unwrap(), r#"{"a":["abc"]}"#);
+        assert_eq!(engine.eval::<String>(r#"#{a:[Fn("abc").curry(42).curry(123)]}.to_json()"#).unwrap(), r#"{"a":[["abc",42,123]]}"#);
     }
 
     engine.parse_json(json, true).unwrap();

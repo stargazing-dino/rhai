@@ -175,7 +175,7 @@ impl fmt::Debug for OpAssignment {
                 .field("pos", &self.pos)
                 .finish()
         } else {
-            fmt::Debug::fmt(&self.pos, f)
+            write!(f, "{} @ {:?}", Token::Equals, self.pos)
         }
     }
 }
