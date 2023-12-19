@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{borrow::Cow, cmp::Ordering, collections::BTreeMap};
+use thin_vec::ThinVec;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,8 +32,8 @@ struct FnParam<'a> {
 struct CustomTypeMetadata<'a> {
     pub type_name: &'a str,
     pub display_name: &'a str,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub doc_comments: Vec<&'a str>,
+    #[serde(default, skip_serializing_if = "ThinVec::is_empty")]
+    pub doc_comments: ThinVec<&'a str>,
 }
 
 impl PartialOrd for CustomTypeMetadata<'_> {
@@ -77,13 +78,13 @@ struct FnMetadata<'a> {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub this_type: Option<&'a str>,
     pub num_params: usize,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub params: Vec<FnParam<'a>>,
+    #[serde(default, skip_serializing_if = "ThinVec::is_empty")]
+    pub params: ThinVec<FnParam<'a>>,
     #[serde(default, skip_serializing_if = "str::is_empty")]
     pub return_type: Cow<'a, str>,
     pub signature: SmartString,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub doc_comments: Vec<&'a str>,
+    #[serde(default, skip_serializing_if = "ThinVec::is_empty")]
+    pub doc_comments: ThinVec<&'a str>,
 }
 
 impl PartialOrd for FnMetadata<'_> {
@@ -166,22 +167,22 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
 struct ModuleMetadata<'a> {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub modules: BTreeMap<&'a str, Self>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub custom_types: Vec<CustomTypeMetadata<'a>>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub functions: Vec<FnMetadata<'a>>,
+    #[serde(default, skip_serializing_if = "ThinVec::is_empty")]
+    pub custom_types: ThinVec<CustomTypeMetadata<'a>>,
+    #[serde(default, skip_serializing_if = "ThinVec::is_empty")]
+    pub functions: ThinVec<FnMetadata<'a>>,
     #[serde(default, skip_serializing_if = "str::is_empty")]
     pub doc: &'a str,
 }
 
 impl ModuleMetadata<'_> {
     #[inline(always)]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             doc: "",
             modules: BTreeMap::new(),
-            custom_types: Vec::new(),
-            functions: Vec::new(),
+            custom_types: ThinVec::new(),
+            functions: ThinVec::new(),
         }
     }
 }
@@ -196,10 +197,10 @@ impl<'a> From<&'a crate::Module> for ModuleMetadata<'a> {
         let mut custom_types = module
             .iter_custom_types()
             .map(Into::into)
-            .collect::<Vec<_>>();
+            .collect::<ThinVec<_>>();
         custom_types.sort();
 
-        let mut functions = module.iter_fn().map(Into::into).collect::<Vec<_>>();
+        let mut functions = module.iter_fn().map(Into::into).collect::<ThinVec<_>>();
         functions.sort();
 
         Self {

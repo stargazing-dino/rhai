@@ -32,6 +32,13 @@ Fixes to bugs found via fuzzing
 * Fixed crash when indexing into an empty array with negative index.
 * Indexing into an array with a negative index that is larger than the length of the array now throws an out-of-bounds error (similar to positive indices) instead of defaulting to the first element.
 * Fixed edge-case crash in timestamp functions.
+* Fixed crash when indenting a block doc-comment with Unicode multi-byte space characters.
+
+Other bug fixes
+---------------
+
+* Arrays in object maps now serialize to JSON correctly via `to_json()` when the `serde` feature is not enabled.
+* `Engine::format_map_as_json` now serializes arrays correctly.
 
 Enhancements
 ------------

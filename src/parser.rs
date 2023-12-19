@@ -68,7 +68,7 @@ pub struct ParseState<'e, 's> {
     pub frame_pointer: usize,
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
     #[cfg(not(feature = "no_closure"))]
-    pub external_vars: Vec<Ident>,
+    pub external_vars: ThinVec<Ident>,
     /// An indicator that, when set to `false`, disables variable capturing into externals one
     /// single time up until the nearest consumed Identifier token.
     ///
@@ -79,10 +79,10 @@ pub struct ParseState<'e, 's> {
     pub allow_capture: bool,
     /// Encapsulates a local stack with imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
-    pub imports: Vec<ImmutableString>,
+    pub imports: ThinVec<ImmutableString>,
     /// List of globally-imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
-    pub global_imports: Vec<ImmutableString>,
+    pub global_imports: ThinVec<ImmutableString>,
 }
 
 impl fmt::Debug for ParseState<'_, '_> {
@@ -123,7 +123,7 @@ impl<'e, 's> ParseState<'e, 's> {
             tokenizer_control,
             expr_filter: |_| true,
             #[cfg(not(feature = "no_closure"))]
-            external_vars: Vec::new(),
+            external_vars: ThinVec::new(),
             allow_capture: true,
             interned_strings,
             external_constants,
@@ -131,9 +131,9 @@ impl<'e, 's> ParseState<'e, 's> {
             stack: Scope::new(),
             frame_pointer: 0,
             #[cfg(not(feature = "no_module"))]
-            imports: Vec::new(),
+            imports: ThinVec::new(),
             #[cfg(not(feature = "no_module"))]
-            global_imports: Vec::new(),
+            global_imports: ThinVec::new(),
         }
     }
 
@@ -503,10 +503,13 @@ fn unindent_block_comment(comment: String, pos: usize) -> String {
         return comment;
     }
 
+    // Note, use `trim_start_matches` instead of `trim` because `trim` will remove even multi-byte
+    // Unicode spaces, which may cause the minimum offset to end up inside that multi-byte space
+    // character. Therefore, be conservative and only remove ASCII spaces.
     let offset = comment
         .lines()
         .skip(1)
-        .map(|s| s.len() - s.trim_start().len())
+        .map(|s| s.len() - s.trim_start_matches(' ').len())
         .min()
         .unwrap_or(pos)
         .min(pos);
@@ -1161,9 +1164,9 @@ impl Engine {
             }
         }
 
-        let mut expressions = Vec::<ConditionalExpr>::new();
+        let mut expressions = ThinVec::<ConditionalExpr>::new();
         let mut cases = StraightHashMap::<CaseBlocksList>::default();
-        let mut ranges = Vec::<RangeCase>::new();
+        let mut ranges = ThinVec::<RangeCase>::new();
         let mut def_case = None;
         let mut def_case_pos = Position::NONE;
 
@@ -3795,6 +3798,8 @@ impl Engine {
         settings: ParseSettings,
         _parent: &mut ParseState,
     ) -> ParseResult<(Expr, Shared<ScriptFnDef>)> {
+        use core::iter::FromIterator;
+
         let settings = settings.level_up()?;
         let mut params_list = StaticVec::<ImmutableString>::new_const();
 
@@ -3850,7 +3855,7 @@ impl Engine {
                 FnArgsVec::new_const(),
             )
         } else {
-            let externals: FnArgsVec<_> = state.external_vars.clone().into();
+            let externals = FnArgsVec::from_iter(state.external_vars.iter().cloned());
 
             let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
             params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));

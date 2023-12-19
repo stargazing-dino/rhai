@@ -17,6 +17,7 @@ use std::{
     num::NonZeroUsize,
     ops::{Range, RangeInclusive},
 };
+use thin_vec::ThinVec;
 
 /// _(internals)_ An op-assignment operator.
 /// Exported under the `internals` feature only.
@@ -174,7 +175,7 @@ impl fmt::Debug for OpAssignment {
                 .field("pos", &self.pos)
                 .finish()
         } else {
-            fmt::Debug::fmt(&self.pos, f)
+            write!(f, "{} @ {:?}", Token::Equals, self.pos)
         }
     }
 }
@@ -379,11 +380,11 @@ pub type CaseBlocksList = smallvec::SmallVec<[usize; 2]>;
 #[derive(Debug, Clone)]
 pub struct SwitchCasesCollection {
     /// List of [`ConditionalExpr`]'s.
-    pub expressions: Vec<ConditionalExpr>,
+    pub expressions: ThinVec<ConditionalExpr>,
     /// Dictionary mapping value hashes to [`ConditionalExpr`]'s.
     pub cases: StraightHashMap<CaseBlocksList>,
     /// List of range cases.
-    pub ranges: Vec<RangeCase>,
+    pub ranges: ThinVec<RangeCase>,
     /// Statements block for the default case (there can be no condition for the default case).
     pub def_case: Option<usize>,
 }

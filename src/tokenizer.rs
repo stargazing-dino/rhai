@@ -1221,7 +1221,7 @@ pub fn parse_string_literal(
     let mut first_char = Position::NONE;
     let mut interpolated = false;
     #[cfg(not(feature = "no_position"))]
-    let mut skip_whitespace_until = 0;
+    let mut skip_space_until = 0;
 
     state.is_within_text_terminated_by = Some(termination_char);
     if let Some(ref mut last) = state.last_token {
@@ -1301,6 +1301,16 @@ pub fn parse_string_literal(
         match next_char {
             // \r - ignore if followed by \n
             '\r' if stream.peek_next().map_or(false, |ch| ch == '\n') => (),
+            // \r
+            'r' if !escape.is_empty() => {
+                escape.clear();
+                result.push('\r');
+            }
+            // \n
+            'n' if !escape.is_empty() => {
+                escape.clear();
+                result.push('\n');
+            }
             // \...
             '\\' if !verbatim && escape.is_empty() => {
                 escape.push('\\');
@@ -1314,16 +1324,6 @@ pub fn parse_string_literal(
             't' if !escape.is_empty() => {
                 escape.clear();
                 result.push('\t');
-            }
-            // \n
-            'n' if !escape.is_empty() => {
-                escape.clear();
-                result.push('\n');
-            }
-            // \r
-            'r' if !escape.is_empty() => {
-                escape.clear();
-                result.push('\r');
             }
             // \x??, \u????, \U????????
             ch @ ('x' | 'u' | 'U') if !escape.is_empty() => {
@@ -1363,16 +1363,16 @@ pub fn parse_string_literal(
             }
 
             // \{termination_char} - escaped
-            _ if termination_char == next_char && !escape.is_empty() => {
+            ch if termination_char == ch && !escape.is_empty() => {
                 escape.clear();
-                result.push(next_char);
+                result.push(termination_char);
             }
 
             // Verbatim
             '\n' if verbatim => {
                 debug_assert_eq!(escape, "", "verbatim strings should not have any escapes");
                 pos.new_line();
-                result.push(next_char);
+                result.push('\n');
             }
 
             // Line continuation
@@ -1384,7 +1384,7 @@ pub fn parse_string_literal(
                 #[cfg(not(feature = "no_position"))]
                 {
                     let start_position = start.position().unwrap();
-                    skip_whitespace_until = start_position + 1;
+                    skip_space_until = start_position + 1;
                 }
             }
 
@@ -1396,24 +1396,24 @@ pub fn parse_string_literal(
             }
 
             // Unknown escape sequence
-            _ if !escape.is_empty() => {
-                escape.push(next_char);
+            ch if !escape.is_empty() => {
+                escape.push(ch);
 
                 return Err((LERR::MalformedEscapeSequence(escape.to_string()), *pos));
             }
 
             // Whitespace to skip
             #[cfg(not(feature = "no_position"))]
-            _ if next_char.is_whitespace() && pos.position().unwrap() < skip_whitespace_until => (),
+            ch if " \t".contains(ch) && pos.position().unwrap() < skip_space_until => (),
 
             // All other characters
-            _ => {
+            ch => {
                 escape.clear();
-                result.push(next_char);
+                result.push(ch);
 
                 #[cfg(not(feature = "no_position"))]
                 {
-                    skip_whitespace_until = 0;
+                    skip_space_until = 0;
                 }
             }
         }
@@ -1586,9 +1586,6 @@ fn get_next_token_inner(
 
         // Identifiers and strings that can have non-ASCII characters
         match (c, cc) {
-            // \n
-            ('\n', ..) => pos.new_line(),
-
             // digit ...
             ('0'..='9', ..) => {
                 let mut result = SmartString::new_const();
@@ -1602,7 +1599,7 @@ fn get_next_token_inner(
                             stream.eat_next_and_advance(pos);
                         }
                         ch if valid(ch) => {
-                            result.push(next_char);
+                            result.push(ch);
                             stream.eat_next_and_advance(pos);
                         }
                         #[cfg(any(not(feature = "no_float"), feature = "decimal"))]
@@ -1613,28 +1610,28 @@ fn get_next_token_inner(
                             match stream.peek_next() {
                                 // digits after period - accept the period
                                 Some('0'..='9') => {
-                                    result.push(next_char);
+                                    result.push('.');
                                     pos.advance();
                                 }
                                 // _ - cannot follow a decimal point
                                 Some(NUMBER_SEPARATOR) => {
-                                    stream.unget(next_char);
+                                    stream.unget('.');
                                     break;
                                 }
                                 // .. - reserved symbol, not a floating-point number
                                 Some('.') => {
-                                    stream.unget(next_char);
+                                    stream.unget('.');
                                     break;
                                 }
                                 // symbol after period - probably a float
                                 Some(ch) if !is_id_first_alphabetic(ch) => {
-                                    result.push(next_char);
+                                    result.push('.');
                                     pos.advance();
                                     result.push('0');
                                 }
                                 // Not a floating-point number
                                 _ => {
-                                    stream.unget(next_char);
+                                    stream.unget('.');
                                     break;
                                 }
                             }
@@ -1647,19 +1644,19 @@ fn get_next_token_inner(
                             match stream.peek_next() {
                                 // digits after e - accept the e
                                 Some('0'..='9') => {
-                                    result.push(next_char);
+                                    result.push('e');
                                     pos.advance();
                                 }
                                 // +/- after e - accept the e and the sign
                                 Some('+' | '-') => {
-                                    result.push(next_char);
+                                    result.push('e');
                                     pos.advance();
                                     result.push(stream.get_next().unwrap());
                                     pos.advance();
                                 }
                                 // Not a floating-point number
                                 _ => {
-                                    stream.unget(next_char);
+                                    stream.unget('e');
                                     break;
                                 }
                             }
@@ -1668,7 +1665,7 @@ fn get_next_token_inner(
                         ch @ ('x' | 'o' | 'b' | 'X' | 'O' | 'B')
                             if c == '0' && result.len() <= 1 =>
                         {
-                            result.push(next_char);
+                            result.push(ch);
                             stream.eat_next_and_advance(pos);
 
                             valid = match ch {
@@ -2218,7 +2215,11 @@ fn get_next_token_inner(
                 return parse_identifier_token(stream, state, pos, start_pos, c);
             }
 
-            _ if c.is_whitespace() => (),
+            // \n
+            ('\n', ..) => pos.new_line(),
+
+            // Whitespace
+            (' ' | '\t' | '\r', ..) => (),
 
             _ => {
                 return (

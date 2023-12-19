@@ -1526,9 +1526,18 @@ pub mod array_functions {
     ///
     /// ## Return Value
     ///
-    /// * Any integer > 0 if `element1 > element2`
-    /// * Zero if `element1 == element2`
-    /// * Any integer < 0 if `element1 < element2`
+    /// An integer number:
+    ///
+    /// * Any positive integer if `element1 > element2`
+    /// * 0 if `element1 == element2`
+    /// * Any negative integer if `element1 < element2`
+    ///
+    /// or a boolean value:
+    ///
+    /// * `true` if `element1 <= element2`
+    /// * `false` if `element1 > element2`
+    ///
+    /// Any other return value type will yield unpredictable order.
     ///
     /// # Example
     ///
@@ -1549,7 +1558,11 @@ pub mod array_functions {
             comparer
                 .call_raw(&ctx, None, [x.clone(), y.clone()])
                 .ok()
-                .and_then(|v| v.as_int().ok())
+                .and_then(|v| {
+                    v.as_int()
+                        .or_else(|_| v.as_bool().map(|v| v.then_some(-1).unwrap_or(1)))
+                        .ok()
+                })
                 .map_or_else(
                     || x.type_id().cmp(&y.type_id()),
                     |v| match v {

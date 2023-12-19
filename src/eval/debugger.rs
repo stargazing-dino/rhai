@@ -7,6 +7,7 @@ use crate::{Dynamic, Engine, EvalAltResult, ImmutableString, Position, RhaiResul
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{fmt, iter::repeat, mem};
+use thin_vec::ThinVec;
 
 /// Callback function to initialize the debugger.
 #[cfg(not(feature = "sync"))]
@@ -216,7 +217,7 @@ pub struct CallStackFrame {
     /// Function name.
     pub fn_name: ImmutableString,
     /// Copies of function call arguments, if any.
-    pub args: Vec<Dynamic>,
+    pub args: ThinVec<Dynamic>,
     /// Source of the function.
     pub source: Option<ImmutableString>,
     /// [Position][`Position`] of the function call.
@@ -252,7 +253,7 @@ pub struct Debugger {
     /// The current set of break-points.
     break_points: Vec<BreakPoint>,
     /// The current function call stack.
-    call_stack: Vec<CallStackFrame>,
+    call_stack: ThinVec<CallStackFrame>,
     /// The current state.
     state: Dynamic,
 }
@@ -261,11 +262,11 @@ impl Debugger {
     /// Create a new [`Debugger`].
     #[inline(always)]
     #[must_use]
-    pub const fn new(status: DebuggerStatus) -> Self {
+    pub fn new(status: DebuggerStatus) -> Self {
         Self {
             status,
             break_points: Vec::new(),
-            call_stack: Vec::new(),
+            call_stack: ThinVec::new(),
             state: Dynamic::UNIT,
         }
     }

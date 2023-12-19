@@ -370,14 +370,7 @@ impl Dynamic {
             Union::Variant(ref v, ..) => (***v).type_name(),
 
             #[cfg(not(feature = "no_closure"))]
-            #[cfg(not(feature = "sync"))]
-            Union::Shared(ref cell, ..) => cell
-                .try_borrow()
-                .map(|v| (*v).type_name())
-                .unwrap_or("<shared>"),
-            #[cfg(not(feature = "no_closure"))]
-            #[cfg(feature = "sync")]
-            Union::Shared(ref cell, ..) => (*cell.read().unwrap()).type_name(),
+            Union::Shared(ref cell, ..) => (*crate::func::locked_read(cell)).type_name(),
         }
     }
 }
