@@ -503,10 +503,13 @@ fn unindent_block_comment(comment: String, pos: usize) -> String {
         return comment;
     }
 
+    // Note, use `trim_start_matches` instead of `trim` because `trim` will remove even multi-byte
+    // Unicode spaces, which may cause the minimum offset to end up inside that multi-byte space
+    // character. Therefore, be conservative and only remove ASCII spaces.
     let offset = comment
         .lines()
         .skip(1)
-        .map(|s| s.len() - s.trim_start().len())
+        .map(|s| s.len() - s.trim_start_matches(' ').len())
         .min()
         .unwrap_or(pos)
         .min(pos);
