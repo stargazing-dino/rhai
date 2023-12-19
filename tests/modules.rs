@@ -512,9 +512,9 @@ fn test_module_file() {
     let ast = engine
         .compile(
             r#"
-            import "scripts/module";
-            print("top");
-        "#,
+                import "scripts/module";
+                print("top");
+            "#,
         )
         .unwrap();
     Module::eval_ast_as_new(Scope::new(), &ast, &engine).unwrap();
