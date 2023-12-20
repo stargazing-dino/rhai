@@ -1362,20 +1362,14 @@ pub fn parse_string_literal(
                 );
             }
 
-            // \{termination_char} - escaped
-            ch if termination_char == ch && !escape.is_empty() => {
-                escape.clear();
-                result.push(termination_char);
-            }
-
-            // Verbatim
+            // LF - Verbatim
             '\n' if verbatim => {
                 debug_assert_eq!(escape, "", "verbatim strings should not have any escapes");
                 pos.new_line();
                 result.push('\n');
             }
 
-            // Line continuation
+            // LF - Line continuation
             '\n' if allow_line_continuation && !escape.is_empty() => {
                 debug_assert_eq!(escape, "\\", "unexpected escape {escape} at end of line");
                 escape.clear();
@@ -1388,11 +1382,17 @@ pub fn parse_string_literal(
                 }
             }
 
-            // Unterminated string
+            // LF - Unterminated string
             '\n' => {
                 pos.rewind();
                 state.is_within_text_terminated_by = None;
                 return Err((LERR::UnterminatedString, start));
+            }
+
+            // \{termination_char} - escaped termination character
+            ch if termination_char == ch && !escape.is_empty() => {
+                escape.clear();
+                result.push(termination_char);
             }
 
             // Unknown escape sequence
@@ -1404,7 +1404,7 @@ pub fn parse_string_literal(
 
             // Whitespace to skip
             #[cfg(not(feature = "no_position"))]
-            ch if " \t".contains(ch) && pos.position().unwrap() < skip_space_until => (),
+            ch if ch.is_whitespace() && pos.position().unwrap() < skip_space_until => (),
 
             // All other characters
             ch => {
@@ -2218,8 +2218,8 @@ fn get_next_token_inner(
             // \n
             ('\n', ..) => pos.new_line(),
 
-            // Whitespace - follows JavaScript's SPACE, TAB, CR, V-TAB, FF
-            (' ' | '\t' | '\r' | '\x0b' | '\x0c', ..) => (),
+            // Whitespace - follows Rust's SPACE, TAB, CR, LF, FF which is the same as WhatWG.
+            (ch, ..) if ch.is_ascii_whitespace() => (),
 
             _ => {
                 return (
