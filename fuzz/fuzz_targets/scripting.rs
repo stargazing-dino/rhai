@@ -24,7 +24,7 @@ fuzz_target!(|ctx: Ctx| {
     engine.set_optimization_level(ctx.optimization_level);
 
     // Limit the length of scripts.
-    let script = &ctx.script[..(ctx.script.len().min(32 * 1020))];
+    let script = ctx.script.chars().take(32 * 1024).collect::<String>();
 
     // We need fuzzing to be fast, so we'll stop executing after 1s.
     let start = Instant::now();
@@ -32,5 +32,5 @@ fuzz_target!(|ctx: Ctx| {
 
     let engine = engine;
 
-    _ = engine.run(script);
+    _ = engine.run(&script);
 });

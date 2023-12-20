@@ -2218,8 +2218,8 @@ fn get_next_token_inner(
             // \n
             ('\n', ..) => pos.new_line(),
 
-            // Whitespace
-            (' ' | '\t' | '\r', ..) => (),
+            // Whitespace - follows JavaScript's SPACE, TAB, CR, V-TAB, FF
+            (' ' | '\t' | '\r' | '\x0b' | '\x0c', ..) => (),
 
             _ => {
                 return (
