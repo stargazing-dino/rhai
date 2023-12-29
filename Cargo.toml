@@ -124,6 +124,9 @@ stdweb = ["getrandom/js", "instant/stdweb"]
 
 #! ### Features used in testing environments only
 
+## Compiled with a non-stable compiler (i.e. beta or nightly)
+unstable = []
+
 ## Running under a testing environment.
 testing-environ = []
 
