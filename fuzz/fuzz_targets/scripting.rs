@@ -39,5 +39,47 @@ fuzz_target!(|ctx: Ctx| {
 
     let engine = engine;
 
-    _ = engine.run(&script);
+    match engine.eval::<Dynamic>(&script) {
+        Ok(val) => {
+            if val.is_array() {
+                _ = black_box(val.clone().into_array().unwrap());
+            }
+            if val.is_blob() {
+                _ = black_box(val.clone().into_blob().unwrap());
+            }
+            if val.is_bool() {
+                _ = black_box(val.clone().as_bool().unwrap());
+            }
+            if val.is_char() {
+                _ = black_box(val.clone().as_char().unwrap());
+            }
+            if val.is_decimal() {
+                _ = black_box(val.clone().as_decimal().unwrap());
+            }
+            if val.is_float() {
+                _ = black_box(val.clone().as_float().unwrap());
+            }
+            if val.is_int() {
+                _ = black_box(val.clone().as_int().unwrap());
+            }
+            if val.is_string() {
+                _ = black_box(val.clone().into_string().unwrap());
+                _ = black_box(val.clone().into_immutable_string().unwrap());
+            }
+            if val.is_timestamp() {
+                _ = black_box(val.clone().try_cast::<rhai::Instant>().unwrap());
+            }
+            _ = black_box(val.is_decimal());
+            _ = black_box(val.is_locked());
+            _ = black_box(val.is_map());
+            _ = black_box(val.is_read_only());
+            _ = black_box(val.is_shared());
+            _ = black_box(val.is_unit());
+            _ = black_box(val.is_variant());
+            _ = black_box(val.type_name());
+            _ = black_box(val.type_id());
+            _ = black_box(val.tag());
+        }
+        Err(e) => _ = black_box(format!("{e}")),
+    }
 });
