@@ -8,6 +8,7 @@ edition = "2018"
 cargo-fuzz = true
 
 [dependencies]
+anyhow = "1.0.78"
 arbitrary = { version = "1.3.2", features = ["derive"] }
 libfuzzer-sys = "0.4"
 rhai = { path = "..", features = ["fuzz", "decimal", "metadata", "debugging"] }
@@ -22,5 +23,11 @@ debug = 1
 [[bin]]
 name = "scripting"
 path = "fuzz_targets/scripting.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "ast"
+path = "fuzz_targets/ast.rs"
 test = false
 doc = false
