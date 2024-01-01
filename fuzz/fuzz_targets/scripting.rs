@@ -3,12 +3,16 @@ use rhai::{Dynamic, Engine, OptimizationLevel};
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
+use rhai::Scope;
+use std::collections::HashMap;
 use std::{hint::black_box, time::Instant};
 
 #[derive(Debug, Clone, Arbitrary)]
 struct Ctx<'a> {
     script: &'a str,
     optimization_level: OptimizationLevel,
+    scoped_constants: HashMap<&'a str, i64>,
+    scoped_vars: HashMap<&'a str, i64>,
 }
 
 fuzz_target!(|ctx: Ctx| {
@@ -39,7 +43,16 @@ fuzz_target!(|ctx: Ctx| {
 
     let engine = engine;
 
-    match engine.eval::<Dynamic>(&script) {
+    let mut scope = Scope::new();
+    for (var_name, value) in ctx.scoped_constants.into_iter() {
+        scope.push_constant(var_name, value);
+    }
+
+    for (var_name, value) in ctx.scoped_vars.into_iter() {
+        scope.set_or_push(var_name, value);
+    }
+
+    match engine.eval_with_scope::<Dynamic>(&mut scope, &script) {
         Ok(val) => {
             if val.is_array() {
                 _ = black_box(val.clone().into_array().unwrap());
@@ -82,4 +95,12 @@ fuzz_target!(|ctx: Ctx| {
         }
         Err(e) => _ = black_box(format!("{e}")),
     }
+    _ = black_box(format!("{scope}"));
+    _ = black_box(scope.clone().into_iter().count());
+    _ = black_box(scope.iter().count());
+    _ = black_box((&scope).into_iter().count());
+    if !scope.is_empty() {
+        _ = black_box(scope.pop());
+    }
+    _ = black_box(scope.clone_visible());
 });
