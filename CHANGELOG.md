@@ -34,6 +34,8 @@ Fixes to bugs found via fuzzing
 * Indexing into an array with a negative index that is larger than the length of the array now throws an out-of-bounds error (similar to positive indices) instead of defaulting to the first element.
 * Fixed edge-case crash in timestamp functions.
 * Fixed crash when indenting a block doc-comment with Unicode multi-byte space characters.
+* Fixed improper parsing of numbers with too many decimal points.
+* Fixed exponential running time when raising a decimal number to a very large power (> 1 million) -- it now returns an overflow error.
 
 Other bug fixes
 ---------------
