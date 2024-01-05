@@ -503,20 +503,23 @@ impl fmt::Display for Dynamic {
             }
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => {
+                #[cfg(feature = "no_std")]
+                use hashbrown::HashSet;
+                #[cfg(not(feature = "no_std"))]
+                use std::collections::HashSet;
+
                 // Avoid infinite recursion for shared values in a reference loop.
                 fn display_fmt(
                     value: &Dynamic,
                     f: &mut fmt::Formatter<'_>,
-                    dict: &mut std::collections::HashSet<*const Dynamic>,
+                    dict: &mut HashSet<*const Dynamic>,
                 ) -> fmt::Result {
-                    let not_existing = dict.insert(value);
-
                     match value.0 {
                         #[cfg(not(feature = "no_closure"))]
                         #[cfg(not(feature = "sync"))]
                         Union::Shared(ref cell, ..) => match cell.try_borrow() {
                             Ok(v) => {
-                                if not_existing {
+                                if dict.insert(value) {
                                     display_fmt(&*v, f, dict)?;
                                     f.write_str(" (shared)")
                                 } else {
@@ -530,7 +533,7 @@ impl fmt::Display for Dynamic {
                         Union::Shared(ref cell, ..) => {
                             let v = cell.read().unwrap();
 
-                            if not_existing {
+                            if dict.insert(value) {
                                 display_fmt(&*v, f, dict)
                             } else {
                                 f.write_str("<shared>")
@@ -538,6 +541,8 @@ impl fmt::Display for Dynamic {
                         }
                         #[cfg(not(feature = "no_index"))]
                         Union::Array(ref arr, ..) => {
+                            dict.insert(value);
+
                             f.write_str("[")?;
                             for (i, v) in arr.iter().enumerate() {
                                 if i > 0 {
@@ -549,6 +554,8 @@ impl fmt::Display for Dynamic {
                         }
                         #[cfg(not(feature = "no_object"))]
                         Union::Map(ref map, ..) => {
+                            dict.insert(value);
+
                             f.write_str("#{")?;
                             for (i, (k, v)) in map.iter().enumerate() {
                                 if i > 0 {
@@ -674,20 +681,23 @@ impl fmt::Debug for Dynamic {
             }
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => {
+                #[cfg(feature = "no_std")]
+                use hashbrown::HashSet;
+                #[cfg(not(feature = "no_std"))]
+                use std::collections::HashSet;
+
                 // Avoid infinite recursion for shared values in a reference loop.
                 fn debug_fmt(
                     value: &Dynamic,
                     f: &mut fmt::Formatter<'_>,
-                    dict: &mut std::collections::HashSet<*const Dynamic>,
+                    dict: &mut HashSet<*const Dynamic>,
                 ) -> fmt::Result {
-                    let not_existing = dict.insert(value);
-
                     match value.0 {
                         #[cfg(not(feature = "no_closure"))]
                         #[cfg(not(feature = "sync"))]
                         Union::Shared(ref cell, ..) => match cell.try_borrow() {
                             Ok(v) => {
-                                if not_existing {
+                                if dict.insert(value) {
                                     debug_fmt(&*v, f, dict)?;
                                     f.write_str(" (shared)")
                                 } else {
@@ -701,7 +711,7 @@ impl fmt::Debug for Dynamic {
                         Union::Shared(ref cell, ..) => {
                             let v = cell.read().unwrap();
 
-                            if not_existing {
+                            if dict.insert(value) {
                                 debug_fmt(&*v, f, dict)?;
                                 f.write_str(" (shared)")
                             } else {
@@ -710,6 +720,8 @@ impl fmt::Debug for Dynamic {
                         }
                         #[cfg(not(feature = "no_index"))]
                         Union::Array(ref arr, ..) => {
+                            dict.insert(value);
+
                             f.write_str("[")?;
                             for (i, v) in arr.iter().enumerate() {
                                 if i > 0 {
@@ -721,6 +733,8 @@ impl fmt::Debug for Dynamic {
                         }
                         #[cfg(not(feature = "no_object"))]
                         Union::Map(ref map, ..) => {
+                            dict.insert(value);
+
                             f.write_str("#{")?;
                             for (i, (k, v)) in map.iter().enumerate() {
                                 if i > 0 {
@@ -733,6 +747,8 @@ impl fmt::Debug for Dynamic {
                             f.write_str("}")
                         }
                         Union::FnPtr(ref fnptr, ..) => {
+                            dict.insert(value);
+
                             f.write_str("Fn")?;
                             #[cfg(not(feature = "no_function"))]
                             if fnptr.fn_def.is_some() {
