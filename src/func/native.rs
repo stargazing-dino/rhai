@@ -445,6 +445,7 @@ impl<'a> NativeCallContext<'a> {
                     calc_fn_hash(None, fn_name, args_len),
                     args,
                     is_ref_mut,
+                    false,
                     Position::NONE,
                 )
                 .map(|(r, ..)| r);

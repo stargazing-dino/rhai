@@ -46,6 +46,12 @@ impl Hash for FnPtr {
     }
 }
 
+impl fmt::Display for FnPtr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Fn({})", self.fn_name())
+    }
+}
+
 impl fmt::Debug for FnPtr {
     #[cold]
     #[inline(never)]
@@ -453,12 +459,6 @@ impl FnPtr {
                     Position::NONE,
                 ))
             })
-    }
-}
-
-impl fmt::Display for FnPtr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Fn({})", self.fn_name())
     }
 }
 

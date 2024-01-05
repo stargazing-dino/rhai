@@ -3,7 +3,7 @@ Rhai - Embedded Scripting for Rust
 
 ![GitHub last commit](https://img.shields.io/github/last-commit/rhaiscript/rhai?logo=github)
 [![Build Status](https://github.com/rhaiscript/rhai/workflows/Build/badge.svg)](https://github.com/rhaiscript/rhai/actions)
-[![Stars](https://img.shields.io/github/stars/rhaiscript/rhai?logo=github)](https://github.com/rhaiscript/rhai)
+[![Stars](https://img.shields.io/github/stars/rhaiscript/rhai?style=flat&logo=github)](https://github.com/rhaiscript/rhai)
 [![License](https://img.shields.io/crates/l/rhai)](https://github.com/license/rhaiscript/rhai)
 [![crates.io](https://img.shields.io/crates/v/rhai?logo=rust)](https://crates.io/crates/rhai/)
 [![crates.io](https://img.shields.io/crates/d/rhai?logo=rust)](https://crates.io/crates/rhai/)

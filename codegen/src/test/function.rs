@@ -286,6 +286,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn is_volatile(&self) -> bool { false }
                     #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]
@@ -326,6 +327,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn is_volatile(&self) -> bool { false }
                     #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]
@@ -366,6 +368,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn is_volatile(&self) -> bool { false }
                     #[inline(always)] fn has_context(&self) -> bool { true }
                 }
                 #[allow(unused)]
@@ -408,6 +411,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn is_volatile(&self) -> bool { false }
                     #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]
@@ -443,6 +447,7 @@ mod generate_tests {
 
                 #[inline(always)] fn is_method_call(&self) -> bool { false }
                 #[inline(always)] fn is_pure(&self) -> bool { true }
+                #[inline(always)] fn is_volatile(&self) -> bool { false }
                 #[inline(always)] fn has_context(&self) -> bool { false }
             }
         };
@@ -478,6 +483,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn is_volatile(&self) -> bool { false }
                     #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]
@@ -519,6 +525,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { true }
                     #[inline(always)] fn is_pure(&self) -> bool { false }
+                    #[inline(always)] fn is_volatile(&self) -> bool { false }
                     #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]
@@ -560,6 +567,7 @@ mod generate_tests {
 
                     #[inline(always)] fn is_method_call(&self) -> bool { false }
                     #[inline(always)] fn is_pure(&self) -> bool { true }
+                    #[inline(always)] fn is_volatile(&self) -> bool { false }
                     #[inline(always)] fn has_context(&self) -> bool { false }
                 }
                 #[allow(unused)]

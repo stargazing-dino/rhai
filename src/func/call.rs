@@ -281,6 +281,7 @@ impl Engine {
                                                 func: Shared::new(f),
                                                 has_context,
                                                 is_pure: false,
+                                                is_volatile: false,
                                             },
                                             source: None,
                                         })
@@ -291,6 +292,7 @@ impl Engine {
                                             func: Shared::new(f),
                                             has_context,
                                             is_pure: true,
+                                            is_volatile: false,
                                         },
                                         source: None,
                                     }),
@@ -346,6 +348,7 @@ impl Engine {
         hash: u64,
         args: &mut FnCallArgs,
         is_ref_mut: bool,
+        non_volatile_only: bool,
         pos: Position,
     ) -> RhaiResultOf<(Dynamic, bool)> {
         self.track_operation(global, pos)?;
@@ -357,6 +360,11 @@ impl Engine {
 
         if let Some(FnResolutionCacheEntry { func, source }) = func {
             debug_assert!(func.is_native());
+
+            if non_volatile_only && func.is_volatile() {
+                let gen_fn_call_signature = self.gen_fn_call_signature(name, args);
+                return Err(ERR::ErrorFunctionNotFound(gen_fn_call_signature, pos).into());
+            }
 
             let is_method = func.is_method();
 
@@ -674,7 +682,7 @@ impl Engine {
         let hash = hashes.native();
 
         self.exec_native_fn_call(
-            global, caches, fn_name, op_token, hash, args, is_ref_mut, pos,
+            global, caches, fn_name, op_token, hash, args, is_ref_mut, false, pos,
         )
     }
 

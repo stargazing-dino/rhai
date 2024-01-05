@@ -41,6 +41,10 @@ pub enum CallableFunction {
         has_context: bool,
         /// This is a dummy field and is not used.
         is_pure: bool,
+        /// Is this function volatile?
+        ///
+        /// A volatile function does not guarantee the same result for the same input(s).
+        is_volatile: bool,
     },
     /// A native Rust object method with the first argument passed by reference,
     /// and the rest passed by value.
@@ -51,6 +55,10 @@ pub enum CallableFunction {
         has_context: bool,
         /// Allow operating on constants?
         is_pure: bool,
+        /// Is this function volatile?
+        ///
+        /// A volatile function does not guarantee the same result for the same input(s).
+        is_volatile: bool,
     },
     /// An iterator function.
     Iterator {
@@ -198,6 +206,24 @@ impl CallableFunction {
             Self::Iterator { .. } => false,
             #[cfg(not(feature = "no_function"))]
             Self::Script { .. } => false,
+        }
+    }
+    /// Is this function volatile?
+    ///
+    /// A volatile function does not guarantee the same result for the same input(s).
+    #[inline]
+    #[must_use]
+    pub fn is_volatile(&self) -> bool {
+        match self {
+            Self::Pure { is_volatile, .. } => *is_volatile,
+            Self::Method { is_volatile, .. } => *is_volatile,
+            Self::Iterator { .. } => true,
+
+            Self::Plugin { func, .. } => func.is_volatile(),
+
+            // Scripts are assumed to be volatile -- it can be calling volatile native functions.
+            #[cfg(not(feature = "no_function"))]
+            Self::Script { .. } => true,
         }
     }
     /// Get the access mode.

@@ -36,12 +36,18 @@ Fixes to bugs found via fuzzing
 * Fixed crash when indenting a block doc-comment with Unicode multi-byte space characters.
 * Fixed improper parsing of numbers with too many decimal points.
 * Fixed exponential running time when raising a decimal number to a very large power (> 1 million) -- it now returns an overflow error.
+* Shared values that contain reference loops no longer cause a stack overflow when printing.
 
 Other bug fixes
 ---------------
 
 * Arrays in object maps now serialize to JSON correctly via `to_json()` when the `serde` feature is not enabled.
 * `Engine::format_map_as_json` now serializes arrays correctly.
+
+New features
+------------
+
+* Functions defined in plugin modules can now be marked as `volatile` which prevents it from being optimized away even under `OptimizationLevel::Full`.
 
 Enhancements
 ------------

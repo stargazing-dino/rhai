@@ -91,6 +91,7 @@ pub struct ExportedFnParams {
     pub name: Vec<String>,
     pub return_raw: Option<Span>,
     pub pure: Option<Span>,
+    pub volatile: Option<Span>,
     pub skip: bool,
     pub special: FnSpecialAccess,
     pub namespace: FnNamespaceAccess,
@@ -130,6 +131,7 @@ impl ExportedParams for ExportedFnParams {
         let mut name = Vec::new();
         let mut return_raw = None;
         let mut pure = None;
+        let mut volatile = None;
         let mut skip = false;
         let mut namespace = FnNamespaceAccess::Unset;
         let mut special = FnSpecialAccess::None;
@@ -186,6 +188,7 @@ impl ExportedParams for ExportedFnParams {
                 }
 
                 ("pure", None) => pure = Some(item_span),
+                ("volatile", None) => volatile = Some(item_span),
                 ("return_raw", None) => return_raw = Some(item_span),
                 ("skip", None) => skip = true,
                 ("global", None) => match namespace {
@@ -255,6 +258,7 @@ impl ExportedParams for ExportedFnParams {
             name,
             return_raw,
             pure,
+            volatile,
             skip,
             special,
             namespace,
@@ -664,6 +668,7 @@ impl ExportedFn {
         let arg_count = self.arg_count();
         let is_method_call = self.mutable_receiver();
         let is_pure = !self.mutable_receiver() || self.params().pure.is_some();
+        let is_volatile = self.params().volatile.is_some();
         let pass_context = self.pass_context;
 
         let mut unpack_statements = Vec::new();
@@ -858,6 +863,7 @@ impl ExportedFn {
 
                 #[inline(always)] fn is_method_call(&self) -> bool { #is_method_call }
                 #[inline(always)] fn is_pure(&self) -> bool { #is_pure }
+                #[inline(always)] fn is_volatile(&self) -> bool { #is_volatile }
                 #[inline(always)] fn has_context(&self) -> bool { #pass_context }
             }
         }

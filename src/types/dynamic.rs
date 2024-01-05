@@ -489,14 +489,90 @@ impl fmt::Display for Dynamic {
             }
 
             #[cfg(not(feature = "no_closure"))]
-            #[cfg(not(feature = "sync"))]
-            Union::Shared(ref cell, ..) => match cell.try_borrow() {
-                Ok(v) => fmt::Display::fmt(&*v, f),
-                Err(_) => f.write_str("<shared>"),
-            },
+            Union::Shared(ref cell, ..) if cfg!(feature = "unchecked") => {
+                #[cfg(not(feature = "sync"))]
+                match cell.try_borrow() {
+                    Ok(v) => {
+                        fmt::Display::fmt(&*v, f)?;
+                        f.write_str(" (shared)")
+                    }
+                    Err(_) => f.write_str("<shared>"),
+                }
+                #[cfg(feature = "sync")]
+                fmt::Display::fmt(&*cell.read().unwrap(), f)
+            }
             #[cfg(not(feature = "no_closure"))]
-            #[cfg(feature = "sync")]
-            Union::Shared(ref cell, ..) => fmt::Display::fmt(&*cell.read().unwrap(), f),
+            Union::Shared(..) => {
+                #[cfg(feature = "no_std")]
+                use hashbrown::HashSet;
+                #[cfg(not(feature = "no_std"))]
+                use std::collections::HashSet;
+
+                // Avoid infinite recursion for shared values in a reference loop.
+                fn display_fmt(
+                    value: &Dynamic,
+                    f: &mut fmt::Formatter<'_>,
+                    dict: &mut HashSet<*const Dynamic>,
+                ) -> fmt::Result {
+                    match value.0 {
+                        #[cfg(not(feature = "no_closure"))]
+                        #[cfg(not(feature = "sync"))]
+                        Union::Shared(ref cell, ..) => match cell.try_borrow() {
+                            Ok(v) => {
+                                if dict.insert(value) {
+                                    display_fmt(&*v, f, dict)?;
+                                    f.write_str(" (shared)")
+                                } else {
+                                    f.write_str("<shared>")
+                                }
+                            }
+                            Err(_) => f.write_str("<shared>"),
+                        },
+                        #[cfg(not(feature = "no_closure"))]
+                        #[cfg(feature = "sync")]
+                        Union::Shared(ref cell, ..) => {
+                            let v = cell.read().unwrap();
+
+                            if dict.insert(value) {
+                                display_fmt(&*v, f, dict)
+                            } else {
+                                f.write_str("<shared>")
+                            }
+                        }
+                        #[cfg(not(feature = "no_index"))]
+                        Union::Array(ref arr, ..) => {
+                            dict.insert(value);
+
+                            f.write_str("[")?;
+                            for (i, v) in arr.iter().enumerate() {
+                                if i > 0 {
+                                    f.write_str(", ")?;
+                                }
+                                display_fmt(v, f, dict)?;
+                            }
+                            f.write_str("]")
+                        }
+                        #[cfg(not(feature = "no_object"))]
+                        Union::Map(ref map, ..) => {
+                            dict.insert(value);
+
+                            f.write_str("#{")?;
+                            for (i, (k, v)) in map.iter().enumerate() {
+                                if i > 0 {
+                                    f.write_str(", ")?;
+                                }
+                                fmt::Display::fmt(k, f)?;
+                                f.write_str(": ")?;
+                                display_fmt(v, f, dict)?;
+                            }
+                            f.write_str("}")
+                        }
+                        _ => fmt::Display::fmt(value, f),
+                    }
+                }
+
+                display_fmt(self, f, &mut <_>::default())
+            }
         }
     }
 }
@@ -591,14 +667,107 @@ impl fmt::Debug for Dynamic {
             }
 
             #[cfg(not(feature = "no_closure"))]
-            #[cfg(not(feature = "sync"))]
-            Union::Shared(ref cell, ..) => match cell.try_borrow() {
-                Ok(v) => write!(f, "{:?} (shared)", *v),
-                Err(_) => f.write_str("<shared>"),
-            },
+            Union::Shared(ref cell, ..) if cfg!(feature = "unchecked") => {
+                #[cfg(not(feature = "sync"))]
+                match cell.try_borrow() {
+                    Ok(v) => {
+                        fmt::Debug::fmt(&*v, f)?;
+                        f.write_str(" (shared)")
+                    }
+                    Err(_) => f.write_str("<shared>"),
+                }
+                #[cfg(feature = "sync")]
+                fmt::Debug::fmt(&*cell.read().unwrap(), f)
+            }
             #[cfg(not(feature = "no_closure"))]
-            #[cfg(feature = "sync")]
-            Union::Shared(ref cell, ..) => fmt::Debug::fmt(&*cell.read().unwrap(), f),
+            Union::Shared(..) => {
+                #[cfg(feature = "no_std")]
+                use hashbrown::HashSet;
+                #[cfg(not(feature = "no_std"))]
+                use std::collections::HashSet;
+
+                // Avoid infinite recursion for shared values in a reference loop.
+                fn debug_fmt(
+                    value: &Dynamic,
+                    f: &mut fmt::Formatter<'_>,
+                    dict: &mut HashSet<*const Dynamic>,
+                ) -> fmt::Result {
+                    match value.0 {
+                        #[cfg(not(feature = "no_closure"))]
+                        #[cfg(not(feature = "sync"))]
+                        Union::Shared(ref cell, ..) => match cell.try_borrow() {
+                            Ok(v) => {
+                                if dict.insert(value) {
+                                    debug_fmt(&*v, f, dict)?;
+                                    f.write_str(" (shared)")
+                                } else {
+                                    f.write_str("<shared>")
+                                }
+                            }
+                            Err(_) => f.write_str("<shared>"),
+                        },
+                        #[cfg(not(feature = "no_closure"))]
+                        #[cfg(feature = "sync")]
+                        Union::Shared(ref cell, ..) => {
+                            let v = cell.read().unwrap();
+
+                            if dict.insert(value) {
+                                debug_fmt(&*v, f, dict)?;
+                                f.write_str(" (shared)")
+                            } else {
+                                f.write_str("<shared>")
+                            }
+                        }
+                        #[cfg(not(feature = "no_index"))]
+                        Union::Array(ref arr, ..) => {
+                            dict.insert(value);
+
+                            f.write_str("[")?;
+                            for (i, v) in arr.iter().enumerate() {
+                                if i > 0 {
+                                    f.write_str(", ")?;
+                                }
+                                debug_fmt(v, f, dict)?;
+                            }
+                            f.write_str("]")
+                        }
+                        #[cfg(not(feature = "no_object"))]
+                        Union::Map(ref map, ..) => {
+                            dict.insert(value);
+
+                            f.write_str("#{")?;
+                            for (i, (k, v)) in map.iter().enumerate() {
+                                if i > 0 {
+                                    f.write_str(", ")?;
+                                }
+                                fmt::Debug::fmt(k, f)?;
+                                f.write_str(": ")?;
+                                debug_fmt(v, f, dict)?;
+                            }
+                            f.write_str("}")
+                        }
+                        Union::FnPtr(ref fnptr, ..) => {
+                            dict.insert(value);
+
+                            f.write_str("Fn")?;
+                            #[cfg(not(feature = "no_function"))]
+                            if fnptr.fn_def.is_some() {
+                                f.write_str("*")?;
+                            }
+                            f.write_str("(")?;
+                            fmt::Debug::fmt(fnptr.fn_name(), f)?;
+                            for curry in fnptr.curry.iter() {
+                                f.write_str(", ")?;
+                                debug_fmt(curry, f, dict)?;
+                            }
+                            f.write_str(")")
+                        }
+                        _ => fmt::Debug::fmt(value, f),
+                    }
+                }
+
+                debug_fmt(self, f, &mut <_>::default())
+            }
         }
     }
 }

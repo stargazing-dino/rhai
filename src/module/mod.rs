@@ -1300,6 +1300,12 @@ impl Module {
     ///
     /// If there is a similar existing Rust function, it is replaced.
     ///
+    /// # Assumptions
+    ///
+    /// * The function is assumed to be _non-pure_.
+    ///
+    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
+    ///
     /// # WARNING - Low Level API
     ///
     /// This function is very low level.
@@ -1379,6 +1385,7 @@ impl Module {
                 func: Shared::new(f),
                 has_context: true,
                 is_pure: false,
+                is_volatile: true,
             },
         )
     }
@@ -1386,6 +1393,12 @@ impl Module {
     /// Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
     ///
     /// If there is a similar existing Rust function, it is replaced.
+    ///
+    /// # Assumptions
+    ///
+    /// * The function is assumed to be _pure_ unless it is a property setter or an index setter.
+    ///
+    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
     ///
     /// # Function Namespace
     ///
@@ -1424,7 +1437,7 @@ impl Module {
         let is_pure =
             is_pure && (F::num_params() != 2 || !fn_name.starts_with(crate::engine::FN_SET));
 
-        let func = func.into_callable_function(fn_name.clone(), is_pure);
+        let func = func.into_callable_function(fn_name.clone(), is_pure, true);
 
         self.set_fn(
             fn_name,
@@ -1440,6 +1453,10 @@ impl Module {
     /// This function is automatically exposed to the global namespace.
     ///
     /// If there is a similar existing Rust getter function, it is replaced.
+    ///
+    /// # Assumptions
+    ///
+    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
     ///
     /// # Function Metadata
     ///
@@ -1463,7 +1480,7 @@ impl Module {
         F: RegisterNativeFunction<(Mut<A>,), 1, C, T, true> + SendSync + 'static,
     {
         let fn_name = crate::engine::make_getter(name.as_ref());
-        let func = func.into_callable_function(fn_name.clone(), true);
+        let func = func.into_callable_function(fn_name.clone(), true, true);
 
         self.set_fn(
             fn_name,
@@ -1480,6 +1497,10 @@ impl Module {
     /// This function is automatically exposed to the global namespace.
     ///
     /// If there is a similar existing setter Rust function, it is replaced.
+    ///
+    /// # Assumptions
+    ///
+    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
     ///
     /// # Function Metadata
     ///
@@ -1507,7 +1528,7 @@ impl Module {
         F: RegisterNativeFunction<(Mut<A>, T), 2, C, (), true> + SendSync + 'static,
     {
         let fn_name = crate::engine::make_setter(name.as_ref());
-        let func = func.into_callable_function(fn_name.clone(), false);
+        let func = func.into_callable_function(fn_name.clone(), false, true);
 
         self.set_fn(
             fn_name,
@@ -1572,6 +1593,10 @@ impl Module {
     ///
     /// If there is a similar existing setter Rust function, it is replaced.
     ///
+    /// # Assumptions
+    ///
+    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
+    ///
     /// # Panics
     ///
     /// Panics if the type is [`Array`][crate::Array] or [`Map`][crate::Map].
@@ -1626,7 +1651,7 @@ impl Module {
             FnAccess::Public,
             None,
             F::param_types(),
-            func.into_callable_function(crate::engine::FN_IDX_GET.into(), true),
+            func.into_callable_function(crate::engine::FN_IDX_GET.into(), true, true),
         )
     }
 
@@ -1635,6 +1660,10 @@ impl Module {
     /// This function is automatically exposed to the global namespace.
     ///
     /// If there is a similar existing Rust function, it is replaced.
+    ///
+    /// # Assumptions
+    ///
+    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
     ///
     /// # Panics
     ///
@@ -1690,7 +1719,7 @@ impl Module {
             FnAccess::Public,
             None,
             F::param_types(),
-            func.into_callable_function(crate::engine::FN_IDX_SET.into(), false),
+            func.into_callable_function(crate::engine::FN_IDX_SET.into(), false, true),
         )
     }
 

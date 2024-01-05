@@ -34,11 +34,23 @@ pub trait PluginFunction {
 
     /// Is this plugin function pure?
     ///
-    /// This defaults to `true` such that any old implementation that has constant-checking code
-    /// inside the function itself will continue to work.
+    /// Defaults to `true` such that any old implementation that has constant-checking code inside
+    /// the function itself will continue to work.
     #[inline(always)]
     #[must_use]
     fn is_pure(&self) -> bool {
+        true
+    }
+
+    /// Is this plugin function volatile?
+    ///
+    /// A volatile function is not guaranteed to return the same result for the same input(s).
+    ///
+    /// Defaults to `true` such that any old implementation that has constant-checking code inside
+    /// the function itself will continue to work.
+    #[inline(always)]
+    #[must_use]
+    fn is_volatile(&self) -> bool {
         true
     }
 }

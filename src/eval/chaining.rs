@@ -71,8 +71,10 @@ impl Engine {
         let hash = hash_idx().0;
         let args = &mut [target, idx];
 
-        self.exec_native_fn_call(global, caches, FN_IDX_GET, None, hash, args, true, pos)
-            .map(|(r, ..)| r)
+        self.exec_native_fn_call(
+            global, caches, FN_IDX_GET, None, hash, args, true, false, pos,
+        )
+        .map(|(r, ..)| r)
     }
 
     /// Call a set indexer.
@@ -93,7 +95,7 @@ impl Engine {
         let args = &mut [target, idx, new_val];
 
         self.exec_native_fn_call(
-            global, caches, FN_IDX_SET, None, hash, args, is_ref_mut, pos,
+            global, caches, FN_IDX_SET, None, hash, args, is_ref_mut, false, pos,
         )
     }
 
@@ -764,7 +766,8 @@ impl Engine {
 
                             let (mut orig_val, ..) = self
                                 .exec_native_fn_call(
-                                    global, caches, getter, None, *hash_get, args, is_ref_mut, *pos,
+                                    global, caches, getter, None, *hash_get, args, is_ref_mut,
+                                    false, *pos,
                                 )
                                 .or_else(|err| match *err {
                                     // Try an indexer if property does not exist
@@ -799,7 +802,7 @@ impl Engine {
                         let args = &mut [target.as_mut(), &mut new_val];
 
                         self.exec_native_fn_call(
-                            global, caches, setter, None, *hash_set, args, is_ref_mut, *pos,
+                            global, caches, setter, None, *hash_set, args, is_ref_mut, false, *pos,
                         )
                         .or_else(|err| match *err {
                             // Try an indexer if property does not exist
@@ -827,7 +830,7 @@ impl Engine {
                         let args = &mut [target.as_mut()];
 
                         self.exec_native_fn_call(
-                            global, caches, getter, None, *hash_get, args, is_ref_mut, *pos,
+                            global, caches, getter, None, *hash_get, args, is_ref_mut, false, *pos,
                         )
                         .map_or_else(
                             |err| match *err {
@@ -922,7 +925,7 @@ impl Engine {
                                 let (mut val, ..) = self
                                     .exec_native_fn_call(
                                         global, caches, getter, None, *hash_get, args, is_ref_mut,
-                                        pos,
+                                        false, pos,
                                     )
                                     .or_else(|err| match *err {
                                         // Try an indexer if property does not exist
@@ -959,7 +962,7 @@ impl Engine {
                                     let _ = self
                                         .exec_native_fn_call(
                                             global, caches, setter, None, *hash_set, args,
-                                            is_ref_mut, pos,
+                                            is_ref_mut, false, pos,
                                         )
                                         .or_else(|err| match *err {
                                             // Try an indexer if property does not exist
