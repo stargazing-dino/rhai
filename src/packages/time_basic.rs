@@ -37,6 +37,7 @@ mod time_functions {
     ///
     /// print(now.elapsed);     // prints 10.???
     /// ```
+    #[rhai_fn(volatile)]
     pub fn timestamp() -> Instant {
         Instant::now()
     }

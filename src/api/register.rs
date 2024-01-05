@@ -30,6 +30,12 @@ impl Engine {
     }
     /// Register a custom function with the [`Engine`].
     ///
+    /// # Assumptions
+    ///
+    /// * The function is assumed to be _pure_ unless it is a property setter or an index setter.
+    ///
+    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
+    ///
     /// # Example
     ///
     /// ```
@@ -100,7 +106,7 @@ impl Engine {
         let is_pure =
             is_pure && (F::num_params() != 2 || !fn_name.starts_with(crate::engine::FN_SET));
 
-        let func = func.into_callable_function(fn_name.into(), is_pure);
+        let func = func.into_callable_function(fn_name.into(), is_pure, true);
 
         self.global_namespace_mut().set_fn(
             name,

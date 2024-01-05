@@ -43,6 +43,11 @@ Other bug fixes
 * Arrays in object maps now serialize to JSON correctly via `to_json()` when the `serde` feature is not enabled.
 * `Engine::format_map_as_json` now serializes arrays correctly.
 
+New features
+------------
+
+* Functions defined in plugin modules can now be marked as `volatile` which prevents it from being optimized away even under `OptimizationLevel::Full`.
+
 Enhancements
 ------------
 

@@ -88,7 +88,12 @@ pub trait RegisterNativeFunction<
 {
     /// Convert this function into a [`CallableFunction`].
     #[must_use]
-    fn into_callable_function(self, name: Identifier, is_pure: bool) -> CallableFunction;
+    fn into_callable_function(
+        self,
+        name: Identifier,
+        is_pure: bool,
+        is_volatile: bool,
+    ) -> CallableFunction;
     /// Get the type ID's of this function's parameters.
     #[must_use]
     fn param_types() -> [TypeId; N];
@@ -151,7 +156,7 @@ macro_rules! def_register {
         > RegisterNativeFunction<($($mark,)*), $n, false, RET, false> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
-            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool) -> CallableFunction {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool, is_volatile: bool) -> CallableFunction {
                 CallableFunction::$abi { func: Shared::new(move |_, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
                     let mut drain = args.iter_mut();
@@ -162,7 +167,7 @@ macro_rules! def_register {
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }), has_context: false, is_pure }
+                }), has_context: false, is_pure, is_volatile }
             }
         }
 
@@ -173,7 +178,7 @@ macro_rules! def_register {
         > RegisterNativeFunction<($($mark,)*), $n, true, RET, false> for FN {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
-            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool) -> CallableFunction {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool, is_volatile: bool) -> CallableFunction {
                 CallableFunction::$abi { func: Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
                     let ctx = ctx.unwrap();
 
@@ -186,7 +191,7 @@ macro_rules! def_register {
 
                     // Map the result
                     Ok(Dynamic::from(r))
-                }), has_context: true, is_pure }
+                }), has_context: true, is_pure, is_volatile }
             }
         }
 
@@ -198,7 +203,7 @@ macro_rules! def_register {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
-            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool) -> CallableFunction {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool, is_volatile: bool) -> CallableFunction {
                 CallableFunction::$abi { func: Shared::new(move |_, args: &mut FnCallArgs| {
                     // The arguments are assumed to be of the correct number and types!
                     let mut drain = args.iter_mut();
@@ -206,7 +211,7 @@ macro_rules! def_register {
 
                     // Call the function with each argument value
                     self($($arg),*).map(Dynamic::from)
-                }), has_context: false, is_pure }
+                }), has_context: false, is_pure, is_volatile }
             }
         }
 
@@ -218,7 +223,7 @@ macro_rules! def_register {
             #[inline(always)] fn param_types() -> [TypeId;$n] { [$(TypeId::of::<$par>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn param_names() -> [&'static str;$n] { [$(type_name::<$param>()),*] }
             #[cfg(feature = "metadata")] #[inline(always)] fn return_type_name() -> &'static str { type_name::<RhaiResultOf<RET>>() }
-            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool) -> CallableFunction {
+            #[inline(always)] fn into_callable_function(self, fn_name: Identifier, is_pure: bool, is_volatile: bool) -> CallableFunction {
                 CallableFunction::$abi { func: Shared::new(move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
                     let ctx = ctx.unwrap();
 
@@ -228,7 +233,7 @@ macro_rules! def_register {
 
                     // Call the function with each argument value
                     self(ctx, $($arg),*).map(Dynamic::from)
-                }), has_context: true, is_pure }
+                }), has_context: true, is_pure, is_volatile }
             }
         }
 

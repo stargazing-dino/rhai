@@ -293,7 +293,7 @@ fn main() {
     println!("{0:=<1$}", "", title.len());
 
     #[cfg(not(feature = "no_optimize"))]
-    let mut optimize_level = rhai::OptimizationLevel::Simple;
+    let mut optimize_level = rhai::OptimizationLevel::Full;
 
     // Initialize scripting engine
     let mut engine = Engine::new();
