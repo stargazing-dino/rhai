@@ -48,6 +48,7 @@ New features
 ------------
 
 * Functions defined in plugin modules can now be marked as `volatile` which prevents it from being optimized away even under `OptimizationLevel::Full`.
+* `Engine::get_interned_string` is made public instead of gated under `internals`.
 
 Enhancements
 ------------
