@@ -489,9 +489,22 @@ impl fmt::Display for Dynamic {
             }
 
             #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) if cfg!(feature = "unchecked") => {
+                #[cfg(not(feature = "sync"))]
+                match cell.try_borrow() {
+                    Ok(v) => {
+                        fmt::Display::fmt(&*v, f)?;
+                        f.write_str(" (shared)")
+                    }
+                    Err(_) => f.write_str("<shared>"),
+                }
+                #[cfg(feature = "sync")]
+                fmt::Display::fmt(&*cell.read().unwrap(), f)
+            }
+            #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => {
                 // Avoid infinite recursion for shared values in a reference loop.
-                pub fn display_fmt(
+                fn display_fmt(
                     value: &Dynamic,
                     f: &mut fmt::Formatter<'_>,
                     dict: &mut std::collections::HashSet<*const Dynamic>,
@@ -647,9 +660,22 @@ impl fmt::Debug for Dynamic {
             }
 
             #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) if cfg!(feature = "unchecked") => {
+                #[cfg(not(feature = "sync"))]
+                match cell.try_borrow() {
+                    Ok(v) => {
+                        fmt::Debug::fmt(&*v, f)?;
+                        f.write_str(" (shared)")
+                    }
+                    Err(_) => f.write_str("<shared>"),
+                }
+                #[cfg(feature = "sync")]
+                fmt::Debug::fmt(&*cell.read().unwrap(), f)
+            }
+            #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => {
                 // Avoid infinite recursion for shared values in a reference loop.
-                pub fn debug_fmt(
+                fn debug_fmt(
                     value: &Dynamic,
                     f: &mut fmt::Formatter<'_>,
                     dict: &mut std::collections::HashSet<*const Dynamic>,

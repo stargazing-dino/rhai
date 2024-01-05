@@ -77,19 +77,13 @@ pub struct Scope<'a> {
 impl fmt::Display for Scope<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, (name, constant, value)) in self.iter_inner().enumerate() {
-            #[cfg(not(feature = "no_closure"))]
-            let value_is_shared = if value.is_shared() { " (shared)" } else { "" };
-            #[cfg(feature = "no_closure")]
-            let value_is_shared = "";
-
             writeln!(
                 f,
-                "[{}] {}{}{} = {:?}",
+                "[{}] {}{} = {:?}",
                 i + 1,
                 if constant { "const " } else { "" },
                 name,
-                value_is_shared,
-                *value.read_lock::<Dynamic>().unwrap(),
+                value,
             )?;
         }
 
