@@ -36,6 +36,7 @@ Fixes to bugs found via fuzzing
 * Fixed crash when indenting a block doc-comment with Unicode multi-byte space characters.
 * Fixed improper parsing of numbers with too many decimal points.
 * Fixed exponential running time when raising a decimal number to a very large power (> 1 million) -- it now returns an overflow error.
+* Shared values that contain reference loops no longer cause a stack overflow when printing.
 
 Other bug fixes
 ---------------
