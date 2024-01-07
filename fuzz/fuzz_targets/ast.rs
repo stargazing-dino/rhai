@@ -4,7 +4,7 @@ use rhai::{Engine, OptimizationLevel};
 use anyhow::Result;
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use std::{hint::black_box};
+use std::hint::black_box;
 
 #[derive(Debug, Clone, Arbitrary)]
 struct Ctx<'a> {
@@ -39,6 +39,7 @@ fn fuzz(ctx: Ctx) -> Result<()> {
     _ = black_box(ast.iter_functions().count());
     _ = black_box(ast.iter_literal_variables(true, true).count());
     _ = black_box(ast.walk(&mut |_| true));
+    _ = black_box(engine.gen_metadata_to_json(&ast, true));
 
     let mut function_only_ast = ast.clone_functions_only();
     assert!(function_only_ast.clear_functions().iter_functions().count() == 0);
