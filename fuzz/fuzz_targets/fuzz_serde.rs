@@ -9,30 +9,55 @@ use rhai::{
 };
 use serde::{Deserialize, Serialize};
 
+enum Enum {
+    Normal,
+    Newtype(u8),
+    StructType { _x: u8, _y: u8 },
+}
+
 #[derive(Arbitrary, Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct SubStruct {
     _x: f64,
 }
 
 #[derive(Arbitrary, Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct NewType(u8);
+
+#[derive(Arbitrary, Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct Tuple(u8, u8);
+
+#[derive(Arbitrary, Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct AllTypes {
     _bool: bool,
     _str: String,
-    _bool_vec: Vec<bool>,
+    _char: char,
+
     _i8: i8,
     _i16: i16,
     _i32: i32,
     _i64: i64,
+    _i128: i128,
 
     _u8: u8,
     _u16: u16,
     _u32: u32,
     _u64: u64,
+    _u128: u128,
+
+    _f32: f32,
+    _f64: f64,
 
     _unit: (),
     _tuple: (u8, u8),
 
+    _bytes: Vec<u8>,
+    _bool_vec: Vec<bool>,
+    _option: Option<u8>,
+
     _struct: SubStruct,
+    _new_type: NewType,
+    _tuple: Tuple,
+    _enum: Enum,
 }
 
 #[derive(Debug, Clone, Arbitrary)]
