@@ -9,6 +9,7 @@ use rhai::{
 };
 use serde::{Deserialize, Serialize};
 
+#[derive(Arbitrary, Debug, Clone, PartialEq, Serialize, Deserialize)]
 enum Enum {
     Normal,
     Newtype(u8),
@@ -24,7 +25,7 @@ struct SubStruct {
 struct NewType(u8);
 
 #[derive(Arbitrary, Debug, Clone, PartialEq, Serialize, Deserialize)]
-struct Tuple(u8, u8);
+struct TupleStruct(u8, u8);
 
 #[derive(Arbitrary, Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct AllTypes {
@@ -56,7 +57,7 @@ struct AllTypes {
 
     _struct: SubStruct,
     _new_type: NewType,
-    _tuple: Tuple,
+    _tuple_struct: TupleStruct,
     _enum: Enum,
 }
 
