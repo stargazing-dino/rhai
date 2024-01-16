@@ -314,10 +314,11 @@ impl Engine {
     }
 
     /// Get an interned [string][ImmutableString].
-    /// Exported under the `internals` feature only.
     ///
     /// [`Engine`] keeps a cache of [`ImmutableString`] instances and tries to avoid new allocations
-    /// when an existing instance is found.
+    /// and save memory when an existing instance is found.
+    ///
+    /// It is usually a good idea to intern strings if they are used frequently.
     #[inline]
     #[must_use]
     pub fn get_interned_string(

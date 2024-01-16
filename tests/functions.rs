@@ -537,3 +537,39 @@ fn test_functions_is_def() {
         )
         .unwrap());
 }
+
+#[test]
+#[cfg(not(feature = "unchecked"))]
+fn test_functions_max() {
+    let mut engine = Engine::new();
+    engine.set_max_functions(5);
+
+    engine
+        .compile(
+            "
+            fn foo1() {}
+            fn foo2() {}
+            fn foo3() {}
+            fn foo4() {}
+            fn foo5() {}
+        ",
+        )
+        .unwrap();
+
+    assert!(matches!(
+        engine
+            .compile(
+                "
+                fn foo1() {}
+                fn foo2() {}
+                fn foo3() {}
+                fn foo4() {}
+                fn foo5() {}
+                fn foo6() {}
+            "
+            )
+            .expect_err("should err")
+            .err_type(),
+        ParseErrorType::TooManyFunctions
+    ))
+}

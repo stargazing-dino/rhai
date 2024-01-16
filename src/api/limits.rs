@@ -62,6 +62,13 @@ pub struct Limits {
     ///
     /// Set to zero to effectively disable creating variables.
     pub num_variables: usize,
+    /// Maximum number of scripted functions allowed.
+    ///
+    /// Set to zero to effectively disable defining any function.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
+    pub num_functions: usize,
     /// Maximum number of [modules][crate::Module] allowed to load.
     ///
     /// Set to zero to effectively disable loading any [module][crate::Module].
@@ -97,6 +104,8 @@ impl Limits {
             function_expr_depth: NonZeroUsize::new(default_limits::MAX_FUNCTION_EXPR_DEPTH),
             num_operations: None,
             num_variables: usize::MAX,
+            #[cfg(not(feature = "no_function"))]
+            num_functions: usize::MAX,
             #[cfg(not(feature = "no_module"))]
             num_modules: usize::MAX,
             string_len: None,
@@ -151,13 +160,11 @@ impl Engine {
     /// The maximum levels of function calls allowed for a script.
     ///
     /// Not available under `unchecked` or `no_function`.
+    #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
     pub const fn max_call_levels(&self) -> usize {
-        #[cfg(not(feature = "no_function"))]
-        return self.limits.call_stack_depth;
-        #[cfg(feature = "no_function")]
-        return 0;
+        self.limits.call_stack_depth
     }
     /// Set the maximum number of operations allowed for a script to run to avoid
     /// consuming too much resources (0 for unlimited).
@@ -179,21 +186,39 @@ impl Engine {
             None => 0,
         }
     }
-    /// Set the maximum number of imported variables allowed for a script at any instant.
+    /// Set the maximum number of variables allowed for a script at any instant.
     ///
     /// Not available under `unchecked`.
     #[inline(always)]
-    pub fn set_max_variables(&mut self, modules: usize) -> &mut Self {
-        self.limits.num_variables = modules;
+    pub fn set_max_variables(&mut self, variables: usize) -> &mut Self {
+        self.limits.num_variables = variables;
         self
     }
-    /// The maximum number of imported variables allowed for a script at any instant.
+    /// The maximum number of variables allowed for a script at any instant.
     ///
     /// Not available under `unchecked`.
     #[inline(always)]
     #[must_use]
     pub const fn max_variables(&self) -> usize {
         self.limits.num_variables
+    }
+    /// Set the maximum number of scripted functions allowed for a script at any instant.
+    ///
+    /// Not available under `unchecked` or `no_function`
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    pub fn set_max_functions(&mut self, functions: usize) -> &mut Self {
+        self.limits.num_functions = functions;
+        self
+    }
+    /// The maximum number of scripted functions allowed for a script at any instant.
+    ///
+    /// Not available under `unchecked` or `no_function`
+    #[cfg(not(feature = "no_function"))]
+    #[inline(always)]
+    #[must_use]
+    pub const fn max_functions(&self) -> usize {
+        self.limits.num_functions
     }
     /// Set the maximum number of imported [modules][crate::Module] allowed for a script.
     ///
@@ -207,13 +232,11 @@ impl Engine {
     /// The maximum number of imported [modules][crate::Module] allowed for a script.
     ///
     /// Not available under `unchecked` or `no_module`.
+    #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     #[must_use]
     pub const fn max_modules(&self) -> usize {
-        #[cfg(not(feature = "no_module"))]
-        return self.limits.num_modules;
-        #[cfg(feature = "no_module")]
-        return 0;
+        self.limits.num_modules
     }
     /// Set the depth limits for expressions (0 for unlimited).
     ///

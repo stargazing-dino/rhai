@@ -1470,6 +1470,14 @@ impl Engine {
 
             // | ...
             #[cfg(not(feature = "no_function"))]
+            #[cfg(not(feature = "unchecked"))]
+            Token::Pipe | Token::Or
+                if settings.has_option(LangOptions::ANON_FN)
+                    && lib.len() >= self.max_functions() =>
+            {
+                return Err(PERR::TooManyFunctions.into_err(settings.pos));
+            }
+            #[cfg(not(feature = "no_function"))]
             Token::Pipe | Token::Or if settings.has_option(LangOptions::ANON_FN) => {
                 // Build new parse state
                 let new_interner = &mut StringsInterner::new();
@@ -3343,6 +3351,10 @@ impl Engine {
                 };
 
                 match input.next().unwrap() {
+                    #[cfg(not(feature = "unchecked"))]
+                    (Token::Fn, pos) if lib.len() >= self.max_functions() => {
+                        Err(PERR::TooManyFunctions.into_err(pos))
+                    }
                     (Token::Fn, pos) => {
                         // Build new parse state
                         let new_state = &mut ParseState::new(
