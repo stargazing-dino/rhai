@@ -1,10 +1,10 @@
 //! Module that defines the public function/module registration API of [`Engine`].
 
-use crate::func::{FnCallArgs, RegisterNativeFunction, SendSync};
-use crate::module::ModuleFlags;
+use crate::func::{CallableFunction, FnCallArgs, RegisterNativeFunction, SendSync};
+use crate::module::{FuncRegistration, ModuleFlags};
 use crate::types::dynamic::Variant;
 use crate::{
-    Engine, FnAccess, FnNamespace, Identifier, Module, NativeCallContext, RhaiResultOf, Shared,
+    Dynamic, Engine, FnNamespace, Identifier, Module, NativeCallContext, RhaiResultOf, Shared,
     SharedModule,
 };
 use std::any::{type_name, TypeId};
@@ -91,13 +91,8 @@ impl Engine {
             .iter()
             .map(String::as_str)
             .collect::<crate::FnArgsVec<_>>();
-        #[cfg(feature = "metadata")]
-        let param_type_names = Some(param_type_names.as_ref());
 
-        #[cfg(not(feature = "metadata"))]
-        let param_type_names: Option<&[&str]> = None;
-
-        let fn_name = name.as_ref();
+        let fn_name = name.into();
         let is_pure = true;
 
         #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
@@ -106,16 +101,15 @@ impl Engine {
         let is_pure =
             is_pure && (F::num_params() != 2 || !fn_name.starts_with(crate::engine::FN_SET));
 
-        let func = func.into_callable_function(fn_name.into(), is_pure, true);
+        let func = func.into_callable_function(is_pure, true);
 
-        self.global_namespace_mut().set_fn(
-            name,
-            FnNamespace::Global,
-            FnAccess::Public,
-            param_type_names,
-            param_types,
-            func,
-        );
+        let metadata = FuncRegistration::new(fn_name).with_namespace(FnNamespace::Global);
+
+        #[cfg(feature = "metadata")]
+        let metadata = metadata.with_params_info(param_type_names);
+
+        metadata.set_into_module_raw(self.global_namespace_mut(), param_types, func);
+
         self
     }
     /// Register a function of the [`Engine`].
@@ -143,13 +137,23 @@ impl Engine {
         arg_types: impl AsRef<[TypeId]>,
         func: impl Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResultOf<T> + SendSync + 'static,
     ) -> &mut Self {
-        self.global_namespace_mut().set_raw_fn(
-            name,
-            FnNamespace::Global,
-            FnAccess::Public,
-            arg_types,
-            func,
-        );
+        FuncRegistration::new(name)
+            .with_namespace(FnNamespace::Global)
+            .set_into_module_raw(
+                self.global_namespace_mut(),
+                arg_types,
+                CallableFunction::Method {
+                    func: Shared::new(
+                        move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
+                            func(ctx.unwrap(), args).map(Dynamic::from)
+                        },
+                    ),
+                    has_context: true,
+                    is_pure: false,
+                    is_volatile: true,
+                },
+            );
+
         self
     }
     /// Register a custom type for use with the [`Engine`].

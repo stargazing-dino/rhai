@@ -243,7 +243,7 @@ pub use eval::EvalContext;
 use func::calc_typed_method_hash;
 use func::{calc_fn_hash, calc_fn_hash_full, calc_var_hash};
 pub use func::{plugin, FuncArgs, NativeCallContext, RegisterNativeFunction};
-pub use module::{FnNamespace, Module};
+pub use module::{FnNamespace, FuncRegistration, Module};
 pub use packages::string_basic::{FUNC_TO_DEBUG, FUNC_TO_STRING};
 pub use rhai_codegen::*;
 #[cfg(not(feature = "no_time"))]

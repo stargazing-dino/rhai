@@ -3,9 +3,9 @@
 use crate::func::SendSync;
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, EvalAltResult, FnPtr, Identifier, ImmutableString, Module, NativeCallContext,
-    Position, RegisterNativeFunction, RhaiResult, RhaiResultOf, Scope, SharedModule, TypeBuilder,
-    AST,
+    Dynamic, Engine, EvalAltResult, FnPtr, FuncRegistration, Identifier, ImmutableString, Module,
+    NativeCallContext, Position, RegisterNativeFunction, RhaiResult, RhaiResultOf, Scope,
+    SharedModule, TypeBuilder, AST,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -693,6 +693,100 @@ impl Module {
     )]
     pub fn get_custom_type(&self, type_name: &str) -> Option<&str> {
         self.get_custom_type_display_by_name(type_name)
+    }
+
+    /// Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
+    ///
+    /// If there is an existing Rust function of the same hash, it is replaced.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated.
+    /// Use the [`FuncRegistration`] API instead.
+    ///
+    /// This method will be removed in the next major version.
+    #[deprecated(since = "1.17.0", note = "use the `FuncRegistration` API instead")]
+    #[inline(always)]
+    pub fn set_fn(
+        &mut self,
+        name: impl Into<Identifier>,
+        namespace: FnNamespace,
+        _access: FnAccess,
+        arg_names: Option<&[&str]>,
+        arg_types: impl AsRef<[TypeId]>,
+        func: CallableFunction,
+    ) -> u64 {
+        let _arg_names = arg_names;
+
+        let fx = FuncRegistration::new(name).with_namespace(namespace);
+
+        #[cfg(feature = "metadata")]
+        let fx = if let Some(arg_names) = _arg_names {
+            fx.with_params_info(arg_names)
+        } else {
+            fx
+        };
+
+        fx.set_into_module_raw(self, arg_types, func).metadata.hash
+    }
+
+    /// _(metadata)_ Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
+    /// Exported under the `metadata` feature only.
+    ///
+    /// If there is an existing Rust function of the same hash, it is replaced.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated.
+    /// Use the [`FuncRegistration`] API instead.
+    ///
+    /// This method will be removed in the next major version.
+    #[deprecated(since = "1.17.0", note = "use the `FuncRegistration` API instead")]
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn set_fn_with_comments<C: AsRef<str>>(
+        &mut self,
+        name: impl Into<Identifier>,
+        namespace: FnNamespace,
+        _access: FnAccess,
+        arg_names: Option<&[&str]>,
+        arg_types: impl AsRef<[TypeId]>,
+        comments: impl IntoIterator<Item = C>,
+        func: CallableFunction,
+    ) -> u64 {
+        FuncRegistration::new(name)
+            .with_namespace(namespace)
+            .with_params_info(arg_names.unwrap_or(&[]))
+            .with_comments(comments)
+            .set_into_module_raw(self, arg_types, func)
+            .metadata
+            .hash
+    }
+
+    /// _(metadata)_ Update the metadata (parameter names/types and return type) of a registered function.
+    /// Exported under the `metadata` feature only.
+    ///
+    /// The [`u64`] hash is returned by the [`set_native_fn`][Module::set_native_fn] call.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated.
+    /// Use [`update_fn_metadata_with_comments`][`Module::update_fn_metadata_with_comments`] instead.
+    ///
+    /// This method will be removed in the next major version.
+    #[deprecated(
+        since = "1.17.0",
+        note = "use `update_fn_metadata_with_comments` instead"
+    )]
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    #[allow(deprecated)]
+    pub fn update_fn_metadata<S: Into<Identifier>>(
+        &mut self,
+        hash_fn: u64,
+        arg_names: impl IntoIterator<Item = S>,
+    ) -> &mut Self {
+        self.update_fn_metadata_with_comments(hash_fn, arg_names, [""; 0])
     }
 }
 

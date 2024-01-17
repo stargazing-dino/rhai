@@ -3,8 +3,8 @@
 pub use super::CallableFunction;
 use super::FnCallArgs;
 pub use crate::{
-    Dynamic, Engine, EvalAltResult, FnAccess, FnNamespace, ImmutableString, Module,
-    NativeCallContext, Position,
+    Dynamic, Engine, EvalAltResult, FnAccess, FnNamespace, FuncRegistration, ImmutableString,
+    Module, NativeCallContext, Position,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
