@@ -82,7 +82,6 @@ pub struct FuncInfoMetadata {
     pub access: FnAccess,
     /// Function name.
     pub name: Identifier,
-    #[cfg(not(feature = "no_object"))]
     /// Number of parameters.
     pub num_params: usize,
     /// Parameter types (if applicable).
@@ -2247,7 +2246,7 @@ impl Module {
                     FnAccess::Private => continue, // Do not index private functions
                 }
 
-                if let Some(fn_def) = f.func.get_script_fn_def() {
+                if f.func.is_script() {
                     #[cfg(not(feature = "no_function"))]
                     {
                         let hash_script = crate::calc_fn_hash(
@@ -2256,8 +2255,13 @@ impl Module {
                             f.metadata.num_params,
                         );
                         #[cfg(not(feature = "no_object"))]
-                        let hash_script =
-                            fn_def.this_type.as_ref().map_or(hash_script, |this_type| {
+                        let hash_script = f
+                            .func
+                            .get_script_fn_def()
+                            .unwrap()
+                            .this_type
+                            .as_ref()
+                            .map_or(hash_script, |this_type| {
                                 crate::calc_typed_method_hash(hash_script, this_type)
                             });
 

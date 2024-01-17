@@ -2071,7 +2071,7 @@ mod generate_tests {
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
                     FuncRegistration::new("index$set$").with_namespace(FnNamespace::Global).with_params_info(set_by_index_token::PARAM_NAMES)
-                         .set_into_module_raw(m, set_by_index_token::param_types(), set_by_index_token().into());
+                         .set_into_module_raw(m, &set_by_index_token::param_types(), set_by_index_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]

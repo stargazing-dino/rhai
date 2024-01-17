@@ -105,20 +105,26 @@ impl Ord for FnMetadata<'_> {
 impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
     fn from(info: &'a FuncInfo) -> Self {
         let base_hash = calc_fn_hash(None, &info.metadata.name, info.metadata.num_params);
-        let (typ, full_hash, this_type) = if let Some(fn_def) = info.func.get_script_fn_def() {
+        let (typ, full_hash, _this_type) = if info.func.is_script() {
             (
                 FnType::Script,
                 base_hash,
+                #[cfg(not(feature = "no_function"))]
                 #[cfg(not(feature = "no_object"))]
-                fn_def.this_type.as_ref().map(|s| s.as_str()),
-                #[cfg(feature = "no_object")]
-                None,
+                info.func
+                    .get_script_fn_def()
+                    .unwrap()
+                    .this_type
+                    .as_ref()
+                    .map(|s| s.as_str()),
+                #[cfg(any(feature = "no_object", feature = "no_function"))]
+                None::<&str>,
             )
         } else {
             (
                 FnType::Native,
                 calc_native_fn_hash(None, &info.metadata.name, &info.metadata.param_types),
-                None,
+                None::<&str>,
             )
         };
 
@@ -133,7 +139,7 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
             is_anonymous: crate::parser::is_anonymous_fn(&info.metadata.name),
             typ,
             #[cfg(not(feature = "no_object"))]
-            this_type,
+            this_type: _this_type,
             num_params: info.metadata.num_params,
             params: info
                 .metadata

@@ -1540,7 +1540,7 @@ impl Dynamic {
     pub fn flatten(self) -> Self {
         match self.0 {
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(cell, ..) => crate::func::shared_try_take(cell).map_or_else(
+            Union::Shared(cell, ..) => crate::func::native::shared_try_take(cell).map_or_else(
                 |ref cell| crate::func::locked_read(cell).clone(),
                 #[cfg(not(feature = "sync"))]
                 crate::Locked::into_inner,

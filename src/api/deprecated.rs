@@ -1,12 +1,13 @@
 //! Module containing all deprecated API that will be removed in the next major version.
 
-use crate::func::SendSync;
+use crate::func::{CallableFunction, SendSync};
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, EvalAltResult, FnPtr, FuncRegistration, Identifier, ImmutableString, Module,
-    NativeCallContext, Position, RegisterNativeFunction, RhaiResult, RhaiResultOf, Scope,
-    SharedModule, TypeBuilder, AST,
+    Dynamic, Engine, EvalAltResult, FnAccess, FnNamespace, FnPtr, FuncRegistration, Identifier,
+    ImmutableString, Module, NativeCallContext, Position, RegisterNativeFunction, RhaiResult,
+    RhaiResultOf, Scope, SharedModule, TypeBuilder, AST,
 };
+use std::any::TypeId;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
