@@ -11,6 +11,7 @@ use std::{
     ops::{Add, AddAssign},
     ptr,
 };
+use thin_vec::ThinVec;
 
 /// Compiled AST (abstract syntax tree) of a Rhai script.
 ///
@@ -22,7 +23,7 @@ pub struct AST {
     /// Source of the [`AST`].
     source: Option<ImmutableString>,
     /// Global statements.
-    body: Box<[Stmt]>,
+    body: ThinVec<Stmt>,
     /// Script-defined functions.
     #[cfg(not(feature = "no_function"))]
     lib: crate::SharedModule,
@@ -79,10 +80,7 @@ impl AST {
             source: None,
             #[cfg(feature = "metadata")]
             doc: crate::SmartString::new_const(),
-            body: statements
-                .into_iter()
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
+            body: statements.into_iter().collect(),
             #[cfg(not(feature = "no_function"))]
             lib: functions.into(),
             #[cfg(not(feature = "no_module"))]
@@ -102,10 +100,7 @@ impl AST {
             source: None,
             #[cfg(feature = "metadata")]
             doc: crate::SmartString::new_const(),
-            body: statements
-                .into_iter()
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
+            body: statements.into_iter().collect(),
             #[cfg(not(feature = "no_function"))]
             lib: functions.into(),
             #[cfg(not(feature = "no_module"))]
@@ -210,7 +205,7 @@ impl AST {
     #[cfg(not(feature = "internals"))]
     #[inline(always)]
     #[must_use]
-    pub(crate) const fn statements(&self) -> &[Stmt] {
+    pub(crate) fn statements(&self) -> &[Stmt] {
         &self.body
     }
     /// _(internals)_ Get the statements.
@@ -218,14 +213,14 @@ impl AST {
     #[cfg(feature = "internals")]
     #[inline(always)]
     #[must_use]
-    pub const fn statements(&self) -> &[Stmt] {
+    pub fn statements(&self) -> &[Stmt] {
         &self.body
     }
     /// Get the statements.
     #[inline(always)]
     #[must_use]
     #[allow(dead_code)]
-    pub(crate) fn statements_mut(&mut self) -> &mut Box<[Stmt]> {
+    pub(crate) fn statements_mut(&mut self) -> &mut ThinVec<Stmt> {
         &mut self.body
     }
     /// Does this [`AST`] contain script-defined functions?
@@ -643,12 +638,7 @@ impl AST {
         match (self.body.as_ref(), other.body.as_ref()) {
             (_, []) => (),
             ([], _) => self.body = other.body,
-            (_, _) => {
-                let mut body = self.body.to_vec();
-                let other = other.body.to_vec();
-                body.extend(other);
-                self.body = body.into_boxed_slice();
-            }
+            (_, _) => self.body.extend(other.body),
         }
 
         #[cfg(not(feature = "no_function"))]

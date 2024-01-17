@@ -2,7 +2,7 @@
 
 use crate::engine::Precedence;
 use crate::func::native::OnParseTokenCallback;
-use crate::{Engine, Identifier, LexError, Position, SmartString, INT, UNSIGNED_INT};
+use crate::{Engine, Identifier, LexError, Position, SmartString, StaticVec, INT, UNSIGNED_INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -2398,10 +2398,8 @@ pub struct MultiInputsStream<'a> {
     pub buf: [Option<char>; 2],
     /// The current stream index.
     pub index: usize,
-    /// The first input character stream.
-    pub stream: Peekable<Chars<'a>>,
-    /// Extra input character streams.
-    pub extra_streams: Box<[Peekable<Chars<'a>>]>,
+    /// Input character streams.
+    pub streams: StaticVec<Peekable<Chars<'a>>>,
 }
 
 impl InputStream for MultiInputsStream<'_> {
@@ -2427,17 +2425,12 @@ impl InputStream for MultiInputsStream<'_> {
         }
 
         loop {
-            if self.index > self.extra_streams.len() {
+            if self.index >= self.streams.len() {
                 // No more streams
                 return None;
             }
-            if self.index == 0 {
-                if let Some(ch) = self.stream.next() {
-                    // Next character in main stream
-                    return Some(ch);
-                }
-            } else if let Some(ch) = self.extra_streams[self.index - 1].next() {
-                // Next character in current stream
+            if let Some(ch) = self.streams[self.index].next() {
+                // Next character in main stream
                 return Some(ch);
             }
             // Jump to the next stream
@@ -2452,17 +2445,12 @@ impl InputStream for MultiInputsStream<'_> {
         }
 
         loop {
-            if self.index > self.extra_streams.len() {
+            if self.index >= self.streams.len() {
                 // No more streams
                 return None;
             }
-            if self.index == 0 {
-                if let Some(&ch) = self.stream.peek() {
-                    // Next character in main stream
-                    return Some(ch);
-                }
-            } else if let Some(&ch) = self.extra_streams[self.index - 1].peek() {
-                // Next character in current stream
+            if let Some(&ch) = self.streams[self.index].peek() {
+                // Next character in main stream
                 return Some(ch);
             }
             // Jump to the next stream
@@ -2689,8 +2677,6 @@ pub fn lex_raw<'a>(
     let buffer: TokenizerControl = RefCell::new(TokenizerControlBlock::new()).into();
     let buffer2 = buffer.clone();
 
-    let mut input_streams = inputs.into_iter().map(|s| s.as_ref().chars().peekable());
-
     (
         TokenIterator {
             engine,
@@ -2707,8 +2693,10 @@ pub fn lex_raw<'a>(
             pos: Position::new(1, 0),
             stream: MultiInputsStream {
                 buf: [None, None],
-                stream: input_streams.next().unwrap(),
-                extra_streams: input_streams.collect(),
+                streams: inputs
+                    .into_iter()
+                    .map(|s| s.as_ref().chars().peekable())
+                    .collect(),
                 index: 0,
             },
             token_mapper,

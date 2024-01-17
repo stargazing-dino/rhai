@@ -639,7 +639,7 @@ impl Engine {
         };
 
         let mut _namespace = namespace;
-        let mut args = Vec::new();
+        let mut args = FnArgsVec::new();
 
         match token {
             // id( <EOF>
@@ -702,7 +702,7 @@ impl Engine {
                     op_token: None,
                     namespace: _namespace,
                     hashes,
-                    args: args.into_boxed_slice(),
+                    args,
                 }
                 .into_fn_call_expr(settings.pos));
             }
@@ -769,7 +769,7 @@ impl Engine {
                         op_token: None,
                         namespace: _namespace,
                         hashes,
-                        args: args.into_boxed_slice(),
+                        args,
                     }
                     .into_fn_call_expr(settings.pos));
                 }
@@ -1998,7 +1998,7 @@ impl Engine {
                         namespace: Namespace::NONE,
                         name: state.get_interned_string("-"),
                         hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "-", 1)),
-                        args: vec![expr].into_boxed_slice(),
+                        args: IntoIterator::into_iter([expr]).collect(),
                         op_token: Some(token),
                         capture_parent_scope: false,
                     }
@@ -2020,7 +2020,7 @@ impl Engine {
                         namespace: Namespace::NONE,
                         name: state.get_interned_string("+"),
                         hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "+", 1)),
-                        args: vec![expr].into_boxed_slice(),
+                        args: IntoIterator::into_iter([expr]).collect(),
                         op_token: Some(token),
                         capture_parent_scope: false,
                     }
@@ -2036,8 +2036,10 @@ impl Engine {
                     namespace: Namespace::NONE,
                     name: state.get_interned_string("!"),
                     hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "!", 1)),
-                    args: vec![self.parse_unary(input, state, lib, settings.level_up()?)?]
-                        .into_boxed_slice(),
+                    args: {
+                        let expr = self.parse_unary(input, state, lib, settings.level_up()?)?;
+                        IntoIterator::into_iter([expr]).collect()
+                    },
                     op_token: Some(token),
                     capture_parent_scope: false,
                 }
@@ -2395,7 +2397,7 @@ impl Engine {
                 namespace: Namespace::NONE,
                 name: state.get_interned_string(&op),
                 hashes: FnCallHashes::from_native_only(hash),
-                args: vec![root, rhs].into_boxed_slice(),
+                args: IntoIterator::into_iter([root, rhs]).collect(),
                 op_token: native_only.then(|| op_token.clone()),
                 capture_parent_scope: false,
             };
@@ -2448,7 +2450,7 @@ impl Engine {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string(OP_NOT),
                             hashes: FnCallHashes::from_native_only(calc_fn_hash(None, OP_NOT, 1)),
-                            args: vec![fn_call].into_boxed_slice(),
+                            args: IntoIterator::into_iter([fn_call]).collect(),
                             op_token: Some(Token::Bang),
                             capture_parent_scope: false,
                         };
@@ -2493,9 +2495,9 @@ impl Engine {
 
         let pos = settings.pos;
 
-        let mut inputs = Vec::new();
-        let mut segments = Vec::new();
-        let mut tokens = Vec::new();
+        let mut inputs = FnArgsVec::new();
+        let mut segments = FnArgsVec::new();
+        let mut tokens = FnArgsVec::new();
 
         // Adjust the variables stack
         if syntax.scope_may_be_changed {
@@ -2663,8 +2665,8 @@ impl Engine {
 
         Ok(Expr::Custom(
             crate::ast::CustomExpr {
-                inputs: inputs.into_boxed_slice(),
-                tokens: tokens.into_boxed_slice(),
+                inputs,
+                tokens,
                 state: user_state,
                 scope_may_be_changed: syntax.scope_may_be_changed,
                 self_terminated,
@@ -3750,7 +3752,7 @@ impl Engine {
         }
 
         let num_externals = externals.as_ref().len();
-        let mut args = Vec::with_capacity(externals.as_ref().len() + 1);
+        let mut args = FnArgsVec::with_capacity(externals.as_ref().len() + 1);
 
         args.push(fn_expr);
 
@@ -3777,7 +3779,7 @@ impl Engine {
                 crate::engine::KEYWORD_FN_PTR_CURRY,
                 num_externals + 1,
             )),
-            args: args.into_boxed_slice(),
+            args,
             op_token: None,
             capture_parent_scope: false,
         }

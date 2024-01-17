@@ -5,8 +5,8 @@ use crate::engine::KEYWORD_FN_PTR;
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
 use crate::{
-    calc_fn_hash, Dynamic, FnPtr, Identifier, ImmutableString, Position, SmartString, StaticVec,
-    INT,
+    calc_fn_hash, Dynamic, FnArgsVec, FnPtr, Identifier, ImmutableString, Position, SmartString,
+    StaticVec, INT,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -39,9 +39,9 @@ pub struct BinaryExpr {
 #[derive(Debug, Clone, Hash)]
 pub struct CustomExpr {
     /// List of keywords.
-    pub inputs: Box<[Expr]>,
+    pub inputs: FnArgsVec<Expr>,
     /// List of tokens actually parsed.
-    pub tokens: Box<[ImmutableString]>,
+    pub tokens: FnArgsVec<ImmutableString>,
     /// State value.
     pub state: Dynamic,
     /// Is the current [`Scope`][crate::Scope] possibly modified by this custom statement
@@ -191,7 +191,7 @@ pub struct FnCallExpr {
     /// Pre-calculated hashes.
     pub hashes: FnCallHashes,
     /// List of function call argument expressions.
-    pub args: Box<[Expr]>,
+    pub args: FnArgsVec<Expr>,
     /// Does this function call capture the parent scope?
     pub capture_parent_scope: bool,
     /// Is this function call a native operator?

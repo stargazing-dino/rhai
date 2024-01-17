@@ -9,8 +9,8 @@ use crate::func::{
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypeInfo, CustomTypesCollection};
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Identifier, ImmutableString, NativeCallContext,
-    RhaiResultOf, Shared, SharedModule, SmartString,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, FnArgsVec, Identifier, ImmutableString,
+    NativeCallContext, RhaiResultOf, Shared, SharedModule, SmartString,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -88,16 +88,16 @@ pub struct FuncInfoMetadata {
     /// Number of parameters.
     pub num_params: usize,
     /// Parameter types (if applicable).
-    pub param_types: Box<[TypeId]>,
+    pub param_types: FnArgsVec<TypeId>,
     /// Parameter names and types (if available).
     #[cfg(feature = "metadata")]
-    pub params_info: Box<[Identifier]>,
+    pub params_info: FnArgsVec<Identifier>,
     /// Return type name.
     #[cfg(feature = "metadata")]
     pub return_type: Identifier,
     /// Comments.
     #[cfg(feature = "metadata")]
-    pub comments: Box<[SmartString]>,
+    pub comments: crate::StaticVec<SmartString>,
 }
 
 /// A type containing a single registered function.
@@ -1024,16 +1024,19 @@ impl Module {
         hash_fn: u64,
         arg_names: impl IntoIterator<Item = S>,
     ) -> &mut Self {
-        let mut param_names = arg_names.into_iter().map(Into::into).collect::<Vec<_>>();
+        let mut params_info = arg_names
+            .into_iter()
+            .map(Into::into)
+            .collect::<FnArgsVec<_>>();
 
         if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
-            let (param_names, return_type_name) = if param_names.len() > f.metadata.num_params {
-                let return_type = param_names.pop().unwrap();
-                (param_names, return_type)
+            let (params_info, return_type_name) = if params_info.len() > f.metadata.num_params {
+                let return_type = params_info.pop().unwrap();
+                (params_info, return_type)
             } else {
-                (param_names, crate::SmartString::new_const())
+                (params_info, crate::SmartString::new_const())
             };
-            f.metadata.params_info = param_names.into_boxed_slice();
+            f.metadata.params_info = params_info;
             f.metadata.return_type = return_type_name;
         }
 
@@ -1221,18 +1224,18 @@ impl Module {
             .iter()
             .enumerate()
             .map(|(i, &type_id)| Self::map_type(!is_method || i > 0, type_id))
-            .collect::<Vec<_>>();
+            .collect::<FnArgsVec<_>>();
 
         let is_dynamic = param_types
             .iter()
             .any(|&type_id| type_id == TypeId::of::<Dynamic>());
 
         #[cfg(feature = "metadata")]
-        let (param_names, return_type_name) = {
+        let (params_info, return_type_name) = {
             let mut names = _arg_names
                 .into_iter()
                 .map(|a| a.as_ref().into())
-                .collect::<Vec<_>>();
+                .collect::<FnArgsVec<_>>();
             let return_type = if names.len() > param_types.len() {
                 names.pop().unwrap()
             } else {
@@ -1272,9 +1275,9 @@ impl Module {
                 #[cfg(not(feature = "no_object"))]
                 this_type: None,
                 num_params: param_types.len(),
-                param_types: param_types.into_boxed_slice(),
+                param_types,
                 #[cfg(feature = "metadata")]
-                params_info: param_names.into_boxed_slice(),
+                params_info,
                 #[cfg(feature = "metadata")]
                 return_type: return_type_name,
                 #[cfg(feature = "metadata")]
