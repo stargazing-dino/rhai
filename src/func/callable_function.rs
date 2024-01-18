@@ -1,32 +1,12 @@
 //! Module defining the standard Rhai function type.
 
 use super::native::{FnAny, FnPlugin, IteratorFn, SendSync};
-use crate::ast::FnAccess;
+use crate::ast::{EncapsulatedEnviron, FnAccess};
 use crate::plugin::PluginFunction;
 use crate::Shared;
 use std::fmt;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-
-/// _(internals)_ Encapsulated AST environment.
-/// Exported under the `internals` feature only.
-///
-/// 1) functions defined within the same AST
-/// 2) the stack of imported [modules][crate::Module]
-/// 3) global constants
-#[derive(Debug, Clone)]
-pub struct EncapsulatedEnviron {
-    /// Functions defined within the same [`AST`][crate::AST].
-    #[cfg(not(feature = "no_function"))]
-    pub lib: crate::SharedModule,
-    /// Imported [modules][crate::Module].
-    #[cfg(not(feature = "no_module"))]
-    pub imports: thin_vec::ThinVec<(crate::ImmutableString, crate::SharedModule)>,
-    /// Globally-defined constants.
-    #[cfg(not(feature = "no_module"))]
-    #[cfg(not(feature = "no_function"))]
-    pub constants: Option<crate::eval::SharedGlobalConstants>,
-}
 
 /// _(internals)_ A type encapsulating a function callable by Rhai.
 /// Exported under the `internals` feature only.

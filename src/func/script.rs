@@ -2,9 +2,8 @@
 #![cfg(not(feature = "no_function"))]
 
 use super::call::FnCallArgs;
-use crate::ast::ScriptFnDef;
+use crate::ast::{EncapsulatedEnviron, ScriptFnDef};
 use crate::eval::{Caches, GlobalRuntimeState};
-use crate::func::EncapsulatedEnviron;
 use crate::{Dynamic, Engine, Position, RhaiResult, Scope, ERR};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;

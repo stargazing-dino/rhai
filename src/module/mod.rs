@@ -2079,7 +2079,7 @@ impl Module {
         let _ = result?;
 
         // Encapsulated environment
-        let environ = Shared::new(crate::func::EncapsulatedEnviron {
+        let environ = Shared::new(crate::ast::EncapsulatedEnviron {
             #[cfg(not(feature = "no_function"))]
             lib: ast.shared_lib().clone(),
             imports,

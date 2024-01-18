@@ -19,7 +19,7 @@ pub use call::ensure_no_data_race;
 #[cfg(not(feature = "no_function"))]
 pub use call::is_anonymous_fn;
 pub use call::FnCallArgs;
-pub use callable_function::{CallableFunction, EncapsulatedEnviron};
+pub use callable_function::CallableFunction;
 #[cfg(not(feature = "no_function"))]
 pub use func::Func;
 #[cfg(not(feature = "no_object"))]

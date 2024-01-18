@@ -359,8 +359,9 @@ pub use api::default_limits;
 
 #[cfg(feature = "internals")]
 pub use ast::{
-    ASTFlags, ASTNode, BinaryExpr, Expr, FlowControl, FnCallExpr, FnCallHashes, Ident,
-    OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock, SwitchCasesCollection,
+    ASTFlags, ASTNode, BinaryExpr, EncapsulatedEnviron, Expr, FlowControl, FnCallExpr,
+    FnCallHashes, Ident, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock,
+    SwitchCasesCollection,
 };
 
 #[cfg(feature = "internals")]
@@ -370,9 +371,6 @@ pub use ast::CustomExpr;
 #[cfg(feature = "internals")]
 #[cfg(not(feature = "no_module"))]
 pub use ast::Namespace;
-
-#[cfg(feature = "internals")]
-pub use func::EncapsulatedEnviron;
 
 #[cfg(feature = "internals")]
 pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeState};

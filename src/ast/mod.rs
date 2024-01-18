@@ -10,7 +10,7 @@ pub mod namespace_none;
 pub mod script_fn;
 pub mod stmt;
 
-pub use ast::{ASTNode, AST};
+pub use ast::{ASTNode, EncapsulatedEnviron, AST};
 #[cfg(not(feature = "no_custom_syntax"))]
 pub use expr::CustomExpr;
 pub use expr::{BinaryExpr, Expr, FnCallExpr, FnCallHashes};

@@ -1,7 +1,7 @@
 //! The `FnPtr` type.
 
+use crate::ast::EncapsulatedEnviron;
 use crate::eval::GlobalRuntimeState;
-use crate::func::EncapsulatedEnviron;
 use crate::tokenizer::{is_reserved_keyword_or_symbol, is_valid_function_name, Token};
 use crate::types::dynamic::Variant;
 use crate::{
