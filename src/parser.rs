@@ -2,9 +2,9 @@
 
 use crate::api::options::LangOptions;
 use crate::ast::{
-    ASTFlags, BinaryExpr, CaseBlocksList, ConditionalExpr, Expr, FlowControl, FnCallExpr,
-    FnCallHashes, Ident, Namespace, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock,
-    StmtBlockContainer, SwitchCasesCollection,
+    ASTFlags, BinaryExpr, CaseBlocksList, Expr, FlowControl, FnCallExpr, FnCallHashes, Ident,
+    Namespace, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock, StmtBlockContainer,
+    SwitchCasesCollection,
 };
 use crate::engine::{Precedence, OP_CONTAINS, OP_NOT};
 use crate::eval::{Caches, GlobalRuntimeState};
@@ -1164,9 +1164,9 @@ impl Engine {
             }
         }
 
-        let mut expressions = ThinVec::<ConditionalExpr>::new();
+        let mut expressions = FnArgsVec::<BinaryExpr>::new();
         let mut cases = StraightHashMap::<CaseBlocksList>::default();
-        let mut ranges = ThinVec::<RangeCase>::new();
+        let mut ranges = StaticVec::<RangeCase>::new();
         let mut def_case = None;
         let mut def_case_pos = Position::NONE;
 
@@ -1261,7 +1261,11 @@ impl Engine {
                     (Expr::Stmt(stmt_block.into()), need_comma)
                 };
 
-            expressions.push((condition, action_expr).into());
+            expressions.push(BinaryExpr {
+                lhs: condition,
+                rhs: action_expr,
+            });
+
             let index = expressions.len() - 1;
 
             if case_expr_list.is_empty() {

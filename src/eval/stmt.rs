@@ -2,8 +2,7 @@
 
 use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::ast::{
-    ASTFlags, BinaryExpr, ConditionalExpr, Expr, FlowControl, OpAssignment, Stmt,
-    SwitchCasesCollection,
+    ASTFlags, BinaryExpr, Expr, FlowControl, OpAssignment, Stmt, SwitchCasesCollection,
 };
 use crate::eval::search_namespace;
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
@@ -526,7 +525,7 @@ impl Engine {
                         for &index in case_blocks_list {
                             let block = &expressions[index];
 
-                            let cond_result = match block.condition {
+                            let cond_result = match block.lhs {
                                 Expr::BoolConstant(b, ..) => b,
                                 ref c => self
                                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), c)?
@@ -537,16 +536,16 @@ impl Engine {
                             };
 
                             if cond_result {
-                                result = Some(&block.expr);
+                                result = Some(&block.rhs);
                                 break;
                             }
                         }
                     } else if !ranges.is_empty() {
                         // Then check integer ranges
                         for r in ranges.iter().filter(|r| r.contains(&value)) {
-                            let ConditionalExpr { condition, expr } = &expressions[r.index()];
+                            let BinaryExpr { lhs, rhs } = &expressions[r.index()];
 
-                            let cond_result = match condition {
+                            let cond_result = match lhs {
                                 Expr::BoolConstant(b, ..) => *b,
                                 c => self
                                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), c)?
@@ -557,7 +556,7 @@ impl Engine {
                             };
 
                             if cond_result {
-                                result = Some(expr);
+                                result = Some(rhs);
                                 break;
                             }
                         }
@@ -565,7 +564,7 @@ impl Engine {
                 }
 
                 result
-                    .or_else(|| def_case.as_ref().map(|&index| &expressions[index].expr))
+                    .or_else(|| def_case.as_ref().map(|&index| &expressions[index].rhs))
                     .map_or(Ok(Dynamic::UNIT), |expr| {
                         self.eval_expr(global, caches, scope, this_ptr, expr)
                     })

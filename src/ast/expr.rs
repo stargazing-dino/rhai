@@ -23,7 +23,7 @@ use thin_vec::ThinVec;
 
 /// _(internals)_ A binary expression.
 /// Exported under the `internals` feature only.
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Hash, Default)]
 pub struct BinaryExpr {
     /// LHS expression.
     pub lhs: Expr,

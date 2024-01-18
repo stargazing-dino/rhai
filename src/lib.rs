@@ -359,8 +359,8 @@ pub use api::default_limits;
 
 #[cfg(feature = "internals")]
 pub use ast::{
-    ASTFlags, ASTNode, BinaryExpr, ConditionalExpr, Expr, FlowControl, FnCallExpr, FnCallHashes,
-    Ident, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock, SwitchCasesCollection,
+    ASTFlags, ASTNode, BinaryExpr, Expr, FlowControl, FnCallExpr, FnCallHashes, Ident,
+    OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock, SwitchCasesCollection,
 };
 
 #[cfg(feature = "internals")]
