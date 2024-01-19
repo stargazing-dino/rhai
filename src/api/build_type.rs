@@ -98,13 +98,13 @@ impl Engine {
 ///
 /// To define a pretty-print name, call [`with_name`][`TypeBuilder::with_name`],
 /// to use [`Engine::register_type_with_name`] instead.
-pub struct TypeBuilder<'a, T: Variant + Clone> {
+pub struct TypeBuilder<'a, 's, T: Variant + Clone> {
     engine: &'a mut Engine,
-    name: Option<&'static str>,
+    name: Option<&'s str>,
     _marker: PhantomData<T>,
 }
 
-impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
+impl<'a, T: Variant + Clone> TypeBuilder<'a, '_, T> {
     /// Create a [`TypeBuilder`] linked to a particular [`Engine`] instance.
     #[inline(always)]
     fn new(engine: &'a mut Engine) -> Self {
@@ -116,11 +116,11 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     }
 }
 
-impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
+impl<'s, T: Variant + Clone> TypeBuilder<'_, 's, T> {
     /// Set a pretty-print name for the `type_of` function.
     #[inline(always)]
-    pub fn with_name(&mut self, name: &'static str) -> &mut Self {
-        self.name = Some(name);
+    pub fn with_name(&mut self, name: &'s str) -> &mut Self {
+        self.name = Some(name.as_ref());
         self
     }
 
@@ -146,17 +146,17 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
 
     /// Register a custom function.
     #[inline(always)]
-    pub fn with_fn<A: 'static, const N: usize, const C: bool, R: Variant + Clone, const L: bool>(
+    pub fn with_fn<A: 'static, const N: usize, const X: bool, R: Variant + Clone, const F: bool>(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
-        method: impl RegisterNativeFunction<A, N, C, R, L> + SendSync + 'static,
+        method: impl RegisterNativeFunction<A, N, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_fn(name, method);
         self
     }
 }
 
-impl<'a, T> TypeBuilder<'a, T>
+impl<T> TypeBuilder<'_, '_, T>
 where
     T: Variant + Clone + IntoIterator,
     <T as IntoIterator>::Item: Variant + Clone,
@@ -171,17 +171,17 @@ where
 }
 
 #[cfg(not(feature = "no_object"))]
-impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
+impl<T: Variant + Clone> TypeBuilder<'_, '_, T> {
     /// Register a getter function.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
     ///
     /// Not available under `no_object`.
     #[inline(always)]
-    pub fn with_get<const C: bool, V: Variant + Clone, const L: bool>(
+    pub fn with_get<const X: bool, R: Variant + Clone, const F: bool>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, C, V, L> + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_get(name, get_fn);
         self
@@ -191,10 +191,10 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     ///
     /// Not available under `no_object`.
     #[inline(always)]
-    pub fn with_set<const C: bool, V: Variant + Clone, const L: bool>(
+    pub fn with_set<const X: bool, R: Variant + Clone, const F: bool>(
         &mut self,
         name: impl AsRef<str>,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, V), 2, C, (), L> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, R), 2, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_set(name, set_fn);
         self
@@ -207,16 +207,16 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// Not available under `no_object`.
     #[inline(always)]
     pub fn with_get_set<
-        const C1: bool,
-        const C2: bool,
-        V: Variant + Clone,
-        const L1: bool,
-        const L2: bool,
+        const X1: bool,
+        const X2: bool,
+        R: Variant + Clone,
+        const F1: bool,
+        const F2: bool,
     >(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, C1, V, L1> + SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, V), 2, C2, (), L2> + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, X1, R, F1> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, R), 2, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_get_set(name, get_fn, set_fn);
         self
@@ -224,7 +224,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
 }
 
 #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
+impl<T: Variant + Clone> TypeBuilder<'_, '_, T> {
     /// Register an index getter.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
@@ -232,13 +232,13 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// Not available under both `no_index` and `no_object`.
     #[inline(always)]
     pub fn with_indexer_get<
-        X: Variant + Clone,
-        const C: bool,
-        V: Variant + Clone,
-        const L: bool,
+        IDX: Variant + Clone,
+        const X: bool,
+        R: Variant + Clone,
+        const F: bool,
     >(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<T>, X), 2, C, V, L> + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>, IDX), 2, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_get(get_fn);
         self
@@ -249,13 +249,13 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// Not available under both `no_index` and `no_object`.
     #[inline(always)]
     pub fn with_indexer_set<
-        X: Variant + Clone,
-        const C: bool,
-        V: Variant + Clone,
-        const L: bool,
+        IDX: Variant + Clone,
+        const X: bool,
+        R: Variant + Clone,
+        const F: bool,
     >(
         &mut self,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), 3, C, (), L> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, IDX, R), 3, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_set(set_fn);
         self
@@ -266,27 +266,27 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// Not available under both `no_index` and `no_object`.
     #[inline(always)]
     pub fn with_indexer_get_set<
-        X: Variant + Clone,
-        const C1: bool,
-        const C2: bool,
-        V: Variant + Clone,
-        const L1: bool,
-        const L2: bool,
+        IDX: Variant + Clone,
+        const X1: bool,
+        const X2: bool,
+        R: Variant + Clone,
+        const F1: bool,
+        const F2: bool,
     >(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<T>, X), 2, C1, V, L1> + SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), 3, C2, (), L2> + SendSync + 'static,
+        get_fn: impl RegisterNativeFunction<(Mut<T>, IDX), 2, X1, R, F1> + SendSync + 'static,
+        set_fn: impl RegisterNativeFunction<(Mut<T>, IDX, R), 3, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_get_set(get_fn, set_fn);
         self
     }
 }
 
-impl<'a, T: Variant + Clone> Drop for TypeBuilder<'a, T> {
+impl<T: Variant + Clone> Drop for TypeBuilder<'_, '_, T> {
     #[inline]
     fn drop(&mut self) {
         match self.name {
-            Some(name) => self.engine.register_type_with_name::<T>(name),
+            Some(ref name) => self.engine.register_type_with_name::<T>(name),
             None => self.engine.register_type::<T>(),
         };
     }

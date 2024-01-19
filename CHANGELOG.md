@@ -60,6 +60,7 @@ Enhancements
 * `Token::FloatConstant` and `Token::DecimalConstant` now carry the original text representation for use in, say, a _token mapper_.
 * `Dynamic::is_fnptr` is made a public API.
 * `Scope::get_value_ref` and `Scope::get_value_mut` are added.
+* `TypeBuilder::with_name` now takes any `&str` instead of just `&'static str`.
 
 
 Version 1.16.3
