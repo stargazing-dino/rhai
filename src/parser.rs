@@ -3,7 +3,7 @@
 use crate::api::options::LangOptions;
 use crate::ast::{
     ASTFlags, BinaryExpr, CaseBlocksList, Expr, FlowControl, FnCallExpr, FnCallHashes, Ident,
-    Namespace, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock, StmtBlockContainer,
+    Namespace, OpAssignment, RangeCase, ScriptFuncDef, Stmt, StmtBlock, StmtBlockContainer,
     SwitchCasesCollection,
 };
 use crate::engine::{Precedence, OP_CONTAINS, OP_NOT};
@@ -35,7 +35,7 @@ use thin_vec::ThinVec;
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
-type FnLib = StraightHashMap<Shared<ScriptFnDef>>;
+type FnLib = StraightHashMap<Shared<ScriptFuncDef>>;
 
 /// Invalid variable name that acts as a search barrier in a [`Scope`].
 const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
@@ -3615,7 +3615,7 @@ impl Engine {
         settings: ParseSettings,
         access: crate::FnAccess,
         #[cfg(feature = "metadata")] comments: impl IntoIterator<Item = crate::Identifier>,
-    ) -> ParseResult<ScriptFnDef> {
+    ) -> ParseResult<ScriptFuncDef> {
         let settings = settings.level_up()?;
 
         let (token, pos) = input.next().unwrap();
@@ -3727,7 +3727,7 @@ impl Engine {
         let mut params: FnArgsVec<_> = params.into_iter().map(|(p, ..)| p).collect();
         params.shrink_to_fit();
 
-        Ok(ScriptFnDef {
+        Ok(ScriptFuncDef {
             name: state.get_interned_string(name),
             access,
             #[cfg(not(feature = "no_object"))]
@@ -3815,7 +3815,7 @@ impl Engine {
         lib: &mut FnLib,
         settings: ParseSettings,
         _parent: &mut ParseState,
-    ) -> ParseResult<(Expr, Shared<ScriptFnDef>)> {
+    ) -> ParseResult<(Expr, Shared<ScriptFuncDef>)> {
         use core::iter::FromIterator;
 
         let settings = settings.level_up()?;
@@ -3893,7 +3893,7 @@ impl Engine {
         let fn_name = state.get_interned_string(make_anonymous_fn(hash));
 
         // Define the function
-        let script = Shared::new(ScriptFnDef {
+        let script = Shared::new(ScriptFuncDef {
             name: fn_name.clone(),
             access: crate::FnAccess::Public,
             #[cfg(not(feature = "no_object"))]
@@ -3982,7 +3982,7 @@ impl Engine {
         mut input: TokenStream,
         state: &mut ParseState,
         process_settings: impl FnOnce(&mut ParseSettings),
-    ) -> ParseResult<(StmtBlockContainer, Vec<Shared<ScriptFnDef>>)> {
+    ) -> ParseResult<(StmtBlockContainer, Vec<Shared<ScriptFuncDef>>)> {
         let mut statements = StmtBlockContainer::new_const();
         let mut functions = <_>::default();
 

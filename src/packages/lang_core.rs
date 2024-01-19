@@ -216,18 +216,18 @@ mod reflection_functions {
 #[cfg(not(feature = "no_object"))]
 fn collect_fn_metadata(
     ctx: &NativeCallContext,
-    filter: impl Fn(FnNamespace, FnAccess, &str, usize, &crate::Shared<crate::ast::ScriptFnDef>) -> bool
+    filter: impl Fn(FnNamespace, FnAccess, &str, usize, &crate::Shared<crate::ast::ScriptFuncDef>) -> bool
         + Copy,
 ) -> crate::Array {
     #[cfg(not(feature = "no_module"))]
     use crate::Identifier;
-    use crate::{ast::ScriptFnDef, engine::FN_ANONYMOUS, Array, Map};
+    use crate::{ast::ScriptFuncDef, engine::FN_ANONYMOUS, Array, Map};
 
     // Create a metadata record for a function.
     fn make_metadata(
         engine: &Engine,
         #[cfg(not(feature = "no_module"))] namespace: Identifier,
-        func: &ScriptFnDef,
+        func: &ScriptFuncDef,
     ) -> Map {
         let mut map = Map::new();
 
@@ -346,7 +346,7 @@ fn collect_fn_metadata(
             list: &mut Array,
             namespace: &str,
             module: &Module,
-            filter: impl Fn(FnNamespace, FnAccess, &str, usize, &Shared<ScriptFnDef>) -> bool + Copy,
+            filter: impl Fn(FnNamespace, FnAccess, &str, usize, &Shared<ScriptFuncDef>) -> bool + Copy,
         ) {
             module
                 .iter_script_fn()

@@ -2,7 +2,8 @@
 #![cfg(feature = "metadata")]
 
 use crate::api::formatting::format_type;
-use crate::module::{calc_native_fn_hash, FuncInfo, ModuleFlags};
+use crate::func::RhaiFunc;
+use crate::module::{calc_native_fn_hash, FuncMetadata, ModuleFlags};
 use crate::types::custom_types::CustomTypeInfo;
 use crate::{calc_fn_hash, Engine, FnAccess, SmartString, AST};
 use serde::{Deserialize, Serialize};
@@ -102,17 +103,17 @@ impl Ord for FnMetadata<'_> {
     }
 }
 
-impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
-    fn from(info: &'a FuncInfo) -> Self {
-        let base_hash = calc_fn_hash(None, &info.metadata.name, info.metadata.num_params);
-        let (typ, full_hash, _this_type) = if info.func.is_script() {
+impl<'a> From<(&'a RhaiFunc, &'a FuncMetadata)> for FnMetadata<'a> {
+    fn from(info: (&'a RhaiFunc, &'a FuncMetadata)) -> Self {
+        let (f, m) = info;
+        let base_hash = calc_fn_hash(None, &m.name, m.num_params);
+        let (typ, full_hash, _this_type) = if f.is_script() {
             (
                 FnType::Script,
                 base_hash,
                 #[cfg(not(feature = "no_function"))]
                 #[cfg(not(feature = "no_object"))]
-                info.func
-                    .get_script_fn_def()
+                f.get_script_fn_def()
                     .unwrap()
                     .this_type
                     .as_ref()
@@ -123,7 +124,7 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
         } else {
             (
                 FnType::Native,
-                calc_native_fn_hash(None, &info.metadata.name, &info.metadata.param_types),
+                calc_native_fn_hash(None, &m.name, &m.param_types),
                 None::<&str>,
             )
         };
@@ -132,17 +133,16 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
             base_hash,
             full_hash,
             #[cfg(not(feature = "no_module"))]
-            namespace: info.metadata.namespace,
-            access: info.metadata.access,
-            name: &info.metadata.name,
+            namespace: m.namespace,
+            access: m.access,
+            name: &m.name,
             #[cfg(not(feature = "no_function"))]
-            is_anonymous: crate::parser::is_anonymous_fn(&info.metadata.name),
+            is_anonymous: crate::parser::is_anonymous_fn(&m.name),
             typ,
             #[cfg(not(feature = "no_object"))]
             this_type: _this_type,
-            num_params: info.metadata.num_params,
-            params: info
-                .metadata
+            num_params: m.num_params,
+            params: m
                 .params_info
                 .iter()
                 .map(|s| {
@@ -155,22 +155,21 @@ impl<'a> From<&'a FuncInfo> for FnMetadata<'a> {
                     FnParam { name, typ }
                 })
                 .collect(),
-            return_type: format_type(&info.metadata.return_type, true),
-            signature: info.gen_signature().into(),
-            doc_comments: if info.func.is_script() {
+            return_type: format_type(&m.return_type, true),
+            signature: m.gen_signature().into(),
+            doc_comments: if f.is_script() {
                 #[cfg(feature = "no_function")]
                 unreachable!("script-defined functions should not exist under no_function");
 
                 #[cfg(not(feature = "no_function"))]
-                info.func
-                    .get_script_fn_def()
-                    .expect("`ScriptFnDef`")
+                f.get_script_fn_def()
+                    .expect("`ScriptFuncDef`")
                     .comments
                     .iter()
                     .map(<_>::as_ref)
                     .collect()
             } else {
-                info.metadata.comments.iter().map(<_>::as_ref).collect()
+                m.comments.iter().map(<_>::as_ref).collect()
             },
         }
     }

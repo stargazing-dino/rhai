@@ -360,7 +360,7 @@ pub use api::default_limits;
 #[cfg(feature = "internals")]
 pub use ast::{
     ASTFlags, ASTNode, BinaryExpr, EncapsulatedEnviron, Expr, FlowControl, FnCallExpr,
-    FnCallHashes, Ident, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock,
+    FnCallHashes, Ident, OpAssignment, RangeCase, ScriptFuncDef, Stmt, StmtBlock,
     SwitchCasesCollection,
 };
 

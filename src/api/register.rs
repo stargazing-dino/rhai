@@ -101,14 +101,16 @@ impl Engine {
         let is_pure =
             is_pure && (FUNC::num_params() != 2 || !fn_name.starts_with(crate::engine::FN_SET));
 
-        let func = func.into_callable_function(is_pure, true);
-
-        let metadata = FuncRegistration::new(fn_name).with_namespace(FnNamespace::Global);
+        let f = FuncRegistration::new(fn_name).with_namespace(FnNamespace::Global);
 
         #[cfg(feature = "metadata")]
-        let metadata = metadata.with_params_info(param_type_names);
+        let f = f.with_params_info(param_type_names);
 
-        metadata.set_into_module_raw(self.global_namespace_mut(), param_types, func);
+        f.set_into_module_raw(
+            self.global_namespace_mut(),
+            param_types,
+            func.into_callable_function(is_pure, true),
+        );
 
         self
     }

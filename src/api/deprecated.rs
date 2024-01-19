@@ -728,7 +728,7 @@ impl Module {
             fx
         };
 
-        fx.set_into_module_raw(self, arg_types, func).metadata.hash
+        fx.set_into_module_raw(self, arg_types, func).hash
     }
 
     /// _(metadata)_ Set a native Rust function into the [`Module`], returning a [`u64`] hash key.
@@ -760,7 +760,6 @@ impl Module {
             .with_params_info(arg_names.unwrap_or(&[]))
             .with_comments(comments)
             .set_into_module_raw(self, arg_types, func)
-            .metadata
             .hash
     }
 

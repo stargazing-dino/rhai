@@ -53,8 +53,8 @@ pub enum RhaiFunc {
     /// A script-defined function.
     #[cfg(not(feature = "no_function"))]
     Script {
-        /// Shared reference to the [`ScriptFnDef`][crate::ast::ScriptFnDef] function definition.
-        fn_def: Shared<crate::ast::ScriptFnDef>,
+        /// Shared reference to the [`ScriptFuncDef`][crate::ast::ScriptFuncDef] function definition.
+        fn_def: Shared<crate::ast::ScriptFuncDef>,
         /// Encapsulated environment, if any.
         environ: Option<Shared<EncapsulatedEnviron>>,
     },
@@ -240,7 +240,7 @@ impl RhaiFunc {
     #[cfg(not(feature = "no_function"))]
     #[inline]
     #[must_use]
-    pub const fn get_script_fn_def(&self) -> Option<&Shared<crate::ast::ScriptFnDef>> {
+    pub const fn get_script_fn_def(&self) -> Option<&Shared<crate::ast::ScriptFuncDef>> {
         match self {
             Self::Pure { .. }
             | Self::Method { .. }
@@ -292,9 +292,9 @@ impl RhaiFunc {
 }
 
 #[cfg(not(feature = "no_function"))]
-impl From<crate::ast::ScriptFnDef> for RhaiFunc {
+impl From<crate::ast::ScriptFuncDef> for RhaiFunc {
     #[inline(always)]
-    fn from(fn_def: crate::ast::ScriptFnDef) -> Self {
+    fn from(fn_def: crate::ast::ScriptFuncDef) -> Self {
         Self::Script {
             fn_def: fn_def.into(),
             environ: None,
@@ -303,9 +303,9 @@ impl From<crate::ast::ScriptFnDef> for RhaiFunc {
 }
 
 #[cfg(not(feature = "no_function"))]
-impl From<Shared<crate::ast::ScriptFnDef>> for RhaiFunc {
+impl From<Shared<crate::ast::ScriptFuncDef>> for RhaiFunc {
     #[inline(always)]
-    fn from(fn_def: Shared<crate::ast::ScriptFnDef>) -> Self {
+    fn from(fn_def: Shared<crate::ast::ScriptFuncDef>) -> Self {
         Self::Script {
             fn_def,
             environ: None,

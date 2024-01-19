@@ -701,7 +701,7 @@ impl AST {
     #[cfg(feature = "internals")]
     #[cfg(not(feature = "no_function"))]
     #[inline]
-    pub fn iter_fn_def(&self) -> impl Iterator<Item = &crate::Shared<super::ScriptFnDef>> {
+    pub fn iter_fn_def(&self) -> impl Iterator<Item = &crate::Shared<super::ScriptFuncDef>> {
         self.lib.iter_script_fn().map(|(.., fn_def)| fn_def)
     }
     /// Iterate through all function definitions.
@@ -711,7 +711,7 @@ impl AST {
     #[cfg(not(feature = "no_function"))]
     #[allow(dead_code)]
     #[inline]
-    pub(crate) fn iter_fn_def(&self) -> impl Iterator<Item = &crate::Shared<super::ScriptFnDef>> {
+    pub(crate) fn iter_fn_def(&self) -> impl Iterator<Item = &crate::Shared<super::ScriptFuncDef>> {
         self.lib.iter_script_fn().map(|(.., fn_def)| fn_def)
     }
     /// Iterate through all function definitions.

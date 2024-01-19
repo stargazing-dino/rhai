@@ -1362,7 +1362,7 @@ pub fn optimize_into_ast(
     engine: &Engine,
     scope: Option<&Scope>,
     statements: StmtBlockContainer,
-    #[cfg(not(feature = "no_function"))] functions: Vec<crate::Shared<crate::ast::ScriptFnDef>>,
+    #[cfg(not(feature = "no_function"))] functions: Vec<crate::Shared<crate::ast::ScriptFuncDef>>,
     optimization_level: OptimizationLevel,
 ) -> AST {
     let mut statements = statements;
@@ -1381,7 +1381,7 @@ pub fn optimize_into_ast(
 
             functions
                 .iter()
-                .map(|fn_def| crate::ast::ScriptFnDef {
+                .map(|fn_def| crate::ast::ScriptFuncDef {
                     name: fn_def.name.clone(),
                     access: fn_def.access,
                     body: crate::ast::StmtBlock::NONE,

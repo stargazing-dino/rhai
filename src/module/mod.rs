@@ -72,7 +72,7 @@ impl FnNamespace {
 /// A type containing the metadata of a single registered function.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[non_exhaustive]
-pub struct FuncInfoMetadata {
+pub struct FuncMetadata {
     /// Hash value.
     pub hash: u64,
     /// Function namespace.
@@ -96,35 +96,25 @@ pub struct FuncInfoMetadata {
     pub comments: crate::StaticVec<SmartString>,
 }
 
-/// A type containing a single registered function.
-#[derive(Debug, Clone)]
-pub struct FuncInfo {
-    /// Function instance.
-    pub func: RhaiFunc,
-    /// Function metadata.
-    pub metadata: Box<FuncInfoMetadata>,
-}
-
-impl FuncInfo {
+impl FuncMetadata {
     /// _(metadata)_ Generate a signature of the function.
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[must_use]
     pub fn gen_signature(&self) -> String {
-        let mut signature = format!("{}(", self.metadata.name);
+        let mut signature = format!("{}(", self.name);
 
-        let return_type = format_type(&self.metadata.return_type, true);
+        let return_type = format_type(&self.return_type, true);
 
-        if self.metadata.params_info.is_empty() {
-            for x in 0..self.metadata.num_params {
+        if self.params_info.is_empty() {
+            for x in 0..self.num_params {
                 signature.push('_');
-                if x < self.metadata.num_params - 1 {
+                if x < self.num_params - 1 {
                     signature.push_str(", ");
                 }
             }
         } else {
             let params = self
-                .metadata
                 .params_info
                 .iter()
                 .map(|param| {
@@ -144,7 +134,7 @@ impl FuncInfo {
         }
         signature.push(')');
 
-        if !self.func.is_script() && !return_type.is_empty() {
+        if !return_type.is_empty() {
             signature.push_str(" -> ");
             signature.push_str(&return_type);
         }
@@ -177,7 +167,7 @@ pub fn calc_native_fn_hash<'a>(
 /// Type for fine-tuned module function registration.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FuncRegistration {
-    metadata: FuncInfoMetadata,
+    metadata: FuncMetadata,
 }
 
 impl FuncRegistration {
@@ -193,13 +183,13 @@ impl FuncRegistration {
     ///     .with_namespace(FnNamespace::Global)
     ///     .set_into_module(&mut module, inc);
     ///
-    /// let hash = f.metadata.hash;
+    /// let hash = f.hash;
     ///
     /// assert!(module.contains_fn(hash));
     /// ```
     pub fn new(name: impl Into<Identifier>) -> Self {
         Self {
-            metadata: FuncInfoMetadata {
+            metadata: FuncMetadata {
                 hash: 0,
                 name: name.into(),
                 namespace: FnNamespace::Internal,
@@ -246,7 +236,7 @@ impl FuncRegistration {
         self,
         module: &mut Module,
         func: FUNC,
-    ) -> &FuncInfo
+    ) -> &FuncMetadata
     where
         R: Variant + Clone,
         FUNC: RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
@@ -270,42 +260,39 @@ impl FuncRegistration {
         module: &mut Module,
         arg_types: impl AsRef<[TypeId]>,
         func: RhaiFunc,
-    ) -> &FuncInfo {
-        let mut metadata = self.metadata;
+    ) -> &FuncMetadata {
+        let mut f = self.metadata;
 
-        metadata.num_params = arg_types.as_ref().len();
-        metadata
-            .param_types
-            .extend(arg_types.as_ref().iter().copied());
+        f.num_params = arg_types.as_ref().len();
+        f.param_types.extend(arg_types.as_ref().iter().copied());
 
         let is_method = func.is_method();
 
-        metadata
-            .param_types
+        f.param_types
             .iter_mut()
             .enumerate()
             .for_each(|(i, type_id)| *type_id = Module::map_type(!is_method || i > 0, *type_id));
 
-        let is_dynamic = metadata
+        let is_dynamic = f
             .param_types
             .iter()
             .any(|&type_id| type_id == TypeId::of::<Dynamic>());
 
         #[cfg(feature = "metadata")]
-        if metadata.params_info.len() > metadata.param_types.len() {
-            metadata.return_type = metadata.params_info.pop().unwrap();
+        if f.params_info.len() > f.param_types.len() {
+            f.return_type = f.params_info.pop().unwrap();
         }
 
-        let hash_base = calc_fn_hash(None, &metadata.name, metadata.param_types.len());
-        let hash_fn = calc_fn_hash_full(hash_base, metadata.param_types.iter().copied());
-        metadata.hash = hash_fn;
+        let hash_base = calc_fn_hash(None, &f.name, f.param_types.len());
+        let hash_fn = calc_fn_hash_full(hash_base, f.param_types.iter().copied());
+        f.hash = hash_fn;
 
         // Catch hash collisions in testing environment only.
         #[cfg(feature = "testing-environ")]
-        if let Some(f) = module.functions.as_ref().and_then(|f| f.get(&hash_base)) {
+        if let Some(fx) = module.functions.as_ref().and_then(|f| f.get(&hash_base)) {
             unreachable!(
                 "Hash {} already exists when registering function {}:\n{:#?}",
-                hash_base, metadata.name, f
+                hash_base, f.name, fx
             );
         }
 
@@ -317,22 +304,19 @@ impl FuncRegistration {
             .flags
             .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
 
-        let f = FuncInfo {
-            func,
-            metadata: metadata.into(),
-        };
-
-        match module
+        let entry = match module
             .functions
             .get_or_insert_with(|| new_hash_map(FN_MAP_SIZE))
             .entry(hash_fn)
         {
             Entry::Occupied(mut entry) => {
-                entry.insert(f);
+                entry.insert((func, f.into()));
                 entry.into_mut()
             }
-            Entry::Vacant(entry) => entry.insert(f),
-        }
+            Entry::Vacant(entry) => entry.insert((func, f.into())),
+        };
+
+        &*entry.1
     }
 }
 
@@ -369,7 +353,7 @@ pub struct Module {
     /// Flattened collection of all [`Module`] variables, including those in sub-modules.
     all_variables: Option<StraightHashMap<Dynamic>>,
     /// Functions (both native Rust and scripted).
-    functions: Option<StraightHashMap<FuncInfo>>,
+    functions: Option<StraightHashMap<(RhaiFunc, Box<FuncMetadata>)>>,
     /// Flattened collection of all functions, native Rust and scripted.
     /// including those in sub-modules.
     all_functions: Option<StraightHashMap<RhaiFunc>>,
@@ -415,7 +399,7 @@ impl fmt::Debug for Module {
                 "functions",
                 &self
                     .iter_fn()
-                    .map(|f| f.func.to_string())
+                    .map(|(_, f)| f.gen_signature())
                     .collect::<Vec<_>>(),
             )
             .field("flags", &self.flags);
@@ -428,7 +412,7 @@ impl fmt::Debug for Module {
 }
 
 #[cfg(not(feature = "no_function"))]
-impl<T: IntoIterator<Item = Shared<crate::ast::ScriptFnDef>>> From<T> for Module {
+impl<T: IntoIterator<Item = Shared<crate::ast::ScriptFuncDef>>> From<T> for Module {
     fn from(iter: T) -> Self {
         let mut module = Self::new();
         iter.into_iter().for_each(|fn_def| {
@@ -867,11 +851,12 @@ impl Module {
     #[inline]
     pub fn gen_fn_signatures(&self) -> impl Iterator<Item = String> + '_ {
         self.iter_fn()
-            .filter(|&f| match f.metadata.access {
+            .map(|(_, f)| f)
+            .filter(|&f| match f.access {
                 FnAccess::Public => true,
                 FnAccess::Private => false,
             })
-            .map(FuncInfo::gen_signature)
+            .map(FuncMetadata::gen_signature)
     }
 
     /// Does a variable exist in the [`Module`]?
@@ -979,7 +964,7 @@ impl Module {
     /// If there is an existing function of the same name and number of arguments, it is replaced.
     #[cfg(not(feature = "no_function"))]
     #[inline]
-    pub fn set_script_fn(&mut self, fn_def: impl Into<Shared<crate::ast::ScriptFnDef>>) -> u64 {
+    pub fn set_script_fn(&mut self, fn_def: impl Into<Shared<crate::ast::ScriptFuncDef>>) -> u64 {
         let fn_def = fn_def.into();
 
         // None + function name + number of arguments.
@@ -1007,29 +992,24 @@ impl Module {
             );
         }
 
+        let metadata = FuncMetadata {
+            hash: hash_script,
+            name: fn_def.name.as_str().into(),
+            namespace,
+            access: fn_def.access,
+            num_params,
+            param_types: FnArgsVec::new_const(),
+            #[cfg(feature = "metadata")]
+            params_info: fn_def.params.iter().map(Into::into).collect(),
+            #[cfg(feature = "metadata")]
+            return_type: <_>::default(),
+            #[cfg(feature = "metadata")]
+            comments: crate::StaticVec::new_const(),
+        };
+
         self.functions
             .get_or_insert_with(|| new_hash_map(FN_MAP_SIZE))
-            .insert(
-                hash_script,
-                FuncInfo {
-                    metadata: FuncInfoMetadata {
-                        hash: hash_script,
-                        name: fn_def.name.as_str().into(),
-                        namespace,
-                        access: fn_def.access,
-                        num_params,
-                        param_types: <_>::default(),
-                        #[cfg(feature = "metadata")]
-                        params_info: fn_def.params.iter().map(Into::into).collect(),
-                        #[cfg(feature = "metadata")]
-                        return_type: "".into(),
-                        #[cfg(feature = "metadata")]
-                        comments: <_>::default(),
-                    }
-                    .into(),
-                    func: fn_def.into(),
-                },
-            );
+            .insert(hash_script, (fn_def.into(), metadata.into()));
 
         self.flags
             .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
@@ -1046,13 +1026,13 @@ impl Module {
         &self,
         name: impl AsRef<str>,
         num_params: usize,
-    ) -> Option<&Shared<crate::ast::ScriptFnDef>> {
+    ) -> Option<&Shared<crate::ast::ScriptFuncDef>> {
         self.functions.as_ref().and_then(|lib| {
             let name = name.as_ref();
 
             lib.values()
-                .find(|&f| f.metadata.num_params == num_params && f.metadata.name == name)
-                .and_then(|f| f.func.get_script_fn_def())
+                .find(|(_, f)| f.num_params == num_params && f.name == name)
+                .and_then(|(f, _)| f.get_script_fn_def())
         })
     }
 
@@ -1182,16 +1162,16 @@ impl Module {
             .map(Into::into)
             .collect::<FnArgsVec<_>>();
 
-        if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
-            let (params_info, return_type_name) = if params_info.len() > f.metadata.num_params {
+        if let Some((_, f)) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
+            let (params_info, return_type_name) = if params_info.len() > f.num_params {
                 let return_type = params_info.pop().unwrap();
                 (params_info, return_type)
             } else {
                 (params_info, crate::SmartString::new_const())
             };
-            f.metadata.params_info = params_info;
-            f.metadata.return_type = return_type_name;
-            f.metadata.comments = comments.into_iter().map(Into::into).collect();
+            f.params_info = params_info;
+            f.return_type = return_type_name;
+            f.comments = comments.into_iter().map(Into::into).collect();
         }
 
         self
@@ -1210,8 +1190,8 @@ impl Module {
     #[deprecated(since = "1.17.0", note = "use the `FuncRegistration` API instead")]
     #[inline]
     pub fn update_fn_namespace(&mut self, hash_fn: u64, namespace: FnNamespace) -> &mut Self {
-        if let Some(f) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
-            f.metadata.namespace = namespace;
+        if let Some((_, f)) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
+            f.namespace = namespace;
             self.flags
                 .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
         }
@@ -1244,7 +1224,7 @@ impl Module {
         options: FuncRegistration,
         arg_types: impl AsRef<[TypeId]>,
         func: RhaiFunc,
-    ) -> &FuncInfo {
+    ) -> &FuncMetadata {
         options.set_into_module_raw(self, arg_types, func)
     }
 
@@ -1282,10 +1262,7 @@ impl Module {
         R: Variant + Clone,
         FUNC: RhaiNativeFunc<A, N, X, R, true> + SendSync + 'static,
     {
-        FuncRegistration::new(name)
-            .set_into_module(self, func)
-            .metadata
-            .hash
+        FuncRegistration::new(name).set_into_module(self, func).hash
     }
 
     /// Set a Rust getter function taking one mutable parameter, returning a [`u64`] hash key.
@@ -1326,7 +1303,6 @@ impl Module {
         FuncRegistration::new(crate::engine::make_getter(name.as_ref()))
             .with_namespace(FnNamespace::Global)
             .set_into_module(self, func)
-            .metadata
             .hash
     }
 
@@ -1373,7 +1349,6 @@ impl Module {
         FuncRegistration::new(crate::engine::make_setter(name.as_ref()))
             .with_namespace(FnNamespace::Global)
             .set_into_module(self, func)
-            .metadata
             .hash
     }
 
@@ -1487,7 +1462,6 @@ impl Module {
         FuncRegistration::new(crate::engine::FN_IDX_GET)
             .with_namespace(FnNamespace::Global)
             .set_into_module(self, func)
-            .metadata
             .hash
     }
 
@@ -1553,7 +1527,6 @@ impl Module {
         FuncRegistration::new(crate::engine::FN_IDX_SET)
             .with_namespace(FnNamespace::Global)
             .set_into_module(self, func)
-            .metadata
             .hash
     }
 
@@ -1621,7 +1594,7 @@ impl Module {
         self.functions
             .as_ref()
             .and_then(|m| m.get(&hash_native))
-            .map(|f| &f.func)
+            .map(|(f, _)| f)
     }
 
     /// Can the particular function with [`Dynamic`] parameter(s) exist in the [`Module`]?
@@ -1793,14 +1766,8 @@ impl Module {
                 Some(ref mut m) => m.extend(
                     functions
                         .iter()
-                        .filter(|(.., f)| {
-                            _filter(
-                                f.metadata.namespace,
-                                f.metadata.access,
-                                f.func.is_script(),
-                                &f.metadata.name,
-                                f.metadata.num_params,
-                            )
+                        .filter(|(.., (f, m))| {
+                            _filter(m.namespace, m.access, f.is_script(), &m.name, m.num_params)
                         })
                         .map(|(&k, f)| (k, f.clone())),
                 ),
@@ -1836,14 +1803,9 @@ impl Module {
     ) -> &mut Self {
         self.functions = std::mem::take(&mut self.functions).map(|m| {
             m.into_iter()
-                .filter(|(.., f)| {
-                    if f.func.is_script() {
-                        filter(
-                            f.metadata.namespace,
-                            f.metadata.access,
-                            &f.metadata.name,
-                            f.metadata.num_params,
-                        )
+                .filter(|(.., (f, m))| {
+                    if f.is_script() {
+                        filter(m.namespace, m.access, &m.name, m.num_params)
                     } else {
                         false
                     }
@@ -1905,8 +1867,11 @@ impl Module {
     /// Get an iterator to the functions in the [`Module`].
     #[inline]
     #[allow(dead_code)]
-    pub(crate) fn iter_fn(&self) -> impl Iterator<Item = &FuncInfo> {
-        self.functions.iter().flat_map(StraightHashMap::values)
+    pub(crate) fn iter_fn(&self) -> impl Iterator<Item = (&RhaiFunc, &FuncMetadata)> {
+        self.functions
+            .iter()
+            .flat_map(StraightHashMap::values)
+            .map(|(f, m)| (f, &**m))
     }
 
     /// Get an iterator over all script-defined functions in the [`Module`].
@@ -1916,7 +1881,7 @@ impl Module {
     /// 2) Access mode ([`FnAccess::Public`] or [`FnAccess::Private`]).
     /// 3) Function name (as string slice).
     /// 4) Number of parameters.
-    /// 5) Shared reference to function definition [`ScriptFnDef`][crate::ast::ScriptFnDef].
+    /// 5) Shared reference to function definition [`ScriptFuncDef`][crate::ast::ScriptFuncDef].
     #[cfg(not(feature = "no_function"))]
     #[inline]
     pub(crate) fn iter_script_fn(
@@ -1927,16 +1892,16 @@ impl Module {
             FnAccess,
             &str,
             usize,
-            &Shared<crate::ast::ScriptFnDef>,
+            &Shared<crate::ast::ScriptFuncDef>,
         ),
     > + '_ {
-        self.iter_fn().filter(|&f| f.func.is_script()).map(|f| {
+        self.iter_fn().filter(|(f, _)| f.is_script()).map(|(f, m)| {
             (
-                f.metadata.namespace,
-                f.metadata.access,
-                f.metadata.name.as_str(),
-                f.metadata.num_params,
-                f.func.get_script_fn_def().expect("`ScriptFnDef`"),
+                m.namespace,
+                m.access,
+                m.name.as_str(),
+                m.num_params,
+                f.get_script_fn_def().expect("`ScriptFuncDef`"),
             )
         })
     }
@@ -1954,14 +1919,9 @@ impl Module {
     pub fn iter_script_fn_info(
         &self,
     ) -> impl Iterator<Item = (FnNamespace, FnAccess, &str, usize)> {
-        self.iter_fn().filter(|&f| f.func.is_script()).map(|f| {
-            (
-                f.metadata.namespace,
-                f.metadata.access,
-                f.metadata.name.as_str(),
-                f.metadata.num_params,
-            )
-        })
+        self.iter_fn()
+            .filter(|(f, _)| f.is_script())
+            .map(|(_, f)| (f.namespace, f.access, f.name.as_str(), f.num_params))
     }
 
     /// _(internals)_ Get an iterator over all script-defined functions in the [`Module`].
@@ -1972,7 +1932,7 @@ impl Module {
     /// 2) Access mode ([`FnAccess::Public`] or [`FnAccess::Private`]).
     /// 3) Function name (as string slice).
     /// 4) Number of parameters.
-    /// 5) _(internals)_ Shared reference to function definition [`ScriptFnDef`][crate::ast::ScriptFnDef].
+    /// 5) _(internals)_ Shared reference to function definition [`ScriptFuncDef`][crate::ast::ScriptFuncDef].
     #[cfg(not(feature = "no_function"))]
     #[cfg(feature = "internals")]
     #[inline(always)]
@@ -1984,7 +1944,7 @@ impl Module {
             FnAccess,
             &str,
             usize,
-            &Shared<crate::ast::ScriptFnDef>,
+            &Shared<crate::ast::ScriptFuncDef>,
         ),
     > {
         self.iter_script_fn()
@@ -2152,13 +2112,14 @@ impl Module {
             })
             .for_each(|f| {
                 let hash = module.set_script_fn(f.clone());
-                let f = module.functions.as_mut().unwrap().get_mut(&hash).unwrap();
-
-                // Encapsulate AST environment
-                if let RhaiFunc::Script {
-                    environ: ref mut e, ..
-                } = f.func
+                if let (
+                    RhaiFunc::Script {
+                        environ: ref mut e, ..
+                    },
+                    _,
+                ) = module.functions.as_mut().unwrap().get_mut(&hash).unwrap()
                 {
+                    // Encapsulate AST environment
                     *e = Some(environ.clone());
                 }
             });
@@ -2230,40 +2191,36 @@ impl Module {
             }
 
             // Index all functions
-            for (&hash, f) in module.functions.iter().flatten() {
-                match f.metadata.namespace {
+            for (&hash, (f, m)) in module.functions.iter().flatten() {
+                match m.namespace {
                     FnNamespace::Global => {
                         // Catch hash collisions in testing environment only.
                         #[cfg(feature = "testing-environ")]
                         if let Some(fx) = functions.get(&hash) {
                             unreachable!(
                                 "Hash {} already exists when indexing function {:#?}:\n{:#?}",
-                                hash, f.func, fx
+                                hash, f, fx
                             );
                         }
 
                         // Flatten all functions with global namespace
-                        functions.insert(hash, f.func.clone());
+                        functions.insert(hash, f.clone());
                         contains_indexed_global_functions = true;
                     }
                     FnNamespace::Internal => (),
                 }
-                match f.metadata.access {
+                match m.access {
                     FnAccess::Public => (),
                     FnAccess::Private => continue, // Do not index private functions
                 }
 
-                if f.func.is_script() {
+                if f.is_script() {
                     #[cfg(not(feature = "no_function"))]
                     {
-                        let hash_script = crate::calc_fn_hash(
-                            path.iter().copied(),
-                            &f.metadata.name,
-                            f.metadata.num_params,
-                        );
+                        let hash_script =
+                            crate::calc_fn_hash(path.iter().copied(), &m.name, m.num_params);
                         #[cfg(not(feature = "no_object"))]
                         let hash_script = f
-                            .func
                             .get_script_fn_def()
                             .unwrap()
                             .this_type
@@ -2277,29 +2234,26 @@ impl Module {
                         if let Some(fx) = functions.get(&hash_script) {
                             unreachable!(
                                 "Hash {} already exists when indexing function {:#?}:\n{:#?}",
-                                hash_script, f.func, fx
+                                hash_script, f, fx
                             );
                         }
 
-                        functions.insert(hash_script, f.func.clone());
+                        functions.insert(hash_script, f.clone());
                     }
                 } else {
-                    let hash_fn = calc_native_fn_hash(
-                        path.iter().copied(),
-                        &f.metadata.name,
-                        &f.metadata.param_types,
-                    );
+                    let hash_fn =
+                        calc_native_fn_hash(path.iter().copied(), &m.name, &m.param_types);
 
                     // Catch hash collisions in testing environment only.
                     #[cfg(feature = "testing-environ")]
                     if let Some(fx) = functions.get(&hash_fn) {
                         unreachable!(
                             "Hash {} already exists when indexing function {:#?}:\n{:#?}",
-                            hash_fn, f.func, fx
+                            hash_fn, f, fx
                         );
                     }
 
-                    functions.insert(hash_fn, f.func.clone());
+                    functions.insert(hash_fn, f.clone());
                 }
             }
 

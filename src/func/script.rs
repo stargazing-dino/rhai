@@ -2,7 +2,7 @@
 #![cfg(not(feature = "no_function"))]
 
 use super::call::FnCallArgs;
-use crate::ast::{EncapsulatedEnviron, ScriptFnDef};
+use crate::ast::{EncapsulatedEnviron, ScriptFuncDef};
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::{Dynamic, Engine, Position, RhaiResult, Scope, ERR};
 #[cfg(feature = "no_std")]
@@ -28,7 +28,7 @@ impl Engine {
         scope: &mut Scope,
         mut this_ptr: Option<&mut Dynamic>,
         _environ: Option<&EncapsulatedEnviron>,
-        fn_def: &ScriptFnDef,
+        fn_def: &ScriptFuncDef,
         args: &mut FnCallArgs,
         rewind_scope: bool,
         pos: Position,
