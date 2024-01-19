@@ -15,7 +15,6 @@ Potentially breaking changes
 * Traits implemented by `ImmutableString` are cleaned up. Normally this should not be a breaking change.
 * `EvalContext::new`, `FloatWrapper` and `ConditionalExpr` are now gated under `internals`.
 * Previously, Rhai follows [Unicode's definition for _whitespace_](https://en.wikipedia.org/wiki/Template:Whitespace_(Unicode)), which allows many exotic whitespace characters in scripts. Starting from this version, whitespace follows [WhatWG](https://infra.spec.whatwg.org/#ascii-whitespace)'s definition of five ASCII characters (TAB, SPACE, CR, LF and FF), which is the same as Rust. All other Unicode whitespace characters (not inside strings) are not considered whitespace by Rhai. If a script used to contain non-ASCII whitespace characters, it now fails to parse with a syntax error.
-* `RegisterNativeFunction`, `CallableFunction`, `PluginFunction` are renamed `RhaiNativeFunc` and `RhaiFunc`, `PluginFunc` respectively to be consistent with naming.
 
 Deprecated API's
 ----------------

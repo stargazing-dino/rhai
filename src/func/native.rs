@@ -568,10 +568,10 @@ pub type FnBuiltin = (
 
 /// Function that gets an iterator from a type.
 #[cfg(not(feature = "sync"))]
-pub type IteratorFn = dyn Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>>;
+pub type FnIterator = dyn Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>>;
 /// Function that gets an iterator from a type.
 #[cfg(feature = "sync")]
-pub type IteratorFn =
+pub type FnIterator =
     dyn Fn(Dynamic) -> Box<dyn Iterator<Item = RhaiResultOf<Dynamic>>> + Send + Sync;
 
 /// Plugin function trait object.

@@ -256,7 +256,7 @@ impl GlobalRuntimeState {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     #[must_use]
-    pub fn get_iter(&self, id: std::any::TypeId) -> Option<&crate::func::IteratorFn> {
+    pub fn get_iter(&self, id: std::any::TypeId) -> Option<&crate::func::FnIterator> {
         self.modules
             .iter()
             .rev()

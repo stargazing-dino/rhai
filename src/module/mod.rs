@@ -4,7 +4,7 @@
 use crate::api::formatting::format_type;
 use crate::ast::FnAccess;
 use crate::func::{
-    shared_take_or_clone, IteratorFn, RhaiFunc, RhaiNativeFunc, SendSync, StraightHashMap,
+    shared_take_or_clone, FnIterator, RhaiFunc, RhaiNativeFunc, SendSync, StraightHashMap,
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypeInfo, CustomTypesCollection};
 use crate::{
@@ -360,9 +360,9 @@ pub struct Module {
     /// Bloom filter on native Rust functions (in scripted hash format) that contain [`Dynamic`] parameters.
     dynamic_functions_filter: BloomFilterU64,
     /// Iterator functions, keyed by the type producing the iterator.
-    type_iterators: BTreeMap<TypeId, Shared<IteratorFn>>,
+    type_iterators: BTreeMap<TypeId, Shared<FnIterator>>,
     /// Flattened collection of iterator functions, including those in sub-modules.
-    all_type_iterators: BTreeMap<TypeId, Shared<IteratorFn>>,
+    all_type_iterators: BTreeMap<TypeId, Shared<FnIterator>>,
     /// Flags.
     pub(crate) flags: ModuleFlags,
 }
@@ -399,7 +399,12 @@ impl fmt::Debug for Module {
                 "functions",
                 &self
                     .iter_fn()
-                    .map(|(_, f)| f.gen_signature())
+                    .map(|(_f, _m)| {
+                        #[cfg(not(feature = "metadata"))]
+                        return _f.to_string();
+                        #[cfg(feature = "metadata")]
+                        return _m.gen_signature();
+                    })
                     .collect::<Vec<_>>(),
             )
             .field("flags", &self.flags);
@@ -2156,7 +2161,7 @@ impl Module {
             path: &mut Vec<&'a str>,
             variables: &mut StraightHashMap<Dynamic>,
             functions: &mut StraightHashMap<RhaiFunc>,
-            type_iterators: &mut BTreeMap<TypeId, Shared<IteratorFn>>,
+            type_iterators: &mut BTreeMap<TypeId, Shared<FnIterator>>,
         ) -> bool {
             let mut contains_indexed_global_functions = false;
 
@@ -2383,14 +2388,14 @@ impl Module {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     #[must_use]
-    pub(crate) fn get_qualified_iter(&self, id: TypeId) -> Option<&IteratorFn> {
+    pub(crate) fn get_qualified_iter(&self, id: TypeId) -> Option<&FnIterator> {
         self.all_type_iterators.get(&id).map(|f| &**f)
     }
 
     /// Get the specified type iterator.
     #[inline]
     #[must_use]
-    pub(crate) fn get_iter(&self, id: TypeId) -> Option<&IteratorFn> {
+    pub(crate) fn get_iter(&self, id: TypeId) -> Option<&FnIterator> {
         self.type_iterators.get(&id).map(|f| &**f)
     }
 }

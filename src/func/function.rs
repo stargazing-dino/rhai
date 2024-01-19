@@ -1,6 +1,6 @@
 //! Module defining the standard Rhai function type.
 
-use super::native::{FnAny, FnPlugin, IteratorFn, SendSync};
+use super::native::{FnAny, FnIterator, FnPlugin, SendSync};
 use crate::ast::{EncapsulatedEnviron, FnAccess};
 use crate::plugin::PluginFunc;
 use crate::Shared;
@@ -43,7 +43,7 @@ pub enum RhaiFunc {
     /// An iterator function.
     Iterator {
         /// Shared function pointer.
-        func: Shared<IteratorFn>,
+        func: Shared<FnIterator>,
     },
     /// A plugin function,
     Plugin {
@@ -268,7 +268,7 @@ impl RhaiFunc {
     /// Get a reference to an iterator function.
     #[inline]
     #[must_use]
-    pub fn get_iter_fn(&self) -> Option<&IteratorFn> {
+    pub fn get_iter_fn(&self) -> Option<&FnIterator> {
         match self {
             Self::Iterator { func, .. } => Some(&**func),
             Self::Pure { .. } | Self::Method { .. } | Self::Plugin { .. } => None,

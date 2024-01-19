@@ -29,8 +29,9 @@ pub use hashing::{calc_fn_hash, calc_fn_hash_full, calc_var_hash, get_hasher, St
 #[cfg(feature = "internals")]
 #[allow(deprecated)]
 pub use native::NativeCallContextStore;
+#[allow(unused_imports)]
 pub use native::{
     locked_read, locked_write, shared_get_mut, shared_make_mut, shared_take, shared_take_or_clone,
-    IteratorFn, Locked, NativeCallContext, SendSync, Shared,
+    FnIterator, Locked, NativeCallContext, SendSync, Shared,
 };
 pub use register::RhaiNativeFunc;
