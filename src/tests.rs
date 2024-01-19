@@ -32,7 +32,7 @@ fn check_struct_sizes() {
 
     #[cfg(feature = "internals")]
     {
-        assert_eq!(size_of::<CallableFunction>(), 3 * WORD_SIZE);
+        assert_eq!(size_of::<RhaiFunc>(), 3 * WORD_SIZE);
         assert_eq!(size_of::<module::FuncInfo>(), 4 * WORD_SIZE);
     }
 

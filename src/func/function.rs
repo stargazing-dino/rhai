@@ -2,7 +2,7 @@
 
 use super::native::{FnAny, FnPlugin, IteratorFn, SendSync};
 use crate::ast::{EncapsulatedEnviron, FnAccess};
-use crate::plugin::PluginFunction;
+use crate::plugin::PluginFunc;
 use crate::Shared;
 use std::fmt;
 #[cfg(feature = "no_std")]
@@ -12,7 +12,7 @@ use std::prelude::v1::*;
 /// Exported under the `internals` feature only.
 #[derive(Clone)]
 #[non_exhaustive]
-pub enum CallableFunction {
+pub enum RhaiFunc {
     /// A pure native Rust function with all arguments passed by value.
     Pure {
         /// Shared function pointer.
@@ -60,7 +60,7 @@ pub enum CallableFunction {
     },
 }
 
-impl fmt::Debug for CallableFunction {
+impl fmt::Debug for RhaiFunc {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -76,7 +76,7 @@ impl fmt::Debug for CallableFunction {
     }
 }
 
-impl fmt::Display for CallableFunction {
+impl fmt::Display for RhaiFunc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Pure { .. } => f.write_str("NativePureFunction"),
@@ -90,7 +90,7 @@ impl fmt::Display for CallableFunction {
     }
 }
 
-impl CallableFunction {
+impl RhaiFunc {
     /// Is this a pure native Rust function?
     #[inline]
     #[must_use]
@@ -292,7 +292,7 @@ impl CallableFunction {
 }
 
 #[cfg(not(feature = "no_function"))]
-impl From<crate::ast::ScriptFnDef> for CallableFunction {
+impl From<crate::ast::ScriptFnDef> for RhaiFunc {
     #[inline(always)]
     fn from(fn_def: crate::ast::ScriptFnDef) -> Self {
         Self::Script {
@@ -303,7 +303,7 @@ impl From<crate::ast::ScriptFnDef> for CallableFunction {
 }
 
 #[cfg(not(feature = "no_function"))]
-impl From<Shared<crate::ast::ScriptFnDef>> for CallableFunction {
+impl From<Shared<crate::ast::ScriptFnDef>> for RhaiFunc {
     #[inline(always)]
     fn from(fn_def: Shared<crate::ast::ScriptFnDef>) -> Self {
         Self::Script {
@@ -313,7 +313,7 @@ impl From<Shared<crate::ast::ScriptFnDef>> for CallableFunction {
     }
 }
 
-impl<T: PluginFunction + 'static + SendSync> From<T> for CallableFunction {
+impl<T: PluginFunc + 'static + SendSync> From<T> for RhaiFunc {
     #[inline(always)]
     fn from(func: T) -> Self {
         Self::Plugin {
@@ -322,7 +322,7 @@ impl<T: PluginFunction + 'static + SendSync> From<T> for CallableFunction {
     }
 }
 
-impl From<Shared<FnPlugin>> for CallableFunction {
+impl From<Shared<FnPlugin>> for RhaiFunc {
     #[inline(always)]
     fn from(func: Shared<FnPlugin>) -> Self {
         Self::Plugin { func }

@@ -4,8 +4,7 @@
 use crate::api::formatting::format_type;
 use crate::ast::FnAccess;
 use crate::func::{
-    shared_take_or_clone, CallableFunction, IteratorFn, RegisterNativeFunction, SendSync,
-    StraightHashMap,
+    shared_take_or_clone, IteratorFn, RhaiFunc, RhaiNativeFunc, SendSync, StraightHashMap,
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypeInfo, CustomTypesCollection};
 use crate::{
@@ -101,7 +100,7 @@ pub struct FuncInfoMetadata {
 #[derive(Debug, Clone)]
 pub struct FuncInfo {
     /// Function instance.
-    pub func: CallableFunction,
+    pub func: RhaiFunc,
     /// Function metadata.
     pub metadata: Box<FuncInfoMetadata>,
 }
@@ -250,7 +249,7 @@ impl FuncRegistration {
     ) -> &FuncInfo
     where
         R: Variant + Clone,
-        FUNC: RegisterNativeFunction<A, N, X, R, F> + SendSync + 'static,
+        FUNC: RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
     {
         let is_pure = true;
 
@@ -270,7 +269,7 @@ impl FuncRegistration {
         self,
         module: &mut Module,
         arg_types: impl AsRef<[TypeId]>,
-        func: CallableFunction,
+        func: RhaiFunc,
     ) -> &FuncInfo {
         let mut metadata = self.metadata;
 
@@ -373,7 +372,7 @@ pub struct Module {
     functions: Option<StraightHashMap<FuncInfo>>,
     /// Flattened collection of all functions, native Rust and scripted.
     /// including those in sub-modules.
-    all_functions: Option<StraightHashMap<CallableFunction>>,
+    all_functions: Option<StraightHashMap<RhaiFunc>>,
     /// Bloom filter on native Rust functions (in scripted hash format) that contain [`Dynamic`] parameters.
     dynamic_functions_filter: BloomFilterU64,
     /// Iterator functions, keyed by the type producing the iterator.
@@ -1244,7 +1243,7 @@ impl Module {
         &mut self,
         options: FuncRegistration,
         arg_types: impl AsRef<[TypeId]>,
-        func: CallableFunction,
+        func: RhaiFunc,
     ) -> &FuncInfo {
         options.set_into_module_raw(self, arg_types, func)
     }
@@ -1281,7 +1280,7 @@ impl Module {
     ) -> u64
     where
         R: Variant + Clone,
-        FUNC: RegisterNativeFunction<A, N, X, R, true> + SendSync + 'static,
+        FUNC: RhaiNativeFunc<A, N, X, R, true> + SendSync + 'static,
     {
         FuncRegistration::new(name)
             .set_into_module(self, func)
@@ -1322,7 +1321,7 @@ impl Module {
     where
         A: Variant + Clone,
         R: Variant + Clone,
-        FUNC: RegisterNativeFunction<(Mut<A>,), 1, X, R, true> + SendSync + 'static,
+        FUNC: RhaiNativeFunc<(Mut<A>,), 1, X, R, true> + SendSync + 'static,
     {
         FuncRegistration::new(crate::engine::make_getter(name.as_ref()))
             .with_namespace(FnNamespace::Global)
@@ -1369,7 +1368,7 @@ impl Module {
     where
         A: Variant + Clone,
         R: Variant + Clone,
-        FUNC: RegisterNativeFunction<(Mut<A>, R), 2, X, (), true> + SendSync + 'static,
+        FUNC: RhaiNativeFunc<(Mut<A>, R), 2, X, (), true> + SendSync + 'static,
     {
         FuncRegistration::new(crate::engine::make_setter(name.as_ref()))
             .with_namespace(FnNamespace::Global)
@@ -1417,8 +1416,8 @@ impl Module {
     >(
         &mut self,
         name: impl AsRef<str>,
-        getter: impl RegisterNativeFunction<(Mut<A>,), 1, X1, R, true> + SendSync + 'static,
-        setter: impl RegisterNativeFunction<(Mut<A>, R), 2, X2, (), true> + SendSync + 'static,
+        getter: impl RhaiNativeFunc<(Mut<A>,), 1, X1, R, true> + SendSync + 'static,
+        setter: impl RhaiNativeFunc<(Mut<A>, R), 2, X2, (), true> + SendSync + 'static,
     ) -> (u64, u64) {
         (
             self.set_getter_fn(name.as_ref(), getter),
@@ -1465,7 +1464,7 @@ impl Module {
         A: Variant + Clone,
         B: Variant + Clone,
         R: Variant + Clone,
-        FUNC: RegisterNativeFunction<(Mut<A>, B), 2, X, R, true> + SendSync + 'static,
+        FUNC: RhaiNativeFunc<(Mut<A>, B), 2, X, R, true> + SendSync + 'static,
     {
         #[cfg(not(feature = "no_index"))]
         assert!(
@@ -1531,7 +1530,7 @@ impl Module {
         A: Variant + Clone,
         B: Variant + Clone,
         R: Variant + Clone,
-        FUNC: RegisterNativeFunction<(Mut<A>, B, R), 3, X, (), true> + SendSync + 'static,
+        FUNC: RhaiNativeFunc<(Mut<A>, B, R), 3, X, (), true> + SendSync + 'static,
     {
         #[cfg(not(feature = "no_index"))]
         assert!(
@@ -1604,8 +1603,8 @@ impl Module {
         R: Variant + Clone,
     >(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<A>, B), 2, X1, R, true> + SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<A>, B, R), 3, X2, (), true> + SendSync + 'static,
+        get_fn: impl RhaiNativeFunc<(Mut<A>, B), 2, X1, R, true> + SendSync + 'static,
+        set_fn: impl RhaiNativeFunc<(Mut<A>, B, R), 3, X2, (), true> + SendSync + 'static,
     ) -> (u64, u64) {
         (
             self.set_indexer_get_fn(get_fn),
@@ -1618,7 +1617,7 @@ impl Module {
     /// The [`u64`] hash is returned by the [`set_native_fn`][Module::set_native_fn] call.
     #[inline]
     #[must_use]
-    pub(crate) fn get_fn(&self, hash_native: u64) -> Option<&CallableFunction> {
+    pub(crate) fn get_fn(&self, hash_native: u64) -> Option<&RhaiFunc> {
         self.functions
             .as_ref()
             .and_then(|m| m.get(&hash_native))
@@ -1651,7 +1650,7 @@ impl Module {
     #[cfg(not(feature = "no_module"))]
     #[inline]
     #[must_use]
-    pub(crate) fn get_qualified_fn(&self, hash_qualified_fn: u64) -> Option<&CallableFunction> {
+    pub(crate) fn get_qualified_fn(&self, hash_qualified_fn: u64) -> Option<&RhaiFunc> {
         self.all_functions
             .as_ref()
             .and_then(|m| m.get(&hash_qualified_fn))
@@ -2156,7 +2155,7 @@ impl Module {
                 let f = module.functions.as_mut().unwrap().get_mut(&hash).unwrap();
 
                 // Encapsulate AST environment
-                if let CallableFunction::Script {
+                if let RhaiFunc::Script {
                     environ: ref mut e, ..
                 } = f.func
                 {
@@ -2195,7 +2194,7 @@ impl Module {
             module: &'a Module,
             path: &mut Vec<&'a str>,
             variables: &mut StraightHashMap<Dynamic>,
-            functions: &mut StraightHashMap<CallableFunction>,
+            functions: &mut StraightHashMap<RhaiFunc>,
             type_iterators: &mut BTreeMap<TypeId, Shared<IteratorFn>>,
         ) -> bool {
             let mut contains_indexed_global_functions = false;

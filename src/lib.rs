@@ -242,7 +242,7 @@ pub use eval::EvalContext;
 #[cfg(not(feature = "no_object"))]
 use func::calc_typed_method_hash;
 use func::{calc_fn_hash, calc_fn_hash_full, calc_var_hash};
-pub use func::{plugin, FuncArgs, NativeCallContext, RegisterNativeFunction};
+pub use func::{plugin, FuncArgs, NativeCallContext, RhaiNativeFunc};
 pub use module::{FnNamespace, FuncRegistration, Module};
 pub use packages::string_basic::{FUNC_TO_DEBUG, FUNC_TO_STRING};
 pub use rhai_codegen::*;
@@ -377,7 +377,7 @@ pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeS
 
 #[cfg(feature = "internals")]
 #[allow(deprecated)]
-pub use func::{locked_read, locked_write, CallableFunction, NativeCallContextStore};
+pub use func::{locked_read, locked_write, NativeCallContextStore, RhaiFunc};
 
 #[cfg(feature = "internals")]
 #[cfg(feature = "metadata")]

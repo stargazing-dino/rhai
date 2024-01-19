@@ -3,7 +3,7 @@
 use super::call::FnCallArgs;
 use crate::ast::FnCallHashes;
 use crate::eval::{Caches, GlobalRuntimeState};
-use crate::plugin::PluginFunction;
+use crate::plugin::PluginFunc;
 use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
@@ -576,10 +576,10 @@ pub type IteratorFn =
 
 /// Plugin function trait object.
 #[cfg(not(feature = "sync"))]
-pub type FnPlugin = dyn PluginFunction;
+pub type FnPlugin = dyn PluginFunc;
 /// Plugin function trait object.
 #[cfg(feature = "sync")]
-pub type FnPlugin = dyn PluginFunction + Send + Sync;
+pub type FnPlugin = dyn PluginFunc + Send + Sync;
 
 /// Callback function for progress reporting.
 #[cfg(not(feature = "unchecked"))]

@@ -1,6 +1,6 @@
 //! Implement function-calling mechanism for [`Engine`].
 
-use super::{get_builtin_binary_op_fn, get_builtin_op_assignment_fn, CallableFunction};
+use super::{get_builtin_binary_op_fn, get_builtin_op_assignment_fn, RhaiFunc};
 use crate::api::default_limits::MAX_DYNAMIC_PARAMETERS;
 use crate::ast::{Expr, FnCallExpr, FnCallHashes};
 use crate::engine::{
@@ -277,7 +277,7 @@ impl Engine {
 
                                     get_builtin_op_assignment_fn(token, first_arg, rest_args[0])
                                         .map(|(f, has_context)| FnResolutionCacheEntry {
-                                            func: CallableFunction::Method {
+                                            func: RhaiFunc::Method {
                                                 func: Shared::new(f),
                                                 has_context,
                                                 is_pure: false,
@@ -288,7 +288,7 @@ impl Engine {
                                 }
                                 Some(token) => get_builtin_binary_op_fn(token, args[0], args[1])
                                     .map(|(f, has_context)| FnResolutionCacheEntry {
-                                        func: CallableFunction::Method {
+                                        func: RhaiFunc::Method {
                                             func: Shared::new(f),
                                             has_context,
                                             is_pure: true,
@@ -407,10 +407,8 @@ impl Engine {
                 f if !f.is_pure() && !args.is_empty() && args[0].is_read_only() => {
                     Err(ERR::ErrorNonPureMethodCallOnConstant(name.to_string(), pos).into())
                 }
-                CallableFunction::Plugin { func } => func.call(context, args),
-                CallableFunction::Pure { func, .. } | CallableFunction::Method { func, .. } => {
-                    func(context, args)
-                }
+                RhaiFunc::Plugin { func } => func.call(context, args),
+                RhaiFunc::Pure { func, .. } | RhaiFunc::Method { func, .. } => func(context, args),
                 _ => unreachable!("non-native function"),
             }
             .and_then(|r| self.check_data_size(r, pos))
@@ -628,7 +626,7 @@ impl Engine {
             }
 
             if let Some(FnResolutionCacheEntry { func, source }) = resolved.cloned() {
-                let CallableFunction::Script { fn_def, environ } = func else {
+                let RhaiFunc::Script { fn_def, environ } = func else {
                     unreachable!("Script function expected");
                 };
 
@@ -1529,7 +1527,7 @@ impl Engine {
         }
 
         // Clone first argument if the function is not a method after-all
-        if !func.map_or(true, CallableFunction::is_method) {
+        if !func.map_or(true, RhaiFunc::is_method) {
             if let Some(first) = first_arg_value {
                 *first = args[0].clone();
                 args[0] = first;
@@ -1540,7 +1538,7 @@ impl Engine {
 
         match func {
             #[cfg(not(feature = "no_function"))]
-            Some(CallableFunction::Script { fn_def, environ }) => {
+            Some(RhaiFunc::Script { fn_def, environ }) => {
                 let environ = environ.as_deref();
                 let scope = &mut Scope::new();
 
@@ -1557,7 +1555,7 @@ impl Engine {
                 Err(ERR::ErrorNonPureMethodCallOnConstant(fn_name.to_string(), pos).into())
             }
 
-            Some(CallableFunction::Plugin { func }) => {
+            Some(RhaiFunc::Plugin { func }) => {
                 let context = func
                     .has_context()
                     .then(|| (self, fn_name, module.id(), &*global, pos).into());
@@ -1566,10 +1564,10 @@ impl Engine {
             }
 
             Some(
-                CallableFunction::Pure {
+                RhaiFunc::Pure {
                     func, has_context, ..
                 }
-                | CallableFunction::Method {
+                | RhaiFunc::Method {
                     func, has_context, ..
                 },
             ) => {
@@ -1578,7 +1576,7 @@ impl Engine {
                 func(context, args).and_then(|r| self.check_data_size(r, pos))
             }
 
-            Some(CallableFunction::Iterator { .. }) => {
+            Some(RhaiFunc::Iterator { .. }) => {
                 unreachable!("iterator functions should not occur here")
             }
 

@@ -1,7 +1,7 @@
 //! Module defining macros for developing _plugins_.
 
-pub use super::CallableFunction;
 use super::FnCallArgs;
+pub use super::RhaiFunc;
 pub use crate::{
     Dynamic, Engine, EvalAltResult, FnAccess, FnNamespace, FuncRegistration, ImmutableString,
     Module, NativeCallContext, Position,
@@ -20,7 +20,7 @@ pub use rhai_codegen::*;
 ///
 /// This trait should not be used directly.
 /// Use the `#[export_module]` and `#[export_fn]` procedural attributes instead.
-pub trait PluginFunction {
+pub trait PluginFunc {
     /// Call the plugin function with the arguments provided.
     fn call(&self, context: Option<NativeCallContext>, args: &mut FnCallArgs) -> RhaiResult;
 
