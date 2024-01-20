@@ -48,8 +48,8 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
 
     quote! {
         impl ::rhai::CustomType for #name {
-            fn build(builder: ::rhai::TypeBuilder<'_, Self>) {
-                #accessors
+            fn build(mut builder: ::rhai::TypeBuilder<'_, Self>) {
+                #accessors;
             }
         }
     }
@@ -63,11 +63,11 @@ fn generate_accessor_fns(
 ) -> proc_macro2::TokenStream {
     let get = get
         .map(|func| quote! {#func})
-        .unwrap_or_else(|| quote! {|obj| obj.#field.clone()});
+        .unwrap_or_else(|| quote! {|obj: &mut Self| obj.#field.clone()});
 
     let set = set
         .map(|func| quote! {#func})
-        .unwrap_or_else(|| quote! {|obj, val| obj.#field = val});
+        .unwrap_or_else(|| quote! {|obj: &mut Self, val| obj.#field = val});
 
     if readonly {
         quote! {
