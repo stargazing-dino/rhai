@@ -19,7 +19,7 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
 
                 for attr in field.attrs.iter() {
                     if attr.path().is_ident("rhai_custom_type_skip") {
-                        if get_fn.is_some() || set_fn.is_some() || name.is_some() {
+                        if get_fn.is_some() || set_fn.is_some() || name.is_some() || readonly {
                             return syn::Error::new(
                                 Span::call_site(),
                                 "cannot use 'rhai_custom_type_skip' with other attributes",
