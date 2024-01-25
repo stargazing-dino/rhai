@@ -400,7 +400,13 @@ impl Hash for Dynamic {
             Union::Blob(ref a, ..) => a.hash(state),
             #[cfg(not(feature = "no_object"))]
             Union::Map(ref m, ..) => m.hash(state),
-            Union::FnPtr(..) => unimplemented!("FnPtr cannot be hashed"),
+            Union::FnPtr(ref f, ..) if f.environ.is_some() => {
+                unimplemented!("FnPtr with embedded environment cannot be hashed")
+            }
+            Union::FnPtr(ref f, ..) => {
+                f.fn_name().hash(state);
+                f.curry().hash(state);
+            }
 
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) => (*crate::func::locked_read(cell)).hash(state),
@@ -1211,7 +1217,9 @@ impl Dynamic {
             Union::Blob(..) => true,
             #[cfg(not(feature = "no_object"))]
             Union::Map(ref m, ..) => m.values().all(Self::is_hashable),
-            Union::FnPtr(..) => false,
+            Union::FnPtr(ref f, ..) => {
+                f.environ.is_none() && f.curry().iter().all(Self::is_hashable)
+            }
             #[cfg(not(feature = "no_time"))]
             Union::TimeStamp(..) => false,
 
