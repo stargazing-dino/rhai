@@ -6,7 +6,7 @@ use crate::func::StraightHashMap;
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
 use crate::types::Span;
-use crate::{calc_fn_hash, Dynamic, Position, INT};
+use crate::{calc_fn_hash, Dynamic, FnArgsVec, Position, StaticVec, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -17,7 +17,6 @@ use std::{
     num::NonZeroUsize,
     ops::{Range, RangeInclusive},
 };
-use thin_vec::ThinVec;
 
 /// _(internals)_ An op-assignment operator.
 /// Exported under the `internals` feature only.
@@ -180,53 +179,6 @@ impl fmt::Debug for OpAssignment {
     }
 }
 
-/// _(internals)_ An expression with a condition.
-/// Exported under the `internals` feature only.
-///
-/// The condition may simply be [`Expr::BoolConstant`] with `true` if there is actually no condition.
-#[derive(Debug, Clone, Default, Hash)]
-pub struct ConditionalExpr {
-    /// Condition.
-    pub condition: Expr,
-    /// Expression.
-    pub expr: Expr,
-}
-
-impl<E: Into<Expr>> From<E> for ConditionalExpr {
-    #[inline(always)]
-    fn from(value: E) -> Self {
-        Self {
-            condition: Expr::BoolConstant(true, Position::NONE),
-            expr: value.into(),
-        }
-    }
-}
-
-impl<E: Into<Expr>> From<(Expr, E)> for ConditionalExpr {
-    #[inline(always)]
-    fn from(value: (Expr, E)) -> Self {
-        Self {
-            condition: value.0,
-            expr: value.1.into(),
-        }
-    }
-}
-
-impl ConditionalExpr {
-    /// Is the condition always `true`?
-    #[inline(always)]
-    #[must_use]
-    pub const fn is_always_true(&self) -> bool {
-        matches!(self.condition, Expr::BoolConstant(true, ..))
-    }
-    /// Is the condition always `false`?
-    #[inline(always)]
-    #[must_use]
-    pub const fn is_always_false(&self) -> bool {
-        matches!(self.condition, Expr::BoolConstant(false, ..))
-    }
-}
-
 /// _(internals)_ A type containing a range case for a `switch` statement.
 /// Exported under the `internals` feature only.
 #[derive(Clone, Hash)]
@@ -379,12 +331,12 @@ pub type CaseBlocksList = smallvec::SmallVec<[usize; 2]>;
 /// Exported under the `internals` feature only.
 #[derive(Debug, Clone)]
 pub struct SwitchCasesCollection {
-    /// List of [`ConditionalExpr`]'s.
-    pub expressions: ThinVec<ConditionalExpr>,
+    /// List of conditional expressions: LHS = condition, RHS = expression.
+    pub expressions: FnArgsVec<BinaryExpr>,
     /// Dictionary mapping value hashes to [`ConditionalExpr`]'s.
     pub cases: StraightHashMap<CaseBlocksList>,
     /// List of range cases.
-    pub ranges: ThinVec<RangeCase>,
+    pub ranges: StaticVec<RangeCase>,
     /// Statements block for the default case (there can be no condition for the default case).
     pub def_case: Option<usize>,
 }
@@ -902,14 +854,14 @@ impl Stmt {
                 expr.is_pure()
                     && sw.cases.values().flat_map(|cases| cases.iter()).all(|&c| {
                         let block = &sw.expressions[c];
-                        block.condition.is_pure() && block.expr.is_pure()
+                        block.lhs.is_pure() && block.rhs.is_pure()
                     })
                     && sw.ranges.iter().all(|r| {
                         let block = &sw.expressions[r.index()];
-                        block.condition.is_pure() && block.expr.is_pure()
+                        block.lhs.is_pure() && block.rhs.is_pure()
                     })
                     && sw.def_case.is_some()
-                    && sw.expressions[sw.def_case.unwrap()].expr.is_pure()
+                    && sw.expressions[sw.def_case.unwrap()].rhs.is_pure()
             }
 
             // Loops that exit can be pure because it can never be infinite.
@@ -1059,10 +1011,10 @@ impl Stmt {
                     for &b in blocks {
                         let block = &sw.expressions[b];
 
-                        if !block.condition.walk(path, on_node) {
+                        if !block.lhs.walk(path, on_node) {
                             return false;
                         }
-                        if !block.expr.walk(path, on_node) {
+                        if !block.rhs.walk(path, on_node) {
                             return false;
                         }
                     }
@@ -1070,15 +1022,15 @@ impl Stmt {
                 for r in &sw.ranges {
                     let block = &sw.expressions[r.index()];
 
-                    if !block.condition.walk(path, on_node) {
+                    if !block.lhs.walk(path, on_node) {
                         return false;
                     }
-                    if !block.expr.walk(path, on_node) {
+                    if !block.rhs.walk(path, on_node) {
                         return false;
                     }
                 }
                 if let Some(index) = sw.def_case {
-                    if !sw.expressions[index].expr.walk(path, on_node) {
+                    if !sw.expressions[index].lhs.walk(path, on_node) {
                         return false;
                     }
                 }

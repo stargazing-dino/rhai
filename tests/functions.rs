@@ -1,5 +1,5 @@
 #![cfg(not(feature = "no_function"))]
-use rhai::{Dynamic, Engine, EvalAltResult, FnNamespace, Module, NativeCallContext, ParseErrorType, Shared, INT};
+use rhai::{Dynamic, Engine, EvalAltResult, FnNamespace, FuncRegistration, Module, NativeCallContext, ParseErrorType, Shared, INT};
 
 #[test]
 fn test_functions() {
@@ -84,8 +84,9 @@ fn test_functions_namespaces() {
     #[cfg(not(feature = "no_module"))]
     {
         let mut m = Module::new();
-        let hash = m.set_native_fn("test", || Ok(999 as INT));
-        m.update_fn_namespace(hash, FnNamespace::Global);
+
+        let f = || 999 as INT;
+        FuncRegistration::new("test").with_namespace(FnNamespace::Global).set_into_module(&mut m, f);
 
         engine.register_static_module("hello", m.into());
 
@@ -536,4 +537,40 @@ fn test_functions_is_def() {
             "#
         )
         .unwrap());
+}
+
+#[test]
+#[cfg(not(feature = "unchecked"))]
+fn test_functions_max() {
+    let mut engine = Engine::new();
+    engine.set_max_functions(5);
+
+    engine
+        .compile(
+            "
+            fn foo1() {}
+            fn foo2() {}
+            fn foo3() {}
+            fn foo4() {}
+            fn foo5() {}
+        ",
+        )
+        .unwrap();
+
+    assert!(matches!(
+        engine
+            .compile(
+                "
+                fn foo1() {}
+                fn foo2() {}
+                fn foo3() {}
+                fn foo4() {}
+                fn foo5() {}
+                fn foo6() {}
+            "
+            )
+            .expect_err("should err")
+            .err_type(),
+        ParseErrorType::TooManyFunctions
+    ))
 }

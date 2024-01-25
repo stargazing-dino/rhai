@@ -37,6 +37,8 @@ Fixes to bugs found via fuzzing
 * Fixed improper parsing of numbers with too many decimal points.
 * Fixed exponential running time when raising a decimal number to a very large power (> 1 million) -- it now returns an overflow error.
 * Shared values that contain reference loops no longer cause a stack overflow when printing.
+* `sleep` no longer panics on `NaN`.
+* `switch` on ranges now work properly.
 
 Other bug fixes
 ---------------
@@ -47,7 +49,11 @@ Other bug fixes
 New features
 ------------
 
+* `#[derive(CustomType)]` is now available, driven by procedural macros in `rhai_codegen`.
+* A new `FuncRegistration` API is added to assist in registering native Rust functions into modules with various settings. Some of the original `Module::set_fn...` API is now deprecated.
 * Functions defined in plugin modules can now be marked as `volatile` which prevents it from being optimized away even under `OptimizationLevel::Full`.
+* Added `Engine::max_functions` and `Engine::set_max_functions` to limit the maximum number of functions allowed in a script. This s to guard against DOS attacks -- e.g. a simple closure `||` (two characters) is a function. When `max_function` is exceeded during script compilation, a new parse error, `TooManyFunctions`, is returned.
+* `Engine::get_interned_string` is made public instead of gated under `internals`.
 
 Enhancements
 ------------
@@ -57,6 +63,7 @@ Enhancements
 * `Token::FloatConstant` and `Token::DecimalConstant` now carry the original text representation for use in, say, a _token mapper_.
 * `Dynamic::is_fnptr` is made a public API.
 * `Scope::get_value_ref` and `Scope::get_value_mut` are added.
+* `TypeBuilder::with_name` now takes any `&str` instead of just `&'static str`.
 
 
 Version 1.16.3

@@ -244,6 +244,7 @@ macro_rules! reg_range {
             let _hash = $lib.set_native_fn($x, |from: $y, to: $y| Ok(from..to));
 
             #[cfg(feature = "metadata")]
+            #[allow(deprecated)]
             $lib.update_fn_metadata_with_comments(_hash, [
                     concat!("from: ", stringify!($y)),
                     concat!("to: ", stringify!($y)),
@@ -277,6 +278,7 @@ macro_rules! reg_range {
             let _hash = $lib.set_native_fn($x, |from: $y, to: $y, step: $y| StepRange::new(from, to, step, $add));
 
             #[cfg(feature = "metadata")]
+            #[allow(deprecated)]
             $lib.update_fn_metadata_with_comments(_hash, [
                     concat!("from: ", stringify!($y)),
                     concat!("to: ", stringify!($y)),
@@ -308,6 +310,7 @@ macro_rules! reg_range {
             let _hash = $lib.set_native_fn($x, |range: std::ops::Range<$y>, step: $y| StepRange::new(range.start, range.end, step, $add));
 
             #[cfg(feature = "metadata")]
+            #[allow(deprecated)]
             $lib.update_fn_metadata_with_comments(_hash, [
                     concat!("range: Range<", stringify!($y), ">"),
                     concat!("step: ", stringify!($y)),
@@ -385,6 +388,7 @@ def_package! {
             Ok(CharsStream::new(string, from, to - from))
         });
         #[cfg(feature = "metadata")]
+        #[allow(deprecated)]
         lib.update_fn_metadata_with_comments(
             _hash,
             ["string: &str", &range_type, "Iterator<char>"],
@@ -407,6 +411,7 @@ def_package! {
             Ok(CharsStream::new(string, from, to-from + 1))
         });
         #[cfg(feature = "metadata")]
+        #[allow(deprecated)]
         lib.update_fn_metadata_with_comments(
             _hash,
             ["string: &str", &range_inclusive_type, "Iterator<char>"],
@@ -425,6 +430,7 @@ def_package! {
 
         let _hash = lib.set_native_fn("chars", |string, from, len| Ok(CharsStream::new(string, from, len)));
         #[cfg(feature = "metadata")]
+        #[allow(deprecated)]
         lib.update_fn_metadata_with_comments(
             _hash,
             ["string: &str", "start: INT", "len: INT", "Iterator<char>"],
@@ -449,6 +455,7 @@ def_package! {
 
         let _hash = lib.set_native_fn("chars", |string, from| Ok(CharsStream::new(string, from, INT::MAX)));
         #[cfg(feature = "metadata")]
+        #[allow(deprecated)]
         lib.update_fn_metadata_with_comments(
             _hash,
             ["string: &str", "from: INT", "Iterator<char>"],
@@ -471,6 +478,7 @@ def_package! {
 
         let _hash = lib.set_native_fn("chars", |string| Ok(CharsStream::new(string, 0, INT::MAX)));
         #[cfg(feature = "metadata")]
+        #[allow(deprecated)]
         lib.update_fn_metadata_with_comments(
             _hash,
             ["string: &str", "Iterator<char>"],
@@ -491,6 +499,7 @@ def_package! {
         {
             let _hash = lib.set_getter_fn("chars", |string: &mut ImmutableString| Ok(CharsStream::new(string, 0, INT::MAX)));
             #[cfg(feature = "metadata")]
+            #[allow(deprecated)]
             lib.update_fn_metadata_with_comments(
                 _hash,
                 ["string: &mut ImmutableString", "Iterator<char>"],
@@ -517,6 +526,7 @@ def_package! {
             BitRange::new(value, from, to - from)
         });
         #[cfg(feature = "metadata")]
+        #[allow(deprecated)]
         lib.update_fn_metadata_with_comments(
             _hash,
             ["value: INT", &range_type, "Iterator<bool>"],
@@ -541,6 +551,7 @@ def_package! {
             BitRange::new(value, from, to - from + 1)
         });
         #[cfg(feature = "metadata")]
+        #[allow(deprecated)]
         lib.update_fn_metadata_with_comments(
             _hash,
             ["value: INT", &range_inclusive_type, "Iterator<bool>"],
@@ -561,6 +572,7 @@ def_package! {
 
         let _hash = lib.set_native_fn("bits", BitRange::new);
         #[cfg(feature = "metadata")]
+        #[allow(deprecated)]
         lib.update_fn_metadata_with_comments(
             _hash,
             ["value: INT", "from: INT", "len: INT", "Iterator<bool>"],
@@ -585,6 +597,7 @@ def_package! {
 
         let _hash = lib.set_native_fn("bits", |value, from| BitRange::new(value, from, INT::MAX));
         #[cfg(feature = "metadata")]
+        #[allow(deprecated)]
         lib.update_fn_metadata_with_comments(
             _hash,
             ["value: INT", "from: INT", "Iterator<bool>"],
@@ -607,6 +620,7 @@ def_package! {
 
         let _hash = lib.set_native_fn("bits", |value| BitRange::new(value, 0, INT::MAX) );
         #[cfg(feature = "metadata")]
+        #[allow(deprecated)]
         lib.update_fn_metadata_with_comments(
             _hash,
             ["value: INT", "Iterator<bool>"],
@@ -629,6 +643,7 @@ def_package! {
         {
             let _hash = lib.set_getter_fn("bits", |value: &mut INT| BitRange::new(*value, 0, INT::MAX) );
             #[cfg(feature = "metadata")]
+            #[allow(deprecated)]
             lib.update_fn_metadata_with_comments(
                 _hash,
                 ["value: &mut INT", "Iterator<bool>"],

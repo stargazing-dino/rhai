@@ -279,7 +279,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 0usize] { [] }
                 }
-                impl PluginFunction for Token {
+                impl PluginFunc for Token {
                     #[inline(always)] fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         Ok(Dynamic::from(do_nothing()))
                     }
@@ -318,7 +318,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: usize", "()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<usize>()] }
                 }
-                impl PluginFunction for Token {
+                impl PluginFunc for Token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<usize>();
@@ -359,7 +359,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: usize", "()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<usize>()] }
                 }
-                impl PluginFunction for Token {
+                impl PluginFunc for Token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<usize>();
@@ -403,7 +403,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["rhai::Dynamic"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 0usize] { [] }
                 }
-                impl PluginFunction for Token {
+                impl PluginFunc for Token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         Ok(Dynamic::from(return_dynamic()))
@@ -438,7 +438,7 @@ mod generate_tests {
                 pub const PARAM_NAMES: &'static [&'static str] = &["x: usize", "()"];
                 #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<usize>()] }
             }
-            impl PluginFunction for TestStruct {
+            impl PluginFunc for TestStruct {
                 #[inline(always)]
                 fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                     let arg0 = mem::take(args[0usize]).cast::<usize>();
@@ -473,7 +473,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: usize", "y: usize", "usize"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 2usize] { [TypeId::of::<usize>(), TypeId::of::<usize>()] }
                 }
-                impl PluginFunction for Token {
+                impl PluginFunc for Token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<usize>();
@@ -515,7 +515,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut usize", "y: usize", "()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 2usize] { [TypeId::of::<usize>(), TypeId::of::<usize>()] }
                 }
-                impl PluginFunction for Token {
+                impl PluginFunc for Token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<usize>();
@@ -558,7 +558,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["message: &str", "()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<ImmutableString>()] }
                 }
-                impl PluginFunction for Token {
+                impl PluginFunc for Token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).into_immutable_string().unwrap();

@@ -1,10 +1,10 @@
 //! Module that defines the public function/module registration API of [`Engine`].
 
-use crate::func::{FnCallArgs, RegisterNativeFunction, SendSync};
-use crate::module::ModuleFlags;
+use crate::func::{FnCallArgs, RhaiFunc, RhaiNativeFunc, SendSync};
+use crate::module::{FuncRegistration, ModuleFlags};
 use crate::types::dynamic::Variant;
 use crate::{
-    Engine, FnAccess, FnNamespace, Identifier, Module, NativeCallContext, RhaiResultOf, Shared,
+    Dynamic, Engine, FnNamespace, Identifier, Module, NativeCallContext, RhaiResultOf, Shared,
     SharedModule,
 };
 use std::any::{type_name, TypeId};
@@ -64,26 +64,26 @@ impl Engine {
     pub fn register_fn<
         A: 'static,
         const N: usize,
-        const C: bool,
+        const X: bool,
         R: Variant + Clone,
-        const L: bool,
-        F: RegisterNativeFunction<A, N, C, R, L> + SendSync + 'static,
+        const F: bool,
+        FUNC: RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
     >(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
-        func: F,
+        func: FUNC,
     ) -> &mut Self {
-        let param_types = F::param_types();
+        let param_types = FUNC::param_types();
 
         #[cfg(feature = "metadata")]
-        let mut param_type_names = F::param_names()
+        let mut param_type_names = FUNC::param_names()
             .iter()
             .map(|ty| format!("_: {}", self.format_type_name(ty)))
             .collect::<crate::FnArgsVec<_>>();
 
         #[cfg(feature = "metadata")]
-        if F::return_type() != TypeId::of::<()>() {
-            param_type_names.push(self.format_type_name(F::return_type_name()).into());
+        if FUNC::return_type() != TypeId::of::<()>() {
+            param_type_names.push(self.format_type_name(FUNC::return_type_name()).into());
         }
 
         #[cfg(feature = "metadata")]
@@ -91,31 +91,27 @@ impl Engine {
             .iter()
             .map(String::as_str)
             .collect::<crate::FnArgsVec<_>>();
-        #[cfg(feature = "metadata")]
-        let param_type_names = Some(param_type_names.as_ref());
 
-        #[cfg(not(feature = "metadata"))]
-        let param_type_names: Option<&[&str]> = None;
-
-        let fn_name = name.as_ref();
+        let fn_name = name.into();
         let is_pure = true;
 
         #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-        let is_pure = is_pure && (F::num_params() != 3 || fn_name != crate::engine::FN_IDX_SET);
+        let is_pure = is_pure && (FUNC::num_params() != 3 || fn_name != crate::engine::FN_IDX_SET);
         #[cfg(not(feature = "no_object"))]
         let is_pure =
-            is_pure && (F::num_params() != 2 || !fn_name.starts_with(crate::engine::FN_SET));
+            is_pure && (FUNC::num_params() != 2 || !fn_name.starts_with(crate::engine::FN_SET));
 
-        let func = func.into_callable_function(fn_name.into(), is_pure, true);
+        let f = FuncRegistration::new(fn_name).with_namespace(FnNamespace::Global);
 
-        self.global_namespace_mut().set_fn(
-            name,
-            FnNamespace::Global,
-            FnAccess::Public,
-            param_type_names,
+        #[cfg(feature = "metadata")]
+        let f = f.with_params_info(param_type_names);
+
+        f.set_into_module_raw(
+            self.global_namespace_mut(),
             param_types,
-            func,
+            func.into_callable_function(is_pure, true),
         );
+
         self
     }
     /// Register a function of the [`Engine`].
@@ -143,13 +139,23 @@ impl Engine {
         arg_types: impl AsRef<[TypeId]>,
         func: impl Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResultOf<T> + SendSync + 'static,
     ) -> &mut Self {
-        self.global_namespace_mut().set_raw_fn(
-            name,
-            FnNamespace::Global,
-            FnAccess::Public,
-            arg_types,
-            func,
-        );
+        FuncRegistration::new(name)
+            .with_namespace(FnNamespace::Global)
+            .set_into_module_raw(
+                self.global_namespace_mut(),
+                arg_types,
+                RhaiFunc::Method {
+                    func: Shared::new(
+                        move |ctx: Option<NativeCallContext>, args: &mut FnCallArgs| {
+                            func(ctx.unwrap(), args).map(Dynamic::from)
+                        },
+                    ),
+                    has_context: true,
+                    is_pure: false,
+                    is_volatile: true,
+                },
+            );
+
         self
     }
     /// Register a custom type for use with the [`Engine`].
@@ -274,12 +280,12 @@ impl Engine {
     /// Register a fallible type iterator for an iterable type with the [`Engine`].
     /// This is an advanced API.
     #[inline(always)]
-    pub fn register_iterator_result<T, X>(&mut self) -> &mut Self
+    pub fn register_iterator_result<T, R>(&mut self) -> &mut Self
     where
-        T: Variant + Clone + IntoIterator<Item = RhaiResultOf<X>>,
-        X: Variant + Clone,
+        T: Variant + Clone + IntoIterator<Item = RhaiResultOf<R>>,
+        R: Variant + Clone,
     {
-        self.global_namespace_mut().set_iterable_result::<T, X>();
+        self.global_namespace_mut().set_iterable_result::<T, R>();
         self
     }
     /// Register a getter function for a member of a registered type with the [`Engine`].
@@ -324,10 +330,10 @@ impl Engine {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn register_get<T: Variant + Clone, const C: bool, V: Variant + Clone, const L: bool>(
+    pub fn register_get<T: Variant + Clone, const X: bool, R: Variant + Clone, const F: bool>(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, C, V, L> + SendSync + 'static,
+        get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
         self.register_fn(crate::engine::make_getter(name.as_ref()), get_fn)
     }
@@ -374,10 +380,10 @@ impl Engine {
     /// ```
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn register_set<T: Variant + Clone, const C: bool, V: Variant + Clone, const L: bool>(
+    pub fn register_set<T: Variant + Clone, const X: bool, R: Variant + Clone, const F: bool>(
         &mut self,
         name: impl AsRef<str>,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, V), 2, C, (), L> + SendSync + 'static,
+        set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
         self.register_fn(crate::engine::make_setter(name.as_ref()), set_fn)
     }
@@ -430,16 +436,16 @@ impl Engine {
     #[inline(always)]
     pub fn register_get_set<
         T: Variant + Clone,
-        const C1: bool,
-        const C2: bool,
-        V: Variant + Clone,
-        const L1: bool,
-        const L2: bool,
+        const X1: bool,
+        const X2: bool,
+        R: Variant + Clone,
+        const F1: bool,
+        const F2: bool,
     >(
         &mut self,
         name: impl AsRef<str>,
-        get_fn: impl RegisterNativeFunction<(Mut<T>,), 1, C1, V, L1> + SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, V), 2, C2, (), L2> + SendSync + 'static,
+        get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X1, R, F1> + SendSync + 'static,
+        set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
         self.register_get(&name, get_fn).register_set(&name, set_fn)
     }
@@ -496,13 +502,13 @@ impl Engine {
     #[inline]
     pub fn register_indexer_get<
         T: Variant + Clone,
-        X: Variant + Clone,
-        const C: bool,
-        V: Variant + Clone,
-        const L: bool,
+        IDX: Variant + Clone,
+        const X: bool,
+        R: Variant + Clone,
+        const F: bool,
     >(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<T>, X), 2, C, V, L> + SendSync + 'static,
+        get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
         #[cfg(not(feature = "no_index"))]
         assert!(
@@ -583,13 +589,13 @@ impl Engine {
     #[inline]
     pub fn register_indexer_set<
         T: Variant + Clone,
-        X: Variant + Clone,
-        const C: bool,
-        V: Variant + Clone,
-        const L: bool,
+        IDX: Variant + Clone,
+        const X: bool,
+        R: Variant + Clone,
+        const F: bool,
     >(
         &mut self,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), 3, C, (), L> + SendSync + 'static,
+        set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
         #[cfg(not(feature = "no_index"))]
         assert!(
@@ -671,16 +677,16 @@ impl Engine {
     #[inline(always)]
     pub fn register_indexer_get_set<
         T: Variant + Clone,
-        X: Variant + Clone,
-        const C1: bool,
-        const C2: bool,
-        V: Variant + Clone,
-        const L1: bool,
-        const L2: bool,
+        IDX: Variant + Clone,
+        const X1: bool,
+        const X2: bool,
+        R: Variant + Clone,
+        const F1: bool,
+        const F2: bool,
     >(
         &mut self,
-        get_fn: impl RegisterNativeFunction<(Mut<T>, X), 2, C1, V, L1> + SendSync + 'static,
-        set_fn: impl RegisterNativeFunction<(Mut<T>, X, V), 3, C2, (), L2> + SendSync + 'static,
+        get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X1, R, F1> + SendSync + 'static,
+        set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
         self.register_indexer_get(get_fn)
             .register_indexer_set(set_fn)

@@ -1,7 +1,7 @@
 //! Module that defines the [`Scope`] type representing a function call-stack scope.
 
 use super::dynamic::{AccessMode, Variant};
-use crate::{Dynamic, Identifier, ImmutableString};
+use crate::{Dynamic, Identifier, ImmutableString, StaticVec};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -69,7 +69,7 @@ pub struct Scope<'a> {
     ///
     /// This `Vec` is not filled until needed because aliases are used rarely
     /// (only for `export` statements).
-    aliases: ThinVec<Box<[ImmutableString]>>,
+    aliases: ThinVec<StaticVec<ImmutableString>>,
     /// Phantom to keep the lifetime parameter in order not to break existing code.
     dummy: PhantomData<&'a ()>,
 }
@@ -819,10 +819,8 @@ impl Scope<'_> {
             self.aliases.resize(index + 1, <_>::default());
         }
         let aliases = self.aliases.get_mut(index).unwrap();
-        if aliases.is_empty() || !aliases.contains(&alias) {
-            let mut vec = std::mem::take(aliases).to_vec();
-            vec.push(alias);
-            *aliases = vec.into_boxed_slice();
+        if !aliases.contains(&alias) {
+            aliases.push(alias);
         }
         self
     }

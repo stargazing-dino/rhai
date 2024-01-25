@@ -12,7 +12,6 @@ use crate::{
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{any::TypeId, cmp::Ordering, mem};
-use thin_vec::ThinVec;
 
 def_package! {
     /// Package of basic array utilities.
@@ -1272,7 +1271,7 @@ pub mod array_functions {
     pub fn dedup(ctx: NativeCallContext, array: &mut Array) {
         let comparer = FnPtr {
             name: ctx.engine().get_interned_string(OP_EQUALS),
-            curry: ThinVec::new(),
+            curry: <_>::default(),
             environ: None,
             #[cfg(not(feature = "no_function"))]
             fn_def: None,

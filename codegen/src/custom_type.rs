@@ -48,7 +48,7 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
 
     quote! {
         impl ::rhai::CustomType for #name {
-            fn build(mut builder: ::rhai::TypeBuilder<'_, Self>) {
+            fn build(mut builder: ::rhai::TypeBuilder<Self>) {
                 #accessors;
             }
         }

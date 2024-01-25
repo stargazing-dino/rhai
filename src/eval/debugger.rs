@@ -253,7 +253,7 @@ pub struct Debugger {
     /// The current set of break-points.
     break_points: Vec<BreakPoint>,
     /// The current function call stack.
-    call_stack: ThinVec<CallStackFrame>,
+    call_stack: Vec<CallStackFrame>,
     /// The current state.
     state: Dynamic,
 }
@@ -266,7 +266,7 @@ impl Debugger {
         Self {
             status,
             break_points: Vec::new(),
-            call_stack: ThinVec::new(),
+            call_stack: Vec::new(),
             state: Dynamic::UNIT,
         }
     }

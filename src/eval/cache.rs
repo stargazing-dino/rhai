@@ -1,6 +1,6 @@
 //! System caches.
 
-use crate::func::{CallableFunction, StraightHashMap};
+use crate::func::{RhaiFunc, StraightHashMap};
 use crate::types::BloomFilterU64;
 use crate::{ImmutableString, StaticVec};
 #[cfg(feature = "no_std")]
@@ -11,7 +11,7 @@ use std::prelude::v1::*;
 #[derive(Debug, Clone)]
 pub struct FnResolutionCacheEntry {
     /// Function.
-    pub func: CallableFunction,
+    pub func: RhaiFunc,
     /// Optional source.
     pub source: Option<ImmutableString>,
 }

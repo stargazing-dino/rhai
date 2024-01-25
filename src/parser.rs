@@ -2,9 +2,9 @@
 
 use crate::api::options::LangOptions;
 use crate::ast::{
-    ASTFlags, BinaryExpr, CaseBlocksList, ConditionalExpr, Expr, FlowControl, FnCallExpr,
-    FnCallHashes, Ident, Namespace, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock,
-    StmtBlockContainer, SwitchCasesCollection,
+    ASTFlags, BinaryExpr, CaseBlocksList, Expr, FlowControl, FnCallExpr, FnCallHashes, Ident,
+    Namespace, OpAssignment, RangeCase, ScriptFuncDef, Stmt, StmtBlock, StmtBlockContainer,
+    SwitchCasesCollection,
 };
 use crate::engine::{Precedence, OP_CONTAINS, OP_NOT};
 use crate::eval::{Caches, GlobalRuntimeState};
@@ -35,7 +35,7 @@ use thin_vec::ThinVec;
 
 pub type ParseResult<T> = Result<T, ParseError>;
 
-type FnLib = StraightHashMap<Shared<ScriptFnDef>>;
+type FnLib = StraightHashMap<Shared<ScriptFuncDef>>;
 
 /// Invalid variable name that acts as a search barrier in a [`Scope`].
 const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
@@ -639,7 +639,7 @@ impl Engine {
         };
 
         let mut _namespace = namespace;
-        let mut args = Vec::new();
+        let mut args = FnArgsVec::new();
 
         match token {
             // id( <EOF>
@@ -702,7 +702,7 @@ impl Engine {
                     op_token: None,
                     namespace: _namespace,
                     hashes,
-                    args: args.into_boxed_slice(),
+                    args,
                 }
                 .into_fn_call_expr(settings.pos));
             }
@@ -769,7 +769,7 @@ impl Engine {
                         op_token: None,
                         namespace: _namespace,
                         hashes,
-                        args: args.into_boxed_slice(),
+                        args,
                     }
                     .into_fn_call_expr(settings.pos));
                 }
@@ -1164,9 +1164,9 @@ impl Engine {
             }
         }
 
-        let mut expressions = ThinVec::<ConditionalExpr>::new();
+        let mut expressions = FnArgsVec::<BinaryExpr>::new();
         let mut cases = StraightHashMap::<CaseBlocksList>::default();
-        let mut ranges = ThinVec::<RangeCase>::new();
+        let mut ranges = StaticVec::<RangeCase>::new();
         let mut def_case = None;
         let mut def_case_pos = Position::NONE;
 
@@ -1261,7 +1261,11 @@ impl Engine {
                     (Expr::Stmt(stmt_block.into()), need_comma)
                 };
 
-            expressions.push((condition, action_expr).into());
+            expressions.push(BinaryExpr {
+                lhs: condition,
+                rhs: action_expr,
+            });
+
             let index = expressions.len() - 1;
 
             if case_expr_list.is_empty() {
@@ -1282,14 +1286,11 @@ impl Engine {
 
                     if let Some(mut r) = range_value {
                         if !r.is_empty() {
-                            // Other range
                             r.set_index(index);
                             ranges.push(r);
                         }
-                        continue;
-                    }
-
-                    if !ranges.is_empty() {
+                    } else if !ranges.is_empty() {
+                        // Check for numeric values after ranges
                         let forbidden = match value {
                             Dynamic(Union::Int(..)) => true,
                             #[cfg(not(feature = "no_float"))]
@@ -1469,6 +1470,14 @@ impl Engine {
             )),
 
             // | ...
+            #[cfg(not(feature = "no_function"))]
+            #[cfg(not(feature = "unchecked"))]
+            Token::Pipe | Token::Or
+                if settings.has_option(LangOptions::ANON_FN)
+                    && lib.len() >= self.max_functions() =>
+            {
+                return Err(PERR::TooManyFunctions.into_err(settings.pos));
+            }
             #[cfg(not(feature = "no_function"))]
             Token::Pipe | Token::Or if settings.has_option(LangOptions::ANON_FN) => {
                 // Build new parse state
@@ -1990,7 +1999,7 @@ impl Engine {
                         namespace: Namespace::NONE,
                         name: state.get_interned_string("-"),
                         hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "-", 1)),
-                        args: vec![expr].into_boxed_slice(),
+                        args: IntoIterator::into_iter([expr]).collect(),
                         op_token: Some(token),
                         capture_parent_scope: false,
                     }
@@ -2012,7 +2021,7 @@ impl Engine {
                         namespace: Namespace::NONE,
                         name: state.get_interned_string("+"),
                         hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "+", 1)),
-                        args: vec![expr].into_boxed_slice(),
+                        args: IntoIterator::into_iter([expr]).collect(),
                         op_token: Some(token),
                         capture_parent_scope: false,
                     }
@@ -2028,8 +2037,10 @@ impl Engine {
                     namespace: Namespace::NONE,
                     name: state.get_interned_string("!"),
                     hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "!", 1)),
-                    args: vec![self.parse_unary(input, state, lib, settings.level_up()?)?]
-                        .into_boxed_slice(),
+                    args: {
+                        let expr = self.parse_unary(input, state, lib, settings.level_up()?)?;
+                        IntoIterator::into_iter([expr]).collect()
+                    },
                     op_token: Some(token),
                     capture_parent_scope: false,
                 }
@@ -2387,7 +2398,7 @@ impl Engine {
                 namespace: Namespace::NONE,
                 name: state.get_interned_string(&op),
                 hashes: FnCallHashes::from_native_only(hash),
-                args: vec![root, rhs].into_boxed_slice(),
+                args: IntoIterator::into_iter([root, rhs]).collect(),
                 op_token: native_only.then(|| op_token.clone()),
                 capture_parent_scope: false,
             };
@@ -2440,7 +2451,7 @@ impl Engine {
                             namespace: Namespace::NONE,
                             name: state.get_interned_string(OP_NOT),
                             hashes: FnCallHashes::from_native_only(calc_fn_hash(None, OP_NOT, 1)),
-                            args: vec![fn_call].into_boxed_slice(),
+                            args: IntoIterator::into_iter([fn_call]).collect(),
                             op_token: Some(Token::Bang),
                             capture_parent_scope: false,
                         };
@@ -2485,9 +2496,9 @@ impl Engine {
 
         let pos = settings.pos;
 
-        let mut inputs = Vec::new();
-        let mut segments = Vec::new();
-        let mut tokens = Vec::new();
+        let mut inputs = FnArgsVec::new();
+        let mut segments = FnArgsVec::new();
+        let mut tokens = FnArgsVec::new();
 
         // Adjust the variables stack
         if syntax.scope_may_be_changed {
@@ -2655,8 +2666,8 @@ impl Engine {
 
         Ok(Expr::Custom(
             crate::ast::CustomExpr {
-                inputs: inputs.into_boxed_slice(),
-                tokens: tokens.into_boxed_slice(),
+                inputs,
+                tokens,
                 state: user_state,
                 scope_may_be_changed: syntax.scope_may_be_changed,
                 self_terminated,
@@ -3343,6 +3354,10 @@ impl Engine {
                 };
 
                 match input.next().unwrap() {
+                    #[cfg(not(feature = "unchecked"))]
+                    (Token::Fn, pos) if lib.len() >= self.max_functions() => {
+                        Err(PERR::TooManyFunctions.into_err(pos))
+                    }
                     (Token::Fn, pos) => {
                         // Build new parse state
                         let new_state = &mut ParseState::new(
@@ -3597,7 +3612,7 @@ impl Engine {
         settings: ParseSettings,
         access: crate::FnAccess,
         #[cfg(feature = "metadata")] comments: impl IntoIterator<Item = crate::Identifier>,
-    ) -> ParseResult<ScriptFnDef> {
+    ) -> ParseResult<ScriptFuncDef> {
         let settings = settings.level_up()?;
 
         let (token, pos) = input.next().unwrap();
@@ -3709,7 +3724,7 @@ impl Engine {
         let mut params: FnArgsVec<_> = params.into_iter().map(|(p, ..)| p).collect();
         params.shrink_to_fit();
 
-        Ok(ScriptFnDef {
+        Ok(ScriptFuncDef {
             name: state.get_interned_string(name),
             access,
             #[cfg(not(feature = "no_object"))]
@@ -3738,7 +3753,7 @@ impl Engine {
         }
 
         let num_externals = externals.as_ref().len();
-        let mut args = Vec::with_capacity(externals.as_ref().len() + 1);
+        let mut args = FnArgsVec::with_capacity(externals.as_ref().len() + 1);
 
         args.push(fn_expr);
 
@@ -3765,7 +3780,7 @@ impl Engine {
                 crate::engine::KEYWORD_FN_PTR_CURRY,
                 num_externals + 1,
             )),
-            args: args.into_boxed_slice(),
+            args,
             op_token: None,
             capture_parent_scope: false,
         }
@@ -3797,7 +3812,7 @@ impl Engine {
         lib: &mut FnLib,
         settings: ParseSettings,
         _parent: &mut ParseState,
-    ) -> ParseResult<(Expr, Shared<ScriptFnDef>)> {
+    ) -> ParseResult<(Expr, Shared<ScriptFuncDef>)> {
         use core::iter::FromIterator;
 
         let settings = settings.level_up()?;
@@ -3875,7 +3890,7 @@ impl Engine {
         let fn_name = state.get_interned_string(make_anonymous_fn(hash));
 
         // Define the function
-        let script = Shared::new(ScriptFnDef {
+        let script = Shared::new(ScriptFuncDef {
             name: fn_name.clone(),
             access: crate::FnAccess::Public,
             #[cfg(not(feature = "no_object"))]
@@ -3964,7 +3979,7 @@ impl Engine {
         mut input: TokenStream,
         state: &mut ParseState,
         process_settings: impl FnOnce(&mut ParseSettings),
-    ) -> ParseResult<(StmtBlockContainer, Vec<Shared<ScriptFnDef>>)> {
+    ) -> ParseResult<(StmtBlockContainer, Vec<Shared<ScriptFuncDef>>)> {
         let mut statements = StmtBlockContainer::new_const();
         let mut functions = <_>::default();
 

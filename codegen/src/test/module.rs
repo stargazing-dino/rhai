@@ -378,9 +378,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("get_mystic_number", FnNamespace::Internal, FnAccess::Public,
-                             Some(get_mystic_number_token::PARAM_NAMES), &[],
-                             get_mystic_number_token().into());
+                    FuncRegistration::new("get_mystic_number").with_namespace(FnNamespace::Internal).with_params_info(get_mystic_number_token::PARAM_NAMES)
+                        .set_into_module_raw(m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -391,7 +390,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["INT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 0usize] { [] }
                 }
-                impl PluginFunction for get_mystic_number_token {
+                impl PluginFunc for get_mystic_number_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         Ok(Dynamic::from(get_mystic_number()))
@@ -473,11 +472,12 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn_with_comments("get_mystic_number", FnNamespace::Internal, FnAccess::Public,
-                             Some(get_mystic_number_token::PARAM_NAMES), &[], &[
-                                 "/// This is a doc-comment.\n/// Another line.\n/// block doc-comment \n/// Final line.",
-                                 "/** doc-comment\n                    in multiple lines\n                 */"
-                             ], get_mystic_number_token().into());
+                    FuncRegistration::new("get_mystic_number").with_namespace(FnNamespace::Internal).with_params_info(get_mystic_number_token::PARAM_NAMES)
+                        .with_comments(&[
+                            "/// This is a doc-comment.\n/// Another line.\n/// block doc-comment \n/// Final line.",
+                            "/** doc-comment\n                    in multiple lines\n                 */"
+                        ])
+                        .set_into_module_raw(m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
                     m.set_custom_type_with_comments::<String>("World", &["/// We are the world!"]);
                     if flatten {} else {}
                 }
@@ -489,7 +489,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["INT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 0usize] { [] }
                 }
-                impl PluginFunction for get_mystic_number_token {
+                impl PluginFunc for get_mystic_number_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         Ok(Dynamic::from(get_mystic_number()))
@@ -537,9 +537,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("add_one_to", FnNamespace::Global, FnAccess::Public,
-                             Some(add_one_to_token::PARAM_NAMES), &[TypeId::of::<INT>()],
-                             add_one_to_token().into());
+                    FuncRegistration::new("add_one_to").with_namespace(FnNamespace::Global).with_params_info(add_one_to_token::PARAM_NAMES)
+                        .set_into_module_raw(m, &add_one_to_token::param_types(), add_one_to_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -550,7 +549,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: INT", "INT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<INT>()] }
                 }
-                impl PluginFunction for add_one_to_token {
+                impl PluginFunc for add_one_to_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
@@ -598,9 +597,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("add_one_to", FnNamespace::Internal, FnAccess::Public, Some(add_one_to_token::PARAM_NAMES),
-                             &[TypeId::of::<INT>()],
-                             add_one_to_token().into());
+                    FuncRegistration::new("add_one_to").with_namespace(FnNamespace::Internal).with_params_info(add_one_to_token::PARAM_NAMES)
+                        .set_into_module_raw(m, &add_one_to_token::param_types(), add_one_to_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -611,7 +609,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: INT", "INT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<INT>()] }
                 }
-                impl PluginFunction for add_one_to_token {
+                impl PluginFunc for add_one_to_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
@@ -670,12 +668,10 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("add_n", FnNamespace::Internal, FnAccess::Public, Some(add_one_to_token::PARAM_NAMES),
-                             &[TypeId::of::<INT>()],
-                             add_one_to_token().into());
-                    m.set_fn("add_n", FnNamespace::Internal, FnAccess::Public, Some(add_n_to_token::PARAM_NAMES),
-                             &[TypeId::of::<INT>(), TypeId::of::<INT>()],
-                             add_n_to_token().into());
+                    FuncRegistration::new("add_n").with_namespace(FnNamespace::Internal).with_params_info(add_one_to_token::PARAM_NAMES)
+                        .set_into_module_raw(m, &add_one_to_token::param_types(), add_one_to_token().into());
+                    FuncRegistration::new("add_n").with_namespace(FnNamespace::Internal).with_params_info(add_n_to_token::PARAM_NAMES)
+                        .set_into_module_raw(m, &add_n_to_token::param_types(), add_n_to_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -686,7 +682,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: INT", "INT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<INT>()] }
                 }
-                impl PluginFunction for add_one_to_token {
+                impl PluginFunc for add_one_to_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
@@ -707,7 +703,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: INT", "y: INT", "INT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 2usize] { [TypeId::of::<INT>(), TypeId::of::<INT>()] }
                 }
-                impl PluginFunction for add_n_to_token {
+                impl PluginFunc for add_n_to_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
@@ -756,9 +752,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("add_together", FnNamespace::Internal, FnAccess::Public, Some(add_together_token::PARAM_NAMES),
-                             &[TypeId::of::<INT>(), TypeId::of::<INT>()],
-                             add_together_token().into());
+                    FuncRegistration::new("add_together").with_namespace(FnNamespace::Internal).with_params_info(add_together_token::PARAM_NAMES)
+                        .set_into_module_raw(m, &add_together_token::param_types(), add_together_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -769,7 +764,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: INT", "y: INT", "INT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 2usize] { [TypeId::of::<INT>(), TypeId::of::<INT>()] }
                 }
-                impl PluginFunction for add_together_token {
+                impl PluginFunc for add_together_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
@@ -819,15 +814,12 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("add", FnNamespace::Internal, FnAccess::Public, Some(add_together_token::PARAM_NAMES),
-                             &[TypeId::of::<INT>(), TypeId::of::<INT>()],
-                             add_together_token().into());
-                    m.set_fn("+", FnNamespace::Internal, FnAccess::Public, Some(add_together_token::PARAM_NAMES),
-                             &[TypeId::of::<INT>(), TypeId::of::<INT>()],
-                             add_together_token().into());
-                    m.set_fn("add_together", FnNamespace::Internal, FnAccess::Public, Some(add_together_token::PARAM_NAMES),
-                             &[TypeId::of::<INT>(), TypeId::of::<INT>()],
-                             add_together_token().into());
+                    FuncRegistration::new("add").with_namespace(FnNamespace::Internal).with_params_info(add_together_token::PARAM_NAMES)
+                        .set_into_module_raw(m, &add_together_token::param_types(), add_together_token().into());
+                    FuncRegistration::new("+").with_namespace(FnNamespace::Internal).with_params_info(add_together_token::PARAM_NAMES)
+                        .set_into_module_raw(m, &add_together_token::param_types(), add_together_token().into());
+                    FuncRegistration::new("add_together").with_namespace(FnNamespace::Internal).with_params_info(add_together_token::PARAM_NAMES)
+                        .set_into_module_raw(m, &add_together_token::param_types(), add_together_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -838,7 +830,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: INT", "y: INT", "INT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 2usize] { [TypeId::of::<INT>(), TypeId::of::<INT>()] }
                 }
-                impl PluginFunction for add_together_token {
+                impl PluginFunc for add_together_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).cast::<INT>();
@@ -901,9 +893,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("get_mystic_number", FnNamespace::Internal, FnAccess::Public,
-                             Some(get_mystic_number_token::PARAM_NAMES), &[TypeId::of::<Hello>()],
-                             get_mystic_number_token().into());
+                    FuncRegistration::new("get_mystic_number").with_namespace(FnNamespace::Internal).with_params_info(get_mystic_number_token::PARAM_NAMES)
+                        .set_into_module_raw(m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
                     m.set_var("MYSTIC_NUMBER", MYSTIC_NUMBER);
                     m.set_custom_type::<Foo>("Hello");
                     if flatten {} else {}
@@ -917,7 +908,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut Hello", "INT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<Hello>()] }
                 }
-                impl PluginFunction for get_mystic_number_token {
+                impl PluginFunc for get_mystic_number_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = &mut args[0usize].write_lock::<Hello>().unwrap();
@@ -1121,9 +1112,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("get_mystic_number", FnNamespace::Internal, FnAccess::Public,
-                             Some(get_mystic_number_token::PARAM_NAMES), &[],
-                             get_mystic_number_token().into());
+                    FuncRegistration::new("get_mystic_number").with_namespace(FnNamespace::Internal).with_params_info(get_mystic_number_token::PARAM_NAMES)
+                        .set_into_module_raw(m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -1134,7 +1124,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["INT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 0usize] { [] }
                 }
-                impl PluginFunction for get_mystic_number_token {
+                impl PluginFunc for get_mystic_number_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         Ok(Dynamic::from(get_mystic_number()))
@@ -1215,9 +1205,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("print_out_to", FnNamespace::Internal, FnAccess::Public, Some(print_out_to_token::PARAM_NAMES),
-                             &[TypeId::of::<ImmutableString>()],
-                             print_out_to_token().into());
+                    FuncRegistration::new("print_out_to").with_namespace(FnNamespace::Internal).with_params_info(print_out_to_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &print_out_to_token::param_types(), print_out_to_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -1228,7 +1217,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &str", "()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<ImmutableString>()] }
                 }
-                impl PluginFunction for print_out_to_token {
+                impl PluginFunc for print_out_to_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).into_immutable_string().unwrap();
@@ -1276,9 +1265,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("print_out_to", FnNamespace::Internal, FnAccess::Public, Some(print_out_to_token::PARAM_NAMES),
-                             &[TypeId::of::<ImmutableString>()],
-                             print_out_to_token().into());
+                    FuncRegistration::new("print_out_to").with_namespace(FnNamespace::Internal).with_params_info(print_out_to_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &print_out_to_token::param_types(), print_out_to_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -1289,7 +1277,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: String", "()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<ImmutableString>()] }
                 }
-                impl PluginFunction for print_out_to_token {
+                impl PluginFunc for print_out_to_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = mem::take(args[0usize]).into_string().unwrap();
@@ -1338,9 +1326,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("foo", FnNamespace::Internal, FnAccess::Public, Some(foo_token::PARAM_NAMES),
-                             &[TypeId::of::<FLOAT>(), TypeId::of::<INT>()],
-                             foo_token().into());
+                    FuncRegistration::new("foo").with_namespace(FnNamespace::Internal).with_params_info(foo_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &foo_token::param_types(), foo_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -1351,7 +1338,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut FLOAT", "y: INT", "FLOAT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 2usize] { [TypeId::of::<FLOAT>(), TypeId::of::<INT>()] }
                 }
-                impl PluginFunction for foo_token {
+                impl PluginFunc for foo_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<INT>();
@@ -1400,9 +1387,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("increment", FnNamespace::Internal, FnAccess::Public, Some(increment_token::PARAM_NAMES),
-                             &[TypeId::of::<FLOAT>()],
-                             increment_token().into());
+                    FuncRegistration::new("increment").with_namespace(FnNamespace::Internal).with_params_info(increment_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &increment_token::param_types(), increment_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -1413,7 +1399,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut FLOAT", "()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<FLOAT>()] }
                 }
-                impl PluginFunction for increment_token {
+                impl PluginFunc for increment_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = &mut args[0usize].write_lock::<FLOAT>().unwrap();
@@ -1465,9 +1451,8 @@ mod generate_tests {
                     #[allow(unused_mut)]
                     #[doc(hidden)]
                     pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                        m.set_fn("increment", FnNamespace::Internal, FnAccess::Public, Some(increment_token::PARAM_NAMES),
-                                 &[TypeId::of::<FLOAT>()],
-                                 increment_token().into());
+                    FuncRegistration::new("increment").with_namespace(FnNamespace::Internal).with_params_info(increment_token::PARAM_NAMES)
+                             .set_into_module_raw(m, &increment_token::param_types(), increment_token().into());
                         if flatten {} else {}
                     }
                     #[allow(non_camel_case_types)]
@@ -1478,7 +1463,7 @@ mod generate_tests {
                         pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut FLOAT", "()"];
                         #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<FLOAT>()] }
                     }
-                    impl PluginFunction for increment_token {
+                    impl PluginFunc for increment_token {
                         #[inline(always)]
                         fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                             let arg0 = &mut args[0usize].write_lock::<FLOAT>().unwrap();
@@ -1552,9 +1537,8 @@ mod generate_tests {
                     #[allow(unused_mut)]
                     #[doc(hidden)]
                     pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                        m.set_fn("increment", FnNamespace::Internal, FnAccess::Public, Some(increment_token::PARAM_NAMES),
-                                 &[TypeId::of::<FLOAT>()],
-                                 increment_token().into());
+                    FuncRegistration::new("increment").with_namespace(FnNamespace::Internal).with_params_info(increment_token::PARAM_NAMES)
+                             .set_into_module_raw(m, &increment_token::param_types(), increment_token().into());
                         if flatten {} else {}
                     }
                     #[allow(non_camel_case_types)]
@@ -1565,7 +1549,7 @@ mod generate_tests {
                         pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut FLOAT", "()"];
                         #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<FLOAT>()] }
                     }
-                    impl PluginFunction for increment_token {
+                    impl PluginFunc for increment_token {
                         #[inline(always)]
                         fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                             let arg0 = &mut args[0usize].write_lock::<FLOAT>().unwrap();
@@ -1640,9 +1624,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("get$square", FnNamespace::Global, FnAccess::Public, Some(int_foo_token::PARAM_NAMES),
-                             &[TypeId::of::<u64>()],
-                             int_foo_token().into());
+                    FuncRegistration::new("get$square").with_namespace(FnNamespace::Global).with_params_info(int_foo_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -1653,7 +1636,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut u64", "u64"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<u64>()] }
                 }
-                impl PluginFunction for int_foo_token {
+                impl PluginFunc for int_foo_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = &mut args[0usize].write_lock::<u64>().unwrap();
@@ -1702,12 +1685,10 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("square", FnNamespace::Internal, FnAccess::Public, Some(int_foo_token::PARAM_NAMES),
-                             &[TypeId::of::<u64>()],
-                             int_foo_token().into());
-                    m.set_fn("get$square", FnNamespace::Global, FnAccess::Public, Some(int_foo_token::PARAM_NAMES),
-                             &[TypeId::of::<u64>()],
-                             int_foo_token().into());
+                    FuncRegistration::new("square").with_namespace(FnNamespace::Internal).with_params_info(int_foo_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
+                    FuncRegistration::new("get$square").with_namespace(FnNamespace::Global).with_params_info(int_foo_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -1718,7 +1699,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut u64", "u64"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 1usize] { [TypeId::of::<u64>()] }
                 }
-                impl PluginFunction for int_foo_token {
+                impl PluginFunc for int_foo_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg0 = &mut args[0usize].write_lock::<u64>().unwrap();
@@ -1767,9 +1748,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("set$squared", FnNamespace::Global, FnAccess::Public, Some(int_foo_token::PARAM_NAMES),
-                             &[TypeId::of::<u64>(), TypeId::of::<u64>()],
-                             int_foo_token().into());
+                    FuncRegistration::new("set$squared").with_namespace(FnNamespace::Global).with_params_info(int_foo_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -1780,7 +1760,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut u64", "y: u64", "()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 2usize] { [TypeId::of::<u64>(), TypeId::of::<u64>()] }
                 }
-                impl PluginFunction for int_foo_token {
+                impl PluginFunc for int_foo_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
@@ -1830,12 +1810,10 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("set_sq", FnNamespace::Internal, FnAccess::Public, Some(int_foo_token::PARAM_NAMES),
-                             &[TypeId::of::<u64>(), TypeId::of::<u64>()],
-                             int_foo_token().into());
-                    m.set_fn("set$squared", FnNamespace::Global, FnAccess::Public, Some(int_foo_token::PARAM_NAMES),
-                             &[TypeId::of::<u64>(), TypeId::of::<u64>()],
-                             int_foo_token().into());
+                    FuncRegistration::new("set_sq").with_namespace(FnNamespace::Internal).with_params_info(int_foo_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
+                    FuncRegistration::new("set$squared").with_namespace(FnNamespace::Global).with_params_info(int_foo_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -1846,7 +1824,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut u64", "y: u64", "()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 2usize] { [TypeId::of::<u64>(), TypeId::of::<u64>()] }
                 }
-                impl PluginFunction for int_foo_token {
+                impl PluginFunc for int_foo_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
@@ -1896,9 +1874,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("index$get$", FnNamespace::Global, FnAccess::Public, Some(get_by_index_token::PARAM_NAMES),
-                             &[TypeId::of::<MyCollection>(), TypeId::of::<u64>()],
-                             get_by_index_token().into());
+                    FuncRegistration::new("index$get$").with_namespace(FnNamespace::Global).with_params_info(get_by_index_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &get_by_index_token::param_types(), get_by_index_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -1909,7 +1886,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut MyCollection", "i: u64", "FLOAT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 2usize] { [TypeId::of::<MyCollection>(), TypeId::of::<u64>()] }
                 }
-                impl PluginFunction for get_by_index_token {
+                impl PluginFunc for get_by_index_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
@@ -1964,9 +1941,8 @@ mod generate_tests {
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
                     #[cfg(hello)]
-                    m.set_fn("index$get$", FnNamespace::Global, FnAccess::Public, Some(get_by_index_token::PARAM_NAMES),
-                             &[TypeId::of::<MyCollection>(), TypeId::of::<u64>()],
-                             get_by_index_token().into());
+                    FuncRegistration::new("index$get$").with_namespace(FnNamespace::Global).with_params_info(get_by_index_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &get_by_index_token::param_types(), get_by_index_token().into());
                     if flatten {} else {}
                 }
                 #[cfg(hello)]
@@ -1980,7 +1956,7 @@ mod generate_tests {
                     #[inline(always)] pub fn param_types() -> [TypeId; 2usize] { [TypeId::of::<MyCollection>(), TypeId::of::<u64>()] }
                 }
                 #[cfg(hello)]
-                impl PluginFunction for get_by_index_token {
+                impl PluginFunc for get_by_index_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
@@ -2030,12 +2006,10 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("get", FnNamespace::Internal, FnAccess::Public, Some(get_by_index_token::PARAM_NAMES),
-                             &[TypeId::of::<MyCollection>(), TypeId::of::<u64>()],
-                             get_by_index_token().into());
-                    m.set_fn("index$get$", FnNamespace::Global, FnAccess::Public, Some(get_by_index_token::PARAM_NAMES),
-                             &[TypeId::of::<MyCollection>(), TypeId::of::<u64>()],
-                             get_by_index_token().into());
+                    FuncRegistration::new("get").with_namespace(FnNamespace::Internal).with_params_info(get_by_index_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &get_by_index_token::param_types(), get_by_index_token().into());
+                    FuncRegistration::new("index$get$").with_namespace(FnNamespace::Global).with_params_info(get_by_index_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &get_by_index_token::param_types(), get_by_index_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -2046,7 +2020,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut MyCollection", "i: u64", "FLOAT"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 2usize] { [TypeId::of::<MyCollection>(), TypeId::of::<u64>()] }
                 }
-                impl PluginFunction for get_by_index_token {
+                impl PluginFunc for get_by_index_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
@@ -2096,9 +2070,8 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("index$set$", FnNamespace::Global, FnAccess::Public, Some(set_by_index_token::PARAM_NAMES),
-                             &[TypeId::of::<MyCollection>(), TypeId::of::<u64>(), TypeId::of::<FLOAT>()],
-                             set_by_index_token().into());
+                    FuncRegistration::new("index$set$").with_namespace(FnNamespace::Global).with_params_info(set_by_index_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &set_by_index_token::param_types(), set_by_index_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -2109,7 +2082,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut MyCollection", "i: u64", "item: FLOAT", "()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 3usize] { [TypeId::of::<MyCollection>(), TypeId::of::<u64>(), TypeId::of::<FLOAT>()] }
                 }
-                impl PluginFunction for set_by_index_token {
+                impl PluginFunc for set_by_index_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();
@@ -2160,12 +2133,10 @@ mod generate_tests {
                 #[allow(unused_mut)]
                 #[doc(hidden)]
                 pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_fn("set", FnNamespace::Internal, FnAccess::Public, Some(set_by_index_token::PARAM_NAMES),
-                             &[TypeId::of::<MyCollection>(), TypeId::of::<u64>(), TypeId::of::<FLOAT>()],
-                             set_by_index_token().into());
-                    m.set_fn("index$set$", FnNamespace::Global, FnAccess::Public, Some(set_by_index_token::PARAM_NAMES),
-                             &[TypeId::of::<MyCollection>(), TypeId::of::<u64>(), TypeId::of::<FLOAT>()],
-                             set_by_index_token().into());
+                    FuncRegistration::new("set").with_namespace(FnNamespace::Internal).with_params_info(set_by_index_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &set_by_index_token::param_types(), set_by_index_token().into());
+                    FuncRegistration::new("index$set$").with_namespace(FnNamespace::Global).with_params_info(set_by_index_token::PARAM_NAMES)
+                         .set_into_module_raw(m, &set_by_index_token::param_types(), set_by_index_token().into());
                     if flatten {} else {}
                 }
                 #[allow(non_camel_case_types)]
@@ -2176,7 +2147,7 @@ mod generate_tests {
                     pub const PARAM_NAMES: &'static [&'static str] = &["x: &mut MyCollection", "i: u64", "item: FLOAT", "()"];
                     #[inline(always)] pub fn param_types() -> [TypeId; 3usize] { [TypeId::of::<MyCollection>(), TypeId::of::<u64>(), TypeId::of::<FLOAT>()] }
                 }
-                impl PluginFunction for set_by_index_token {
+                impl PluginFunc for set_by_index_token {
                     #[inline(always)]
                     fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                         let arg1 = mem::take(args[1usize]).cast::<u64>();

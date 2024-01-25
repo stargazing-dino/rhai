@@ -854,7 +854,7 @@ impl ExportedFn {
                 #[inline(always)] pub fn param_types() -> [TypeId; #arg_count] { [#(#input_type_exprs),*] }
             }
             #(#cfg_attrs)*
-            impl PluginFunction for #type_name {
+            impl PluginFunc for #type_name {
                 #[inline(always)]
                 fn call(&self, context: Option<NativeCallContext>, args: &mut [&mut Dynamic]) -> RhaiResult {
                     #(#unpack_statements)*

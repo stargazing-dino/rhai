@@ -25,7 +25,7 @@ num-traits = { version = "0.2.0", default-features = false }
 once_cell = { version = "1.7.0", default-features = false, features = ["race"] }
 bitflags = { version = "2.0.0", default-features = false }
 smartstring = { version = "1.0.0", default-features = false }
-rhai_codegen = { version = "1.7.0", path = "codegen" }
+rhai_codegen = { version = "1.17.0", path = "codegen" }
 
 no-std-compat = { git = "https://gitlab.com/jD91mZM2/no-std-compat", version = "0.4.1", default-features = false, features = ["alloc"], optional = true }
 libm = { version = "0.2.0", default-features = false, optional = true }
@@ -165,3 +165,6 @@ features = ["document-features", "metadata", "serde", "internals", "decimal", "d
 # Notice that a custom modified version of `rustyline` is used which supports bracketed paste on Windows.
 # This can be moved to the official version when bracketed paste is added.
 rustyline = { git = "https://github.com/schungx/rustyline", branch = "v13" }
+
+# Patch SmartString to resolve an UB issue.
+smartstring = { git = "https://github.com/bodil/smartstring", ref = "refs/pull/34/head" }

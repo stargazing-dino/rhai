@@ -242,8 +242,8 @@ pub use eval::EvalContext;
 #[cfg(not(feature = "no_object"))]
 use func::calc_typed_method_hash;
 use func::{calc_fn_hash, calc_fn_hash_full, calc_var_hash};
-pub use func::{plugin, FuncArgs, NativeCallContext, RegisterNativeFunction};
-pub use module::{FnNamespace, Module};
+pub use func::{plugin, FuncArgs, NativeCallContext, RhaiNativeFunc};
+pub use module::{FnNamespace, FuncRegistration, Module};
 pub use packages::string_basic::{FUNC_TO_DEBUG, FUNC_TO_STRING};
 pub use rhai_codegen::*;
 #[cfg(not(feature = "no_time"))]
@@ -359,8 +359,9 @@ pub use api::default_limits;
 
 #[cfg(feature = "internals")]
 pub use ast::{
-    ASTFlags, ASTNode, BinaryExpr, ConditionalExpr, Expr, FlowControl, FnCallExpr, FnCallHashes,
-    Ident, OpAssignment, RangeCase, ScriptFnDef, Stmt, StmtBlock, SwitchCasesCollection,
+    ASTFlags, ASTNode, BinaryExpr, EncapsulatedEnviron, Expr, FlowControl, FnCallExpr,
+    FnCallHashes, Ident, OpAssignment, RangeCase, ScriptFuncDef, Stmt, StmtBlock,
+    SwitchCasesCollection,
 };
 
 #[cfg(feature = "internals")]
@@ -372,14 +373,11 @@ pub use ast::CustomExpr;
 pub use ast::Namespace;
 
 #[cfg(feature = "internals")]
-pub use func::EncapsulatedEnviron;
-
-#[cfg(feature = "internals")]
 pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeState};
 
 #[cfg(feature = "internals")]
 #[allow(deprecated)]
-pub use func::{locked_read, locked_write, CallableFunction, NativeCallContextStore};
+pub use func::{locked_read, locked_write, NativeCallContextStore, RhaiFunc};
 
 #[cfg(feature = "internals")]
 #[cfg(feature = "metadata")]
