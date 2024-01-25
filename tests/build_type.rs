@@ -1,8 +1,8 @@
 #![cfg(not(feature = "no_object"))]
-use rhai::{CustomType, Engine, EvalAltResult, Position, TypeBuilder, INT};
+use rhai::{CustomType, Engine, EvalAltResult, Position, Scope, TypeBuilder, INT};
 
 #[test]
-fn build_type() {
+fn test_build_type() {
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct Vec3 {
         x: INT,
@@ -154,5 +154,71 @@ fn build_type() {
             )
             .unwrap(),
         6,
+    );
+}
+
+#[test]
+fn test_build_type_macro() {
+    #[derive(Debug, Clone, Eq, PartialEq)] // <- necessary for any custom type
+    #[derive(CustomType)] // <- auto-implement 'CustomType'
+    struct Foo {
+        #[rhai_custom_type_skip]
+        dummy: i64, // <- skip this field
+        #[rhai_custom_type_readonly] // <- only auto-implement getters
+        bar: i64,
+        #[rhai_custom_type_name("emphasize")]
+        baz: bool, // <- auto-implement getter/setter for 'baz'
+        #[rhai_custom_type_set(Self::set_hello)] // <- call custom setter for 'hello'
+        hello: String, // <- auto-implement getter for 'hello'
+    }
+
+    impl Foo {
+        pub fn set_hello(&mut self, value: String) {
+            self.hello = if self.baz {
+                let mut s = self.hello.clone();
+                s.push_str(&value);
+                for _ in 0..self.bar {
+                    s.push('!');
+                }
+                s
+            } else {
+                value
+            };
+        }
+    }
+
+    let mut engine = Engine::new();
+    engine.build_type::<Foo>();
+
+    let mut scope = Scope::new();
+    scope.push(
+        "foo",
+        Foo {
+            dummy: 0,
+            bar: 5,
+            baz: false,
+            hello: "hey".to_string(),
+        },
+    );
+
+    assert_eq!(
+        engine
+            .eval_with_scope::<Foo>(
+                &mut scope,
+                r#"
+                    foo.hello = "this should not be seen";
+                    foo.hello = "world!";
+                    foo.emphasize = true;
+                    foo.hello = "yo";
+                    foo
+                "#
+            )
+            .unwrap(),
+        Foo {
+            dummy: 0,
+            bar: 5,
+            baz: true,
+            hello: "world!yo!!!!!".into()
+        }
     );
 }
