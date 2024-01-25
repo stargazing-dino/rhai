@@ -38,6 +38,7 @@ Fixes to bugs found via fuzzing
 * Fixed exponential running time when raising a decimal number to a very large power (> 1 million) -- it now returns an overflow error.
 * Shared values that contain reference loops no longer cause a stack overflow when printing.
 * `sleep` no longer panics on `NaN`.
+* `switch` on ranges now work properly.
 
 Other bug fixes
 ---------------

@@ -400,15 +400,65 @@ impl Hash for Dynamic {
             Union::Blob(ref a, ..) => a.hash(state),
             #[cfg(not(feature = "no_object"))]
             Union::Map(ref m, ..) => m.hash(state),
-            Union::FnPtr(ref f, ..) => f.hash(state),
+            Union::FnPtr(..) => unimplemented!("FnPtr cannot be hashed"),
 
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) => (*crate::func::locked_read(cell)).hash(state),
 
-            Union::Variant(..) => unimplemented!("{} cannot be hashed", self.type_name()),
+            Union::Variant(ref v, ..) => {
+                let _value_any = (***v).as_any();
+
+                #[cfg(not(feature = "only_i32"))]
+                #[cfg(not(feature = "only_i64"))]
+                if let Some(value) = _value_any.downcast_ref::<u8>() {
+                    return value.hash(state);
+                } else if let Some(value) = _value_any.downcast_ref::<u16>() {
+                    return value.hash(state);
+                } else if let Some(value) = _value_any.downcast_ref::<u32>() {
+                    return value.hash(state);
+                } else if let Some(value) = _value_any.downcast_ref::<u64>() {
+                    return value.hash(state);
+                } else if let Some(value) = _value_any.downcast_ref::<i8>() {
+                    return value.hash(state);
+                } else if let Some(value) = _value_any.downcast_ref::<i16>() {
+                    return value.hash(state);
+                } else if let Some(value) = _value_any.downcast_ref::<i32>() {
+                    return value.hash(state);
+                } else if let Some(value) = _value_any.downcast_ref::<i64>() {
+                    return value.hash(state);
+                }
+
+                #[cfg(not(feature = "no_float"))]
+                #[cfg(not(feature = "f32_float"))]
+                if let Some(value) = _value_any.downcast_ref::<f32>() {
+                    return value.to_ne_bytes().hash(state);
+                }
+                #[cfg(not(feature = "no_float"))]
+                #[cfg(feature = "f32_float")]
+                if let Some(value) = _value_any.downcast_ref::<f64>() {
+                    return value.to_ne_bytes().hash(state);
+                }
+
+                #[cfg(not(feature = "only_i32"))]
+                #[cfg(not(feature = "only_i64"))]
+                #[cfg(not(target_family = "wasm"))]
+                if let Some(value) = _value_any.downcast_ref::<u128>() {
+                    return value.hash(state);
+                } else if let Some(value) = _value_any.downcast_ref::<i128>() {
+                    return value.hash(state);
+                }
+
+                if let Some(range) = _value_any.downcast_ref::<ExclusiveRange>() {
+                    return range.hash(state);
+                } else if let Some(range) = _value_any.downcast_ref::<InclusiveRange>() {
+                    return range.hash(state);
+                }
+
+                unimplemented!("Custom type {} cannot be hashed", self.type_name())
+            }
 
             #[cfg(not(feature = "no_time"))]
-            Union::TimeStamp(..) => unimplemented!("{} cannot be hashed", self.type_name()),
+            Union::TimeStamp(..) => unimplemented!("Timestamp cannot be hashed"),
         }
     }
 }
@@ -1153,15 +1203,65 @@ impl Dynamic {
 
             #[cfg(not(feature = "no_float"))]
             Union::Float(..) => true,
+            #[cfg(feature = "decimal")]
+            Union::Decimal(..) => true,
             #[cfg(not(feature = "no_index"))]
-            Union::Array(..) => true,
+            Union::Array(ref a, ..) => a.iter().all(Self::is_hashable),
+            #[cfg(not(feature = "no_index"))]
+            Union::Blob(..) => true,
             #[cfg(not(feature = "no_object"))]
-            Union::Map(..) => true,
+            Union::Map(ref m, ..) => m.values().all(Self::is_hashable),
+            Union::FnPtr(..) => false,
+            #[cfg(not(feature = "no_time"))]
+            Union::TimeStamp(..) => false,
+
+            Union::Variant(ref v, ..) => {
+                let _value_any = (***v).as_any();
+                let _type_id = _value_any.type_id();
+
+                #[cfg(not(feature = "only_i32"))]
+                #[cfg(not(feature = "only_i64"))]
+                if _type_id == TypeId::of::<u8>()
+                    || _type_id == TypeId::of::<u16>()
+                    || _type_id == TypeId::of::<u32>()
+                    || _type_id == TypeId::of::<u64>()
+                    || _type_id == TypeId::of::<i8>()
+                    || _type_id == TypeId::of::<i16>()
+                    || _type_id == TypeId::of::<i32>()
+                    || _type_id == TypeId::of::<i64>()
+                {
+                    return true;
+                }
+
+                #[cfg(not(feature = "no_float"))]
+                #[cfg(not(feature = "f32_float"))]
+                if _type_id == TypeId::of::<f32>() {
+                    return true;
+                }
+                #[cfg(not(feature = "no_float"))]
+                #[cfg(feature = "f32_float")]
+                if _type_id == TypeId::of::<f64>() {
+                    return true;
+                }
+
+                #[cfg(not(feature = "only_i32"))]
+                #[cfg(not(feature = "only_i64"))]
+                #[cfg(not(target_family = "wasm"))]
+                if _type_id == TypeId::of::<u128>() || _type_id == TypeId::of::<i128>() {
+                    return true;
+                }
+
+                if _type_id == TypeId::of::<ExclusiveRange>()
+                    || _type_id == TypeId::of::<InclusiveRange>()
+                {
+                    return true;
+                }
+
+                false
+            }
 
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) => crate::func::locked_read(cell).is_hashable(),
-
-            _ => false,
         }
     }
     /// Create a [`Dynamic`] from any type.  A [`Dynamic`] value is simply returned as is.

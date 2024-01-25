@@ -13,9 +13,7 @@ use std::prelude::v1::*;
 use std::{
     any::type_name,
     convert::{TryFrom, TryInto},
-    fmt,
-    hash::{Hash, Hasher},
-    mem,
+    fmt, mem,
     ops::{Index, IndexMut},
 };
 use thin_vec::ThinVec;
@@ -29,21 +27,6 @@ pub struct FnPtr {
     pub(crate) environ: Option<Shared<EncapsulatedEnviron>>,
     #[cfg(not(feature = "no_function"))]
     pub(crate) fn_def: Option<Shared<crate::ast::ScriptFuncDef>>,
-}
-
-impl Hash for FnPtr {
-    #[inline(always)]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-        self.curry.hash(state);
-
-        // Hash the shared [`EncapsulatedEnviron`] by hashing its shared pointer.
-        self.environ.as_ref().map(Shared::as_ptr).hash(state);
-
-        // Hash the linked [`ScriptFuncDef`][crate::ast::ScriptFuncDef] by hashing its shared pointer.
-        #[cfg(not(feature = "no_function"))]
-        self.fn_def.as_ref().map(Shared::as_ptr).hash(state);
-    }
 }
 
 impl fmt::Display for FnPtr {

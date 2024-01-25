@@ -1286,14 +1286,11 @@ impl Engine {
 
                     if let Some(mut r) = range_value {
                         if !r.is_empty() {
-                            // Other range
                             r.set_index(index);
                             ranges.push(r);
                         }
-                        continue;
-                    }
-
-                    if !ranges.is_empty() {
+                    } else if !ranges.is_empty() {
+                        // Check for numeric values after ranges
                         let forbidden = match value {
                             Dynamic(Union::Int(..)) => true,
                             #[cfg(not(feature = "no_float"))]

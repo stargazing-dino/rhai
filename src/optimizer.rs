@@ -389,6 +389,16 @@ impl StmtBlock {
     }
 }
 
+/// Is this [`Expr`] a constant that is hashable?
+#[inline(always)]
+fn is_hashable_constant(expr: &Expr) -> bool {
+    match expr {
+        _ if !expr.is_constant() => false,
+        Expr::DynamicConstant(v, ..) => v.is_hashable(),
+        _ => false,
+    }
+}
+
 /// Optimize a [statement][Stmt].
 fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: bool) {
     #[inline(always)]
@@ -505,7 +515,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         }
 
         // switch const { ... }
-        Stmt::Switch(x, pos) if x.0.is_constant() => {
+        Stmt::Switch(x, pos) if is_hashable_constant(&x.0) => {
             let (
                 match_expr,
                 SwitchCasesCollection {
