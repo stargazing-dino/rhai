@@ -88,9 +88,10 @@
 //!
 
 use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned};
+use syn::{parse_macro_input, spanned::Spanned, DeriveInput};
 
 mod attrs;
+mod custom_type;
 mod function;
 mod module;
 mod register;
@@ -409,4 +410,11 @@ pub fn set_exported_global_fn(args: proc_macro::TokenStream) -> proc_macro::Toke
         }
         Err(e) => e.to_compile_error().into(),
     }
+}
+
+#[proc_macro_derive(CustomType, attributes(get, set, readonly))]
+pub fn derive_custom_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let expanded = custom_type::derive_custom_type_impl(input);
+    expanded.into()
 }
