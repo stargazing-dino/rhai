@@ -32,7 +32,7 @@ mod core_functions {
     /// ```rhai
     /// exit(42);
     /// ```
-    #[rhai_fn(name = "exit", return_raw)]
+    #[rhai_fn(name = "exit", volatile, return_raw)]
     pub fn exit_with_value(value: Dynamic) -> RhaiResult {
         Err(ERR::Exit(value, Position::NONE).into())
     }
@@ -42,7 +42,7 @@ mod core_functions {
     /// ```rhai
     /// exit();
     /// ```
-    #[rhai_fn(return_raw)]
+    #[rhai_fn(volatile, return_raw)]
     pub fn exit() -> RhaiResult {
         Err(ERR::Exit(Dynamic::UNIT, Position::NONE).into())
     }
@@ -134,7 +134,7 @@ mod core_functions {
     /// ```
     #[cfg(not(feature = "no_float"))]
     #[cfg(not(feature = "no_std"))]
-    #[rhai_fn(name = "sleep")]
+    #[rhai_fn(name = "sleep", volatile)]
     pub fn sleep_float(seconds: FLOAT) {
         if seconds <= 0.0 {
             return;
@@ -154,6 +154,7 @@ mod core_functions {
     /// sleep(10);
     /// ```
     #[cfg(not(feature = "no_std"))]
+    #[rhai_fn(volatile)]
     pub fn sleep(seconds: INT) {
         if seconds <= 0 {
             return;
