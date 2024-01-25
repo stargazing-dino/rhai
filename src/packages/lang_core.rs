@@ -136,7 +136,7 @@ mod core_functions {
     #[cfg(not(feature = "no_std"))]
     #[rhai_fn(name = "sleep", volatile)]
     pub fn sleep_float(seconds: FLOAT) {
-        if seconds <= 0.0 {
+        if !seconds.is_normal() || seconds.is_sign_negative() {
             return;
         }
 
