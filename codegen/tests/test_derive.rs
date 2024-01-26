@@ -4,7 +4,7 @@ use rhai::{CustomType, TypeBuilder, FLOAT, INT};
 
 #[derive(Clone, CustomType)]
 pub struct Bar(
-    #[cfg(not(feature = "no_float"))]
+    #[cfg(not(feature = "no_float"))] // check other attributes
     #[rhai_custom_type_skip]
     FLOAT,
     INT,
@@ -16,8 +16,9 @@ pub struct Bar(
 
 #[derive(Clone, CustomType)]
 pub struct Foo {
+    #[cfg(not(feature = "no_float"))] // check other attributes
     #[rhai_custom_type_skip]
-    _dummy: INT,
+    _dummy: FLOAT,
     #[rhai_custom_type_get(get_bar)]
     pub bar: INT,
     #[rhai_custom_type_name("boo")]
