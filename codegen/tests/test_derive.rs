@@ -19,12 +19,12 @@ pub struct Foo {
     #[rhai_custom_type_skip]
     _dummy: INT,
     #[rhai_custom_type_get(get_bar)]
-    bar: INT,
+    pub bar: INT,
     #[rhai_custom_type_name("boo")]
     #[rhai_custom_type_readonly]
-    baz: String,
+    pub(crate) baz: String,
     #[rhai_custom_type_set(Self::set_qux)]
-    qux: Vec<INT>,
+    pub qux: Vec<INT>,
 }
 
 impl Foo {

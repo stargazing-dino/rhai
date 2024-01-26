@@ -26,7 +26,7 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
                 let mut set_fn = None;
                 let mut readonly = false;
                 let mut skip = false;
-        
+
                 for attr in field.attrs.iter() {
                     if attr.path().is_ident("rhai_custom_type_skip") {
                         skip = true;
@@ -63,7 +63,7 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
                         readonly = true;
                     }
                 }
-        
+
                 if skip && (get_fn.is_some() || set_fn.is_some() || name.is_some() || readonly) {
                     return syn::Error::new(
                         Span::call_site(),
@@ -71,7 +71,7 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
                     )
                     .into_compile_error();
                 }
-        
+
                 if !skip {
                     let field_name = if let Some(ref field_name) = field.ident {
                         quote! { #field_name }
@@ -83,13 +83,13 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
                         let index = proc_macro2::Literal::usize_unsuffixed(i);
                         quote! { #index }
                     };
-        
+
                     generate_accessor_fns(field_name, name, get_fn, set_fn, readonly)
                 } else {
                     quote! {}
                 }
             });
-        
+
             quote! { #(#iter ;)* }
         }
 
