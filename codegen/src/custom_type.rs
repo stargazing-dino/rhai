@@ -3,7 +3,7 @@ use quote::quote;
 use syn::{DeriveInput, Fields};
 
 pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
-    let name = input.ident;
+    let type_name = input.ident;
 
     let accessors = match input.data {
         // struct Foo;
@@ -102,8 +102,9 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
     };
 
     quote! {
-        impl CustomType for #name {
+        impl CustomType for #type_name {
             fn build(mut builder: TypeBuilder<Self>) {
+                builder.with_name(stringify!(#type_name));
                 #accessors;
             }
         }
