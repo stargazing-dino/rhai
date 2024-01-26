@@ -533,6 +533,7 @@ pub mod decimal_functions {
         #[rhai_fn(return_raw)]
         pub fn power(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
             // Raising to a very large power can take exponential time, so limit it to 1 million.
+            // TODO: Remove this limit when `rust-decimal` is updated with the fix.
             if std::convert::TryInto::<u32>::try_into(y.round()).map_or(true, |v| v > 1000000) {
                 return Err(make_err(format!("Exponential overflow: {x} ** {y}")));
             }

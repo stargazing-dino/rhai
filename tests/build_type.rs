@@ -159,17 +159,16 @@ fn test_build_type() {
 
 #[test]
 fn test_build_type_macro() {
-    #[derive(Debug, Clone, Eq, PartialEq)] // <- necessary for any custom type
-    #[derive(CustomType)] // <- auto-implement 'CustomType'
+    #[derive(Debug, Clone, Eq, PartialEq, CustomType)]
     struct Foo {
         #[rhai_custom_type_skip]
-        dummy: i64, // <- skip this field
-        #[rhai_custom_type_readonly] // <- only auto-implement getters
+        dummy: i64,
+        #[rhai_custom_type_readonly]
         bar: i64,
         #[rhai_custom_type_name("emphasize")]
-        baz: bool, // <- auto-implement getter/setter for 'baz'
-        #[rhai_custom_type_set(Self::set_hello)] // <- call custom setter for 'hello'
-        hello: String, // <- auto-implement getter for 'hello'
+        baz: bool,
+        #[rhai_custom_type_set(Self::set_hello)]
+        hello: String,
     }
 
     impl Foo {
