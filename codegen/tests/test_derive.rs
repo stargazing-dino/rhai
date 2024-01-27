@@ -1,30 +1,31 @@
-use rhai::{CustomType, TypeBuilder, FLOAT, INT};
+use rhai::{CustomType, Engine, TypeBuilder, FLOAT, INT};
 
 // Sanity check to make sure everything compiles
 
 #[derive(Clone, CustomType)]
 pub struct Bar(
     #[cfg(not(feature = "no_float"))] // check other attributes
-    #[rhai_custom_type_skip]
+    #[rhai_type_skip]
     FLOAT,
     INT,
-    #[rhai_custom_type_name("boo")]
-    #[rhai_custom_type_readonly]
+    #[rhai_type_name("boo")]
+    #[rhai_type_readonly]
     String,
     Vec<INT>,
 );
 
-#[derive(Clone, CustomType)]
+#[derive(Clone, Default, CustomType)]
+#[rhai_type_name("MyFoo")]
+#[rhai_type_extra(Self::build_extra)]
 pub struct Foo {
-    #[cfg(not(feature = "no_float"))] // check other attributes
-    #[rhai_custom_type_skip]
+    #[rhai_type_skip]
     _dummy: FLOAT,
-    #[rhai_custom_type_get(get_bar)]
+    #[rhai_type_get(get_bar)]
     pub bar: INT,
-    #[rhai_custom_type_name("boo")]
-    #[rhai_custom_type_readonly]
+    #[rhai_type_name("boo")]
+    #[rhai_type_readonly]
     pub(crate) baz: String,
-    #[rhai_custom_type_set(Self::set_qux)]
+    #[rhai_type_set(Self::set_qux)]
     pub qux: Vec<INT>,
 }
 
@@ -32,11 +33,20 @@ impl Foo {
     pub fn set_qux(&mut self, value: Vec<INT>) {
         self.qux = value;
     }
+
+    fn build_extra(builder: &mut TypeBuilder<Self>) {
+        builder.with_fn("new_foo", || Self::default());
+    }
 }
 
-fn get_bar(_this: &mut Foo) -> INT {
+fn get_bar(_this: &Foo) -> INT {
     42
 }
 
 #[test]
-fn test() {}
+fn test() {
+    let mut engine = Engine::new();
+    engine.build_type::<Foo>().build_type::<Bar>();
+
+    engine.run("new_foo()").unwrap();
+}

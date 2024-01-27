@@ -413,11 +413,12 @@ pub fn set_exported_global_fn(args: proc_macro::TokenStream) -> proc_macro::Toke
 #[proc_macro_derive(
     CustomType,
     attributes(
-        rhai_custom_type_name,
-        rhai_custom_type_get,
-        rhai_custom_type_set,
-        rhai_custom_type_readonly,
-        rhai_custom_type_skip
+        rhai_type_name,
+        rhai_type_get,
+        rhai_type_set,
+        rhai_type_readonly,
+        rhai_type_skip,
+        rhai_type_extra
     )
 )]
 pub fn derive_custom_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

@@ -144,7 +144,7 @@ impl<'s, T: Variant + Clone> TypeBuilder<'_, 's, T> {
         self
     }
 
-    /// Register a custom function.
+    /// Register a custom method.
     #[inline(always)]
     pub fn with_fn<A: 'static, const N: usize, const X: bool, R: Variant + Clone, const F: bool>(
         &mut self,
