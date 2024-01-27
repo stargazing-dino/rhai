@@ -1,5 +1,5 @@
 #![cfg(not(feature = "no_object"))]
-use rhai::{CustomType, Engine, EvalAltResult, Position, Scope, TypeBuilder, INT};
+use rhai::{CustomType, Engine, EvalAltResult, Position, TypeBuilder, INT};
 
 #[test]
 fn test_build_type() {
@@ -160,18 +160,28 @@ fn test_build_type() {
 #[test]
 fn test_build_type_macro() {
     #[derive(Debug, Clone, Eq, PartialEq, CustomType)]
+    #[rhai_type_name("MyFoo")]
+    #[rhai_type_extra(Self::build_extra)]
     struct Foo {
-        #[rhai_custom_type_skip]
+        #[rhai_type_skip]
         dummy: i64,
-        #[rhai_custom_type_readonly]
+        #[rhai_type_readonly]
         bar: i64,
-        #[rhai_custom_type_name("emphasize")]
+        #[rhai_type_name("emphasize")]
         baz: bool,
-        #[rhai_custom_type_set(Self::set_hello)]
+        #[rhai_type_set(Self::set_hello)]
         hello: String,
     }
 
     impl Foo {
+        pub fn new() -> Self {
+            Self {
+                dummy: 0,
+                bar: 5,
+                baz: false,
+                hello: "hey".to_string(),
+            }
+        }
         pub fn set_hello(&mut self, value: String) {
             self.hello = if self.baz {
                 let mut s = self.hello.clone();
@@ -184,27 +194,19 @@ fn test_build_type_macro() {
                 value
             };
         }
+        fn build_extra(builder: &mut TypeBuilder<Self>) {
+            builder.with_fn("new_foo", || Self::new());
+        }
     }
 
     let mut engine = Engine::new();
     engine.build_type::<Foo>();
 
-    let mut scope = Scope::new();
-    scope.push(
-        "foo",
-        Foo {
-            dummy: 0,
-            bar: 5,
-            baz: false,
-            hello: "hey".to_string(),
-        },
-    );
-
     assert_eq!(
         engine
-            .eval_with_scope::<Foo>(
-                &mut scope,
+            .eval::<Foo>(
                 r#"
+                    let foo = new_foo();
                     foo.hello = "this should not be seen";
                     foo.hello = "world!";
                     foo.emphasize = true;
