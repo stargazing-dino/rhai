@@ -26,7 +26,6 @@ mod custom_type_tests {
             impl CustomType for Bar {
                 fn build(mut builder: TypeBuilder<Self>) {
                     builder.with_name(stringify!(Bar));
-                    ;
                     builder.with_get_set("field1",
                         |obj: &mut Self| obj.1.clone(),
                         |obj: &mut Self, val| obj.1 = val
@@ -36,7 +35,6 @@ mod custom_type_tests {
                         |obj: &mut Self| obj.3.clone(),
                         |obj: &mut Self, val| obj.3 = val
                     );
-                    ;
                 }
             }
         };
@@ -70,7 +68,6 @@ mod custom_type_tests {
             impl CustomType for Foo {
                 fn build(mut builder: TypeBuilder<Self>) {
                     builder.with_name("MyFoo");
-                    ;
                     builder.with_get_set(stringify!(bar),
                         |obj: &mut Self| get_bar(&*obj),
                         |obj: &mut Self, val| obj.bar = val
@@ -80,7 +77,6 @@ mod custom_type_tests {
                         |obj: &mut Self| obj.qux.clone(),
                         Self::set_qux
                     );
-                    ;
                     Self::build_extra(&mut builder);
                 }
             }
