@@ -1,12 +1,12 @@
-use rhai::{CustomType, Engine, TypeBuilder, FLOAT, INT};
+use rhai::{CustomType, Engine, TypeBuilder, INT};
 
 // Sanity check to make sure everything compiles
 
 #[derive(Clone, CustomType)]
 pub struct Bar(
-    #[cfg(not(feature = "no_float"))] // check other attributes
     #[rhai_type_skip]
-    FLOAT,
+    #[cfg(not(feature = "no_float"))] // check other attributes
+    rhai::FLOAT,
     INT,
     #[rhai_type_name("boo")]
     #[rhai_type_readonly]
@@ -18,8 +18,9 @@ pub struct Bar(
 #[rhai_type_name("MyFoo")]
 #[rhai_type_extra(Self::build_extra)]
 pub struct Foo {
+    #[cfg(not(feature = "no_float"))] // check other attributes
     #[rhai_type_skip]
-    _dummy: FLOAT,
+    _dummy: rhai::FLOAT,
     #[rhai_type_get(get_bar)]
     pub bar: INT,
     #[rhai_type_name("boo")]
@@ -48,5 +49,16 @@ fn test() {
     let mut engine = Engine::new();
     engine.build_type::<Foo>().build_type::<Bar>();
 
-    engine.run("new_foo()").unwrap();
+    assert_eq!(
+        engine
+            .eval::<INT>(
+                "
+                    let foo = new_foo();
+                    foo.bar = 42;
+                    foo.bar
+                "
+            )
+            .unwrap(),
+        42
+    );
 }
