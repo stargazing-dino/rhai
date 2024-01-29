@@ -8,12 +8,11 @@ mod custom_type_tests {
         let input = quote! {
             #[derive(Clone, CustomType)]
             pub struct Bar(
-                #[rhai_type_skip]
+                #[rhai_type(skip)]
                 #[cfg(not(feature = "no_float"))]
                 rhai::FLOAT,
                 INT,
-                #[rhai_type_name("boo")]
-                #[rhai_type_readonly]
+                #[rhai_type(name = "boo", readonly)]
                 String,
                 Vec<INT>
             );
@@ -49,18 +48,16 @@ mod custom_type_tests {
     fn test_custom_type_struct() {
         let input = quote! {
             #[derive(CustomType)]
-            #[rhai_type_name("MyFoo")]
-            #[rhai_type_extra(Self::build_extra)]
+            #[rhai_type(skip, name = "MyFoo", extra = Self::build_extra)]
             pub struct Foo {
                 #[cfg(not(feature = "no_float"))]
-                #[rhai_type_skip]
+                #[rhai_type(skip)]
                 _dummy: rhai::FLOAT,
-                #[rhai_type_get(get_bar)]
+                #[rhai_type(get = get_bar)]
                 pub bar: INT,
-                #[rhai_type_name("boo")]
-                #[rhai_type_readonly]
+                #[rhai_type(name = "boo", readonly)]
                 pub(crate) baz: String,
-                #[rhai_type_set(Self::set_qux)]
+                #[rhai_type(set = Self::set_qux)]
                 pub qux: Vec<INT>
             }
         };

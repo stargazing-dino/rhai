@@ -410,17 +410,20 @@ pub fn set_exported_global_fn(args: proc_macro::TokenStream) -> proc_macro::Toke
     }
 }
 
-#[proc_macro_derive(
-    CustomType,
-    attributes(
-        rhai_type_name,
-        rhai_type_get,
-        rhai_type_set,
-        rhai_type_readonly,
-        rhai_type_skip,
-        rhai_type_extra
-    )
-)]
+/// Macro to implement the [`CustomType`][rhai::CustomType] trait.
+///
+/// # Usage
+///
+/// ```
+/// # use rhai::CustomType;
+/// #[derive(Clone, CustomType)]
+/// struct MyType {
+///     foo: i64,
+///     bar: bool,
+///     baz: String
+/// }
+/// ```
+#[proc_macro_derive(CustomType, attributes(rhai_type,))]
 pub fn derive_custom_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let expanded = custom_type::derive_custom_type_impl(input);
