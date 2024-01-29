@@ -415,7 +415,8 @@ pub fn set_exported_global_fn(args: proc_macro::TokenStream) -> proc_macro::Toke
 /// # Usage
 ///
 /// ```
-/// # use rhai::CustomType;
+/// use rhai::{CustomType, TypeBuilder};
+///
 /// #[derive(Clone, CustomType)]
 /// struct MyType {
 ///     foo: i64,
