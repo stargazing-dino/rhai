@@ -100,8 +100,8 @@ mod print_debug_functions {
         string
     }
     /// Convert the string into debug format.
-    #[rhai_fn(name = "debug", name = "to_debug", pure)]
-    pub fn debug_string(string: &mut ImmutableString) -> ImmutableString {
+    #[rhai_fn(name = "debug", name = "to_debug")]
+    pub fn debug_string(string: &str) -> ImmutableString {
         let mut buf = SmartString::new_const();
         write!(&mut buf, "{string:?}").unwrap();
         buf.into()
