@@ -308,7 +308,7 @@ impl RangeCase {
             Self::InclusiveInt(..) => true,
         }
     }
-    /// Get the index to the [`ConditionalExpr`].
+    /// Get the index to the list of expressions.
     #[inline(always)]
     #[must_use]
     pub const fn index(&self) -> usize {
@@ -316,7 +316,7 @@ impl RangeCase {
             Self::ExclusiveInt(.., n) | Self::InclusiveInt(.., n) => *n,
         }
     }
-    /// Set the index to the [`ConditionalExpr`].
+    /// Set the index to the list of expressions.
     #[inline(always)]
     pub fn set_index(&mut self, index: usize) {
         match self {
@@ -333,7 +333,7 @@ pub type CaseBlocksList = smallvec::SmallVec<[usize; 2]>;
 pub struct SwitchCasesCollection {
     /// List of conditional expressions: LHS = condition, RHS = expression.
     pub expressions: FnArgsVec<BinaryExpr>,
-    /// Dictionary mapping value hashes to [`ConditionalExpr`]'s.
+    /// Dictionary mapping value hashes to [`CaseBlocksList`]'s.
     pub cases: StraightHashMap<CaseBlocksList>,
     /// List of range cases.
     pub ranges: StaticVec<RangeCase>,
@@ -867,7 +867,7 @@ impl Stmt {
             // Loops that exit can be pure because it can never be infinite.
             Self::While(x, ..) if matches!(x.expr, Expr::BoolConstant(false, ..)) => true,
             Self::Do(x, options, ..) if matches!(x.expr, Expr::BoolConstant(..)) => match x.expr {
-                Expr::BoolConstant(cond, ..) if cond == options.contains(ASTFlags::NEGATED) => {
+                Expr::BoolConstant(cond, ..) if cond == options.intersects(ASTFlags::NEGATED) => {
                     x.body.iter().all(Self::is_pure)
                 }
                 _ => false,

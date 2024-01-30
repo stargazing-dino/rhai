@@ -551,7 +551,7 @@ impl Position {
 }
 
 #[allow(deprecated)]
-impl<T: Variant + Clone> TypeBuilder<'_, '_, T> {
+impl<T: Variant + Clone> TypeBuilder<'_, T> {
     /// Register a custom fallible function.
     ///
     /// # Deprecated
@@ -787,6 +787,22 @@ impl Module {
         arg_names: impl IntoIterator<Item = S>,
     ) -> &mut Self {
         self.update_fn_metadata_with_comments(hash_fn, arg_names, [""; 0])
+    }
+
+    /// _(metadata)_ Generate signatures for all the non-private functions in the [`Module`].
+    /// Exported under the `metadata` feature only.
+    ///
+    /// # Deprecated
+    ///
+    /// This method is deprecated.
+    /// Use [`gen_fn_signatures_with_mapper`][`Module::gen_fn_signatures_with_mapper`] instead.
+    ///
+    /// This method will be removed in the next major version.
+    #[deprecated(since = "1.17.0", note = "use `gen_fn_signatures_with_mapper` instead")]
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn gen_fn_signatures(&self) -> impl Iterator<Item = String> + '_ {
+        self.gen_fn_signatures_with_mapper(|s| s.into())
     }
 }
 

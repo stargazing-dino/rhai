@@ -167,4 +167,4 @@ features = ["document-features", "metadata", "serde", "internals", "decimal", "d
 rustyline = { git = "https://github.com/schungx/rustyline", branch = "v13" }
 
 # Patch SmartString to resolve an UB issue.
-smartstring = { git = "https://github.com/bodil/smartstring", ref = "refs/pull/34/head" }
+#smartstring = { git = "https://github.com/bodil/smartstring", ref = "refs/pull/34/head" }

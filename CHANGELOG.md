@@ -4,9 +4,17 @@ Rhai Release Notes
 Version 1.17.0
 ==============
 
-In this version, fuzzing via [Google OSS-Fuzz](https://github.com/google/oss-fuzz) is used to flush
-out hidden bugs and edge cases. This should result in higher code quality, better stability and
-improved security.
+Starting from this version, the official preferred method of registering an API for a custom type is
+via the `#[derive(CustomType)]` macro. The old API is still available for types that reside in
+external crates (and thus cannot implement `CustomType`).
+
+Starting from this version, the new `FuncRegistration` API is preferred for registering native Rust
+functions into a `Module`. The old API is still available but deprecated.
+
+Starting from this version, fuzzing via [Google OSS-Fuzz](https://github.com/google/oss-fuzz) is
+used to flush out hidden bugs and edge cases. This should result in higher code quality, better
+stability and improved security. And indeed, a large number of bugs have been discovered from this
+and fixed.
 
 Potentially breaking changes
 ----------------------------
@@ -16,11 +24,22 @@ Potentially breaking changes
 * `EvalContext::new`, `FloatWrapper` and `ConditionalExpr` are now gated under `internals`.
 * Previously, Rhai follows [Unicode's definition for _whitespace_](https://en.wikipedia.org/wiki/Template:Whitespace_(Unicode)), which allows many exotic whitespace characters in scripts. Starting from this version, whitespace follows [WhatWG](https://infra.spec.whatwg.org/#ascii-whitespace)'s definition of five ASCII characters (TAB, SPACE, CR, LF and FF), which is the same as Rust. All other Unicode whitespace characters (not inside strings) are not considered whitespace by Rhai. If a script used to contain non-ASCII whitespace characters, it now fails to parse with a syntax error.
 
+New features
+------------
+
+* `#[derive(CustomType)]` is now available, driven by procedural macros in `rhai_codegen`.
+* A new `FuncRegistration` API is added to assist in registering native Rust functions into modules with various settings. Some of the original `Module::set_fn...` API is now deprecated.
+* Functions defined in plugin modules can now be marked as `volatile` which prevents it from being optimized away even under `OptimizationLevel::Full`.
+* Added `Engine::max_functions` and `Engine::set_max_functions` to limit the maximum number of functions allowed in a script. This is to guard against DOS attacks -- e.g. a simple closure `||` (two characters) is a function. When `max_function` is exceeded during script compilation, a new parse error, `ParseErrorType::TooManyFunctions`, is returned.
+* `Engine::get_interned_string` is made public instead of gated under `internals`.
+
 Deprecated API's
 ----------------
 
 * `rhai::config::hashing::set_ahash_seed`, `rhai::config::hashing::get_ahash_seed` and the `RHAI_AHASH_SEED` environment variable are deprecated in favor of `rhai::config::hashing::set_hashing_seed`, `rhai::config::hashing::get_hashing_seed` and `RHAI_HASHING_SEED`.
 * `AST::clear_doc` is deprecated.
+* Much of the `Module::update_XXX` API is deprecated in favor of using the `FuncRegistration` API.
+* `Module::gen_fn_signatures` is deprecated in favor of `Module::gen_fn_signatures_with_mapper`.
 
 Fixes to bugs found via fuzzing
 -------------------------------
@@ -45,15 +64,8 @@ Other bug fixes
 
 * Arrays in object maps now serialize to JSON correctly via `to_json()` when the `serde` feature is not enabled.
 * `Engine::format_map_as_json` now serializes arrays correctly.
-
-New features
-------------
-
-* `#[derive(CustomType)]` is now available, driven by procedural macros in `rhai_codegen`.
-* A new `FuncRegistration` API is added to assist in registering native Rust functions into modules with various settings. Some of the original `Module::set_fn...` API is now deprecated.
-* Functions defined in plugin modules can now be marked as `volatile` which prevents it from being optimized away even under `OptimizationLevel::Full`.
-* Added `Engine::max_functions` and `Engine::set_max_functions` to limit the maximum number of functions allowed in a script. This is to guard against DOS attacks -- e.g. a simple closure `||` (two characters) is a function. When `max_function` is exceeded during script compilation, a new parse error, `ParseErrorType::TooManyFunctions`, is returned.
-* `Engine::get_interned_string` is made public instead of gated under `internals`.
+* `Engine::gen_fn_signatures(false)` now properly skips functions in the standard library.
+* `TypeBuilder::with_name` now properly sets the display-name of the type for use in generating metadata.
 
 Enhancements
 ------------
@@ -64,6 +76,7 @@ Enhancements
 * `Dynamic::is_fnptr` is made a public API.
 * `Scope::get_value_ref` and `Scope::get_value_mut` are added.
 * `TypeBuilder::with_name` now takes any `&str` instead of just `&'static str`.
+* `Engine::gen_fn_signatures` now formats the function signatures using pretty-print names of custom types.
 
 
 Version 1.16.3

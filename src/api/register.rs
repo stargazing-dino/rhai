@@ -19,7 +19,7 @@ impl Engine {
     /// (which is the first module in `global_modules`).
     #[inline(always)]
     #[must_use]
-    fn global_namespace_mut(&mut self) -> &mut Module {
+    pub(crate) fn global_namespace_mut(&mut self) -> &mut Module {
         if self.global_modules.is_empty() {
             let mut global_namespace = Module::new();
             global_namespace.flags |= ModuleFlags::INTERNAL;
@@ -32,9 +32,11 @@ impl Engine {
     ///
     /// # Assumptions
     ///
-    /// * The function is assumed to be _pure_ unless it is a property setter or an index setter.
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
     ///
-    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
+    /// * **Purity**: The function is assumed to be _pure_ unless it is a property setter or an index setter.
+    ///
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
     ///
     /// # Example
     ///
@@ -73,44 +75,28 @@ impl Engine {
         name: impl AsRef<str> + Into<Identifier>,
         func: FUNC,
     ) -> &mut Self {
-        let param_types = FUNC::param_types();
+        let reg = FuncRegistration::new(name.into()).with_namespace(FnNamespace::Global);
 
         #[cfg(feature = "metadata")]
-        let mut param_type_names = FUNC::param_names()
-            .iter()
-            .map(|ty| format!("_: {}", self.format_type_name(ty)))
-            .collect::<crate::FnArgsVec<_>>();
+        let reg = {
+            let mut param_type_names = FUNC::param_names()
+                .iter()
+                .map(|ty| format!("_: {}", self.format_param_type(ty)))
+                .collect::<crate::FnArgsVec<_>>();
 
-        #[cfg(feature = "metadata")]
-        if FUNC::return_type() != TypeId::of::<()>() {
-            param_type_names.push(self.format_type_name(FUNC::return_type_name()).into());
-        }
+            if FUNC::return_type() != TypeId::of::<()>() {
+                param_type_names.push(self.format_param_type(FUNC::return_type_name()).into());
+            }
 
-        #[cfg(feature = "metadata")]
-        let param_type_names = param_type_names
-            .iter()
-            .map(String::as_str)
-            .collect::<crate::FnArgsVec<_>>();
+            let param_type_names = param_type_names
+                .iter()
+                .map(String::as_str)
+                .collect::<crate::FnArgsVec<_>>();
 
-        let fn_name = name.into();
-        let is_pure = true;
+            reg.with_params_info(param_type_names)
+        };
 
-        #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-        let is_pure = is_pure && (FUNC::num_params() != 3 || fn_name != crate::engine::FN_IDX_SET);
-        #[cfg(not(feature = "no_object"))]
-        let is_pure =
-            is_pure && (FUNC::num_params() != 2 || !fn_name.starts_with(crate::engine::FN_SET));
-
-        let f = FuncRegistration::new(fn_name).with_namespace(FnNamespace::Global);
-
-        #[cfg(feature = "metadata")]
-        let f = f.with_params_info(param_type_names);
-
-        f.set_into_module_raw(
-            self.global_namespace_mut(),
-            param_types,
-            func.into_callable_function(is_pure, true),
-        );
+        reg.set_into_module(self.global_namespace_mut(), func);
 
         self
     }
@@ -139,6 +125,15 @@ impl Engine {
         arg_types: impl AsRef<[TypeId]>,
         func: impl Fn(NativeCallContext, &mut FnCallArgs) -> RhaiResultOf<T> + SendSync + 'static,
     ) -> &mut Self {
+        let name = name.into();
+        let arg_types = arg_types.as_ref();
+        let is_pure = true;
+
+        #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+        let is_pure = is_pure && (arg_types.len() != 3 || name != crate::engine::FN_IDX_SET);
+        #[cfg(not(feature = "no_object"))]
+        let is_pure = is_pure && (arg_types.len() != 2 || !name.starts_with(crate::engine::FN_SET));
+
         FuncRegistration::new(name)
             .with_namespace(FnNamespace::Global)
             .set_into_module_raw(
@@ -151,7 +146,7 @@ impl Engine {
                         },
                     ),
                     has_context: true,
-                    is_pure: false,
+                    is_pure,
                     is_volatile: true,
                 },
             );
@@ -499,7 +494,7 @@ impl Engine {
     /// # }
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-    #[inline]
+    #[inline(always)]
     pub fn register_indexer_get<
         T: Variant + Clone,
         IDX: Variant + Clone,
@@ -510,30 +505,6 @@ impl Engine {
         &mut self,
         get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
-        #[cfg(not(feature = "no_index"))]
-        assert!(
-            TypeId::of::<T>() != TypeId::of::<crate::Array>(),
-            "Cannot register indexer for arrays."
-        );
-
-        #[cfg(not(feature = "no_object"))]
-        assert!(
-            TypeId::of::<T>() != TypeId::of::<crate::Map>(),
-            "Cannot register indexer for object maps."
-        );
-
-        assert!(
-            TypeId::of::<T>() != TypeId::of::<String>()
-                && TypeId::of::<T>() != TypeId::of::<&str>()
-                && TypeId::of::<T>() != TypeId::of::<crate::ImmutableString>(),
-            "Cannot register indexer for strings."
-        );
-
-        assert!(
-            TypeId::of::<T>() != TypeId::of::<crate::INT>(),
-            "Cannot register indexer for integers."
-        );
-
         self.register_fn(crate::engine::FN_IDX_GET, get_fn)
     }
     /// Register an index setter for a custom type with the [`Engine`].
@@ -586,7 +557,7 @@ impl Engine {
     /// # }
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-    #[inline]
+    #[inline(always)]
     pub fn register_indexer_set<
         T: Variant + Clone,
         IDX: Variant + Clone,
@@ -597,30 +568,6 @@ impl Engine {
         &mut self,
         set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
-        #[cfg(not(feature = "no_index"))]
-        assert!(
-            TypeId::of::<T>() != TypeId::of::<crate::Array>(),
-            "Cannot register indexer for arrays."
-        );
-
-        #[cfg(not(feature = "no_object"))]
-        assert!(
-            TypeId::of::<T>() != TypeId::of::<crate::Map>(),
-            "Cannot register indexer for object maps."
-        );
-
-        assert!(
-            TypeId::of::<T>() != TypeId::of::<String>()
-                && TypeId::of::<T>() != TypeId::of::<&str>()
-                && TypeId::of::<T>() != TypeId::of::<crate::ImmutableString>(),
-            "Cannot register indexer for strings."
-        );
-
-        assert!(
-            TypeId::of::<T>() != TypeId::of::<crate::INT>(),
-            "Cannot register indexer for integers."
-        );
-
         self.register_fn(crate::engine::FN_IDX_SET, set_fn)
     }
     /// Short-hand for registering both index getter and setter functions for a custom type with the [`Engine`].
@@ -804,12 +751,17 @@ impl Engine {
         let mut signatures = Vec::with_capacity(64);
 
         if let Some(global_namespace) = self.global_modules.first() {
-            signatures.extend(global_namespace.gen_fn_signatures());
+            signatures.extend(
+                global_namespace.gen_fn_signatures_with_mapper(|s| self.format_param_type(s)),
+            );
         }
 
         #[cfg(not(feature = "no_module"))]
         for (name, m) in &self.global_sub_modules {
-            signatures.extend(m.gen_fn_signatures().map(|f| format!("{name}::{f}")));
+            signatures.extend(
+                m.gen_fn_signatures_with_mapper(|s| self.format_param_type(s))
+                    .map(|f| format!("{name}::{f}")),
+            );
         }
 
         let exclude_flags = if include_packages {
@@ -822,8 +774,8 @@ impl Engine {
             self.global_modules
                 .iter()
                 .skip(1)
-                .filter(|m| !m.flags.contains(exclude_flags))
-                .flat_map(|m| m.gen_fn_signatures()),
+                .filter(|m| !m.flags.intersects(exclude_flags))
+                .flat_map(|m| m.gen_fn_signatures_with_mapper(|s| self.format_param_type(s))),
         );
 
         signatures
