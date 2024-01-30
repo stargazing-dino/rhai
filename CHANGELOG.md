@@ -64,6 +64,7 @@ Other bug fixes
 * Arrays in object maps now serialize to JSON correctly via `to_json()` when the `serde` feature is not enabled.
 * `Engine::format_map_as_json` now serializes arrays correctly.
 * `Engine::gen_fn_signatures(false)` now properly skips functions in the standard library.
+* `TypeBuilder::with_name` now properly sets the display-name of the type for use in generating metadata.
 
 Enhancements
 ------------

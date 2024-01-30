@@ -98,29 +98,27 @@ impl Engine {
 ///
 /// To define a pretty-print name, call [`with_name`][`TypeBuilder::with_name`],
 /// to use [`Engine::register_type_with_name`] instead.
-pub struct TypeBuilder<'a, 's, T: Variant + Clone> {
+pub struct TypeBuilder<'a, T: Variant + Clone> {
     engine: &'a mut Engine,
-    name: Option<&'s str>,
     _marker: PhantomData<T>,
 }
 
-impl<'a, T: Variant + Clone> TypeBuilder<'a, '_, T> {
+impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     /// Create a [`TypeBuilder`] linked to a particular [`Engine`] instance.
     #[inline(always)]
     fn new(engine: &'a mut Engine) -> Self {
         Self {
             engine,
-            name: None,
             _marker: PhantomData,
         }
     }
 }
 
-impl<'s, T: Variant + Clone> TypeBuilder<'_, 's, T> {
+impl<'s, T: Variant + Clone> TypeBuilder<'_, T> {
     /// Set a pretty-print name for the `type_of` function.
     #[inline(always)]
-    pub fn with_name(&mut self, name: &'s str) -> &mut Self {
-        self.name = Some(name.as_ref());
+    pub fn with_name(&mut self, name: &str) -> &mut Self {
+        self.engine.register_type_with_name::<T>(name);
         self
     }
 
@@ -156,7 +154,7 @@ impl<'s, T: Variant + Clone> TypeBuilder<'_, 's, T> {
     }
 }
 
-impl<T> TypeBuilder<'_, '_, T>
+impl<T> TypeBuilder<'_, T>
 where
     T: Variant + Clone + IntoIterator,
     <T as IntoIterator>::Item: Variant + Clone,
@@ -171,7 +169,7 @@ where
 }
 
 #[cfg(not(feature = "no_object"))]
-impl<T: Variant + Clone> TypeBuilder<'_, '_, T> {
+impl<T: Variant + Clone> TypeBuilder<'_, T> {
     /// Register a getter function.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
@@ -224,7 +222,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, '_, T> {
 }
 
 #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-impl<T: Variant + Clone> TypeBuilder<'_, '_, T> {
+impl<T: Variant + Clone> TypeBuilder<'_, T> {
     /// Register an index getter.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
@@ -279,15 +277,5 @@ impl<T: Variant + Clone> TypeBuilder<'_, '_, T> {
     ) -> &mut Self {
         self.engine.register_indexer_get_set(get_fn, set_fn);
         self
-    }
-}
-
-impl<T: Variant + Clone> Drop for TypeBuilder<'_, '_, T> {
-    #[inline]
-    fn drop(&mut self) {
-        match self.name {
-            Some(ref name) => self.engine.register_type_with_name::<T>(name),
-            None => self.engine.register_type::<T>(),
-        };
     }
 }
