@@ -8,8 +8,8 @@ use crate::func::{
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypeInfo, CustomTypesCollection};
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, FnArgsVec, Identifier, ImmutableString, RhaiResultOf,
-    Shared, SharedModule, SmartString,
+    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, Identifier, ImmutableString,
+    RhaiResultOf, Shared, SharedModule, SmartString,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -178,6 +178,16 @@ pub struct FuncRegistration {
 impl FuncRegistration {
     /// Create a new [`FuncRegistration`].
     ///
+    /// # Defaults
+    ///
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Internal`].
+    ///
+    /// * **Purity**: The function is assumed to be _pure_ unless it is a property setter or an index setter.
+    ///
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
+    ///
+    /// * **Metadata**: No metadata for the function is registered.
+    ///
     /// ```
     /// # use rhai::{Module, FuncRegistration, FnNamespace};
     /// let mut module = Module::new();
@@ -211,6 +221,82 @@ impl FuncRegistration {
             purity: None,
             volatility: None,
         }
+    }
+    /// Create a new [`FuncRegistration`] for a property getter.
+    ///
+    /// Not available under `no_object`.
+    ///
+    /// # Defaults
+    ///
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
+    ///
+    /// * **Purity**: The function is assumed to be _pure_.
+    ///
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
+    ///
+    /// * **Metadata**: No metadata for the function is registered.
+    #[cfg(not(feature = "no_object"))]
+    #[inline(always)]
+    pub fn new_getter(prop: impl AsRef<str>) -> Self {
+        Self::new(crate::engine::make_getter(prop.as_ref())).with_namespace(FnNamespace::Global)
+    }
+    /// Create a new [`FuncRegistration`] for a property setter.
+    ///
+    /// Not available under `no_object`.
+    ///
+    /// # Defaults
+    ///
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
+    ///
+    /// * **Purity**: The function is assumed to be _no-pure_.
+    ///
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
+    ///
+    /// * **Metadata**: No metadata for the function is registered.
+    #[cfg(not(feature = "no_object"))]
+    #[inline(always)]
+    pub fn new_setter(prop: impl AsRef<str>) -> Self {
+        Self::new(crate::engine::make_setter(prop.as_ref()))
+            .with_namespace(FnNamespace::Global)
+            .with_purity(false)
+    }
+    /// Create a new [`FuncRegistration`] for an index getter.
+    ///
+    /// Not available under both `no_index` and `no_object`.
+    ///
+    /// # Defaults
+    ///
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
+    ///
+    /// * **Purity**: The function is assumed to be _pure_.
+    ///
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
+    ///
+    /// * **Metadata**: No metadata for the function is registered.
+    #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+    #[inline(always)]
+    pub fn new_index_getter() -> Self {
+        Self::new(crate::engine::FN_IDX_GET).with_namespace(FnNamespace::Global)
+    }
+    /// Create a new [`FuncRegistration`] for an index setter.
+    ///
+    /// Not available under both `no_index` and `no_object`.
+    ///
+    /// # Defaults
+    ///
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
+    ///
+    /// * **Purity**: The function is assumed to be _no-pure_.
+    ///
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
+    ///
+    /// * **Metadata**: No metadata for the function is registered.
+    #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+    #[inline(always)]
+    pub fn new_index_setter() -> Self {
+        Self::new(crate::engine::FN_IDX_SET)
+            .with_namespace(FnNamespace::Global)
+            .with_purity(false)
     }
     /// Set the [namespace][`FnNamespace`] of the function.
     pub fn with_namespace(mut self, namespace: FnNamespace) -> Self {
@@ -270,13 +356,21 @@ impl FuncRegistration {
         self.metadata.comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
         self
     }
+    /// Register the function into the specified [`Engine`].
+    #[inline]
+    pub fn register_into_engine<A: 'static, const N: usize, const X: bool, R, const F: bool, FUNC>(
+        self,
+        engine: &mut Engine,
+        func: FUNC,
+    ) -> &FuncMetadata
+    where
+        R: Variant + Clone,
+        FUNC: RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
+    {
+        self.with_namespace(FnNamespace::Global)
+            .set_into_module(engine.global_namespace_mut(), func)
+    }
     /// Register the function into the specified [`Module`].
-    ///
-    /// # Assumptions
-    ///
-    /// * **Purity**: The function is assumed to be _pure_ (so it can be called on constants) unless it is a property setter or an index setter.
-    ///
-    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
     #[inline]
     pub fn set_into_module<A: 'static, const N: usize, const X: bool, R, const F: bool, FUNC>(
         self,
@@ -318,6 +412,14 @@ impl FuncRegistration {
     ///
     /// This function is very low level.  It takes a list of [`TypeId`][std::any::TypeId]'s
     /// indicating the actual types of the parameters.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the type of the first parameter is [`Array`][crate::Array], [`Map`][crate::Map],
+    /// [`String`], [`ImmutableString`][crate::ImmutableString], `&str` or [`INT`][crate::INT] and
+    /// the function name indicates that it is an index getter or setter.
+    ///
+    /// Indexers for arrays, object maps, strings and integers cannot be registered.
     #[inline]
     pub fn set_into_module_raw(
         self,
@@ -333,6 +435,34 @@ impl FuncRegistration {
 
         f.num_params = arg_types.as_ref().len();
         f.param_types.extend(arg_types.as_ref().iter().copied());
+
+        if f.name == crate::engine::FN_IDX_GET || f.name == crate::engine::FN_IDX_SET {
+            if let Some(&type_id) = f.param_types.first() {
+                #[cfg(not(feature = "no_index"))]
+                assert!(
+                    type_id != TypeId::of::<crate::Array>(),
+                    "Cannot register indexer for arrays."
+                );
+
+                #[cfg(not(feature = "no_object"))]
+                assert!(
+                    type_id != TypeId::of::<crate::Map>(),
+                    "Cannot register indexer for object maps."
+                );
+
+                assert!(
+                    type_id != TypeId::of::<String>()
+                        && type_id != TypeId::of::<&str>()
+                        && type_id != TypeId::of::<crate::ImmutableString>(),
+                    "Cannot register indexer for strings."
+                );
+
+                assert!(
+                    type_id != TypeId::of::<crate::INT>(),
+                    "Cannot register indexer for integers."
+                );
+            }
+        }
 
         let is_method = func.is_method();
 

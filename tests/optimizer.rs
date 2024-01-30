@@ -1,5 +1,5 @@
 #![cfg(not(feature = "no_optimize"))]
-use rhai::{Engine, Module, OptimizationLevel, Scope, INT};
+use rhai::{CustomType, Engine, FuncRegistration, Module, OptimizationLevel, Scope, TypeBuilder, INT};
 
 #[test]
 fn test_optimizer() {
@@ -10,10 +10,10 @@ fn test_optimizer() {
         engine
             .eval::<INT>(
                 "
-                const X = 0;
-                const X = 40 + 2 - 1 + 1;
-                X
-            "
+                    const X = 0;
+                    const X = 40 + 2 - 1 + 1;
+                    X
+                "
             )
             .unwrap(),
         42
@@ -147,7 +147,7 @@ fn test_optimizer_re_optimize() {
 
 #[test]
 fn test_optimizer_full() {
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, CustomType)]
     struct TestStruct(INT);
 
     let mut engine = Engine::new();
@@ -170,16 +170,15 @@ fn test_optimizer_full() {
     );
 
     engine
-        .register_type_with_name::<TestStruct>("TestStruct")
+        .build_type::<TestStruct>()
         .register_fn("ts", |n: INT| TestStruct(n))
-        .register_fn("value", |ts: &mut TestStruct| ts.0)
         .register_fn("+", |ts1: &mut TestStruct, ts2: TestStruct| TestStruct(ts1.0 + ts2.0));
 
     let ast = engine
         .compile(
             "
                 const FOO = ts(40) + ts(2);
-                value(FOO)
+                field0(FOO)
             ",
         )
         .unwrap();
@@ -192,4 +191,29 @@ fn test_optimizer_full() {
     assert_eq!(scope.len(), 1);
 
     assert_eq!(scope.get_value::<TestStruct>("FOO").unwrap().0, 42);
+}
+
+#[test]
+fn test_optimizer_volatile() {
+    let mut engine = Engine::new();
+
+    engine.set_optimization_level(OptimizationLevel::Full);
+
+    FuncRegistration::new("foo").with_volatility(true).register_into_engine(&mut engine, |x: i64| x + 1);
+
+    let ast = engine.compile("foo(42)").unwrap();
+
+    let text_ast = format!("{ast:?}");
+
+    // Make sure the call is not optimized away
+    assert!(text_ast.contains(r#"name: "foo""#));
+
+    FuncRegistration::new("foo").with_volatility(false).register_into_engine(&mut engine, |x: i64| x + 1);
+
+    let ast = engine.compile("foo(42)").unwrap();
+
+    let text_ast = format!("{ast:?}");
+
+    // Make sure the call is optimized away
+    assert!(!text_ast.contains(r#"name: "foo""#));
 }
