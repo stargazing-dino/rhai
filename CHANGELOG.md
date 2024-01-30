@@ -39,6 +39,7 @@ Deprecated API's
 * `rhai::config::hashing::set_ahash_seed`, `rhai::config::hashing::get_ahash_seed` and the `RHAI_AHASH_SEED` environment variable are deprecated in favor of `rhai::config::hashing::set_hashing_seed`, `rhai::config::hashing::get_hashing_seed` and `RHAI_HASHING_SEED`.
 * `AST::clear_doc` is deprecated.
 * Much of the `Module::update_XXX` API is deprecated in favor of using the `FuncRegistration` API.
+* `Module::gen_fn_signatures` is deprecated in favor of `Module::gen_fn_signatures_with_mapper`.
 
 Fixes to bugs found via fuzzing
 -------------------------------
@@ -75,6 +76,7 @@ Enhancements
 * `Dynamic::is_fnptr` is made a public API.
 * `Scope::get_value_ref` and `Scope::get_value_mut` are added.
 * `TypeBuilder::with_name` now takes any `&str` instead of just `&'static str`.
+* `Engine::gen_fn_signatures` now formats the function signatures using pretty-print names of custom types.
 
 
 Version 1.16.3

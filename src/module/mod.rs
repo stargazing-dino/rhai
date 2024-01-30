@@ -1,7 +1,7 @@
 //! Module defining external-loaded modules for Rhai.
 
 #[cfg(feature = "metadata")]
-use crate::api::formatting::format_type;
+use crate::api::formatting::format_param_type_for_display;
 use crate::ast::FnAccess;
 use crate::func::{
     shared_take_or_clone, FnIterator, RhaiFunc, RhaiNativeFunc, SendSync, StraightHashMap,
@@ -101,10 +101,13 @@ impl FuncMetadata {
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[must_use]
-    pub fn gen_signature(&self) -> String {
+    pub fn gen_signature<'a>(
+        &'a self,
+        type_mapper: impl Fn(&'a str) -> std::borrow::Cow<'a, str>,
+    ) -> String {
         let mut signature = format!("{}(", self.name);
 
-        let return_type = format_type(&self.return_type, true);
+        let return_type = format_param_type_for_display(&self.return_type, true);
 
         if self.params_info.is_empty() {
             for x in 0..self.num_params {
@@ -120,12 +123,18 @@ impl FuncMetadata {
                 .map(|param| {
                     let mut segment = param.splitn(2, ':');
                     let name = match segment.next().unwrap().trim() {
-                        "" => "_",
+                        "" => "_".into(),
                         s => s,
                     };
-                    let result: std::borrow::Cow<str> = segment.next().map_or_else(
+                    let result: std::borrow::Cow<_> = segment.next().map_or_else(
                         || name.into(),
-                        |typ| format!("{name}: {}", format_type(typ, false)).into(),
+                        |typ| {
+                            format!(
+                                "{name}: {}",
+                                format_param_type_for_display(&type_mapper(typ), false)
+                            )
+                            .into()
+                        },
                     );
                     result
                 })
@@ -601,7 +610,7 @@ impl fmt::Debug for Module {
                         #[cfg(not(feature = "metadata"))]
                         return _f.to_string();
                         #[cfg(feature = "metadata")]
-                        return _m.gen_signature();
+                        return _m.gen_signature(|s| s.into());
                     })
                     .collect::<Vec<_>>(),
             )
@@ -1052,14 +1061,17 @@ impl Module {
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[inline]
-    pub fn gen_fn_signatures(&self) -> impl Iterator<Item = String> + '_ {
+    pub fn gen_fn_signatures_with_mapper<'a>(
+        &'a self,
+        type_mapper: impl Fn(&'a str) -> std::borrow::Cow<'a, str> + 'a,
+    ) -> impl Iterator<Item = String> + 'a {
         self.iter_fn()
-            .map(|(_, f)| f)
+            .map(|(_, m)| m)
             .filter(|&f| match f.access {
                 FnAccess::Public => true,
                 FnAccess::Private => false,
             })
-            .map(FuncMetadata::gen_signature)
+            .map(move |m| m.gen_signature(&type_mapper))
     }
 
     /// Does a variable exist in the [`Module`]?

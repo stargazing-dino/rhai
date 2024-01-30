@@ -84,11 +84,11 @@ impl Engine {
         {
             let mut param_type_names = FUNC::param_names()
                 .iter()
-                .map(|ty| format!("_: {}", self.format_type_name(ty)))
+                .map(|ty| format!("_: {}", self.format_param_type(ty)))
                 .collect::<crate::FnArgsVec<_>>();
 
             if FUNC::return_type() != TypeId::of::<()>() {
-                param_type_names.push(self.format_type_name(FUNC::return_type_name()).into());
+                param_type_names.push(self.format_param_type(FUNC::return_type_name()).into());
             }
 
             let param_type_names = param_type_names
@@ -754,12 +754,17 @@ impl Engine {
         let mut signatures = Vec::with_capacity(64);
 
         if let Some(global_namespace) = self.global_modules.first() {
-            signatures.extend(global_namespace.gen_fn_signatures());
+            signatures.extend(
+                global_namespace.gen_fn_signatures_with_mapper(|s| self.format_param_type(s)),
+            );
         }
 
         #[cfg(not(feature = "no_module"))]
         for (name, m) in &self.global_sub_modules {
-            signatures.extend(m.gen_fn_signatures().map(|f| format!("{name}::{f}")));
+            signatures.extend(
+                m.gen_fn_signatures_with_mapper(|s| self.format_param_type(s))
+                    .map(|f| format!("{name}::{f}")),
+            );
         }
 
         let exclude_flags = if include_packages {
@@ -773,7 +778,7 @@ impl Engine {
                 .iter()
                 .skip(1)
                 .filter(|m| !m.flags.intersects(exclude_flags))
-                .flat_map(|m| m.gen_fn_signatures()),
+                .flat_map(|m| m.gen_fn_signatures_with_mapper(|s| self.format_param_type(s))),
         );
 
         signatures

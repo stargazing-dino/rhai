@@ -533,7 +533,7 @@ impl FuncMetadata {
 /// Associated generic types are also rewritten into regular generic type parameters.
 #[must_use]
 fn def_type_name<'a>(ty: &'a str, engine: &'a Engine) -> Cow<'a, str> {
-    let ty = engine.format_type_name(ty).replace("crate::", "");
+    let ty = engine.format_param_type(ty).replace("crate::", "");
     let ty = ty.strip_prefix("&mut").unwrap_or(&*ty).trim();
     let ty = ty.split("::").last().unwrap();
 

@@ -1,7 +1,7 @@
 //! Serialization of functions metadata.
 #![cfg(feature = "metadata")]
 
-use crate::api::formatting::format_type;
+use crate::api::formatting::format_param_type_for_display;
 use crate::func::RhaiFunc;
 use crate::module::{calc_native_fn_hash, FuncMetadata, ModuleFlags};
 use crate::types::custom_types::CustomTypeInfo;
@@ -151,12 +151,12 @@ impl<'a> From<(&'a RhaiFunc, &'a FuncMetadata)> for FnMetadata<'a> {
                         "_" => None,
                         s => Some(s),
                     };
-                    let typ = seg.next().map(|s| format_type(s, false));
+                    let typ = seg.next().map(|s| format_param_type_for_display(s, false));
                     FnParam { name, typ }
                 })
                 .collect(),
-            return_type: format_type(&m.return_type, true),
-            signature: m.gen_signature().into(),
+            return_type: format_param_type_for_display(&m.return_type, true),
+            signature: m.gen_signature(|s| s.into()).into(),
             doc_comments: if f.is_script() {
                 #[cfg(feature = "no_function")]
                 unreachable!("script-defined functions should not exist under no_function");
