@@ -200,7 +200,7 @@ fn test_optimizer_volatile() {
 
     engine.set_optimization_level(OptimizationLevel::Full);
 
-    FuncRegistration::new("foo").with_volatility(true).register_into_engine(&mut engine, |x: i64| x + 1);
+    FuncRegistration::new("foo").with_volatility(true).register_into_engine(&mut engine, |x: INT| x + 1);
 
     let ast = engine.compile("foo(42)").unwrap();
 
@@ -209,11 +209,12 @@ fn test_optimizer_volatile() {
     // Make sure the call is not optimized away
     assert!(text_ast.contains(r#"name: "foo""#));
 
-    FuncRegistration::new("foo").with_volatility(false).register_into_engine(&mut engine, |x: i64| x + 1);
+    FuncRegistration::new("foo").with_volatility(false).register_into_engine(&mut engine, |x: INT| x + 1);
 
     let ast = engine.compile("foo(42)").unwrap();
 
     let text_ast = format!("{ast:?}");
+    println!("{text_ast:#?}");
 
     // Make sure the call is optimized away
     assert!(!text_ast.contains(r#"name: "foo""#));
