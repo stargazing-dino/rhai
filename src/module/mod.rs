@@ -903,7 +903,7 @@ impl Module {
     /// let mut module = Module::new();
     /// assert!(module.is_indexed());
     ///
-    /// module.set_native_fn("foo", |x: &mut i64, y: i64| *x = y);
+    /// module.set_native_fn("foo", |x: &mut i64, y: i64| { *x = y; Ok(()) });
     /// assert!(!module.is_indexed());
     ///
     /// # #[cfg(not(feature = "no_module"))]
@@ -1199,7 +1199,7 @@ impl Module {
     /// ```
     /// # use rhai::Module;
     /// let mut module = Module::new();
-    /// let hash = module.set_native_fn("calc", || 42_i64);
+    /// let hash = module.set_native_fn("calc", |x: i64| Ok(42 + x));
     /// assert!(module.contains_fn(hash));
     /// ```
     #[inline]
@@ -1306,6 +1306,21 @@ impl Module {
     ///
     /// If there is a similar existing Rust function, it is replaced.
     ///
+    /// # Use `FuncRegistration` API
+    ///
+    /// It is recommended that the [`FuncRegistration`] API be used instead.
+    ///
+    /// Essentially, this method is a shortcut for:
+    ///
+    /// ```text
+    /// FuncRegistration::new(name)
+    ///     .with_namespace(FnNamespace::Internal)
+    ///     .with_purity(true)
+    ///     .with_volatility(false)
+    ///     .set_into_module(module, func)
+    ///     .hash
+    /// ```
+    ///
     /// # Assumptions
     ///
     /// * **Accessibility**: The function namespace is [`FnNamespace::Internal`].
@@ -1323,7 +1338,7 @@ impl Module {
     /// ```
     /// # use rhai::Module;
     /// let mut module = Module::new();
-    /// let hash = module.set_native_fn("calc", |x: i64| 42 + x);
+    /// let hash = module.set_native_fn("calc", |x: i64| Ok(42 + x));
     /// assert!(module.contains_fn(hash));
     /// ```
     #[inline]
@@ -1366,7 +1381,7 @@ impl Module {
     /// ```
     /// # use rhai::Module;
     /// let mut module = Module::new();
-    /// let hash = module.set_getter_fn("value", |x: &mut i64| *x);
+    /// let hash = module.set_getter_fn("value", |x: &mut i64| Ok(*x));
     /// assert!(module.contains_fn(hash));
     /// ```
     #[cfg(not(feature = "no_object"))]
@@ -1413,9 +1428,9 @@ impl Module {
     /// use rhai::{Module, ImmutableString};
     ///
     /// let mut module = Module::new();
-    /// let hash = module.set_setter_fn("value",
-    ///     |x: &mut i64, y: ImmutableString| *x = y.len() as i64
-    /// );
+    /// let hash = module.set_setter_fn("value", |x: &mut i64, y: ImmutableString| {
+    ///                 *x = y.len() as i64; Ok(())
+    /// });
     /// assert!(module.contains_fn(hash));
     /// ```
     #[cfg(not(feature = "no_object"))]
@@ -1455,8 +1470,8 @@ impl Module {
     /// let mut module = Module::new();
     /// let (hash_get, hash_set) =
     ///         module.set_getter_setter_fn("value",
-    ///                 |x: &mut i64| x.to_string().into(),
-    ///                 |x: &mut i64, y: ImmutableString| *x = y.len() as i64
+    ///                 |x: &mut i64| Ok(x.to_string().into()),
+    ///                 |x: &mut i64, y: ImmutableString| { *x = y.len() as i64; Ok(()) }
     ///         );
     /// assert!(module.contains_fn(hash_get));
     /// assert!(module.contains_fn(hash_set));
@@ -1510,7 +1525,7 @@ impl Module {
     ///
     /// let mut module = Module::new();
     /// let hash = module.set_indexer_get_fn(
-    ///                 |x: &mut i64, y: ImmutableString| *x + y.len() as i64
+    ///                 |x: &mut i64, y: ImmutableString| Ok(*x + y.len() as i64)
     ///            );
     /// assert!(module.contains_fn(hash));
     /// ```
@@ -1579,9 +1594,10 @@ impl Module {
     /// use rhai::{Module, ImmutableString};
     ///
     /// let mut module = Module::new();
-    /// let hash = module.set_indexer_set_fn(|x: &mut i64, y: ImmutableString, value: i64|
-    ///                         *x = y.len() as i64 + value
-    /// );
+    /// let hash = module.set_indexer_set_fn(|x: &mut i64, y: ImmutableString, value: i64| {
+    ///                         *x = y.len() as i64 + value;
+    ///                         Ok(())
+    /// });
     /// assert!(module.contains_fn(hash));
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
@@ -1639,8 +1655,8 @@ impl Module {
     ///
     /// let mut module = Module::new();
     /// let (hash_get, hash_set) = module.set_indexer_get_set_fn(
-    ///     |x: &mut i64, y: ImmutableString| *x + y.len() as i64,
-    ///     |x: &mut i64, y: ImmutableString, value: i64| *x = y.len() as i64 + value
+    ///     |x: &mut i64, y: ImmutableString| Ok(*x + y.len() as i64),
+    ///     |x: &mut i64, y: ImmutableString, value: i64| { *x = y.len() as i64 + value; Ok(()) }
     /// );
     /// assert!(module.contains_fn(hash_get));
     /// assert!(module.contains_fn(hash_set));
