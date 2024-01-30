@@ -75,10 +75,10 @@ impl Engine {
         name: impl AsRef<str> + Into<Identifier>,
         func: FUNC,
     ) -> &mut Self {
-        let mut reg = FuncRegistration::new(name.into()).with_namespace(FnNamespace::Global);
+        let reg = FuncRegistration::new(name.into()).with_namespace(FnNamespace::Global);
 
         #[cfg(feature = "metadata")]
-        {
+        let reg = {
             let mut param_type_names = FUNC::param_names()
                 .iter()
                 .map(|ty| format!("_: {}", self.format_param_type(ty)))
@@ -93,8 +93,8 @@ impl Engine {
                 .map(String::as_str)
                 .collect::<crate::FnArgsVec<_>>();
 
-            reg = reg.with_params_info(param_type_names);
-        }
+            reg.with_params_info(param_type_names)
+        };
 
         reg.set_into_module(self.global_namespace_mut(), func);
 

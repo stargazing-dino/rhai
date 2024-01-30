@@ -1591,8 +1591,8 @@ fn get_next_token_inner(
                 let mut result = SmartString::new_const();
                 let mut radix_base: Option<u32> = None;
                 let mut valid: fn(char) -> bool = is_numeric_digit;
-                let mut has_period = false;
-                let mut has_e = false;
+                let mut _has_period = false;
+                let mut _has_e = false;
 
                 result.push(c);
 
@@ -1606,7 +1606,7 @@ fn get_next_token_inner(
                             stream.eat_next_and_advance(pos);
                         }
                         #[cfg(any(not(feature = "no_float"), feature = "decimal"))]
-                        '.' if !has_period && radix_base.is_none() => {
+                        '.' if !_has_period && radix_base.is_none() => {
                             stream.get_next().unwrap();
 
                             // Check if followed by digits or something that cannot start a property name
@@ -1615,7 +1615,7 @@ fn get_next_token_inner(
                                 Some('0'..='9') => {
                                     result.push('.');
                                     pos.advance();
-                                    has_period = true;
+                                    _has_period = true;
                                 }
                                 // _ - cannot follow a decimal point
                                 Some(NUMBER_SEPARATOR) => {
@@ -1632,7 +1632,7 @@ fn get_next_token_inner(
                                     result.push('.');
                                     pos.advance();
                                     result.push('0');
-                                    has_period = true;
+                                    _has_period = true;
                                 }
                                 // Not a floating-point number
                                 _ => {
@@ -1642,7 +1642,7 @@ fn get_next_token_inner(
                             }
                         }
                         #[cfg(not(feature = "no_float"))]
-                        'e' if !has_e && radix_base.is_none() => {
+                        'e' if !_has_e && radix_base.is_none() => {
                             stream.get_next().unwrap();
 
                             // Check if followed by digits or +/-
@@ -1651,8 +1651,8 @@ fn get_next_token_inner(
                                 Some('0'..='9') => {
                                     result.push('e');
                                     pos.advance();
-                                    has_e = true;
-                                    has_period = true;
+                                    _has_e = true;
+                                    _has_period = true;
                                 }
                                 // +/- after e - accept the e and the sign (no decimal points allowed)
                                 Some('+' | '-') => {
@@ -1660,8 +1660,8 @@ fn get_next_token_inner(
                                     pos.advance();
                                     result.push(stream.get_next().unwrap());
                                     pos.advance();
-                                    has_e = true;
-                                    has_period = true;
+                                    _has_e = true;
+                                    _has_period = true;
                                 }
                                 // Not a floating-point number
                                 _ => {

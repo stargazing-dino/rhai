@@ -445,6 +445,7 @@ impl FuncRegistration {
         f.num_params = arg_types.as_ref().len();
         f.param_types.extend(arg_types.as_ref().iter().copied());
 
+        #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
         if (f.name == crate::engine::FN_IDX_GET && f.num_params == 2)
             || (f.name == crate::engine::FN_IDX_SET && f.num_params == 3)
         {
