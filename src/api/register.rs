@@ -75,10 +75,7 @@ impl Engine {
         name: impl AsRef<str> + Into<Identifier>,
         func: FUNC,
     ) -> &mut Self {
-        let mut reg = FuncRegistration::new(name.into())
-            .with_namespace(FnNamespace::Global)
-            .with_purity(true)
-            .with_volatility(false);
+        let mut reg = FuncRegistration::new(name.into()).with_namespace(FnNamespace::Global);
 
         #[cfg(feature = "metadata")]
         {

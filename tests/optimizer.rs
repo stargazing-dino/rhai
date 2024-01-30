@@ -1,5 +1,5 @@
 #![cfg(not(feature = "no_optimize"))]
-use rhai::{CustomType, Engine, FuncRegistration, Module, OptimizationLevel, Scope, TypeBuilder, INT};
+use rhai::{Engine, FuncRegistration, Module, OptimizationLevel, Scope, INT};
 
 #[test]
 fn test_optimizer() {
@@ -147,7 +147,7 @@ fn test_optimizer_re_optimize() {
 
 #[test]
 fn test_optimizer_full() {
-    #[derive(Debug, Clone, CustomType)]
+    #[derive(Debug, Clone)]
     struct TestStruct(INT);
 
     let mut engine = Engine::new();
@@ -170,15 +170,16 @@ fn test_optimizer_full() {
     );
 
     engine
-        .build_type::<TestStruct>()
+        .register_type_with_name::<TestStruct>("TestStruct")
         .register_fn("ts", |n: INT| TestStruct(n))
+        .register_fn("value", |ts: &mut TestStruct| ts.0)
         .register_fn("+", |ts1: &mut TestStruct, ts2: TestStruct| TestStruct(ts1.0 + ts2.0));
 
     let ast = engine
         .compile(
             "
                 const FOO = ts(40) + ts(2);
-                field0(FOO)
+                value(FOO)
             ",
         )
         .unwrap();

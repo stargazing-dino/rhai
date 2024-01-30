@@ -445,7 +445,9 @@ impl FuncRegistration {
         f.num_params = arg_types.as_ref().len();
         f.param_types.extend(arg_types.as_ref().iter().copied());
 
-        if f.name == crate::engine::FN_IDX_GET || f.name == crate::engine::FN_IDX_SET {
+        if (f.name == crate::engine::FN_IDX_GET && f.num_params == 2)
+            || (f.name == crate::engine::FN_IDX_SET && f.num_params == 3)
+        {
             if let Some(&type_id) = f.param_types.first() {
                 #[cfg(not(feature = "no_index"))]
                 assert!(
@@ -1657,18 +1659,25 @@ impl Module {
     ///
     /// # Panics
     ///
-    /// Panics if the type is [`Array`][crate::Array] or [`Map`][crate::Map].
-    /// Indexers for arrays, object maps and strings cannot be registered.
+    /// Panics if the type is [`Array`][crate::Array], [`Map`][crate::Map], [`String`],
+    /// [`ImmutableString`][crate::ImmutableString], `&str` or [`INT`][crate::INT].
+    ///
+    /// Indexers for arrays, object maps, strings and integers cannot be registered.
     ///
     /// # Example
     ///
     /// ```
     /// use rhai::{Module, ImmutableString};
     ///
+    /// #[derive(Clone)]
+    /// struct TestStruct(i64);
+    ///
     /// let mut module = Module::new();
+    ///
     /// let hash = module.set_indexer_get_fn(
-    ///                 |x: &mut i64, y: ImmutableString| Ok(*x + y.len() as i64)
+    ///                 |x: &mut TestStruct, y: ImmutableString| Ok(x.0 + y.len() as i64)
     ///            );
+    ///
     /// assert!(module.contains_fn(hash));
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
@@ -1680,24 +1689,6 @@ impl Module {
         R: Variant + Clone,
         FUNC: RhaiNativeFunc<(Mut<A>, B), 2, X, R, true> + SendSync + 'static,
     {
-        #[cfg(not(feature = "no_index"))]
-        assert!(
-            TypeId::of::<A>() != TypeId::of::<crate::Array>(),
-            "Cannot register indexer for arrays."
-        );
-        #[cfg(not(feature = "no_object"))]
-        assert!(
-            TypeId::of::<A>() != TypeId::of::<crate::Map>(),
-            "Cannot register indexer for object maps."
-        );
-
-        assert!(
-            TypeId::of::<A>() != TypeId::of::<String>()
-                && TypeId::of::<A>() != TypeId::of::<&str>()
-                && TypeId::of::<A>() != TypeId::of::<ImmutableString>(),
-            "Cannot register indexer for strings."
-        );
-
         FuncRegistration::new(crate::engine::FN_IDX_GET)
             .with_namespace(FnNamespace::Global)
             .with_purity(true)
@@ -1722,24 +1713,26 @@ impl Module {
     ///
     /// # Panics
     ///
-    /// Panics if the type is [`Array`][crate::Array] or [`Map`][crate::Map].
-    /// Indexers for arrays, object maps and strings cannot be registered.
+    /// Panics if the type is [`Array`][crate::Array], [`Map`][crate::Map], [`String`],
+    /// [`ImmutableString`][crate::ImmutableString], `&str` or [`INT`][crate::INT].
     ///
-    /// # Panics
-    ///
-    /// Panics if the type is [`Array`][crate::Array] or [`Map`][crate::Map].
-    /// Indexers for arrays, object maps and strings cannot be registered.
+    /// Indexers for arrays, object maps, strings and integers cannot be registered.
     ///
     /// # Example
     ///
     /// ```
     /// use rhai::{Module, ImmutableString};
     ///
+    /// #[derive(Clone)]
+    /// struct TestStruct(i64);
+    ///
     /// let mut module = Module::new();
-    /// let hash = module.set_indexer_set_fn(|x: &mut i64, y: ImmutableString, value: i64| {
-    ///                         *x = y.len() as i64 + value;
+    ///
+    /// let hash = module.set_indexer_set_fn(|x: &mut TestStruct, y: ImmutableString, value: i64| {
+    ///                         *x = TestStruct(y.len() as i64 + value);
     ///                         Ok(())
-    /// });
+    ///            });
+    ///
     /// assert!(module.contains_fn(hash));
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
@@ -1751,24 +1744,6 @@ impl Module {
         R: Variant + Clone,
         FUNC: RhaiNativeFunc<(Mut<A>, B, R), 3, X, (), true> + SendSync + 'static,
     {
-        #[cfg(not(feature = "no_index"))]
-        assert!(
-            TypeId::of::<A>() != TypeId::of::<crate::Array>(),
-            "Cannot register indexer for arrays."
-        );
-        #[cfg(not(feature = "no_object"))]
-        assert!(
-            TypeId::of::<A>() != TypeId::of::<crate::Map>(),
-            "Cannot register indexer for object maps."
-        );
-
-        assert!(
-            TypeId::of::<A>() != TypeId::of::<String>()
-                && TypeId::of::<A>() != TypeId::of::<&str>()
-                && TypeId::of::<A>() != TypeId::of::<ImmutableString>(),
-            "Cannot register indexer for strings."
-        );
-
         FuncRegistration::new(crate::engine::FN_IDX_SET)
             .with_namespace(FnNamespace::Global)
             .with_purity(false)
@@ -1787,19 +1762,26 @@ impl Module {
     ///
     /// # Panics
     ///
-    /// Panics if the type is [`Array`][crate::Array] or [`Map`][crate::Map].
-    /// Indexers for arrays, object maps and strings cannot be registered.
+    /// Panics if the type is [`Array`][crate::Array], [`Map`][crate::Map], [`String`],
+    /// [`ImmutableString`][crate::ImmutableString], `&str` or [`INT`][crate::INT].
+    ///
+    /// Indexers for arrays, object maps, strings and integers cannot be registered.
     ///
     /// # Example
     ///
     /// ```
     /// use rhai::{Module, ImmutableString};
     ///
+    /// #[derive(Clone)]
+    /// struct TestStruct(i64);
+    ///
     /// let mut module = Module::new();
+    ///
     /// let (hash_get, hash_set) = module.set_indexer_get_set_fn(
-    ///     |x: &mut i64, y: ImmutableString| Ok(*x + y.len() as i64),
-    ///     |x: &mut i64, y: ImmutableString, value: i64| { *x = y.len() as i64 + value; Ok(()) }
+    ///     |x: &mut TestStruct, y: ImmutableString| Ok(x.0 + y.len() as i64),
+    ///     |x: &mut TestStruct, y: ImmutableString, value: i64| { *x = TestStruct(y.len() as i64 + value); Ok(()) }
     /// );
+    ///
     /// assert!(module.contains_fn(hash_get));
     /// assert!(module.contains_fn(hash_set));
     /// ```
