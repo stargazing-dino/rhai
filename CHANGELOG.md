@@ -4,9 +4,14 @@ Rhai Release Notes
 Version 1.17.0
 ==============
 
-In this version, fuzzing via [Google OSS-Fuzz](https://github.com/google/oss-fuzz) is used to flush
-out hidden bugs and edge cases. This should result in higher code quality, better stability and
-improved security.
+Starting from this version, the official preferred method of registering an API for a custom type is
+via the `#[derive(CustomType)]` macro. Of course the old API's are still available for types that
+reside in external crates (and thus cannot implement `CustomType`).
+
+Starting from this version, fuzzing via [Google OSS-Fuzz](https://github.com/google/oss-fuzz) is
+used to flush out hidden bugs and edge cases. This should result in higher code quality, better
+stability and improved security. And indeed, a large number of bugs have been discovered from this
+and fixed.
 
 Potentially breaking changes
 ----------------------------

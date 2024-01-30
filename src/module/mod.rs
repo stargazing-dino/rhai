@@ -167,7 +167,12 @@ pub fn calc_native_fn_hash<'a>(
 /// Type for fine-tuned module function registration.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct FuncRegistration {
+    /// Function metadata.
     metadata: FuncMetadata,
+    /// Is the function pure?
+    purity: Option<bool>,
+    /// Is the function volatile?
+    volatility: Option<bool>,
 }
 
 impl FuncRegistration {
@@ -203,6 +208,8 @@ impl FuncRegistration {
                 #[cfg(feature = "metadata")]
                 comments: <_>::default(),
             },
+            purity: None,
+            volatility: None,
         }
     }
     /// Set the [namespace][`FnNamespace`] of the function.
@@ -210,8 +217,31 @@ impl FuncRegistration {
         self.metadata.namespace = namespace;
         self
     }
+    /// Set whether the function is _pure_.
+    /// A pure function has no side effects.
+    pub fn with_purity(mut self, pure: bool) -> Self {
+        self.purity = Some(pure);
+        self
+    }
+    /// Set whether the function is _volatile_.
+    /// A volatile function does not guarantee the same result for the same input(s).
+    pub fn with_volatility(mut self, volatile: bool) -> Self {
+        self.volatility = Some(volatile);
+        self
+    }
     /// _(metadata)_ Set the function's parameter names and/or types.
     /// Exported under the `metadata` feature only.
+    ///
+    /// The input is a list of strings, each of which is either a parameter name or a parameter name/type pair.
+    ///
+    /// The _last_ string should be the _type_ of the return value.
+    ///
+    /// # Parameter Examples
+    ///
+    /// `"foo: &str"`   <- parameter name = `foo`, type = `&str`  
+    /// `"bar"`         <- parameter name = `bar`, type unknown  
+    /// `"_: i64"`      <- parameter name unknown, type = `i64`  
+    /// `"MyType"`      <- parameter name unknown, type = `MyType`  
     #[cfg(feature = "metadata")]
     pub fn with_params_info<S: AsRef<str>>(mut self, params: impl IntoIterator<Item = S>) -> Self {
         self.metadata.params_info = params.into_iter().map(|s| s.as_ref().into()).collect();
@@ -219,6 +249,22 @@ impl FuncRegistration {
     }
     /// _(metadata)_ Set the function's doc-comments.
     /// Exported under the `metadata` feature only.
+    ///
+    /// The input is a list of strings, each of which is either a block of single-line doc-comments
+    /// or a single block doc-comment.
+    ///
+    /// ## Comments
+    ///
+    /// Single-line doc-comments typically start with `///` and should be merged, with line-breaks,
+    /// into a single string without a final termination line-break.
+    ///
+    /// Block doc-comments typically start with `/**` and end with `*/` and should be kept in a
+    /// separate string.
+    ///
+    /// Leading white-spaces should be stripped, and each string should always start with the
+    /// corresponding doc-comment leader: `///` or `/**`.
+    ///
+    /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
     pub fn with_comments<S: AsRef<str>>(mut self, comments: impl IntoIterator<Item = S>) -> Self {
         self.metadata.comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
@@ -228,9 +274,9 @@ impl FuncRegistration {
     ///
     /// # Assumptions
     ///
-    /// * The function is assumed to be _pure_ (so it can be called on constants) unless it is a property setter or an index setter.
+    /// * **Purity**: The function is assumed to be _pure_ (so it can be called on constants) unless it is a property setter or an index setter.
     ///
-    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
     #[inline]
     pub fn set_into_module<A: 'static, const N: usize, const X: bool, R, const F: bool, FUNC>(
         self,
@@ -241,19 +287,37 @@ impl FuncRegistration {
         R: Variant + Clone,
         FUNC: RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
     {
-        let is_pure = true;
+        let is_pure = self.purity.unwrap_or_else(|| {
+            // default to pure unless specified
+            let is_pure = true;
 
-        #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
-        let is_pure =
-            is_pure && (FUNC::num_params() != 3 || self.metadata.name != crate::engine::FN_IDX_SET);
-        #[cfg(not(feature = "no_object"))]
-        let is_pure = is_pure
-            && (FUNC::num_params() != 2 || !self.metadata.name.starts_with(crate::engine::FN_SET));
+            #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
+            let is_pure = is_pure
+                && (FUNC::num_params() != 3 || self.metadata.name != crate::engine::FN_IDX_SET);
 
-        let func = func.into_callable_function(is_pure, true);
-        self.set_into_module_raw(module, FUNC::param_types(), func)
+            #[cfg(not(feature = "no_object"))]
+            let is_pure = is_pure
+                && (FUNC::num_params() != 2
+                    || !self.metadata.name.starts_with(crate::engine::FN_SET));
+            is_pure
+        });
+        let is_volatile = self.volatility.unwrap_or(false);
+
+        let func = func.into_rhai_function(is_pure, is_volatile);
+
+        // Clear flags
+        let mut reg = self;
+        reg.purity = None;
+        reg.volatility = None;
+
+        reg.set_into_module_raw(module, FUNC::param_types(), func)
     }
     /// Register the function into the specified [`Module`].
+    ///
+    /// # WARNING - Low Level API
+    ///
+    /// This function is very low level.  It takes a list of [`TypeId`][std::any::TypeId]'s
+    /// indicating the actual types of the parameters.
     #[inline]
     pub fn set_into_module_raw(
         self,
@@ -261,6 +325,10 @@ impl FuncRegistration {
         arg_types: impl AsRef<[TypeId]>,
         func: RhaiFunc,
     ) -> &FuncMetadata {
+        // Make sure that conflicting flags should not be set.
+        debug_assert!(self.purity.is_none());
+        debug_assert!(self.volatility.is_none());
+
         let mut f = self.metadata;
 
         f.num_params = arg_types.as_ref().len();
@@ -835,7 +903,7 @@ impl Module {
     /// let mut module = Module::new();
     /// assert!(module.is_indexed());
     ///
-    /// module.set_native_fn("foo", |x: &mut i64, y: i64| { *x = y; Ok(()) });
+    /// module.set_native_fn("foo", |x: &mut i64, y: i64| *x = y);
     /// assert!(!module.is_indexed());
     ///
     /// # #[cfg(not(feature = "no_module"))]
@@ -1131,7 +1199,7 @@ impl Module {
     /// ```
     /// # use rhai::Module;
     /// let mut module = Module::new();
-    /// let hash = module.set_native_fn("calc", || Ok(42_i64));
+    /// let hash = module.set_native_fn("calc", || 42_i64);
     /// assert!(module.contains_fn(hash));
     /// ```
     #[inline]
@@ -1144,8 +1212,6 @@ impl Module {
 
     /// _(metadata)_ Update the metadata (parameter names/types, return type and doc-comments) of a registered function.
     /// Exported under the `metadata` feature only.
-    ///
-    /// The [`u64`] hash is returned by the [`set_native_fn`][Module::set_native_fn] call.
     ///
     /// # Deprecated
     ///
@@ -1184,8 +1250,6 @@ impl Module {
 
     /// Update the namespace of a registered function.
     ///
-    /// The [`u64`] hash is returned by the [`set_native_fn`][Module::set_native_fn] call.
-    ///
     /// # Deprecated
     ///
     /// This method is deprecated.
@@ -1223,6 +1287,11 @@ impl Module {
     }
 
     /// Set a native Rust function into the [`Module`] based on a [`FuncRegistration`].
+    ///
+    /// # WARNING - Low Level API
+    ///
+    /// This function is very low level.  It takes a list of [`TypeId`][std::any::TypeId]'s
+    /// indicating the actual types of the parameters.
     #[inline(always)]
     pub fn set_fn_raw_with_options(
         &mut self,
@@ -1239,22 +1308,22 @@ impl Module {
     ///
     /// # Assumptions
     ///
-    /// * The function is assumed to be _pure_ unless it is a property setter or an index setter.
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Internal`].
     ///
-    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
+    /// * **Purity**: The function is assumed to be _pure_ unless it is a property setter or an index setter.
     ///
-    /// * The function namespace is [`FnNamespace::Internal`].
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
     ///
-    /// * No metadata for the function is registered.
+    /// * **Metadata**: No metadata for the function is registered.
     ///
-    /// To change this, use the [`FuncRegistration`] API instead.
+    /// To change these assumptions, use the [`FuncRegistration`] API instead.
     ///
     /// # Example
     ///
     /// ```
     /// # use rhai::Module;
     /// let mut module = Module::new();
-    /// let hash = module.set_native_fn("calc", || Ok(42_i64));
+    /// let hash = module.set_native_fn("calc", |x: i64| 42 + x);
     /// assert!(module.contains_fn(hash));
     /// ```
     #[inline]
@@ -1267,7 +1336,12 @@ impl Module {
         R: Variant + Clone,
         FUNC: RhaiNativeFunc<A, N, X, R, true> + SendSync + 'static,
     {
-        FuncRegistration::new(name).set_into_module(self, func).hash
+        FuncRegistration::new(name)
+            .with_namespace(FnNamespace::Internal)
+            .with_purity(true)
+            .with_volatility(false)
+            .set_into_module(self, func)
+            .hash
     }
 
     /// Set a Rust getter function taking one mutable parameter, returning a [`u64`] hash key.
@@ -1277,20 +1351,22 @@ impl Module {
     ///
     /// # Assumptions
     ///
-    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
     ///
-    /// # Function Metadata
+    /// * **Purity**: The function is assumed to be _pure_ (so it can be called on constants).
     ///
-    /// No metadata for the function is registered.
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
     ///
-    /// Use the [`FuncRegistration`] API instead to add metadata.
+    /// * **Metadata**: No metadata for the function is registered.
+    ///
+    /// To change these assumptions, use the [`FuncRegistration`] API instead.
     ///
     /// # Example
     ///
     /// ```
     /// # use rhai::Module;
     /// let mut module = Module::new();
-    /// let hash = module.set_getter_fn("value", |x: &mut i64| { Ok(*x) });
+    /// let hash = module.set_getter_fn("value", |x: &mut i64| *x);
     /// assert!(module.contains_fn(hash));
     /// ```
     #[cfg(not(feature = "no_object"))]
@@ -1307,6 +1383,8 @@ impl Module {
     {
         FuncRegistration::new(crate::engine::make_getter(name.as_ref()))
             .with_namespace(FnNamespace::Global)
+            .with_purity(true)
+            .with_volatility(false)
             .set_into_module(self, func)
             .hash
     }
@@ -1319,13 +1397,15 @@ impl Module {
     ///
     /// # Assumptions
     ///
-    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
     ///
-    /// # Function Metadata
+    /// * **Purity**: The function is assumed to be _non-pure_ (so it cannot be called on constants).
     ///
-    /// No metadata for the function is registered.
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
     ///
-    /// Use the [`FuncRegistration`] API instead to add metadata.
+    /// * **Metadata**: No metadata for the function is registered.
+    ///
+    /// To change these assumptions, use the [`FuncRegistration`] API instead.
     ///
     /// # Example
     ///
@@ -1333,10 +1413,9 @@ impl Module {
     /// use rhai::{Module, ImmutableString};
     ///
     /// let mut module = Module::new();
-    /// let hash = module.set_setter_fn("value", |x: &mut i64, y: ImmutableString| {
-    ///     *x = y.len() as i64;
-    ///     Ok(())
-    /// });
+    /// let hash = module.set_setter_fn("value",
+    ///     |x: &mut i64, y: ImmutableString| *x = y.len() as i64
+    /// );
     /// assert!(module.contains_fn(hash));
     /// ```
     #[cfg(not(feature = "no_object"))]
@@ -1353,6 +1432,8 @@ impl Module {
     {
         FuncRegistration::new(crate::engine::make_setter(name.as_ref()))
             .with_namespace(FnNamespace::Global)
+            .with_purity(false)
+            .with_volatility(false)
             .set_into_module(self, func)
             .hash
     }
@@ -1364,11 +1445,7 @@ impl Module {
     ///
     /// If there are similar existing Rust functions, they are replaced.
     ///
-    /// # Function Metadata
-    ///
-    /// No metadata for the function is registered.
-    ///
-    /// Use the [`FuncRegistration`] API instead to add metadata.
+    /// To change these assumptions, use the [`FuncRegistration`] API instead.
     ///
     /// # Example
     ///
@@ -1376,13 +1453,11 @@ impl Module {
     /// use rhai::{Module, ImmutableString};
     ///
     /// let mut module = Module::new();
-    /// let (hash_get, hash_set) = module.set_getter_setter_fn("value",
-    ///                                 |x: &mut i64| { Ok(x.to_string().into()) },
-    ///                                 |x: &mut i64, y: ImmutableString| {
-    ///                                     *x = y.len() as i64;
-    ///                                     Ok(())
-    ///                                 }
-    /// );
+    /// let (hash_get, hash_set) =
+    ///         module.set_getter_setter_fn("value",
+    ///                 |x: &mut i64| x.to_string().into(),
+    ///                 |x: &mut i64, y: ImmutableString| *x = y.len() as i64
+    ///         );
     /// assert!(module.contains_fn(hash_get));
     /// assert!(module.contains_fn(hash_set));
     /// ```
@@ -1413,18 +1488,20 @@ impl Module {
     ///
     /// # Assumptions
     ///
-    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
+    ///
+    /// * **Purity**: The function is assumed to be _pure_ (so it can be called on constants).
+    ///
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
+    ///
+    /// * **Metadata**: No metadata for the function is registered.
+    ///
+    /// To change these assumptions, use the [`FuncRegistration`] API instead.
     ///
     /// # Panics
     ///
     /// Panics if the type is [`Array`][crate::Array] or [`Map`][crate::Map].
     /// Indexers for arrays, object maps and strings cannot be registered.
-    ///
-    /// # Function Metadata
-    ///
-    /// No metadata for the function is registered.
-    ///
-    /// Use the [`FuncRegistration`] API instead to add metadata.
     ///
     /// # Example
     ///
@@ -1432,9 +1509,9 @@ impl Module {
     /// use rhai::{Module, ImmutableString};
     ///
     /// let mut module = Module::new();
-    /// let hash = module.set_indexer_get_fn(|x: &mut i64, y: ImmutableString| {
-    ///     Ok(*x + y.len() as i64)
-    /// });
+    /// let hash = module.set_indexer_get_fn(
+    ///                 |x: &mut i64, y: ImmutableString| *x + y.len() as i64
+    ///            );
     /// assert!(module.contains_fn(hash));
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
@@ -1466,6 +1543,8 @@ impl Module {
 
         FuncRegistration::new(crate::engine::FN_IDX_GET)
             .with_namespace(FnNamespace::Global)
+            .with_purity(true)
+            .with_volatility(false)
             .set_into_module(self, func)
             .hash
     }
@@ -1478,18 +1557,21 @@ impl Module {
     ///
     /// # Assumptions
     ///
-    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
+    ///
+    /// * **Purity**: The function is assumed to be _non-pure_ (so it cannot be called on constants).
+    ///
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
     ///
     /// # Panics
     ///
     /// Panics if the type is [`Array`][crate::Array] or [`Map`][crate::Map].
     /// Indexers for arrays, object maps and strings cannot be registered.
     ///
-    /// # Function Metadata
+    /// # Panics
     ///
-    /// No metadata for the function is registered.
-    ///
-    /// Use the [`FuncRegistration`] API instead to add metadata.
+    /// Panics if the type is [`Array`][crate::Array] or [`Map`][crate::Map].
+    /// Indexers for arrays, object maps and strings cannot be registered.
     ///
     /// # Example
     ///
@@ -1497,9 +1579,9 @@ impl Module {
     /// use rhai::{Module, ImmutableString};
     ///
     /// let mut module = Module::new();
-    /// let hash = module.set_indexer_set_fn(|x: &mut i64, y: ImmutableString, value: i64| {
-    ///     *x = y.len() as i64 + value; Ok(())
-    /// });
+    /// let hash = module.set_indexer_set_fn(|x: &mut i64, y: ImmutableString, value: i64|
+    ///                         *x = y.len() as i64 + value
+    /// );
     /// assert!(module.contains_fn(hash));
     /// ```
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
@@ -1531,6 +1613,8 @@ impl Module {
 
         FuncRegistration::new(crate::engine::FN_IDX_SET)
             .with_namespace(FnNamespace::Global)
+            .with_purity(false)
+            .with_volatility(false)
             .set_into_module(self, func)
             .hash
     }
@@ -1548,12 +1632,6 @@ impl Module {
     /// Panics if the type is [`Array`][crate::Array] or [`Map`][crate::Map].
     /// Indexers for arrays, object maps and strings cannot be registered.
     ///
-    /// # Function Metadata
-    ///
-    /// No metadata for the function is registered.
-    ///
-    /// Use the [`FuncRegistration`] API instead to add metadata.
-    ///
     /// # Example
     ///
     /// ```
@@ -1561,12 +1639,8 @@ impl Module {
     ///
     /// let mut module = Module::new();
     /// let (hash_get, hash_set) = module.set_indexer_get_set_fn(
-    ///     |x: &mut i64, y: ImmutableString| {
-    ///         Ok(*x + y.len() as i64)
-    ///     },
-    ///     |x: &mut i64, y: ImmutableString, value: i64| {
-    ///         *x = y.len() as i64 + value; Ok(())
-    ///     }
+    ///     |x: &mut i64, y: ImmutableString| *x + y.len() as i64,
+    ///     |x: &mut i64, y: ImmutableString, value: i64| *x = y.len() as i64 + value
     /// );
     /// assert!(module.contains_fn(hash_get));
     /// assert!(module.contains_fn(hash_set));
@@ -1591,8 +1665,6 @@ impl Module {
     }
 
     /// Look up a native Rust function by hash.
-    ///
-    /// The [`u64`] hash is returned by the [`set_native_fn`][Module::set_native_fn] call.
     #[inline]
     #[must_use]
     pub(crate) fn get_fn(&self, hash_native: u64) -> Option<&RhaiFunc> {

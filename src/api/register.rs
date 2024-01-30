@@ -32,9 +32,11 @@ impl Engine {
     ///
     /// # Assumptions
     ///
-    /// * The function is assumed to be _pure_ unless it is a property setter or an index setter.
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
     ///
-    /// * The function is assumed to be _volatile_ -- i.e. it does not guarantee the same result for the same input(s).
+    /// * **Purity**: The function is assumed to be _pure_ unless it is a property setter or an index setter.
+    ///
+    /// * **Volatility**: The function is assumed to be _non-volatile_ -- i.e. it guarantees the same result for the same input(s).
     ///
     /// # Example
     ///
@@ -73,8 +75,6 @@ impl Engine {
         name: impl AsRef<str> + Into<Identifier>,
         func: FUNC,
     ) -> &mut Self {
-        let param_types = FUNC::param_types();
-
         #[cfg(feature = "metadata")]
         let mut param_type_names = FUNC::param_names()
             .iter()
@@ -101,16 +101,15 @@ impl Engine {
         let is_pure =
             is_pure && (FUNC::num_params() != 2 || !fn_name.starts_with(crate::engine::FN_SET));
 
-        let f = FuncRegistration::new(fn_name).with_namespace(FnNamespace::Global);
+        let f = FuncRegistration::new(fn_name)
+            .with_namespace(FnNamespace::Global)
+            .with_purity(is_pure)
+            .with_volatility(false);
 
         #[cfg(feature = "metadata")]
         let f = f.with_params_info(param_type_names);
 
-        f.set_into_module_raw(
-            self.global_namespace_mut(),
-            param_types,
-            func.into_callable_function(is_pure, true),
-        );
+        f.set_into_module(self.global_namespace_mut(), func);
 
         self
     }
