@@ -772,7 +772,7 @@ impl Engine {
             self.global_modules
                 .iter()
                 .skip(1)
-                .filter(|m| !m.flags.contains(exclude_flags))
+                .filter(|m| !m.flags.intersects(exclude_flags))
                 .flat_map(|m| m.gen_fn_signatures()),
         );
 

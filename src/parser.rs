@@ -325,13 +325,13 @@ impl ParseSettings {
     #[inline(always)]
     #[must_use]
     pub const fn has_flag(&self, flag: ParseSettingFlags) -> bool {
-        self.flags.contains(flag)
+        self.flags.intersects(flag)
     }
     /// Is a particular language option on?
     #[inline(always)]
     #[must_use]
     pub const fn has_option(&self, option: LangOptions) -> bool {
-        self.options.contains(option)
+        self.options.intersects(option)
     }
     /// Create a new `ParseSettings` with one higher expression level.
     #[inline]
@@ -595,7 +595,7 @@ fn optimize_combo_chain(expr: &mut Expr) {
     let mut tail = root.as_mut();
     let mut tail_options = &mut root_options;
 
-    while !tail_options.contains(ASTFlags::BREAK) {
+    while !tail_options.intersects(ASTFlags::BREAK) {
         match tail.rhs {
             Expr::Index(ref mut x, ref mut options2, ..) => {
                 tail = x.as_mut();
@@ -1663,7 +1663,7 @@ impl Engine {
                     // Namespace qualification
                     #[cfg(not(feature = "no_module"))]
                     (token @ Token::DoubleColon, pos) => {
-                        if options.contains(ChainingFlags::DISALLOW_NAMESPACES) {
+                        if options.intersects(ChainingFlags::DISALLOW_NAMESPACES) {
                             return Err(LexError::ImproperSymbol(
                                 token.literal_syntax().into(),
                                 String::new(),
@@ -1681,7 +1681,7 @@ impl Engine {
                     _ => {
                         let (index, is_func) = state.access_var(&s, lib, settings.pos);
 
-                        if !options.contains(ChainingFlags::PROPERTY)
+                        if !options.intersects(ChainingFlags::PROPERTY)
                             && !is_func
                             && index.is_none()
                             && settings.has_option(LangOptions::STRICT_VAR)
@@ -1833,7 +1833,7 @@ impl Engine {
                 // Disallowed module separator
                 #[cfg(not(feature = "no_module"))]
                 (_, token @ Token::DoubleColon)
-                    if _options.contains(ChainingFlags::DISALLOW_NAMESPACES) =>
+                    if _options.intersects(ChainingFlags::DISALLOW_NAMESPACES) =>
                 {
                     return Err(LexError::ImproperSymbol(
                         token.literal_syntax().into(),
@@ -2066,7 +2066,7 @@ impl Engine {
             match expr {
                 Expr::Index(x, options, ..) | Expr::Dot(x, options, ..) if parent_is_dot => {
                     match x.lhs {
-                        Expr::Property(..) if !options.contains(ASTFlags::BREAK) => {
+                        Expr::Property(..) if !options.intersects(ASTFlags::BREAK) => {
                             check_lvalue(&x.rhs, matches!(expr, Expr::Dot(..)))
                         }
                         Expr::Property(..) => None,
@@ -2076,7 +2076,7 @@ impl Engine {
                 }
                 Expr::Index(x, options, ..) | Expr::Dot(x, options, ..) => match x.lhs {
                     Expr::Property(..) => unreachable!("unexpected Expr::Property in indexing"),
-                    _ if !options.contains(ASTFlags::BREAK) => {
+                    _ if !options.intersects(ASTFlags::BREAK) => {
                         check_lvalue(&x.rhs, matches!(expr, Expr::Dot(..)))
                     }
                     _ => None,
@@ -2124,7 +2124,7 @@ impl Engine {
             }
             // xxx[???]... = rhs, xxx.prop... = rhs
             Expr::Index(ref x, options, ..) | Expr::Dot(ref x, options, ..) => {
-                let valid_lvalue = if options.contains(ASTFlags::BREAK) {
+                let valid_lvalue = if options.intersects(ASTFlags::BREAK) {
                     None
                 } else {
                     check_lvalue(&x.rhs, matches!(lhs, Expr::Dot(..)))
@@ -2176,7 +2176,7 @@ impl Engine {
         match (lhs, rhs) {
             // lhs[...][...].rhs
             (Expr::Index(mut x, options, pos), rhs)
-                if !parent_options.contains(ASTFlags::BREAK) =>
+                if !parent_options.intersects(ASTFlags::BREAK) =>
             {
                 let options = options | parent_options;
                 x.rhs = Self::make_dot_expr(state, x.rhs, rhs, options, op_flags, op_pos)?;
@@ -2777,7 +2777,7 @@ impl Engine {
     ) -> ParseResult<Stmt> {
         // do ...
         let mut settings = settings.level_up_with_position(eat_token(input, &Token::Do))?;
-        let orig_breakable = settings.flags.contains(ParseSettingFlags::BREAKABLE);
+        let orig_breakable = settings.has_flag(ParseSettingFlags::BREAKABLE);
         settings.flags |= ParseSettingFlags::BREAKABLE;
 
         // do { body } [while|until] guard

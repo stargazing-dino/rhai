@@ -1003,7 +1003,7 @@ impl Module {
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        !self.flags.contains(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS)
+        !self.flags.intersects(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS)
             && self
                 .functions
                 .as_ref()
@@ -1045,7 +1045,7 @@ impl Module {
     #[inline(always)]
     #[must_use]
     pub const fn is_indexed(&self) -> bool {
-        self.flags.contains(ModuleFlags::INDEXED)
+        self.flags.intersects(ModuleFlags::INDEXED)
     }
 
     /// _(metadata)_ Generate signatures for all the non-private functions in the [`Module`].
@@ -2365,7 +2365,7 @@ impl Module {
     #[inline(always)]
     #[must_use]
     pub const fn contains_indexed_global_functions(&self) -> bool {
-        self.flags.contains(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS)
+        self.flags.intersects(ModuleFlags::INDEXED_GLOBAL_FUNCTIONS)
     }
 
     /// Scan through all the sub-modules in the [`Module`] and build a hash index of all

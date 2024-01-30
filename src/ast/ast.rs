@@ -807,12 +807,12 @@ impl AST {
     ) -> impl Iterator<Item = (&str, bool, Dynamic)> {
         self.statements().iter().filter_map(move |stmt| match stmt {
             Stmt::Var(x, options, ..)
-                if options.contains(ASTFlags::CONSTANT) && include_constants
-                    || !options.contains(ASTFlags::CONSTANT) && include_variables =>
+                if options.intersects(ASTFlags::CONSTANT) && include_constants
+                    || !options.intersects(ASTFlags::CONSTANT) && include_variables =>
             {
                 let (name, expr, ..) = &**x;
                 expr.get_literal_value()
-                    .map(|value| (name.as_str(), options.contains(ASTFlags::CONSTANT), value))
+                    .map(|value| (name.as_str(), options.intersects(ASTFlags::CONSTANT), value))
             }
             _ => None,
         })

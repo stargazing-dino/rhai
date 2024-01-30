@@ -321,7 +321,7 @@ impl Definitions<'_> {
         self.engine
             .global_modules
             .iter()
-            .filter(|m| !m.flags.contains(exclude_flags))
+            .filter(|&m| !m.flags.intersects(exclude_flags))
             .enumerate()
             .for_each(|(i, m)| {
                 if i > 0 {

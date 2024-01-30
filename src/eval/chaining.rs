@@ -473,7 +473,7 @@ impl Engine {
             (Expr::Property(..), ChainType::Dotting) => (),
 
             (Expr::Index(x, ..) | Expr::Dot(x, ..), chain_type)
-                if !parent.options().contains(ASTFlags::BREAK) =>
+                if !parent.options().intersects(ASTFlags::BREAK) =>
             {
                 let BinaryExpr { lhs, rhs, .. } = &**x;
 
@@ -556,7 +556,7 @@ impl Engine {
             #[cfg(not(feature = "no_index"))]
             ChainType::Indexing => {
                 // Check for existence with the null conditional operator
-                if parent.options().contains(ASTFlags::NEGATED) && target.as_ref().is_unit() {
+                if parent.options().intersects(ASTFlags::NEGATED) && target.as_ref().is_unit() {
                     return Ok((Dynamic::UNIT, false));
                 }
 
@@ -565,7 +565,7 @@ impl Engine {
                 match (rhs, new_val) {
                     // xxx[idx].expr... | xxx[idx][expr]...
                     (Expr::Dot(x, ..) | Expr::Index(x, ..), new_val)
-                        if !parent.options().contains(ASTFlags::BREAK) =>
+                        if !parent.options().intersects(ASTFlags::BREAK) =>
                     {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, _scope, this_ptr.as_deref_mut(), parent)?;
@@ -688,7 +688,7 @@ impl Engine {
             #[cfg(not(feature = "no_object"))]
             ChainType::Dotting => {
                 // Check for existence with the Elvis operator
-                if parent.options().contains(ASTFlags::NEGATED) && target.as_ref().is_unit() {
+                if parent.options().intersects(ASTFlags::NEGATED) && target.as_ref().is_unit() {
                     return Ok((Dynamic::UNIT, false));
                 }
 

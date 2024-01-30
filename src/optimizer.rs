@@ -223,7 +223,7 @@ fn optimize_stmt_block(
                 Stmt::Var(x, options, ..) => {
                     optimize_expr(&mut x.1, state, false);
 
-                    let value = if options.contains(ASTFlags::CONSTANT) && x.1.is_constant() {
+                    let value = if options.intersects(ASTFlags::CONSTANT) && x.1.is_constant() {
                         // constant literal
                         Some(Cow::Owned(x.1.get_literal_value().unwrap()))
                     } else {
@@ -282,7 +282,7 @@ fn optimize_stmt_block(
                 match statements[..] {
                     // { return; } -> {}
                     [Stmt::Return(None, options, ..)]
-                        if reduce_return && !options.contains(ASTFlags::BREAK) =>
+                        if reduce_return && !options.intersects(ASTFlags::BREAK) =>
                     {
                         state.set_dirty();
                         statements.clear();
@@ -294,7 +294,7 @@ fn optimize_stmt_block(
                     // { ...; return; } -> { ... }
                     [.., ref last_stmt, Stmt::Return(None, options, ..)]
                         if reduce_return
-                            && !options.contains(ASTFlags::BREAK)
+                            && !options.intersects(ASTFlags::BREAK)
                             && !last_stmt.returns_value() =>
                     {
                         state.set_dirty();
@@ -302,7 +302,7 @@ fn optimize_stmt_block(
                     }
                     // { ...; return val; } -> { ...; val }
                     [.., Stmt::Return(ref mut expr, options, pos)]
-                        if reduce_return && !options.contains(ASTFlags::BREAK) =>
+                        if reduce_return && !options.intersects(ASTFlags::BREAK) =>
                     {
                         state.set_dirty();
                         *statements.last_mut().unwrap() = expr
@@ -339,7 +339,7 @@ fn optimize_stmt_block(
                     }
                     // { ...; return; } -> { ... }
                     [.., Stmt::Return(None, options, ..)]
-                        if reduce_return && !options.contains(ASTFlags::BREAK) =>
+                        if reduce_return && !options.intersects(ASTFlags::BREAK) =>
                     {
                         state.set_dirty();
                         statements.pop().unwrap();
@@ -347,7 +347,7 @@ fn optimize_stmt_block(
                     // { ...; return pure_val; } -> { ... }
                     [.., Stmt::Return(Some(ref expr), options, ..)]
                         if reduce_return
-                            && !options.contains(ASTFlags::BREAK)
+                            && !options.intersects(ASTFlags::BREAK)
                             && expr.is_pure() =>
                     {
                         state.set_dirty();
@@ -771,7 +771,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
                 optimize_stmt_block(x.2.body.take_statements(), state, false, true, false);
         }
         // let id = expr;
-        Stmt::Var(x, options, ..) if !options.contains(ASTFlags::CONSTANT) => {
+        Stmt::Var(x, options, ..) if !options.intersects(ASTFlags::CONSTANT) => {
             optimize_expr(&mut x.1, state, false);
         }
         // import expr as var;
@@ -911,7 +911,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         }
         // ()?.rhs
         #[cfg(not(feature = "no_object"))]
-        Expr::Dot(x, options, ..) if options.contains(ASTFlags::NEGATED) && matches!(x.lhs, Expr::Unit(..)) => {
+        Expr::Dot(x, options, ..) if options.intersects(ASTFlags::NEGATED) && matches!(x.lhs, Expr::Unit(..)) => {
             state.set_dirty();
             *expr = x.lhs.take();
         }
@@ -953,7 +953,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
 
         // ()?[rhs]
         #[cfg(not(feature = "no_index"))]
-        Expr::Index(x, options, ..) if options.contains(ASTFlags::NEGATED) && matches!(x.lhs, Expr::Unit(..)) => {
+        Expr::Index(x, options, ..) if options.intersects(ASTFlags::NEGATED) && matches!(x.lhs, Expr::Unit(..)) => {
             state.set_dirty();
             *expr = x.lhs.take();
         }
@@ -1300,7 +1300,7 @@ impl Engine {
         if self
             .global_modules
             .iter()
-            .filter(|m| !m.flags.contains(ModuleFlags::STANDARD_LIB))
+            .filter(|m| !m.flags.intersects(ModuleFlags::STANDARD_LIB))
             .any(|m| m.contains_fn(hash))
         {
             return true;

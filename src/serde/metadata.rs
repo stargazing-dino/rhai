@@ -249,7 +249,7 @@ pub fn gen_metadata_to_json(
     engine
         .global_modules
         .iter()
-        .filter(|m| !m.flags.contains(exclude_flags))
+        .filter(|&m| !m.flags.intersects(exclude_flags))
         .for_each(|m| {
             if !m.doc().is_empty() {
                 if !global_doc.is_empty() {
