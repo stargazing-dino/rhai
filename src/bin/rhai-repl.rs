@@ -365,7 +365,7 @@ fn main() {
                     Ok(mut line) if line.ends_with('\\') => {
                         line.pop();
                         input += &line;
-                        input.push('\n');
+                        input += "\n";
                     }
                     Ok(line) => {
                         input += &line;

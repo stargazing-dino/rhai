@@ -546,7 +546,7 @@ impl AST {
             ("", _) => (),
             (_, "") => _ast.doc = other.doc.clone(),
             (_, _) => {
-                _ast.doc.push('\n');
+                _ast.doc.push_str("\n");
                 _ast.doc.push_str(&other.doc);
             }
         }
@@ -650,7 +650,7 @@ impl AST {
             ("", _) => (),
             (_, "") => self.doc = other.doc,
             (_, _) => {
-                self.doc.push('\n');
+                self.doc.push_str("\n");
                 self.doc.push_str(&other.doc);
             }
         }

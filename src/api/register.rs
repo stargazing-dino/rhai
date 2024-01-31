@@ -1,7 +1,7 @@
 //! Module that defines the public function/module registration API of [`Engine`].
 
 use crate::func::{FnCallArgs, RhaiFunc, RhaiNativeFunc, SendSync};
-use crate::module::{FuncRegistration, ModuleFlags};
+use crate::module::FuncRegistration;
 use crate::types::dynamic::Variant;
 use crate::{
     Dynamic, Engine, FnNamespace, Identifier, Module, NativeCallContext, RhaiResultOf, Shared,
@@ -22,7 +22,7 @@ impl Engine {
     pub(crate) fn global_namespace_mut(&mut self) -> &mut Module {
         if self.global_modules.is_empty() {
             let mut global_namespace = Module::new();
-            global_namespace.flags |= ModuleFlags::INTERNAL;
+            global_namespace.set_internal(true);
             self.global_modules.push(global_namespace.into());
         }
 
@@ -747,7 +747,7 @@ impl Engine {
     #[cfg(feature = "metadata")]
     #[inline]
     #[must_use]
-    pub fn gen_fn_signatures(&self, include_packages: bool) -> Vec<String> {
+    pub fn gen_fn_signatures(&self, include_standard_packages: bool) -> Vec<String> {
         let mut signatures = Vec::with_capacity(64);
 
         if let Some(global_namespace) = self.global_modules.first() {
@@ -764,17 +764,11 @@ impl Engine {
             );
         }
 
-        let exclude_flags = if include_packages {
-            crate::module::ModuleFlags::INTERNAL
-        } else {
-            crate::module::ModuleFlags::INTERNAL | crate::module::ModuleFlags::STANDARD_LIB
-        };
-
         signatures.extend(
             self.global_modules
                 .iter()
                 .skip(1)
-                .filter(|m| !m.flags.intersects(exclude_flags))
+                .filter(|m| !m.is_internal() && (include_standard_packages || !m.is_standard_lib()))
                 .flat_map(|m| m.gen_fn_signatures_with_mapper(|s| self.format_param_type(s))),
         );
 

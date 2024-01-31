@@ -1,7 +1,6 @@
 #![cfg(not(feature = "no_object"))]
 
 use crate::engine::OP_EQUALS;
-use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{def_package, Dynamic, ImmutableString, Map, NativeCallContext, RhaiResultOf, INT};
 #[cfg(feature = "no_std")]
@@ -13,7 +12,7 @@ use crate::Array;
 def_package! {
     /// Package of basic object map utilities.
     pub BasicMapPackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
         combine_with_exported_module!(lib, "map", map_functions);
     }

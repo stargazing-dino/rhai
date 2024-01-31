@@ -2,7 +2,7 @@
 #![cfg(feature = "internals")]
 #![cfg(feature = "metadata")]
 
-use crate::module::{FuncMetadata, ModuleFlags};
+use crate::module::FuncMetadata;
 use crate::tokenizer::{is_valid_function_name, Token};
 use crate::{Engine, FnAccess, FnPtr, Module, Scope, INT};
 
@@ -312,16 +312,10 @@ impl Definitions<'_> {
             String::new()
         };
 
-        let exclude_flags = if self.config.include_standard_packages {
-            ModuleFlags::empty()
-        } else {
-            ModuleFlags::STANDARD_LIB
-        };
-
         self.engine
             .global_modules
             .iter()
-            .filter(|&m| !m.flags.intersects(exclude_flags))
+            .filter(|&m| self.config.include_standard_packages || !m.is_standard_lib())
             .enumerate()
             .for_each(|(i, m)| {
                 if i > 0 {

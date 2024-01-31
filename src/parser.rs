@@ -3298,7 +3298,7 @@ impl Engine {
                             comments.push(c.into());
                         } else {
                             if !buf.is_empty() {
-                                buf.push('\n');
+                                buf.push_str("\n");
                             }
                             buf.push_str(&comment);
                         }

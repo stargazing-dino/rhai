@@ -3,7 +3,7 @@
 
 use crate::api::formatting::format_param_type_for_display;
 use crate::func::RhaiFunc;
-use crate::module::{calc_native_fn_hash, FuncMetadata, ModuleFlags};
+use crate::module::{calc_native_fn_hash, FuncMetadata};
 use crate::types::custom_types::CustomTypeInfo;
 use crate::{calc_fn_hash, Engine, FnAccess, SmartString, ThinVec, AST};
 use serde::{Deserialize, Serialize};
@@ -239,22 +239,16 @@ pub fn gen_metadata_to_json(
         global.modules.insert(name, m.as_ref().into());
     }
 
-    let exclude_flags = if include_standard_packages {
-        ModuleFlags::empty()
-    } else {
-        ModuleFlags::STANDARD_LIB
-    };
-
     engine
         .global_modules
         .iter()
-        .filter(|&m| !m.flags.intersects(exclude_flags))
+        .filter(|&m| include_standard_packages || !m.is_standard_lib())
         .for_each(|m| {
             if !m.doc().is_empty() {
                 if !global_doc.is_empty() {
-                    global_doc.push('\n');
+                    global_doc += "\n";
                 }
-                global_doc.push_str(m.doc());
+                global_doc += m.doc();
             }
 
             m.iter_custom_types()
@@ -294,9 +288,9 @@ pub fn gen_metadata_to_json(
     if let Some(ast) = _ast {
         if !ast.doc().is_empty() {
             if !global_doc.is_empty() {
-                global_doc.push('\n');
+                global_doc += "\n";
             }
-            global_doc.push_str(ast.doc());
+            global_doc += ast.doc();
         }
     }
 

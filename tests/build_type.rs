@@ -178,7 +178,7 @@ fn test_build_type_macro() {
                 let mut s = self.hello.clone();
                 s.push_str(&value);
                 for _ in 0..self.bar {
-                    s.push('!');
+                    s += "!";
                 }
                 s
             } else {

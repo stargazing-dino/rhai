@@ -1,5 +1,4 @@
 use crate::def_package;
-use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::types::dynamic::Tag;
 use crate::{Dynamic, RhaiResult, RhaiResultOf, ERR, INT};
@@ -13,7 +12,7 @@ use crate::FLOAT;
 def_package! {
     /// Package of core language features.
     pub LanguageCorePackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
         combine_with_exported_module!(lib, "core", core_functions);
 
