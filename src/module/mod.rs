@@ -139,13 +139,13 @@ impl FuncMetadata {
                     result
                 })
                 .collect::<crate::FnArgsVec<_>>();
-            signature.push_str(&params.join(", "));
+            signature += &params.join(", ");
         }
         signature += ")";
 
         if !return_type.is_empty() {
             signature += " -> ";
-            signature.push_str(&return_type);
+            signature += &return_type;
         }
 
         signature

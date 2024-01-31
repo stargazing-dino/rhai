@@ -267,7 +267,7 @@ pub fn check_rename_collisions(fns: &[ExportedFn]) -> Result<(), syn::Error> {
                     syn::FnArg::Typed(syn::PatType { ref ty, .. }) => print_type(ty),
                 };
                 arg_str += ".";
-                arg_str.push_str(&type_string);
+                arg_str += &type_string;
                 arg_str
             })
     }

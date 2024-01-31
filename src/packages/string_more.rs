@@ -129,7 +129,7 @@ mod string_functions {
                 }
             } else {
                 let mut x = string.into_owned();
-                x.push_str(s.as_ref());
+                x += s.as_ref();
                 x.into()
             }
         }
@@ -152,7 +152,7 @@ mod string_functions {
             };
 
             if !string.is_empty() {
-                s.push_str(string);
+                s += string;
             }
 
             s.into()
