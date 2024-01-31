@@ -1304,26 +1304,26 @@ pub fn parse_string_literal(
             // \r
             'r' if !escape.is_empty() => {
                 escape.clear();
-                result.push('\r');
+                result.push_str("\r");
             }
             // \n
             'n' if !escape.is_empty() => {
                 escape.clear();
-                result.push('\n');
+                result.push_str("\n");
             }
             // \...
             '\\' if !verbatim && escape.is_empty() => {
-                escape.push('\\');
+                escape.push_str("\\");
             }
             // \\
             '\\' if !escape.is_empty() => {
                 escape.clear();
-                result.push('\\');
+                result.push_str("\\");
             }
             // \t
             't' if !escape.is_empty() => {
                 escape.clear();
-                result.push('\t');
+                result.push_str("\t");
             }
             // \x??, \u????, \U????????
             ch @ ('x' | 'u' | 'U') if !escape.is_empty() => {
@@ -1366,7 +1366,7 @@ pub fn parse_string_literal(
             '\n' if verbatim => {
                 debug_assert_eq!(escape, "", "verbatim strings should not have any escapes");
                 pos.new_line();
-                result.push('\n');
+                result.push_str("\n");
             }
 
             // LF - Line continuation
@@ -1613,7 +1613,7 @@ fn get_next_token_inner(
                             match stream.peek_next() {
                                 // digits after period - accept the period
                                 Some('0'..='9') => {
-                                    result.push('.');
+                                    result.push_str(".");
                                     pos.advance();
                                     _has_period = true;
                                 }
@@ -1629,9 +1629,9 @@ fn get_next_token_inner(
                                 }
                                 // symbol after period - probably a float
                                 Some(ch) if !is_id_first_alphabetic(ch) => {
-                                    result.push('.');
+                                    result.push_str(".");
                                     pos.advance();
-                                    result.push('0');
+                                    result.push_str("0");
                                     _has_period = true;
                                 }
                                 // Not a floating-point number
@@ -1649,14 +1649,14 @@ fn get_next_token_inner(
                             match stream.peek_next() {
                                 // digits after e - accept the e (no decimal points allowed)
                                 Some('0'..='9') => {
-                                    result.push('e');
+                                    result.push_str("e");
                                     pos.advance();
                                     _has_e = true;
                                     _has_period = true;
                                 }
                                 // +/- after e - accept the e and the sign (no decimal points allowed)
                                 Some('+' | '-') => {
-                                    result.push('e');
+                                    result.push_str("e");
                                     pos.advance();
                                     result.push(stream.get_next().unwrap());
                                     pos.advance();
@@ -1967,9 +1967,9 @@ fn get_next_token_inner(
                     Some(comment) if comment.starts_with("//!") => {
                         let g = &mut state.tokenizer_control.borrow_mut().global_comments;
                         if !g.is_empty() {
-                            g.push('\n');
+                            *g += "\n";
                         }
-                        g.push_str(&comment);
+                        *g += &comment;
                     }
                     Some(comment) => return (Token::Comment(comment.into()), start_pos),
                     None => (),
@@ -2600,7 +2600,7 @@ impl<'a> Iterator for TokenIterator<'a> {
                             Token::StringConstant(..) | Token::InterpolatedString(..)
                         )
                     {
-                        compressed.push_str(&last_token[1..]);
+                        *compressed += &last_token[1..];
                     } else {
                         buf = last_token.clone();
                     }
@@ -2612,12 +2612,12 @@ impl<'a> Iterator for TokenIterator<'a> {
                             let prev = compressed.chars().last().unwrap();
 
                             if prev == '_' || is_id_first_alphabetic(prev) || is_id_continue(prev) {
-                                compressed.push(' ');
+                                *compressed += " ";
                             }
                         }
                     }
 
-                    compressed.push_str(&buf);
+                    *compressed += &buf;
                 }
             }
         }

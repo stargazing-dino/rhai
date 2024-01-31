@@ -1,4 +1,3 @@
-use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{def_package, FnPtr, ImmutableString, SmartString, INT};
 use std::any::TypeId;
@@ -25,7 +24,7 @@ pub const FUNC_TO_DEBUG: &str = "to_debug";
 def_package! {
     /// Package of basic string utilities (e.g. printing)
     pub BasicStringPackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
         combine_with_exported_module!(lib, "print_debug", print_debug_functions);
         combine_with_exported_module!(lib, "number_formatting", number_formatting);
@@ -203,7 +202,7 @@ mod print_debug_functions {
     pub fn format_array(ctx: NativeCallContext, array: &mut Array) -> ImmutableString {
         let len = array.len();
         let mut result = SmartString::new_const();
-        result.push('[');
+        result.push_str("[");
 
         array.iter_mut().enumerate().for_each(|(i, x)| {
             result.push_str(&print_with_func(FUNC_TO_DEBUG, &ctx, x));
@@ -212,7 +211,7 @@ mod print_debug_functions {
             }
         });
 
-        result.push(']');
+        result.push_str("]");
         result.into()
     }
 
@@ -241,7 +240,7 @@ mod print_debug_functions {
             .unwrap();
         });
 
-        result.push('}');
+        result.push_str("}");
         result.into()
     }
 }

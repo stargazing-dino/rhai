@@ -1,4 +1,3 @@
-use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{def_package, FnPtr, ImmutableString, NativeCallContext};
 #[cfg(feature = "no_std")]
@@ -7,7 +6,7 @@ use std::prelude::v1::*;
 def_package! {
     /// Package of basic function pointer utilities.
     pub BasicFnPackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
         combine_with_exported_module!(lib, "FnPtr", fn_ptr_functions);
     }

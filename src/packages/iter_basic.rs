@@ -1,5 +1,4 @@
 use crate::eval::calc_index;
-use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::FuncRegistration;
 use crate::{
@@ -239,145 +238,132 @@ impl ExactSizeIterator for CharsStream {
 }
 
 macro_rules! reg_range {
-    ($lib:ident | $x:expr => $( $y:ty ),*) => {
-        $(
-            $lib.set_iterator::<Range<$y>>();
+    ($lib:ident => $( $arg_type:ty ),*) => {
+        $({
+            $lib.set_iterator::<Range<$arg_type>>();
 
-            let f = FuncRegistration::new($x);
+            #[export_module]
+            mod range_function {
+                /// Return an iterator over the exclusive range of `from..to`.
+                /// The value `to` is never included.
+                ///
+                /// # Example
+                ///
+                /// ```rhai
+                /// // prints all values from 8 to 17
+                /// for n in range(8, 18) {
+                ///     print(n);
+                /// }
+                /// ```
+                pub fn range (from: $arg_type, to: $arg_type) -> Range<$arg_type> {
+                    from..to
+                }
+            }
 
-            #[cfg(feature = "metadata")]
-            let f = f.with_params_info([
-                concat!("from: ", stringify!($y)),
-                concat!("to: ", stringify!($y)),
-                concat!("Iterator<", stringify!($y), ">"),
-            ]).with_comments(["\
-                /// Return an iterator over the exclusive range of `from..to`.\n\
-                /// The value `to` is never included.\n\
-                ///\n\
-                /// # Example\n\
-                ///\n\
-                /// ```rhai\n\
-                /// // prints all values from 8 to 17\n\
-                /// for n in range(8, 18) {\n\
-                ///     print(n);\n\
-                /// }\n\
-                /// ```"
-            ]);
+            combine_with_exported_module!($lib, stringify!($arg_type), range_function);
 
-            f.set_into_module($lib, |from: $y, to: $y| from..to);
+            $lib.set_iterator::<RangeInclusive<$arg_type>>();
 
-            $lib.set_iterator::<RangeInclusive<$y>>();
-        )*
+        })*
     };
-    ($lib:ident | step $x:expr => $( $y:ty ),*) => {
+    ($lib:ident |> $( $arg_type:ty ),*) => {
         #[cfg(not(feature = "unchecked"))]
-        reg_range!($lib | step(std_add) $x => $( $y ),*);
+        reg_range!($lib |> std_add => $( $arg_type ),*);
         #[cfg(feature = "unchecked")]
-        reg_range!($lib | step(regular_add) $x => $( $y ),*);
+        reg_range!($lib |> regular_add => $( $arg_type ),*);
     };
-    ($lib:ident | step ( $add:ident ) $x:expr => $( $y:ty ),*) => {
-        $(
-            $lib.set_iterator::<StepRange<$y>>();
+    ($lib:ident |> $add:ident => $( $arg_type:ty ),*) => {
+        $({
+            $lib.set_iterator::<StepRange<$arg_type>>();
 
-            let f = FuncRegistration::new($x);
+            #[export_module]
+            mod range_functions {
+                /// Return an iterator over the exclusive range of `from..to`, each iteration increasing by `step`.
+                /// The value `to` is never included.
+                ///
+                /// If `from` > `to` and `step` < 0, iteration goes backwards.
+                ///
+                /// If `from` > `to` and `step` > 0 or `from` < `to` and `step` < 0, an empty iterator is returned.
+                ///
+                /// # Example
+                ///
+                /// ```rhai
+                /// // prints all values from 8 to 17 in steps of 3
+                /// for n in range(8, 18, 3) {
+                ///     print(n);
+                /// }
+                ///
+                /// // prints all values down from 18 to 9 in steps of -3
+                /// for n in range(18, 8, -3) {
+                ///     print(n);
+                /// }
+                /// ```
+                #[rhai_fn(name = "range", return_raw)]
+                pub fn range_from_to_stepped (from: $arg_type, to: $arg_type, step: $arg_type) -> RhaiResultOf<StepRange<$arg_type>> {
+                    StepRange::new(from, to, step, $add)
+                }
+                /// Return an iterator over an exclusive range, each iteration increasing by `step`.
+                ///
+                /// If `range` is reversed and `step` < 0, iteration goes backwards.
+                ///
+                /// Otherwise, if `range` is empty, an empty iterator is returned.
+                ///
+                /// # Example
+                ///
+                /// ```rhai
+                /// // prints all values from 8 to 17 in steps of 3
+                /// for n in range(8..18, 3) {
+                ///     print(n);
+                /// }
+                ///
+                /// // prints all values down from 18 to 9 in steps of -3
+                /// for n in range(18..8, -3) {
+                ///     print(n);
+                /// }
+                /// ```
+                #[rhai_fn(name = "range", return_raw)]
+                pub fn range_stepped (range: std::ops::Range<$arg_type>, step: $arg_type) -> RhaiResultOf<StepRange<$arg_type>> {
+                    StepRange::new(range.start, range.end, step, $add)
+                }
+            }
 
-            #[cfg(feature = "metadata")]
-            let f = f.with_params_info([
-                concat!("from: ", stringify!($y)),
-                concat!("to: ", stringify!($y)),
-                concat!("step: ", stringify!($y)),
-                concat!("Iterator<", stringify!($y), ">")
-            ]).with_comments(["\
-                /// Return an iterator over the exclusive range of `from..to`, each iteration increasing by `step`.\n\
-                /// The value `to` is never included.\n\
-                ///\n\
-                /// If `from` > `to` and `step` < 0, iteration goes backwards.\n\
-                ///\n\
-                /// If `from` > `to` and `step` > 0 or `from` < `to` and `step` < 0, an empty iterator is returned.\n\
-                ///\n\
-                /// # Example\n\
-                ///\n\
-                /// ```rhai\n\
-                /// // prints all values from 8 to 17 in steps of 3\n\
-                /// for n in range(8, 18, 3) {\n\
-                ///     print(n);\n\
-                /// }\n\
-                ///\n\
-                /// // prints all values down from 18 to 9 in steps of -3\n\
-                /// for n in range(18, 8, -3) {\n\
-                ///     print(n);\n\
-                /// }\n\
-                /// ```"
-            ]);
-
-            f.set_into_module($lib, |from: $y, to: $y, step: $y| StepRange::new(from, to, step, $add));
-
-            let f = FuncRegistration::new($x);
-
-            #[cfg(feature = "metadata")]
-            let f = f.with_params_info([
-                concat!("range: Range<", stringify!($y), ">"),
-                concat!("step: ", stringify!($y)),
-                concat!("Iterator<", stringify!($y), ">")
-            ]).with_comments(["\
-                /// Return an iterator over an exclusive range, each iteration increasing by `step`.\n\
-                ///\n\
-                /// If `range` is reversed and `step` < 0, iteration goes backwards.\n\
-                ///\n\
-                /// Otherwise, if `range` is empty, an empty iterator is returned.\n\
-                ///\n\
-                /// # Example\n\
-                ///\n\
-                /// ```rhai\n\
-                /// // prints all values from 8 to 17 in steps of 3\n\
-                /// for n in range(8..18, 3) {\n\
-                ///     print(n);\n\
-                /// }\n\
-                ///\n\
-                /// // prints all values down from 18 to 9 in steps of -3\n\
-                /// for n in range(18..8, -3) {\n\
-                ///     print(n);\n\
-                /// }\n\
-                /// ```"
-            ]);
-
-            f.set_into_module($lib, |range: std::ops::Range<$y>, step: $y| StepRange::new(range.start, range.end, step, $add));
-        )*
+            combine_with_exported_module!($lib, stringify!($arg_type), range_functions);
+        })*
     };
 }
 
 def_package! {
     /// Package of basic range iterators
     pub BasicIteratorPackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
-        reg_range!(lib | "range" => INT);
+        reg_range!(lib => INT);
 
         #[cfg(not(feature = "only_i32"))]
         #[cfg(not(feature = "only_i64"))]
         {
-            reg_range!(lib | "range" => i8, u8, i16, u16, i32, u32, i64, u64);
+            reg_range!(lib => i8, u8, i16, u16, i32, u32, i64, u64);
 
             #[cfg(not(target_family = "wasm"))]
-            reg_range!(lib | "range" => i128, u128);
+            reg_range!(lib => i128, u128);
         }
 
-        reg_range!(lib | step "range" => INT);
+        reg_range!(lib |> INT);
 
         #[cfg(not(feature = "only_i32"))]
         #[cfg(not(feature = "only_i64"))]
         {
-            reg_range!(lib | step "range" => i8, u8, i16, u16, i32, u32, i64, u64);
+            reg_range!(lib |> i8, u8, i16, u16, i32, u32, i64, u64);
 
             #[cfg(not(target_family = "wasm"))]
-            reg_range!(lib | step "range" => i128, u128);
+            reg_range!(lib |> i128, u128);
         }
 
         #[cfg(not(feature = "no_float"))]
-        reg_range!(lib | step(regular_add) "range" => FLOAT);
+        reg_range!(lib |> regular_add => FLOAT);
 
         #[cfg(feature = "decimal")]
-        reg_range!(lib | step "range" => Decimal);
+        reg_range!(lib |> Decimal);
 
         // Register string iterator
         lib.set_iterator::<CharsStream>();

@@ -3,7 +3,6 @@
 use crate::api::deprecated::deprecated_array_functions;
 use crate::engine::OP_EQUALS;
 use crate::eval::{calc_index, calc_offset_len};
-use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
     def_package, Array, Dynamic, ExclusiveRange, FnPtr, InclusiveRange, NativeCallContext,
@@ -16,7 +15,7 @@ use std::{any::TypeId, cmp::Ordering, mem};
 def_package! {
     /// Package of basic array utilities.
     pub BasicArrayPackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
         combine_with_exported_module!(lib, "array", array_functions);
         combine_with_exported_module!(lib, "deprecated_array", deprecated_array_functions);

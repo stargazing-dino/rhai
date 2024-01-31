@@ -1,5 +1,4 @@
 use crate::eval::calc_index;
-use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
     def_package, ExclusiveRange, InclusiveRange, Position, RhaiResultOf, ERR, INT, INT_BITS,
@@ -11,7 +10,7 @@ use std::prelude::v1::*;
 def_package! {
     /// Package of basic bit-field utilities.
     pub BitFieldPackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
         combine_with_exported_module!(lib, "bit_field", bit_field_functions);
     }

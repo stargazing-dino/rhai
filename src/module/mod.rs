@@ -111,9 +111,9 @@ impl FuncMetadata {
 
         if self.params_info.is_empty() {
             for x in 0..self.num_params {
-                signature.push('_');
+                signature += "_";
                 if x < self.num_params - 1 {
-                    signature.push_str(", ");
+                    signature += ", ";
                 }
             }
         } else {
@@ -141,10 +141,10 @@ impl FuncMetadata {
                 .collect::<crate::FnArgsVec<_>>();
             signature.push_str(&params.join(", "));
         }
-        signature.push(')');
+        signature += ")";
 
         if !return_type.is_empty() {
-            signature.push_str(" -> ");
+            signature += " -> ";
             signature.push_str(&return_type);
         }
 
@@ -533,7 +533,7 @@ impl FuncRegistration {
 bitflags! {
     /// Bit-flags containing all status for [`Module`].
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
-    pub struct ModuleFlags: u8 {
+    struct ModuleFlags: u8 {
         /// Is the [`Module`] internal?
         const INTERNAL = 0b0000_0001;
         /// Is the [`Module`] part of a standard library?
@@ -574,7 +574,7 @@ pub struct Module {
     /// Flattened collection of iterator functions, including those in sub-modules.
     all_type_iterators: BTreeMap<TypeId, Shared<FnIterator>>,
     /// Flags.
-    pub(crate) flags: ModuleFlags,
+    flags: ModuleFlags,
 }
 
 impl Default for Module {
@@ -1058,6 +1058,29 @@ impl Module {
     #[must_use]
     pub const fn is_indexed(&self) -> bool {
         self.flags.intersects(ModuleFlags::INDEXED)
+    }
+
+    /// Is the [`Module`] an internal Rhai system module?
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_internal(&self) -> bool {
+        self.flags.intersects(ModuleFlags::INTERNAL)
+    }
+    /// Set whether the [`Module`] is a Rhai internal system module.
+    #[inline(always)]
+    pub(crate) fn set_internal(&mut self, value: bool) {
+        self.flags.set(ModuleFlags::INTERNAL, value)
+    }
+    /// Is the [`Module`] a Rhai standard library module?
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_standard_lib(&self) -> bool {
+        self.flags.intersects(ModuleFlags::STANDARD_LIB)
+    }
+    /// Set whether the [`Module`] is a Rhai standard library module.
+    #[inline(always)]
+    pub(crate) fn set_standard_lib(&mut self, value: bool) {
+        self.flags.set(ModuleFlags::STANDARD_LIB, value)
     }
 
     /// _(metadata)_ Generate signatures for all the non-private functions in the [`Module`].
@@ -1869,7 +1892,7 @@ impl Module {
         #[cfg(feature = "metadata")]
         {
             if !self.doc.is_empty() {
-                self.doc.push('\n');
+                self.doc.push_str("\n");
             }
             self.doc.push_str(&other.doc);
         }
@@ -1902,7 +1925,7 @@ impl Module {
         #[cfg(feature = "metadata")]
         {
             if !self.doc.is_empty() {
-                self.doc.push('\n');
+                self.doc.push_str("\n");
             }
             self.doc.push_str(&other.doc);
         }
@@ -1949,7 +1972,7 @@ impl Module {
         #[cfg(feature = "metadata")]
         {
             if !self.doc.is_empty() {
-                self.doc.push('\n');
+                self.doc.push_str("\n");
             }
             self.doc.push_str(&other.doc);
         }
@@ -2004,7 +2027,7 @@ impl Module {
         #[cfg(feature = "metadata")]
         {
             if !self.doc.is_empty() {
-                self.doc.push('\n');
+                self.doc.push_str("\n");
             }
             self.doc.push_str(&other.doc);
         }
