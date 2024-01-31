@@ -1,6 +1,10 @@
 Rhai Release Notes
 ==================
 
+Version 1.18.0
+==============
+
+
 Version 1.17.1
 ==============
 
@@ -10,17 +14,11 @@ This is a bug-fix release that bumps `rhai_codegen` version to `2.0.0` to satisf
 Version 1.17.0
 ==============
 
-Starting from this version, the official preferred method of registering an API for a custom type is
-via the `#[derive(CustomType)]` macro. The old API is still available for types that reside in
-external crates (and thus cannot implement `CustomType`).
+Starting from this version, the official preferred method of registering an API for a custom type is via the `#[derive(CustomType)]` macro. The old API is still available for types that reside in external crates (and thus cannot implement `CustomType`).
 
-Starting from this version, the new `FuncRegistration` API is preferred for registering native Rust
-functions into a `Module`. The old API is still available but deprecated.
+Starting from this version, the new `FuncRegistration` API is preferred for registering native Rust functions into a `Module`. The old API is still available but deprecated.
 
-Starting from this version, fuzzing via [Google OSS-Fuzz](https://github.com/google/oss-fuzz) is
-used to flush out hidden bugs and edge cases. This should result in higher code quality, better
-stability and improved security. And indeed, a large number of bugs have been discovered from this
-and fixed.
+Starting from this version, fuzzing via [Google OSS-Fuzz](https://github.com/google/oss-fuzz) is used to flush out hidden bugs and edge cases. This should result in higher code quality, better stability and improved security. And indeed, a large number of bugs have been discovered from this and fixed.
 
 Potentially breaking changes
 ----------------------------
