@@ -971,7 +971,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             .engine()
                             .throw_on_size((0, 0, ch.len() + s.len()))?;
 
-                        ch.push_str(s);
+                        ch += s;
                         ch
                     };
 

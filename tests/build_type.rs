@@ -176,7 +176,7 @@ fn test_build_type_macro() {
         pub fn set_hello(&mut self, value: String) {
             self.hello = if self.baz {
                 let mut s = self.hello.clone();
-                s.push_str(&value);
+                s += &value;
                 for _ in 0..self.bar {
                     s += "!";
                 }

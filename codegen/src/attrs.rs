@@ -167,7 +167,7 @@ pub fn doc_attributes(attrs: &[syn::Attribute]) -> syn::Result<Vec<String>> {
                     buf += "\n";
                 }
                 buf += "///";
-                buf.push_str(&line);
+                buf += &line;
             }
         }
     }
