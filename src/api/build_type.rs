@@ -114,7 +114,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     }
 }
 
-impl<'s, T: Variant + Clone> TypeBuilder<'_, T> {
+impl<T: Variant + Clone> TypeBuilder<'_, T> {
     /// Set a pretty-print name for the `type_of` function.
     #[inline(always)]
     pub fn with_name(&mut self, name: &str) -> &mut Self {

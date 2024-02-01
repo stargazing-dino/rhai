@@ -155,7 +155,7 @@ impl<'a> From<(&'a RhaiFunc, &'a FuncMetadata)> for FnMetadata<'a> {
                 })
                 .collect(),
             return_type: format_param_type_for_display(&m.return_type, true),
-            signature: m.gen_signature(|s| s.into()).into(),
+            signature: m.gen_signature(Into::into).into(),
             doc_comments: if f.is_script() {
                 #[cfg(feature = "no_function")]
                 unreachable!("script-defined functions should not exist under no_function");

@@ -488,7 +488,7 @@ impl Expr {
             // Interpolated string
             Self::InterpolatedString(x, ..) if self.is_constant() => {
                 let mut s = SmartString::new_const();
-                for segment in x.iter() {
+                for segment in x {
                     let v = segment.get_literal_value().unwrap();
                     write!(&mut s, "{v}").unwrap();
                 }

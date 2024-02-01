@@ -3812,8 +3812,6 @@ impl Engine {
         settings: ParseSettings,
         _parent: &mut ParseState,
     ) -> ParseResult<(Expr, Shared<ScriptFuncDef>)> {
-        use core::iter::FromIterator;
-
         let settings = settings.level_up()?;
         let mut params_list = StaticVec::<ImmutableString>::new_const();
 
@@ -3869,7 +3867,7 @@ impl Engine {
                 FnArgsVec::new_const(),
             )
         } else {
-            let externals = FnArgsVec::from_iter(state.external_vars.iter().cloned());
+            let externals: FnArgsVec<_> = state.external_vars.iter().cloned().collect();
 
             let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
             params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));

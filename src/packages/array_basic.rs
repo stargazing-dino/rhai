@@ -1558,7 +1558,7 @@ pub mod array_functions {
                 .ok()
                 .and_then(|v| {
                     v.as_int()
-                        .or_else(|_| v.as_bool().map(|v| v.then_some(-1).unwrap_or(1)))
+                        .or_else(|_| v.as_bool().map(|v| if v { -1 } else { 1 }))
                         .ok()
                 })
                 .map_or_else(

@@ -255,7 +255,7 @@ macro_rules! reg_range {
                 ///     print(n);
                 /// }
                 /// ```
-                pub fn range (from: $arg_type, to: $arg_type) -> Range<$arg_type> {
+                pub const fn range (from: $arg_type, to: $arg_type) -> Range<$arg_type> {
                     from..to
                 }
             }
