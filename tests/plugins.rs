@@ -62,12 +62,6 @@ macro_rules! gen_unary_functions {
     }
 }
 
-macro_rules! reg_functions {
-    ($mod_name:ident += $op_name:ident :: $func:ident ( $($arg_type:ident),+ )) => {
-        $(register_exported_fn!($mod_name, stringify!($op_name), $op_name::$arg_type::$func);)*
-    }
-}
-
 fn make_greeting(n: impl std::fmt::Display) -> String {
     format!("{n} kitties")
 }
@@ -105,8 +99,6 @@ fn test_plugins_package() {
     combine_with_exported_module!(&mut m, "test", test::special_array_package);
     combine_with_exported_module!(&mut m, "enum", my_enum_module);
     engine.register_global_module(m.into());
-
-    reg_functions!(engine += greet::single(INT, bool, char));
 
     assert_eq!(engine.eval::<INT>("MYSTIC_NUMBER").unwrap(), 42);
 

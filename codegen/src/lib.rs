@@ -281,26 +281,12 @@ pub fn combine_with_exported_module(args: proc_macro::TokenStream) -> proc_macro
 
 /// Macro to register a _plugin function_ (defined via [`#[export_fn]`][macro@export_fn]) into an `Engine`.
 ///
-/// # Usage
+/// # Deprecated
 ///
-/// ```
-/// # use rhai::{Engine, EvalAltResult};
-/// use rhai::plugin::*;
+/// This macro is deprecated as it performs no additional value.
 ///
-/// #[export_fn]
-/// fn my_plugin_function(x: i64) -> i64 {
-///     x * 2
-/// }
-///
-/// # fn main() -> Result<(), Box<EvalAltResult>> {
-/// let mut engine = Engine::new();
-///
-/// register_exported_fn!(engine, "func", my_plugin_function);
-///
-/// assert_eq!(engine.eval::<i64>("func(21)")?, 42);
-/// # Ok(())
-/// # }
-/// ```
+/// This method will be removed in the next major version.
+#[deprecated(since = "1.18.0")]
 #[proc_macro]
 pub fn register_exported_fn(args: proc_macro::TokenStream) -> proc_macro::TokenStream {
     match crate::register::parse_register_macro(args) {
@@ -316,29 +302,12 @@ pub fn register_exported_fn(args: proc_macro::TokenStream) -> proc_macro::TokenS
 
 /// Macro to register a _plugin function_ into a Rhai `Module`.
 ///
-/// # Usage
+/// # Deprecated
 ///
-/// ```
-/// # use rhai::{Engine, EvalAltResult};
-/// use rhai::plugin::*;
+/// This macro is deprecated as it performs no additional value.
 ///
-/// #[export_fn]
-/// fn my_plugin_function(x: i64) -> i64 {
-///     x * 2
-/// }
-///
-/// # fn main() -> Result<(), Box<EvalAltResult>> {
-/// let mut engine = Engine::new();
-///
-/// let mut module = Module::new();
-/// set_exported_fn!(module, "func", my_plugin_function);
-///
-/// engine.register_global_module(module.into());
-///
-/// assert_eq!(engine.eval::<i64>("func(21)")?, 42);
-/// # Ok(())
-/// # }
-/// ```
+/// This method will be removed in the next major version.
+#[deprecated(since = "1.18.0")]
 #[proc_macro]
 pub fn set_exported_fn(args: proc_macro::TokenStream) -> proc_macro::TokenStream {
     match crate::register::parse_register_macro(args) {
@@ -364,29 +333,12 @@ pub fn set_exported_fn(args: proc_macro::TokenStream) -> proc_macro::TokenStream
 
 /// Macro to register a _plugin function_ into a Rhai `Module` and expose it globally.
 ///
-/// # Usage
+/// # Deprecated
 ///
-/// ```
-/// # use rhai::{Engine, EvalAltResult};
-/// use rhai::plugin::*;
+/// This macro is deprecated as it performs no additional value.
 ///
-/// #[export_fn]
-/// fn my_plugin_function(x: i64) -> i64 {
-///     x * 2
-/// }
-///
-/// # fn main() -> Result<(), Box<EvalAltResult>> {
-/// let mut engine = Engine::new();
-///
-/// let mut module = Module::new();
-/// set_exported_global_fn!(module, "func", my_plugin_function);
-///
-/// engine.register_static_module("test", module.into());
-///
-/// assert_eq!(engine.eval::<i64>("func(21)")?, 42);
-/// # Ok(())
-/// # }
-/// ```
+/// This method will be removed in the next major version.
+#[deprecated(since = "1.18.0")]
 #[proc_macro]
 pub fn set_exported_global_fn(args: proc_macro::TokenStream) -> proc_macro::TokenStream {
     match crate::register::parse_register_macro(args) {
