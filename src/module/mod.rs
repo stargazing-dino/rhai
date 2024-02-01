@@ -204,7 +204,7 @@ impl FuncRegistration {
     /// fn inc(x: i64) -> i64 { x + 1 }
     ///
     /// let f = FuncRegistration::new("inc")
-    ///     .with_namespace(FnNamespace::Global)
+    ///     .in_global_namespace()
     ///     .set_into_module(&mut module, inc);
     ///
     /// let hash = f.hash;
@@ -249,7 +249,7 @@ impl FuncRegistration {
     #[inline(always)]
     #[must_use]
     pub fn new_getter(prop: impl AsRef<str>) -> Self {
-        Self::new(crate::engine::make_getter(prop.as_ref())).with_namespace(FnNamespace::Global)
+        Self::new(crate::engine::make_getter(prop.as_ref())).in_global_namespace()
     }
     /// Create a new [`FuncRegistration`] for a property setter.
     ///
@@ -269,7 +269,7 @@ impl FuncRegistration {
     #[must_use]
     pub fn new_setter(prop: impl AsRef<str>) -> Self {
         Self::new(crate::engine::make_setter(prop.as_ref()))
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(false)
     }
     /// Create a new [`FuncRegistration`] for an index getter.
@@ -289,7 +289,7 @@ impl FuncRegistration {
     #[inline(always)]
     #[must_use]
     pub fn new_index_getter() -> Self {
-        Self::new(crate::engine::FN_IDX_GET).with_namespace(FnNamespace::Global)
+        Self::new(crate::engine::FN_IDX_GET).in_global_namespace()
     }
     /// Create a new [`FuncRegistration`] for an index setter.
     ///
@@ -309,13 +309,25 @@ impl FuncRegistration {
     #[must_use]
     pub fn new_index_setter() -> Self {
         Self::new(crate::engine::FN_IDX_SET)
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(false)
     }
     /// Set the [namespace][`FnNamespace`] of the function.
     #[must_use]
     pub fn with_namespace(mut self, namespace: FnNamespace) -> Self {
         self.metadata.namespace = namespace;
+        self
+    }
+    /// Set the function to the [global namespace][`FnNamespace::Global`].
+    #[must_use]
+    pub fn in_global_namespace(mut self) -> Self {
+        self.metadata.namespace = FnNamespace::Global;
+        self
+    }
+    /// Set the function to the [internal namespace][`FnNamespace::Internal`].
+    #[must_use]
+    pub fn in_internal_namespace(mut self) -> Self {
+        self.metadata.namespace = FnNamespace::Internal;
         self
     }
     /// Set whether the function is _pure_.
@@ -370,7 +382,6 @@ impl FuncRegistration {
     ///
     /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
-    #[allow(return_self_not_must_use)]
     #[must_use]
     pub fn with_comments<S: AsRef<str>>(mut self, comments: impl IntoIterator<Item = S>) -> Self {
         self.metadata.comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
@@ -387,7 +398,7 @@ impl FuncRegistration {
         R: Variant + Clone,
         FUNC: RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
     {
-        self.with_namespace(FnNamespace::Global)
+        self.in_global_namespace()
             .set_into_module(engine.global_namespace_mut(), func)
     }
     /// Register the function into the specified [`Module`].
@@ -1493,7 +1504,7 @@ impl Module {
     ///
     /// ```text
     /// FuncRegistration::new(name)
-    ///     .with_namespace(FnNamespace::Internal)
+    ///     .in_internal_namespace()
     ///     .with_purity(true)
     ///     .with_volatility(false)
     ///     .set_into_module(module, func)
@@ -1531,7 +1542,7 @@ impl Module {
         FUNC: RhaiNativeFunc<A, N, X, R, true> + SendSync + 'static,
     {
         FuncRegistration::new(name)
-            .with_namespace(FnNamespace::Internal)
+            .in_internal_namespace()
             .with_purity(true)
             .with_volatility(false)
             .set_into_module(self, func)
@@ -1576,7 +1587,7 @@ impl Module {
         FUNC: RhaiNativeFunc<(Mut<A>,), 1, X, R, true> + SendSync + 'static,
     {
         FuncRegistration::new(crate::engine::make_getter(name.as_ref()))
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(true)
             .with_volatility(false)
             .set_into_module(self, func)
@@ -1625,7 +1636,7 @@ impl Module {
         FUNC: RhaiNativeFunc<(Mut<A>, R), 2, X, (), true> + SendSync + 'static,
     {
         FuncRegistration::new(crate::engine::make_setter(name.as_ref()))
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(false)
             .with_volatility(false)
             .set_into_module(self, func)
@@ -1725,7 +1736,7 @@ impl Module {
         FUNC: RhaiNativeFunc<(Mut<A>, B), 2, X, R, true> + SendSync + 'static,
     {
         FuncRegistration::new(crate::engine::FN_IDX_GET)
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(true)
             .with_volatility(false)
             .set_into_module(self, func)
@@ -1780,7 +1791,7 @@ impl Module {
         FUNC: RhaiNativeFunc<(Mut<A>, B, R), 3, X, (), true> + SendSync + 'static,
     {
         FuncRegistration::new(crate::engine::FN_IDX_SET)
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(false)
             .with_volatility(false)
             .set_into_module(self, func)

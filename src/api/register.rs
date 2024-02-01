@@ -4,8 +4,7 @@ use crate::func::{FnCallArgs, RhaiFunc, RhaiNativeFunc, SendSync};
 use crate::module::FuncRegistration;
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, FnNamespace, Identifier, Module, NativeCallContext, RhaiResultOf, Shared,
-    SharedModule,
+    Dynamic, Engine, Identifier, Module, NativeCallContext, RhaiResultOf, Shared, SharedModule,
 };
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
@@ -32,7 +31,7 @@ impl Engine {
     ///
     /// # Assumptions
     ///
-    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`][`crate::FnNamespace::Global`].
     ///
     /// * **Purity**: The function is assumed to be _pure_ unless it is a property setter or an index setter.
     ///
@@ -75,7 +74,7 @@ impl Engine {
         name: impl AsRef<str> + Into<Identifier>,
         func: FUNC,
     ) -> &mut Self {
-        let reg = FuncRegistration::new(name.into()).with_namespace(FnNamespace::Global);
+        let reg = FuncRegistration::new(name.into()).in_global_namespace();
 
         #[cfg(feature = "metadata")]
         let reg = {
@@ -135,7 +134,7 @@ impl Engine {
         let is_pure = is_pure && (arg_types.len() != 2 || !name.starts_with(crate::engine::FN_SET));
 
         FuncRegistration::new(name)
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .set_into_module_raw(
                 self.global_namespace_mut(),
                 arg_types,
@@ -659,7 +658,7 @@ impl Engine {
     }
     /// Register a shared [`Module`] as a static module namespace with the [`Engine`].
     ///
-    /// Functions marked [`FnNamespace::Global`] and type iterators are exposed to scripts without
+    /// Functions marked [`FnNamespace::Global`][`crate::FnNamespace::Global`] and type iterators are exposed to scripts without
     /// namespace qualifications.
     ///
     /// Not available under `no_module`.
