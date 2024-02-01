@@ -2237,7 +2237,7 @@ impl Module {
         let mut module = Self::new();
 
         // Extra modules left become sub-modules
-        let mut imports = thin_vec::ThinVec::new();
+        let mut imports = crate::ThinVec::new();
 
         if result.is_ok() {
             global

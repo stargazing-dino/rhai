@@ -25,14 +25,14 @@ pub type SharedGlobalConstants =
 pub struct GlobalRuntimeState {
     /// Names of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    imports: thin_vec::ThinVec<ImmutableString>,
+    imports: crate::ThinVec<ImmutableString>,
     /// Stack of imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    modules: thin_vec::ThinVec<crate::SharedModule>,
+    modules: crate::ThinVec<crate::SharedModule>,
 
     /// The current stack of loaded [modules][crate::Module] containing script-defined functions.
     #[cfg(not(feature = "no_function"))]
-    pub lib: thin_vec::ThinVec<crate::SharedModule>,
+    pub lib: crate::ThinVec<crate::SharedModule>,
     /// Source of the current context.
     ///
     /// No source if the string is empty.
@@ -82,11 +82,11 @@ impl GlobalRuntimeState {
     pub fn new(engine: &Engine) -> Self {
         Self {
             #[cfg(not(feature = "no_module"))]
-            imports: thin_vec::ThinVec::new(),
+            imports: crate::ThinVec::new(),
             #[cfg(not(feature = "no_module"))]
-            modules: thin_vec::ThinVec::new(),
+            modules: crate::ThinVec::new(),
             #[cfg(not(feature = "no_function"))]
-            lib: thin_vec::ThinVec::new(),
+            lib: crate::ThinVec::new(),
             source: None,
             num_operations: 0,
             #[cfg(not(feature = "no_module"))]

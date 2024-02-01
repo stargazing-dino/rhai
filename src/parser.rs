@@ -20,7 +20,7 @@ use crate::types::{
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
     ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position, Scope,
-    Shared, SmartString, StaticVec, VarDefInfo, AST, PERR,
+    Shared, SmartString, StaticVec, ThinVec, VarDefInfo, AST, PERR,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -31,7 +31,6 @@ use std::{
     hash::{Hash, Hasher},
     num::{NonZeroU8, NonZeroUsize},
 };
-use thin_vec::ThinVec;
 
 pub type ParseResult<T> = Result<T, ParseError>;
 

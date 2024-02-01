@@ -1,7 +1,7 @@
 //! Module that defines the [`Scope`] type representing a function call-stack scope.
 
 use super::dynamic::{AccessMode, Variant};
-use crate::{Dynamic, Identifier, ImmutableString, StaticVec};
+use crate::{Dynamic, Identifier, ImmutableString, StaticVec, ThinVec};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -9,7 +9,6 @@ use std::{
     iter::{Extend, FromIterator},
     marker::PhantomData,
 };
-use thin_vec::ThinVec;
 
 /// Minimum number of entries in the [`Scope`] to avoid reallocations.
 pub const MIN_SCOPE_ENTRIES: usize = 8;
