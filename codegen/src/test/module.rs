@@ -436,7 +436,7 @@ mod generate_tests {
                 #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
-                    _m.set_doc("/// This is the one_fn module!\n/** block doc-comment\n             *  multi-line\n             */\n/// Another line!\n/// Final line!");
+                    m.set_doc("/// This is the one_fn module!\n/** block doc-comment\n             *  multi-line\n             */\n/// Another line!\n/// Final line!");
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
