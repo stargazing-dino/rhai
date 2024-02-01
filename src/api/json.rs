@@ -197,7 +197,7 @@ fn format_dynamic_as_json(result: &mut String, value: &Dynamic) {
             *result += "]";
         }
         Union::FnPtr(ref f, _, _) => write!(result, "{:?}", f.fn_name()).unwrap(),
-        Union::Map(ref m, ..) => *result += &format_map_as_json(&m),
+        Union::Map(ref m, ..) => *result += &format_map_as_json(m),
         #[cfg(not(feature = "no_index"))]
         Union::Array(ref a, _, _) => {
             *result += "[";
@@ -221,7 +221,7 @@ fn format_dynamic_as_json(result: &mut String, value: &Dynamic) {
             *result += "]";
         }
         #[cfg(not(feature = "no_closure"))]
-        Union::Shared(ref v, _, _) => format_dynamic_as_json(result, &*crate::func::locked_read(v)),
+        Union::Shared(ref v, _, _) => format_dynamic_as_json(result, &crate::func::locked_read(v)),
         _ => write!(result, "{value:?}").unwrap(),
     }
 }

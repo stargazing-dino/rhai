@@ -123,7 +123,7 @@ impl FuncMetadata {
                 .map(|param| {
                     let mut segment = param.splitn(2, ':');
                     let name = match segment.next().unwrap().trim() {
-                        "" => "_".into(),
+                        "" => "_",
                         s => s,
                     };
                     let result: std::borrow::Cow<_> = segment.next().map_or_else(
@@ -211,6 +211,7 @@ impl FuncRegistration {
     ///
     /// assert!(module.contains_fn(hash));
     /// ```
+    #[must_use]
     pub fn new(name: impl Into<Identifier>) -> Self {
         Self {
             metadata: FuncMetadata {
@@ -246,6 +247,7 @@ impl FuncRegistration {
     /// * **Metadata**: No metadata for the function is registered.
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
+    #[must_use]
     pub fn new_getter(prop: impl AsRef<str>) -> Self {
         Self::new(crate::engine::make_getter(prop.as_ref())).with_namespace(FnNamespace::Global)
     }
@@ -264,6 +266,7 @@ impl FuncRegistration {
     /// * **Metadata**: No metadata for the function is registered.
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
+    #[must_use]
     pub fn new_setter(prop: impl AsRef<str>) -> Self {
         Self::new(crate::engine::make_setter(prop.as_ref()))
             .with_namespace(FnNamespace::Global)
@@ -284,6 +287,7 @@ impl FuncRegistration {
     /// * **Metadata**: No metadata for the function is registered.
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline(always)]
+    #[must_use]
     pub fn new_index_getter() -> Self {
         Self::new(crate::engine::FN_IDX_GET).with_namespace(FnNamespace::Global)
     }
@@ -302,24 +306,28 @@ impl FuncRegistration {
     /// * **Metadata**: No metadata for the function is registered.
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline(always)]
+    #[must_use]
     pub fn new_index_setter() -> Self {
         Self::new(crate::engine::FN_IDX_SET)
             .with_namespace(FnNamespace::Global)
             .with_purity(false)
     }
     /// Set the [namespace][`FnNamespace`] of the function.
+    #[must_use]
     pub fn with_namespace(mut self, namespace: FnNamespace) -> Self {
         self.metadata.namespace = namespace;
         self
     }
     /// Set whether the function is _pure_.
     /// A pure function has no side effects.
+    #[must_use]
     pub fn with_purity(mut self, pure: bool) -> Self {
         self.purity = Some(pure);
         self
     }
     /// Set whether the function is _volatile_.
     /// A volatile function does not guarantee the same result for the same input(s).
+    #[must_use]
     pub fn with_volatility(mut self, volatile: bool) -> Self {
         self.volatility = Some(volatile);
         self
@@ -338,6 +346,7 @@ impl FuncRegistration {
     /// `"_: i64"`      <- parameter name unknown, type = `i64`  
     /// `"MyType"`      <- parameter name unknown, type = `MyType`  
     #[cfg(feature = "metadata")]
+    #[must_use]
     pub fn with_params_info<S: AsRef<str>>(mut self, params: impl IntoIterator<Item = S>) -> Self {
         self.metadata.params_info = params.into_iter().map(|s| s.as_ref().into()).collect();
         self
@@ -361,6 +370,8 @@ impl FuncRegistration {
     ///
     /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
+    #[allow(return_self_not_must_use)]
+    #[must_use]
     pub fn with_comments<S: AsRef<str>>(mut self, comments: impl IntoIterator<Item = S>) -> Self {
         self.metadata.comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
         self
@@ -526,7 +537,7 @@ impl FuncRegistration {
             Entry::Vacant(entry) => entry.insert((func, f.into())),
         };
 
-        &*entry.1
+        &entry.1
     }
 }
 
@@ -613,7 +624,7 @@ impl fmt::Debug for Module {
                         #[cfg(not(feature = "metadata"))]
                         return _f.to_string();
                         #[cfg(feature = "metadata")]
-                        return _m.gen_signature(|s| s.into());
+                        return _m.gen_signature(Into::into);
                     })
                     .collect::<Vec<_>>(),
             )
