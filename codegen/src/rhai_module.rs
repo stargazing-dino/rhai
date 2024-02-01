@@ -157,19 +157,19 @@ pub fn generate_body(
                 ns => namespace = ns,
             }
 
-            let ns_str = syn::Ident::new(
-                match namespace {
-                    FnNamespaceAccess::Unset => unreachable!("`namespace` should be set"),
-                    FnNamespaceAccess::Global => "Global",
-                    FnNamespaceAccess::Internal => "Internal",
-                },
-                fn_literal.span(),
-            );
-
             let mut tokens = quote! {
                 #(#cfg_attrs)*
-                FuncRegistration::new(#fn_literal).with_namespace(FnNamespace::#ns_str)
+                FuncRegistration::new(#fn_literal)
             };
+
+            match namespace {
+                FnNamespaceAccess::Unset => unreachable!("`namespace` should be set"),
+                FnNamespaceAccess::Global => {
+                    tokens.extend(quote! { .with_namespace(FnNamespace::Global) })
+                }
+                FnNamespaceAccess::Internal => (),
+            }
+
             #[cfg(feature = "metadata")]
             {
                 tokens.extend(quote! {
@@ -239,7 +239,7 @@ pub fn generate_body(
                 m
             }
             #[doc(hidden)]
-            #[inline]
+            #[inline(always)]
             pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                 #(#set_fn_statements)*
                 #(#set_const_statements)*
