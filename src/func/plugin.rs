@@ -19,7 +19,6 @@ pub use rhai_codegen::*;
 /// Trait implemented by a _plugin function_.
 ///
 /// This trait should not be used directly.
-/// Use the `#[export_module]` and `#[export_fn]` procedural attributes instead.
 pub trait PluginFunc {
     /// Call the plugin function with the arguments provided.
     fn call(&self, context: Option<NativeCallContext>, args: &mut FnCallArgs) -> RhaiResult;
