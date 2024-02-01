@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use rhai::plugin::*;
 
 #[derive(Clone)]
@@ -12,10 +13,7 @@ pub fn test_fn(input: &mut Point) {
 }
 
 fn main() {
-    let n = Point {
-        x: 0.0,
-        y: 10.0,
-    };
+    let n = Point { x: 0.0, y: 10.0 };
     test_fn(&mut n);
     if n.x >= 10.0 {
         println!("yes");

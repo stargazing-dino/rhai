@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+#![allow(deprecated)]
 use rhai::plugin::*;
 
 #[derive(Clone)]

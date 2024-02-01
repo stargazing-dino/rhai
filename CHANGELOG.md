@@ -7,7 +7,7 @@ Version 1.18.0
 Deprecated API's
 ----------------
 
-* The plugin macros `register_exported_fn!`, `set_exported_fn!` and `set_exported_global_fn!` are deprecated because they do not add value over existing direct API's.
+* The plugin macros `export_fn`, `register_exported_fn!`, `set_exported_fn!` and `set_exported_global_fn!` are deprecated because they do not add value over existing direct API's.
 
 Enhancements
 ------------
