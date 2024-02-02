@@ -1,6 +1,12 @@
 Rhai Release Notes
 ==================
 
+Version 1.17.1
+==============
+
+This is a bug-fix release that bumps `rhai_codegen` version to `2.0.0` to satisfy semver rules.
+
+
 Version 1.17.0
 ==============
 

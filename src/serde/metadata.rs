@@ -5,12 +5,11 @@ use crate::api::formatting::format_param_type_for_display;
 use crate::func::RhaiFunc;
 use crate::module::{calc_native_fn_hash, FuncMetadata, ModuleFlags};
 use crate::types::custom_types::CustomTypeInfo;
-use crate::{calc_fn_hash, Engine, FnAccess, SmartString, AST};
+use crate::{calc_fn_hash, Engine, FnAccess, SmartString, ThinVec, AST};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{borrow::Cow, cmp::Ordering, collections::BTreeMap};
-use thin_vec::ThinVec;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

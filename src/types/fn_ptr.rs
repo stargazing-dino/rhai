@@ -6,7 +6,7 @@ use crate::tokenizer::{is_reserved_keyword_or_symbol, is_valid_function_name, To
 use crate::types::dynamic::Variant;
 use crate::{
     Dynamic, Engine, FnArgsVec, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError,
-    RhaiResult, RhaiResultOf, Shared, StaticVec, AST, ERR, PERR,
+    RhaiResult, RhaiResultOf, Shared, StaticVec, ThinVec, AST, ERR, PERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -16,7 +16,6 @@ use std::{
     fmt, mem,
     ops::{Index, IndexMut},
 };
-use thin_vec::ThinVec;
 
 /// A general function pointer, which may carry additional (i.e. curried) argument values
 /// to be passed onto a function during a call.

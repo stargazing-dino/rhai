@@ -3,11 +3,12 @@
 
 use super::{Caches, EvalContext, GlobalRuntimeState};
 use crate::ast::{ASTNode, Expr, Stmt};
-use crate::{Dynamic, Engine, EvalAltResult, ImmutableString, Position, RhaiResultOf, Scope};
+use crate::{
+    Dynamic, Engine, EvalAltResult, ImmutableString, Position, RhaiResultOf, Scope, ThinVec,
+};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{fmt, iter::repeat, mem};
-use thin_vec::ThinVec;
 
 /// Callback function to initialize the debugger.
 #[cfg(not(feature = "sync"))]

@@ -1,7 +1,7 @@
 //! Module defining the AST (abstract syntax tree).
 
 use super::{ASTFlags, Expr, FnAccess, Stmt};
-use crate::{Dynamic, FnNamespace, ImmutableString, Position};
+use crate::{Dynamic, FnNamespace, ImmutableString, Position, ThinVec};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -11,7 +11,6 @@ use std::{
     ops::{Add, AddAssign},
     ptr,
 };
-use thin_vec::ThinVec;
 
 /// Compiled AST (abstract syntax tree) of a Rhai script.
 ///
@@ -989,7 +988,7 @@ pub struct EncapsulatedEnviron {
     pub lib: crate::SharedModule,
     /// Imported [modules][crate::Module].
     #[cfg(not(feature = "no_module"))]
-    pub imports: thin_vec::ThinVec<(ImmutableString, crate::SharedModule)>,
+    pub imports: crate::ThinVec<(ImmutableString, crate::SharedModule)>,
     /// Globally-defined constants.
     #[cfg(not(feature = "no_module"))]
     #[cfg(not(feature = "no_function"))]
