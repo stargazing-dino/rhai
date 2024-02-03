@@ -100,6 +100,12 @@ impl Engine {
     }
 
     /// Get the value at the indexed position of a base type.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the target object is shared.
+    ///
+    /// Shared objects should be handled (dereferenced) before calling this method.
     fn get_indexed_mut<'t>(
         &self,
         global: &mut GlobalRuntimeState,
@@ -430,10 +436,10 @@ impl Engine {
                 let value = self
                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), lhs_expr)?
                     .flatten();
-                let obj_ptr = &mut value.into();
+                let item_ptr = &mut value.into();
 
                 self.eval_dot_index_chain_raw(
-                    global, caches, scope2, this_ptr, lhs_expr, expr, obj_ptr, rhs, idx_values,
+                    global, caches, scope2, this_ptr, lhs_expr, expr, item_ptr, rhs, idx_values,
                     None,
                 )
             }
@@ -575,19 +581,30 @@ impl Engine {
                         let idx_pos = x.lhs.start_position();
 
                         let (try_setter, result) = {
-                            let target = target.as_mut();
-                            let mut obj = self.get_indexed_mut(
-                                global, caches, target, idx_val, idx_pos, op_pos, false, true,
+                            let obj = target.as_mut();
+
+                            #[cfg(not(feature = "no_closure"))]
+                            let mut target_guard;
+                            #[cfg(not(feature = "no_closure"))]
+                            let obj = if obj.is_shared() {
+                                target_guard = obj.write_lock::<Dynamic>().unwrap();
+                                &mut *target_guard
+                            } else {
+                                obj
+                            };
+
+                            let mut item = self.get_indexed_mut(
+                                global, caches, obj, idx_val, idx_pos, op_pos, false, true,
                             )?;
-                            let is_obj_temp_val = obj.is_temp_value();
-                            let obj_ptr = &mut obj;
+                            let is_item_temp_val = item.is_temp_value();
+                            let item_ptr = &mut item;
 
                             match self.eval_dot_index_chain_raw(
-                                global, caches, _scope, this_ptr, root, rhs, obj_ptr, &x.rhs,
+                                global, caches, _scope, this_ptr, root, rhs, item_ptr, &x.rhs,
                                 idx_values, new_val,
                             ) {
-                                Ok((result, true)) if is_obj_temp_val => {
-                                    (Some(obj.take_or_clone()), (result, true))
+                                Ok((result, true)) if is_item_temp_val => {
+                                    (Some(item.take_or_clone()), (result, true))
                                 }
                                 Ok(result) => (None, result),
                                 Err(err) => return Err(err),
@@ -617,19 +634,30 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, _scope, this_ptr, parent)?;
 
-                        let target = target.as_mut();
+                        let obj = target.as_mut();
+
+                        #[cfg(not(feature = "no_closure"))]
+                        let mut target_guard;
+                        #[cfg(not(feature = "no_closure"))]
+                        let obj = if obj.is_shared() {
+                            target_guard = obj.write_lock::<Dynamic>().unwrap();
+                            &mut *target_guard
+                        } else {
+                            obj
+                        };
+
                         let idx_val = &mut idx_values.pop().unwrap();
                         let idx = &mut idx_val.clone();
 
                         let try_setter = match self
-                            .get_indexed_mut(global, caches, target, idx, pos, op_pos, true, false)
+                            .get_indexed_mut(global, caches, obj, idx, pos, op_pos, true, false)
                         {
                             // Indexed value is not a temp value - update directly
-                            Ok(ref mut obj_ptr) => {
+                            Ok(ref mut item_ptr) => {
                                 self.eval_op_assignment(
-                                    global, caches, op_info, root, obj_ptr, new_val,
+                                    global, caches, op_info, root, item_ptr, new_val,
                                 )?;
-                                self.check_data_size(obj_ptr.as_ref(), op_info.position())?;
+                                self.check_data_size(item_ptr.as_ref(), op_info.position())?;
                                 None
                             }
                             // Indexed value cannot be referenced - use indexer
@@ -646,7 +674,7 @@ impl Engine {
 
                                 // Call the index getter to get the current value
                                 if let Ok(val) =
-                                    self.call_indexer_get(global, caches, target, idx, op_pos)
+                                    self.call_indexer_get(global, caches, obj, idx, op_pos)
                                 {
                                     let mut val = val.into();
                                     // Run the op-assignment
@@ -663,7 +691,7 @@ impl Engine {
                             let new_val = &mut new_val;
                             // The return value of a indexer setter (usually `()`) is thrown away and not used.
                             let _ = self.call_indexer_set(
-                                global, caches, target, idx_val, new_val, is_ref_mut, op_pos,
+                                global, caches, obj, idx_val, new_val, is_ref_mut, op_pos,
                             )?;
                         }
 
@@ -674,13 +702,22 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, _scope, this_ptr, parent)?;
 
-                        let target = target.as_mut();
+                        let obj = target.as_mut();
+
+                        #[cfg(not(feature = "no_closure"))]
+                        let mut target_guard;
+                        #[cfg(not(feature = "no_closure"))]
+                        let obj = if obj.is_shared() {
+                            target_guard = obj.write_lock::<Dynamic>().unwrap();
+                            &mut *target_guard
+                        } else {
+                            obj
+                        };
+
                         let idx_val = &mut idx_values.pop().unwrap();
 
-                        self.get_indexed_mut(
-                            global, caches, target, idx_val, pos, op_pos, false, true,
-                        )
-                        .map(|v| (v.take_or_clone(), false))
+                        self.get_indexed_mut(global, caches, obj, idx_val, pos, op_pos, false, true)
+                            .map(|v| (v.take_or_clone(), false))
                     }
                 }
             }
@@ -731,13 +768,22 @@ impl Engine {
 
                         let index = &mut x.2.clone().into();
                         {
-                            let target = target.as_mut();
-                            let val_target = &mut self.get_indexed_mut(
-                                global, caches, target, index, *pos, op_pos, true, false,
+                            let obj = target.as_mut();
+
+                            #[cfg(not(feature = "no_closure"))]
+                            let mut target_guard;
+                            #[cfg(not(feature = "no_closure"))]
+                            let obj = if obj.is_shared() {
+                                target_guard = obj.write_lock::<Dynamic>().unwrap();
+                                &mut *target_guard
+                            } else {
+                                obj
+                            };
+
+                            let item = &mut self.get_indexed_mut(
+                                global, caches, obj, index, *pos, op_pos, true, false,
                             )?;
-                            self.eval_op_assignment(
-                                global, caches, op_info, root, val_target, new_val,
-                            )?;
+                            self.eval_op_assignment(global, caches, op_info, root, item, new_val)?;
                         }
                         self.check_data_size(target.source(), op_info.position())?;
                         Ok((Dynamic::UNIT, true))
@@ -747,12 +793,23 @@ impl Engine {
                         #[cfg(feature = "debugging")]
                         self.run_debugger(global, caches, _scope, this_ptr, rhs)?;
 
-                        let target = target.as_mut();
+                        let obj = target.as_mut();
+
+                        #[cfg(not(feature = "no_closure"))]
+                        let mut target_guard;
+                        #[cfg(not(feature = "no_closure"))]
+                        let obj = if obj.is_shared() {
+                            target_guard = obj.write_lock::<Dynamic>().unwrap();
+                            &mut *target_guard
+                        } else {
+                            obj
+                        };
+
                         let index = &mut x.2.clone().into();
-                        let val = self.get_indexed_mut(
-                            global, caches, target, index, *pos, op_pos, false, false,
+                        let item = self.get_indexed_mut(
+                            global, caches, obj, index, *pos, op_pos, false, false,
                         )?;
-                        Ok((val.take_or_clone(), false))
+                        Ok((item.take_or_clone(), false))
                     }
                     // xxx.id op= ???
                     (Expr::Property(x, pos), Some((mut new_val, op_info)), false) => {
@@ -856,16 +913,27 @@ impl Engine {
                         let _node = &x.lhs;
                         let mut _this_ptr = this_ptr;
                         let _tp = _this_ptr.as_deref_mut();
+                        #[cfg(not(feature = "no_closure"))]
+                        let mut target_guard;
 
-                        let val_target = &mut match x.lhs {
+                        let item = &mut match x.lhs {
                             Expr::Property(ref p, pos) => {
                                 #[cfg(feature = "debugging")]
                                 self.run_debugger(global, caches, _scope, _tp, _node)?;
 
-                                let target = target.as_mut();
+                                let obj = target.as_mut();
+
+                                #[cfg(not(feature = "no_closure"))]
+                                let obj = if obj.is_shared() {
+                                    target_guard = obj.write_lock::<Dynamic>().unwrap();
+                                    &mut *target_guard
+                                } else {
+                                    obj
+                                };
+
                                 let index = &mut p.2.clone().into();
                                 self.get_indexed_mut(
-                                    global, caches, target, index, pos, op_pos, false, true,
+                                    global, caches, obj, index, pos, op_pos, false, true,
                                 )?
                             }
                             // {xxx:map}.fn_name(arg_expr_list)[expr] | {xxx:map}.fn_name(arg_expr_list).expr
@@ -902,8 +970,8 @@ impl Engine {
                         };
 
                         self.eval_dot_index_chain_raw(
-                            global, caches, _scope, _this_ptr, root, rhs, val_target, &x.rhs,
-                            idx_values, new_val,
+                            global, caches, _scope, _this_ptr, root, rhs, item, &x.rhs, idx_values,
+                            new_val,
                         )
                     }
                     // xxx.sub_lhs[expr] | xxx.sub_lhs.expr

@@ -368,6 +368,22 @@ fn test_var_resolver() {
         assert_eq!(engine.eval::<INT>("HELLO = HELLO + 1; HELLO").unwrap(), 124);
         assert_eq!(engine.eval::<INT>("HELLO = HELLO * 2; HELLO").unwrap(), 248);
         assert_eq!(base.as_int().unwrap(), 248);
+
+        #[cfg(not(feature = "no_index"))]
+        #[cfg(not(feature = "no_object"))]
+        assert_eq!(
+            engine
+                .eval::<INT>(
+                    "
+                        HELLO = [1,2,3];
+                        HELLO[0] = #{a:#{foo:1}, b:1};
+                        HELLO[0].a.foo = 42;
+                        HELLO[0].a.foo
+                    "
+                )
+                .unwrap(),
+            42
+        );
     }
 
     assert_eq!(engine.eval_with_scope::<INT>(&mut scope, "chameleon").unwrap(), 1);
