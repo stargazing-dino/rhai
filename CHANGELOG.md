@@ -1,6 +1,15 @@
 Rhai Release Notes
 ==================
 
+Version 1.17.2
+==============
+
+Bug fixes
+---------
+
+* The engine no longer crashes when accessing a property or indexed item from a shared value returned from a variables resolver.
+
+
 Version 1.17.1
 ==============
 
