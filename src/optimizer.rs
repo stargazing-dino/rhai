@@ -12,7 +12,6 @@ use crate::engine::{
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::builtin::get_builtin_binary_op_fn;
 use crate::func::hashing::get_hasher;
-use crate::module::ModuleFlags;
 use crate::tokenizer::Token;
 use crate::{
     calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, FnPtr, ImmutableString, Position,
@@ -1300,7 +1299,7 @@ impl Engine {
         if self
             .global_modules
             .iter()
-            .filter(|m| !m.flags.intersects(ModuleFlags::STANDARD_LIB))
+            .filter(|m| !m.is_standard_lib())
             .any(|m| m.contains_fn(hash))
         {
             return true;

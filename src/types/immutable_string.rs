@@ -36,7 +36,7 @@ use std::{
 /// let mut s: String = s1.into_owned();
 ///
 /// // Changing the clone has no impact on the previously shared version.
-/// s.push_str(", world!");
+/// s += ", world!";
 ///
 /// // The old version still exists.
 /// assert_eq!(s2, s3);

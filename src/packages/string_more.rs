@@ -1,4 +1,3 @@
-use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{
     def_package, Dynamic, ExclusiveRange, ImmutableString, InclusiveRange, RhaiResultOf,
@@ -13,7 +12,7 @@ use super::string_basic::{print_with_func, FUNC_TO_STRING};
 def_package! {
     /// Package of additional string utilities over [`BasicStringPackage`][super::BasicStringPackage]
     pub MoreStringPackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
         combine_with_exported_module!(lib, "string", string_functions);
     }
@@ -130,7 +129,7 @@ mod string_functions {
                 }
             } else {
                 let mut x = string.into_owned();
-                x.push_str(s.as_ref());
+                x += s.as_ref();
                 x.into()
             }
         }
@@ -153,7 +152,7 @@ mod string_functions {
             };
 
             if !string.is_empty() {
-                s.push_str(string);
+                s += string;
             }
 
             s.into()

@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use rhai::plugin::*;
 
 #[derive(Clone)]
@@ -12,10 +13,7 @@ pub fn test_fn(input: Point) -> bool {
 }
 
 fn main() {
-    let n = Point {
-        x: 0.0,
-        y: 10.0,
-    };
+    let n = Point { x: 0.0, y: 10.0 };
     if test_fn(n) {
         println!("yes");
     } else {

@@ -1,6 +1,3 @@
-#![allow(non_snake_case)]
-
-use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{def_package, Position, RhaiError, RhaiResultOf, ERR, INT};
 #[cfg(feature = "no_std")]
@@ -18,6 +15,7 @@ pub fn make_err(msg: impl Into<String>) -> RhaiError {
 
 macro_rules! gen_arithmetic_functions {
     ($root:ident => $($arg_type:ident),+) => {
+        #[allow(non_snake_case)]
         pub mod $root { $(pub mod $arg_type {
             use super::super::*;
 
@@ -149,6 +147,7 @@ macro_rules! gen_arithmetic_functions {
 
 macro_rules! gen_signed_functions {
     ($root:ident => $($arg_type:ident),+) => {
+        #[allow(non_snake_case)]
         pub mod $root { $(pub mod $arg_type {
             use super::super::*;
 
@@ -197,7 +196,7 @@ macro_rules! reg_functions {
 def_package! {
     /// Basic arithmetic package.
     pub ArithmeticPackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
         combine_with_exported_module!(lib, "int", int_functions);
         reg_functions!(lib += signed_basic; INT);
@@ -205,13 +204,17 @@ def_package! {
         #[cfg(not(feature = "only_i32"))]
         #[cfg(not(feature = "only_i64"))]
         {
+            gen_arithmetic_functions!(arith_numbers => i8, u8, i16, u16, i32, u32, u64);
             reg_functions!(lib += arith_numbers; i8, u8, i16, u16, i32, u32, u64);
+            gen_signed_functions!(signed_numbers => i8, i16, i32);
             reg_functions!(lib += signed_numbers; i8, i16, i32);
 
             #[cfg(not(target_family = "wasm"))]
             {
-                reg_functions!(lib += arith_num_128; i128, u128);
-                reg_functions!(lib += signed_num_128; i128);
+                gen_arithmetic_functions!(arith_numbers => i128, u128);
+                reg_functions!(lib += arith_numbers; i128, u128);
+                gen_signed_functions!(signed_numbers => i128);
+                reg_functions!(lib += signed_numbers; i128);
             }
         }
 
@@ -248,28 +251,7 @@ mod int_functions {
 }
 
 gen_arithmetic_functions!(arith_basic => INT);
-
-#[cfg(not(feature = "only_i32"))]
-#[cfg(not(feature = "only_i64"))]
-gen_arithmetic_functions!(arith_numbers => i8, u8, i16, u16, i32, u32, u64);
-
-#[cfg(not(feature = "only_i32"))]
-#[cfg(not(feature = "only_i64"))]
-#[cfg(not(target_family = "wasm"))]
-
-gen_arithmetic_functions!(arith_num_128 => i128, u128);
-
 gen_signed_functions!(signed_basic => INT);
-
-#[cfg(not(feature = "only_i32"))]
-#[cfg(not(feature = "only_i64"))]
-gen_signed_functions!(signed_numbers => i8, i16, i32);
-
-#[cfg(not(feature = "only_i32"))]
-#[cfg(not(feature = "only_i64"))]
-#[cfg(not(target_family = "wasm"))]
-
-gen_signed_functions!(signed_num_128 => i128);
 
 #[cfg(not(feature = "no_float"))]
 #[export_module]
@@ -534,7 +516,7 @@ pub mod decimal_functions {
         pub fn power(x: Decimal, y: Decimal) -> RhaiResultOf<Decimal> {
             // Raising to a very large power can take exponential time, so limit it to 1 million.
             // TODO: Remove this limit when `rust-decimal` is updated with the fix.
-            if std::convert::TryInto::<u32>::try_into(y.round()).map_or(true, |v| v > 1000000) {
+            if std::convert::TryInto::<u32>::try_into(y.round()).map_or(true, |v| v > 1_000_000) {
                 return Err(make_err(format!("Exponential overflow: {x} ** {y}")));
             }
             x.checked_powd(y)

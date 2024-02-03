@@ -46,34 +46,6 @@ mod test {
     }
 }
 
-macro_rules! gen_unary_functions {
-    ($op_name:ident = $op_fn:ident ( $($arg_type:ident),+ ) -> $return_type:ident) => {
-        mod $op_name { $(
-            #[allow(non_snake_case)]
-            pub mod $arg_type {
-                use super::super::*;
-
-                #[export_fn(name="test")]
-                pub fn single(x: $arg_type) -> $return_type {
-                    super::super::$op_fn(x)
-                }
-            }
-        )* }
-    }
-}
-
-macro_rules! reg_functions {
-    ($mod_name:ident += $op_name:ident :: $func:ident ( $($arg_type:ident),+ )) => {
-        $(register_exported_fn!($mod_name, stringify!($op_name), $op_name::$arg_type::$func);)*
-    }
-}
-
-fn make_greeting(n: impl std::fmt::Display) -> String {
-    format!("{n} kitties")
-}
-
-gen_unary_functions!(greet = make_greeting(INT, bool, char) -> String);
-
 macro_rules! expand_enum {
     ($module:ident : $typ:ty => $($variant:ident),+) => {
         #[export_module]
@@ -106,8 +78,6 @@ fn test_plugins_package() {
     combine_with_exported_module!(&mut m, "enum", my_enum_module);
     engine.register_global_module(m.into());
 
-    reg_functions!(engine += greet::single(INT, bool, char));
-
     assert_eq!(engine.eval::<INT>("MYSTIC_NUMBER").unwrap(), 42);
 
     #[cfg(not(feature = "no_object"))]
@@ -126,7 +96,6 @@ fn test_plugins_package() {
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)").unwrap(), 6);
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; hi(a, 2)").unwrap(), 6);
     assert_eq!(engine.eval::<INT>("let a = [1, 2, 3]; test(a, 2)").unwrap(), 6);
-    assert_eq!(engine.eval::<String>("let a = [1, 2, 3]; greet(test(a, 2))").unwrap(), "6 kitties");
     assert_eq!(engine.eval::<INT>("2 + 2").unwrap(), 4);
 
     engine.set_fast_operators(false);

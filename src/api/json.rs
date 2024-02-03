@@ -169,16 +169,16 @@ pub fn format_map_as_json(map: &Map) -> String {
 
     for (key, value) in map {
         if result.len() > 1 {
-            result.push(',');
+            result += ",";
         }
 
         write!(result, "{key:?}").unwrap();
-        result.push(':');
+        result += ":";
 
         format_dynamic_as_json(&mut result, value);
     }
 
-    result.push('}');
+    result += "}";
 
     result
 }
@@ -186,42 +186,42 @@ pub fn format_map_as_json(map: &Map) -> String {
 /// Format a [`Dynamic`] value as JSON.
 fn format_dynamic_as_json(result: &mut String, value: &Dynamic) {
     match value.0 {
-        Union::Unit(..) => result.push_str("null"),
+        Union::Unit(..) => *result += "null",
         Union::FnPtr(ref f, _, _) if f.is_curried() => {
-            result.push('[');
+            *result += "[";
             write!(result, "{:?}", f.fn_name()).unwrap();
             f.iter_curry().for_each(|value| {
-                result.push(',');
+                *result += ",";
                 format_dynamic_as_json(result, value);
             });
-            result.push(']');
+            *result += "]";
         }
         Union::FnPtr(ref f, _, _) => write!(result, "{:?}", f.fn_name()).unwrap(),
-        Union::Map(ref m, ..) => result.push_str(&format_map_as_json(&m)),
+        Union::Map(ref m, ..) => *result += &format_map_as_json(m),
         #[cfg(not(feature = "no_index"))]
         Union::Array(ref a, _, _) => {
-            result.push('[');
+            *result += "[";
             for (i, x) in a.iter().enumerate() {
                 if i > 0 {
-                    result.push(',');
+                    *result += ",";
                 }
                 format_dynamic_as_json(result, x);
             }
-            result.push(']');
+            *result += "]";
         }
         #[cfg(not(feature = "no_index"))]
         Union::Blob(ref b, _, _) => {
-            result.push('[');
+            *result += "[";
             for (i, x) in b.iter().enumerate() {
                 if i > 0 {
-                    result.push(',');
+                    *result += ",";
                 }
                 write!(result, "{x}").unwrap();
             }
-            result.push(']');
+            *result += "]";
         }
         #[cfg(not(feature = "no_closure"))]
-        Union::Shared(ref v, _, _) => format_dynamic_as_json(result, &*crate::func::locked_read(v)),
+        Union::Shared(ref v, _, _) => format_dynamic_as_json(result, &crate::func::locked_read(v)),
         _ => write!(result, "{value:?}").unwrap(),
     }
 }

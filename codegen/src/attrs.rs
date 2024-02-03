@@ -159,15 +159,15 @@ pub fn doc_attributes(attrs: &[syn::Attribute]) -> syn::Result<Vec<String>> {
                     buf.clear();
                 }
                 line.insert_str(0, "/**");
-                line.push_str("*/");
+                line += "*/";
                 comments.push(line);
             } else {
                 // Single line - assume it is `///`
                 if !buf.is_empty() {
-                    buf.push('\n');
+                    buf += "\n";
                 }
-                buf.push_str("///");
-                buf.push_str(&line);
+                buf += "///";
+                buf += &line;
             }
         }
     }

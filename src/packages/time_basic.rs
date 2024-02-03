@@ -1,7 +1,6 @@
 #![cfg(not(feature = "no_time"))]
 
 use super::arithmetic::make_err as make_arithmetic_err;
-use crate::module::ModuleFlags;
 use crate::plugin::*;
 use crate::{def_package, Dynamic, RhaiResult, RhaiResultOf, INT};
 
@@ -17,7 +16,7 @@ use instant::{Duration, Instant};
 def_package! {
     /// Package of basic timing utilities.
     pub BasicTimePackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
         // Register date/time functions
         combine_with_exported_module!(lib, "time", time_functions);

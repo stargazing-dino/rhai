@@ -1,8 +1,7 @@
 #![allow(non_snake_case)]
 
-use crate::module::ModuleFlags;
 use crate::plugin::*;
-use crate::{def_package, Position, RhaiResultOf, ERR, INT};
+use crate::{def_package, FuncRegistration, Position, RhaiResultOf, ERR, INT};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -19,58 +18,40 @@ use rust_decimal::Decimal;
 #[cfg(feature = "decimal")]
 use super::arithmetic::make_err;
 
-macro_rules! gen_conversion_as_functions {
-    ($root:ident => $func_name:ident ( $($arg_type:ident),+ ) -> $result_type:ty) => {
-        pub mod $root { $(pub mod $arg_type {
-            use super::super::*;
-
-            #[export_fn]
-            #[allow(clippy::missing_const_for_fn)]
-            pub fn $func_name(x: $arg_type) -> $result_type {
-                x as $result_type
-            }
-        })* }
-    }
+macro_rules! gen_conversion_as_function {
+    ($mod_name:ident => $func_name:ident ( $($arg_type:ident),+ ) -> $result_type:ty) => {
+        $(
+            FuncRegistration::new(stringify!($func_name)).set_into_module($mod_name, |x: $arg_type| x as $result_type);
+        )*
+    };
 }
 
 #[cfg(feature = "decimal")]
-macro_rules! gen_conversion_into_functions {
-    ($root:ident => $func_name:ident ( $($arg_type:ident),+ ) -> $result_type:ty) => {
-        pub mod $root { $(pub mod $arg_type {
-            use super::super::*;
-
-            #[export_fn]
-            pub fn $func_name(x: $arg_type) -> $result_type {
-                x.into()
-            }
-        })* }
+macro_rules! gen_conversion_into_function {
+    ($mod_name:ident => $func_name:ident ( $($arg_type:ident),+ ) -> $result_type:ty) => {
+        $(
+            FuncRegistration::new(stringify!($func_name)).set_into_module($mod_name, |x: $arg_type| -> $result_type { x.into() });
+        )*
     }
-}
-
-macro_rules! reg_functions {
-    ($mod_name:ident += $root:ident :: $func_name:ident ( $($arg_type:ident),+ ) ) => { $(
-        set_exported_fn!($mod_name, stringify!($func_name), $root::$arg_type::$func_name);
-    )* }
 }
 
 def_package! {
     /// Basic mathematical package.
     pub BasicMathPackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
         // Integer functions
         combine_with_exported_module!(lib, "int", int_functions);
 
-        reg_functions!(lib += basic_to_int::to_int(char));
+        gen_conversion_as_function!(lib => to_int (char) -> INT);
 
         #[cfg(not(feature = "only_i32"))]
         #[cfg(not(feature = "only_i64"))]
         {
-            reg_functions!(lib += numbers_to_int::to_int(i8, u8, i16, u16, i32, u32, i64, u64));
+            gen_conversion_as_function!(lib => to_int (i8, u8, i16, u16, i32, u32, i64, u64) -> INT);
 
             #[cfg(not(target_family = "wasm"))]
-
-            reg_functions!(lib += num_128_to_int::to_int(i128, u128));
+            gen_conversion_as_function!(lib => to_int (i128, u128) -> INT);
         }
 
         #[cfg(not(feature = "no_float"))]
@@ -81,16 +62,15 @@ def_package! {
             // Trig functions
             combine_with_exported_module!(lib, "trig", trig_functions);
 
-            reg_functions!(lib += basic_to_float::to_float(INT));
+            gen_conversion_as_function!(lib => to_float (INT) -> FLOAT);
 
             #[cfg(not(feature = "only_i32"))]
             #[cfg(not(feature = "only_i64"))]
             {
-                reg_functions!(lib += numbers_to_float::to_float(i8, u8, i16, u16, i32, u32, i64, u32));
+                gen_conversion_as_function!(lib => to_float (i8, u8, i16, u16, i32, u32, i64, u64) -> FLOAT);
 
                 #[cfg(not(target_family = "wasm"))]
-
-                reg_functions!(lib += num_128_to_float::to_float(i128, u128));
+                gen_conversion_as_function!(lib => to_float (i128, u128) -> FLOAT);
             }
         }
 
@@ -99,11 +79,11 @@ def_package! {
         {
             combine_with_exported_module!(lib, "decimal", decimal_functions);
 
-            reg_functions!(lib += basic_to_decimal::to_decimal(INT));
+            gen_conversion_into_function!(lib => to_decimal (INT) -> Decimal);
 
             #[cfg(not(feature = "only_i32"))]
             #[cfg(not(feature = "only_i64"))]
-            reg_functions!(lib += numbers_to_decimal::to_decimal(i8, u8, i16, u16, i32, u32, i64, u64));
+            gen_conversion_into_function!(lib => to_decimal (i8, u8, i16, u16, i32, u32, i64, u64) -> Decimal);
         }
     }
 }
@@ -651,38 +631,3 @@ mod decimal_functions {
         })
     }
 }
-
-#[cfg(not(feature = "no_float"))]
-gen_conversion_as_functions!(basic_to_float => to_float (INT) -> FLOAT);
-
-#[cfg(not(feature = "no_float"))]
-#[cfg(not(feature = "only_i32"))]
-#[cfg(not(feature = "only_i64"))]
-gen_conversion_as_functions!(numbers_to_float => to_float (i8, u8, i16, u16, i32, u32, i64, u64) -> FLOAT);
-
-#[cfg(not(feature = "no_float"))]
-#[cfg(not(feature = "only_i32"))]
-#[cfg(not(feature = "only_i64"))]
-#[cfg(not(target_family = "wasm"))]
-
-gen_conversion_as_functions!(num_128_to_float => to_float (i128, u128) -> FLOAT);
-
-gen_conversion_as_functions!(basic_to_int => to_int (char) -> INT);
-
-#[cfg(not(feature = "only_i32"))]
-#[cfg(not(feature = "only_i64"))]
-gen_conversion_as_functions!(numbers_to_int => to_int (i8, u8, i16, u16, i32, u32, i64, u64) -> INT);
-
-#[cfg(not(feature = "only_i32"))]
-#[cfg(not(feature = "only_i64"))]
-#[cfg(not(target_family = "wasm"))]
-
-gen_conversion_as_functions!(num_128_to_int => to_int (i128, u128) -> INT);
-
-#[cfg(feature = "decimal")]
-gen_conversion_into_functions!(basic_to_decimal => to_decimal (INT) -> Decimal);
-
-#[cfg(feature = "decimal")]
-#[cfg(not(feature = "only_i32"))]
-#[cfg(not(feature = "only_i64"))]
-gen_conversion_into_functions!(numbers_to_decimal => to_decimal (i8, u8, i16, u16, i32, u32, i64, u64) -> Decimal);

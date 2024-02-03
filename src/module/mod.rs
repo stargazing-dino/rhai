@@ -111,9 +111,9 @@ impl FuncMetadata {
 
         if self.params_info.is_empty() {
             for x in 0..self.num_params {
-                signature.push('_');
+                signature += "_";
                 if x < self.num_params - 1 {
-                    signature.push_str(", ");
+                    signature += ", ";
                 }
             }
         } else {
@@ -123,7 +123,7 @@ impl FuncMetadata {
                 .map(|param| {
                     let mut segment = param.splitn(2, ':');
                     let name = match segment.next().unwrap().trim() {
-                        "" => "_".into(),
+                        "" => "_",
                         s => s,
                     };
                     let result: std::borrow::Cow<_> = segment.next().map_or_else(
@@ -139,13 +139,13 @@ impl FuncMetadata {
                     result
                 })
                 .collect::<crate::FnArgsVec<_>>();
-            signature.push_str(&params.join(", "));
+            signature += &params.join(", ");
         }
-        signature.push(')');
+        signature += ")";
 
         if !return_type.is_empty() {
-            signature.push_str(" -> ");
-            signature.push_str(&return_type);
+            signature += " -> ";
+            signature += &return_type;
         }
 
         signature
@@ -204,13 +204,14 @@ impl FuncRegistration {
     /// fn inc(x: i64) -> i64 { x + 1 }
     ///
     /// let f = FuncRegistration::new("inc")
-    ///     .with_namespace(FnNamespace::Global)
+    ///     .in_global_namespace()
     ///     .set_into_module(&mut module, inc);
     ///
     /// let hash = f.hash;
     ///
     /// assert!(module.contains_fn(hash));
     /// ```
+    #[must_use]
     pub fn new(name: impl Into<Identifier>) -> Self {
         Self {
             metadata: FuncMetadata {
@@ -246,8 +247,9 @@ impl FuncRegistration {
     /// * **Metadata**: No metadata for the function is registered.
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
+    #[must_use]
     pub fn new_getter(prop: impl AsRef<str>) -> Self {
-        Self::new(crate::engine::make_getter(prop.as_ref())).with_namespace(FnNamespace::Global)
+        Self::new(crate::engine::make_getter(prop.as_ref())).in_global_namespace()
     }
     /// Create a new [`FuncRegistration`] for a property setter.
     ///
@@ -264,9 +266,10 @@ impl FuncRegistration {
     /// * **Metadata**: No metadata for the function is registered.
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
+    #[must_use]
     pub fn new_setter(prop: impl AsRef<str>) -> Self {
         Self::new(crate::engine::make_setter(prop.as_ref()))
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(false)
     }
     /// Create a new [`FuncRegistration`] for an index getter.
@@ -284,8 +287,9 @@ impl FuncRegistration {
     /// * **Metadata**: No metadata for the function is registered.
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline(always)]
+    #[must_use]
     pub fn new_index_getter() -> Self {
-        Self::new(crate::engine::FN_IDX_GET).with_namespace(FnNamespace::Global)
+        Self::new(crate::engine::FN_IDX_GET).in_global_namespace()
     }
     /// Create a new [`FuncRegistration`] for an index setter.
     ///
@@ -302,24 +306,40 @@ impl FuncRegistration {
     /// * **Metadata**: No metadata for the function is registered.
     #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
     #[inline(always)]
+    #[must_use]
     pub fn new_index_setter() -> Self {
         Self::new(crate::engine::FN_IDX_SET)
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(false)
     }
     /// Set the [namespace][`FnNamespace`] of the function.
+    #[must_use]
     pub fn with_namespace(mut self, namespace: FnNamespace) -> Self {
         self.metadata.namespace = namespace;
         self
     }
+    /// Set the function to the [global namespace][`FnNamespace::Global`].
+    #[must_use]
+    pub fn in_global_namespace(mut self) -> Self {
+        self.metadata.namespace = FnNamespace::Global;
+        self
+    }
+    /// Set the function to the [internal namespace][`FnNamespace::Internal`].
+    #[must_use]
+    pub fn in_internal_namespace(mut self) -> Self {
+        self.metadata.namespace = FnNamespace::Internal;
+        self
+    }
     /// Set whether the function is _pure_.
     /// A pure function has no side effects.
+    #[must_use]
     pub fn with_purity(mut self, pure: bool) -> Self {
         self.purity = Some(pure);
         self
     }
     /// Set whether the function is _volatile_.
     /// A volatile function does not guarantee the same result for the same input(s).
+    #[must_use]
     pub fn with_volatility(mut self, volatile: bool) -> Self {
         self.volatility = Some(volatile);
         self
@@ -338,6 +358,7 @@ impl FuncRegistration {
     /// `"_: i64"`      <- parameter name unknown, type = `i64`  
     /// `"MyType"`      <- parameter name unknown, type = `MyType`  
     #[cfg(feature = "metadata")]
+    #[must_use]
     pub fn with_params_info<S: AsRef<str>>(mut self, params: impl IntoIterator<Item = S>) -> Self {
         self.metadata.params_info = params.into_iter().map(|s| s.as_ref().into()).collect();
         self
@@ -361,6 +382,7 @@ impl FuncRegistration {
     ///
     /// Each line in non-block doc-comments should start with `///`.
     #[cfg(feature = "metadata")]
+    #[must_use]
     pub fn with_comments<S: AsRef<str>>(mut self, comments: impl IntoIterator<Item = S>) -> Self {
         self.metadata.comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
         self
@@ -376,7 +398,7 @@ impl FuncRegistration {
         R: Variant + Clone,
         FUNC: RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
     {
-        self.with_namespace(FnNamespace::Global)
+        self.in_global_namespace()
             .set_into_module(engine.global_namespace_mut(), func)
     }
     /// Register the function into the specified [`Module`].
@@ -526,14 +548,14 @@ impl FuncRegistration {
             Entry::Vacant(entry) => entry.insert((func, f.into())),
         };
 
-        &*entry.1
+        &entry.1
     }
 }
 
 bitflags! {
     /// Bit-flags containing all status for [`Module`].
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
-    pub struct ModuleFlags: u8 {
+    struct ModuleFlags: u8 {
         /// Is the [`Module`] internal?
         const INTERNAL = 0b0000_0001;
         /// Is the [`Module`] part of a standard library?
@@ -574,7 +596,7 @@ pub struct Module {
     /// Flattened collection of iterator functions, including those in sub-modules.
     all_type_iterators: BTreeMap<TypeId, Shared<FnIterator>>,
     /// Flags.
-    pub(crate) flags: ModuleFlags,
+    flags: ModuleFlags,
 }
 
 impl Default for Module {
@@ -613,7 +635,7 @@ impl fmt::Debug for Module {
                         #[cfg(not(feature = "metadata"))]
                         return _f.to_string();
                         #[cfg(feature = "metadata")]
-                        return _m.gen_signature(|s| s.into());
+                        return _m.gen_signature(Into::into);
                     })
                     .collect::<Vec<_>>(),
             )
@@ -1060,6 +1082,29 @@ impl Module {
         self.flags.intersects(ModuleFlags::INDEXED)
     }
 
+    /// Is the [`Module`] an internal Rhai system module?
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_internal(&self) -> bool {
+        self.flags.intersects(ModuleFlags::INTERNAL)
+    }
+    /// Set whether the [`Module`] is a Rhai internal system module.
+    #[inline(always)]
+    pub(crate) fn set_internal(&mut self, value: bool) {
+        self.flags.set(ModuleFlags::INTERNAL, value)
+    }
+    /// Is the [`Module`] a Rhai standard library module?
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_standard_lib(&self) -> bool {
+        self.flags.intersects(ModuleFlags::STANDARD_LIB)
+    }
+    /// Set whether the [`Module`] is a Rhai standard library module.
+    #[inline(always)]
+    pub(crate) fn set_standard_lib(&mut self, value: bool) {
+        self.flags.set(ModuleFlags::STANDARD_LIB, value)
+    }
+
     /// _(metadata)_ Generate signatures for all the non-private functions in the [`Module`].
     /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
@@ -1459,7 +1504,7 @@ impl Module {
     ///
     /// ```text
     /// FuncRegistration::new(name)
-    ///     .with_namespace(FnNamespace::Internal)
+    ///     .in_internal_namespace()
     ///     .with_purity(true)
     ///     .with_volatility(false)
     ///     .set_into_module(module, func)
@@ -1497,7 +1542,7 @@ impl Module {
         FUNC: RhaiNativeFunc<A, N, X, R, true> + SendSync + 'static,
     {
         FuncRegistration::new(name)
-            .with_namespace(FnNamespace::Internal)
+            .in_internal_namespace()
             .with_purity(true)
             .with_volatility(false)
             .set_into_module(self, func)
@@ -1542,7 +1587,7 @@ impl Module {
         FUNC: RhaiNativeFunc<(Mut<A>,), 1, X, R, true> + SendSync + 'static,
     {
         FuncRegistration::new(crate::engine::make_getter(name.as_ref()))
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(true)
             .with_volatility(false)
             .set_into_module(self, func)
@@ -1591,7 +1636,7 @@ impl Module {
         FUNC: RhaiNativeFunc<(Mut<A>, R), 2, X, (), true> + SendSync + 'static,
     {
         FuncRegistration::new(crate::engine::make_setter(name.as_ref()))
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(false)
             .with_volatility(false)
             .set_into_module(self, func)
@@ -1691,7 +1736,7 @@ impl Module {
         FUNC: RhaiNativeFunc<(Mut<A>, B), 2, X, R, true> + SendSync + 'static,
     {
         FuncRegistration::new(crate::engine::FN_IDX_GET)
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(true)
             .with_volatility(false)
             .set_into_module(self, func)
@@ -1746,7 +1791,7 @@ impl Module {
         FUNC: RhaiNativeFunc<(Mut<A>, B, R), 3, X, (), true> + SendSync + 'static,
     {
         FuncRegistration::new(crate::engine::FN_IDX_SET)
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .with_purity(false)
             .with_volatility(false)
             .set_into_module(self, func)
@@ -1869,7 +1914,7 @@ impl Module {
         #[cfg(feature = "metadata")]
         {
             if !self.doc.is_empty() {
-                self.doc.push('\n');
+                self.doc.push_str("\n");
             }
             self.doc.push_str(&other.doc);
         }
@@ -1902,7 +1947,7 @@ impl Module {
         #[cfg(feature = "metadata")]
         {
             if !self.doc.is_empty() {
-                self.doc.push('\n');
+                self.doc.push_str("\n");
             }
             self.doc.push_str(&other.doc);
         }
@@ -1949,7 +1994,7 @@ impl Module {
         #[cfg(feature = "metadata")]
         {
             if !self.doc.is_empty() {
-                self.doc.push('\n');
+                self.doc.push_str("\n");
             }
             self.doc.push_str(&other.doc);
         }
@@ -2004,7 +2049,7 @@ impl Module {
         #[cfg(feature = "metadata")]
         {
             if !self.doc.is_empty() {
-                self.doc.push('\n');
+                self.doc.push_str("\n");
             }
             self.doc.push_str(&other.doc);
         }

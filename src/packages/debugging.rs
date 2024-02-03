@@ -1,7 +1,6 @@
 #![cfg(feature = "debugging")]
 
 use crate::def_package;
-use crate::module::ModuleFlags;
 use crate::plugin::*;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -18,7 +17,7 @@ use crate::Map;
 def_package! {
     /// Package of basic debugging utilities.
     pub DebuggingPackage(lib) {
-        lib.flags |= ModuleFlags::STANDARD_LIB;
+        lib.set_standard_lib(true);
 
         combine_with_exported_module!(lib, "debugging", debugging_functions);
     }
@@ -59,16 +58,12 @@ mod debugging_functions {
                             #[cfg(not(feature = "no_object"))]
                             {
                                 use crate::INT;
-                                use std::iter::FromIterator;
 
                                 let mut map = Map::new();
                                 map.insert("display".into(), display.into());
                                 map.insert("fn_name".into(), _fn_name.into());
                                 if !_args.is_empty() {
-                                    map.insert(
-                                        "args".into(),
-                                        Dynamic::from_iter(_args.iter().cloned()),
-                                    );
+                                    map.insert("args".into(), _args.iter().cloned().collect());
                                 }
                                 if let Some(source) = _source {
                                     map.insert("source".into(), source.into());

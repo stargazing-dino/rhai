@@ -54,13 +54,10 @@ pub fn generate_body(
             .map(syn::Attribute::to_token_stream)
             .collect();
 
-        set_const_statements.push(
-            syn::parse2::<syn::Stmt>(quote! {
-                #(#cfg_attrs)*
-                m.set_var(#const_literal, #const_ref);
-            })
-            .unwrap(),
-        );
+        set_const_statements.push(quote! {
+            #(#cfg_attrs)*
+            _m.set_var(#const_literal, #const_ref);
+        });
     }
 
     for ExportedType {
@@ -88,17 +85,15 @@ pub fn generate_body(
         let comments = Vec::<syn::LitStr>::new();
 
         set_const_statements.push(if comments.is_empty() {
-            syn::parse2::<syn::Stmt>(quote! {
+            quote! {
                 #(#cfg_attrs)*
-                m.set_custom_type::<#typ>(#const_literal);
-            })
-            .unwrap()
+                _m.set_custom_type::<#typ>(#const_literal);
+            }
         } else {
-            syn::parse2::<syn::Stmt>(quote! {
+            quote! {
                 #(#cfg_attrs)*
-                m.set_custom_type_with_comments::<#typ>(#const_literal, &[#(#comments),*]);
-            })
-            .unwrap()
+                _m.set_custom_type_with_comments::<#typ>(#const_literal, &[#(#comments),*]);
+            }
         });
     }
 
@@ -110,24 +105,14 @@ pub fn generate_body(
         let module_name = item_mod.module_name();
         let exported_name = syn::LitStr::new(item_mod.exported_name().as_ref(), Span::call_site());
         let cfg_attrs = crate::attrs::collect_cfg_attr(item_mod.attrs());
-        add_mod_blocks.push(
-            syn::parse2::<syn::ExprBlock>(quote! {
-                {
-                    #(#cfg_attrs)*
-                    m.set_sub_module(#exported_name, self::#module_name::rhai_module_generate());
-                }
-            })
-            .unwrap(),
-        );
-        set_flattened_mod_blocks.push(
-            syn::parse2::<syn::ExprBlock>(quote! {
-                {
-                    #(#cfg_attrs)*
-                    self::#module_name::rhai_generate_into_module(m, flatten);
-                }
-            })
-            .unwrap(),
-        );
+        add_mod_blocks.push(quote! {
+            #(#cfg_attrs)*
+            _m.set_sub_module(#exported_name, self::#module_name::rhai_module_generate());
+        });
+        set_flattened_mod_blocks.push(quote! {
+            #(#cfg_attrs)*
+            self::#module_name::rhai_generate_into_module(_m, _flatten);
+        });
     }
 
     // NB: these are token streams, because re-parsing messes up "> >" vs ">>"
@@ -172,19 +157,19 @@ pub fn generate_body(
                 ns => namespace = ns,
             }
 
-            let ns_str = syn::Ident::new(
-                match namespace {
-                    FnNamespaceAccess::Unset => unreachable!("`namespace` should be set"),
-                    FnNamespaceAccess::Global => "Global",
-                    FnNamespaceAccess::Internal => "Internal",
-                },
-                fn_literal.span(),
-            );
-
             let mut tokens = quote! {
                 #(#cfg_attrs)*
-                FuncRegistration::new(#fn_literal).with_namespace(FnNamespace::#ns_str)
+                FuncRegistration::new(#fn_literal)
             };
+
+            match namespace {
+                FnNamespaceAccess::Unset => unreachable!("`namespace` should be set"),
+                FnNamespaceAccess::Global => {
+                    tokens.extend(quote! { .with_namespace(FnNamespace::Global) })
+                }
+                FnNamespaceAccess::Internal => (),
+            }
+
             #[cfg(feature = "metadata")]
             {
                 tokens.extend(quote! {
@@ -205,7 +190,7 @@ pub fn generate_body(
             }
 
             tokens.extend(quote! {
-                .set_into_module_raw(m, &#fn_token_name::param_types(), #fn_token_name().into());
+                .set_into_module_raw(_m, &#fn_token_name::param_types(), #fn_token_name().into());
             });
 
             set_fn_statements.push(syn::parse2::<syn::Stmt>(tokens).unwrap());
@@ -222,14 +207,21 @@ pub fn generate_body(
     }
 
     let module_docs = if doc.is_empty() {
-        None
+        quote! {}
     } else {
-        Some(
-            syn::parse2::<syn::Stmt>(quote! {
-                m.set_doc(#doc);
-            })
-            .unwrap(),
-        )
+        quote! { m.set_doc(#doc); }
+    };
+
+    let flatten = if set_flattened_mod_blocks.is_empty() && add_mod_blocks.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            if _flatten {
+                #(#set_flattened_mod_blocks)*
+            } else {
+                #(#add_mod_blocks)*
+            }
+        }
     };
 
     let mut generate_fn_call = syn::parse2::<syn::ItemMod>(quote! {
@@ -238,6 +230,7 @@ pub fn generate_body(
             use super::*;
 
             #[doc(hidden)]
+            #[inline(always)]
             pub fn rhai_module_generate() -> Module {
                 let mut m = Module::new();
                 #module_docs
@@ -245,17 +238,12 @@ pub fn generate_body(
                 m.build_index();
                 m
             }
-            #[allow(unused_mut)]
             #[doc(hidden)]
-            pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
+            #[inline(always)]
+            pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                 #(#set_fn_statements)*
                 #(#set_const_statements)*
-
-                if flatten {
-                    #(#set_flattened_mod_blocks)*
-                } else {
-                    #(#add_mod_blocks)*
-                }
+                #flatten
             }
         }
     })
@@ -278,8 +266,8 @@ pub fn check_rename_collisions(fns: &[ExportedFn]) -> Result<(), syn::Error> {
                     syn::FnArg::Receiver(..) => unimplemented!("receiver rhai_fns not implemented"),
                     syn::FnArg::Typed(syn::PatType { ref ty, .. }) => print_type(ty),
                 };
-                arg_str.push('.');
-                arg_str.push_str(&type_string);
+                arg_str += ".";
+                arg_str += &type_string;
                 arg_str
             })
     }

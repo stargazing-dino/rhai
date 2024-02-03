@@ -1,11 +1,10 @@
 //! Module that defines the public function/module registration API of [`Engine`].
 
 use crate::func::{FnCallArgs, RhaiFunc, RhaiNativeFunc, SendSync};
-use crate::module::{FuncRegistration, ModuleFlags};
+use crate::module::FuncRegistration;
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, FnNamespace, Identifier, Module, NativeCallContext, RhaiResultOf, Shared,
-    SharedModule,
+    Dynamic, Engine, Identifier, Module, NativeCallContext, RhaiResultOf, Shared, SharedModule,
 };
 use std::any::{type_name, TypeId};
 #[cfg(feature = "no_std")]
@@ -22,7 +21,7 @@ impl Engine {
     pub(crate) fn global_namespace_mut(&mut self) -> &mut Module {
         if self.global_modules.is_empty() {
             let mut global_namespace = Module::new();
-            global_namespace.flags |= ModuleFlags::INTERNAL;
+            global_namespace.set_internal(true);
             self.global_modules.push(global_namespace.into());
         }
 
@@ -32,7 +31,7 @@ impl Engine {
     ///
     /// # Assumptions
     ///
-    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`].
+    /// * **Accessibility**: The function namespace is [`FnNamespace::Global`][`crate::FnNamespace::Global`].
     ///
     /// * **Purity**: The function is assumed to be _pure_ unless it is a property setter or an index setter.
     ///
@@ -75,7 +74,7 @@ impl Engine {
         name: impl AsRef<str> + Into<Identifier>,
         func: FUNC,
     ) -> &mut Self {
-        let reg = FuncRegistration::new(name.into()).with_namespace(FnNamespace::Global);
+        let reg = FuncRegistration::new(name.into()).in_global_namespace();
 
         #[cfg(feature = "metadata")]
         let reg = {
@@ -135,7 +134,7 @@ impl Engine {
         let is_pure = is_pure && (arg_types.len() != 2 || !name.starts_with(crate::engine::FN_SET));
 
         FuncRegistration::new(name)
-            .with_namespace(FnNamespace::Global)
+            .in_global_namespace()
             .set_into_module_raw(
                 self.global_namespace_mut(),
                 arg_types,
@@ -659,7 +658,7 @@ impl Engine {
     }
     /// Register a shared [`Module`] as a static module namespace with the [`Engine`].
     ///
-    /// Functions marked [`FnNamespace::Global`] and type iterators are exposed to scripts without
+    /// Functions marked [`FnNamespace::Global`][`crate::FnNamespace::Global`] and type iterators are exposed to scripts without
     /// namespace qualifications.
     ///
     /// Not available under `no_module`.
@@ -747,7 +746,7 @@ impl Engine {
     #[cfg(feature = "metadata")]
     #[inline]
     #[must_use]
-    pub fn gen_fn_signatures(&self, include_packages: bool) -> Vec<String> {
+    pub fn gen_fn_signatures(&self, include_standard_packages: bool) -> Vec<String> {
         let mut signatures = Vec::with_capacity(64);
 
         if let Some(global_namespace) = self.global_modules.first() {
@@ -764,17 +763,11 @@ impl Engine {
             );
         }
 
-        let exclude_flags = if include_packages {
-            crate::module::ModuleFlags::INTERNAL
-        } else {
-            crate::module::ModuleFlags::INTERNAL | crate::module::ModuleFlags::STANDARD_LIB
-        };
-
         signatures.extend(
             self.global_modules
                 .iter()
                 .skip(1)
-                .filter(|m| !m.flags.intersects(exclude_flags))
+                .filter(|m| !m.is_internal() && (include_standard_packages || !m.is_standard_lib()))
                 .flat_map(|m| m.gen_fn_signatures_with_mapper(|s| self.format_param_type(s))),
         );
 

@@ -576,7 +576,7 @@ impl fmt::Display for Dynamic {
                         Union::Shared(ref cell, ..) => match cell.try_borrow() {
                             Ok(v) => {
                                 if dict.insert(value) {
-                                    display_fmt(&*v, f, dict)?;
+                                    display_fmt(&v, f, dict)?;
                                     f.write_str(" (shared)")
                                 } else {
                                     f.write_str("<shared>")
@@ -754,7 +754,7 @@ impl fmt::Debug for Dynamic {
                         Union::Shared(ref cell, ..) => match cell.try_borrow() {
                             Ok(v) => {
                                 if dict.insert(value) {
-                                    debug_fmt(&*v, f, dict)?;
+                                    debug_fmt(&v, f, dict)?;
                                     f.write_str(" (shared)")
                                 } else {
                                     f.write_str("<shared>")
@@ -812,7 +812,7 @@ impl fmt::Debug for Dynamic {
                             }
                             f.write_str("(")?;
                             fmt::Debug::fmt(fnptr.fn_name(), f)?;
-                            for curry in fnptr.curry.iter() {
+                            for curry in &fnptr.curry {
                                 f.write_str(", ")?;
                                 debug_fmt(curry, f, dict)?;
                             }

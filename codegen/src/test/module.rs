@@ -302,16 +302,16 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                 }
             }
         };
@@ -340,18 +340,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("get_mystic_number").with_namespace(FnNamespace::Internal).with_params_info(get_mystic_number_token::PARAM_NAMES)
-                        .set_into_module_raw(m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("get_mystic_number").with_params_info(get_mystic_number_token::PARAM_NAMES)
+                        .set_into_module_raw(_m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -433,6 +433,7 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     m.set_doc("/// This is the one_fn module!\n/** block doc-comment\n             *  multi-line\n             */\n/// Another line!\n/// Final line!");
@@ -440,17 +441,16 @@ mod generate_tests {
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("get_mystic_number").with_namespace(FnNamespace::Internal).with_params_info(get_mystic_number_token::PARAM_NAMES)
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("get_mystic_number").with_params_info(get_mystic_number_token::PARAM_NAMES)
                         .with_comments(&[
                             "/// This is a doc-comment.\n/// Another line.\n/// block doc-comment \n/// Final line.",
                             "/** doc-comment\n                    in multiple lines\n                 */"
                         ])
-                        .set_into_module_raw(m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
-                    m.set_custom_type_with_comments::<String>("World", &["/// We are the world!"]);
-                    if flatten {} else {}
+                        .set_into_module_raw(_m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
+                    _m.set_custom_type_with_comments::<String>("World", &["/// We are the world!"]);
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -499,18 +499,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                     FuncRegistration::new("add_one_to").with_namespace(FnNamespace::Global).with_params_info(add_one_to_token::PARAM_NAMES)
-                        .set_into_module_raw(m, &add_one_to_token::param_types(), add_one_to_token().into());
-                    if flatten {} else {}
+                        .set_into_module_raw(_m, &add_one_to_token::param_types(), add_one_to_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -559,18 +559,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("add_one_to").with_namespace(FnNamespace::Internal).with_params_info(add_one_to_token::PARAM_NAMES)
-                        .set_into_module_raw(m, &add_one_to_token::param_types(), add_one_to_token().into());
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("add_one_to").with_params_info(add_one_to_token::PARAM_NAMES)
+                        .set_into_module_raw(_m, &add_one_to_token::param_types(), add_one_to_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -630,20 +630,20 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("add_n").with_namespace(FnNamespace::Internal).with_params_info(add_one_to_token::PARAM_NAMES)
-                        .set_into_module_raw(m, &add_one_to_token::param_types(), add_one_to_token().into());
-                    FuncRegistration::new("add_n").with_namespace(FnNamespace::Internal).with_params_info(add_n_to_token::PARAM_NAMES)
-                        .set_into_module_raw(m, &add_n_to_token::param_types(), add_n_to_token().into());
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("add_n").with_params_info(add_one_to_token::PARAM_NAMES)
+                        .set_into_module_raw(_m, &add_one_to_token::param_types(), add_one_to_token().into());
+                    FuncRegistration::new("add_n").with_params_info(add_n_to_token::PARAM_NAMES)
+                        .set_into_module_raw(_m, &add_n_to_token::param_types(), add_n_to_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -714,18 +714,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("add_together").with_namespace(FnNamespace::Internal).with_params_info(add_together_token::PARAM_NAMES)
-                        .set_into_module_raw(m, &add_together_token::param_types(), add_together_token().into());
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("add_together").with_params_info(add_together_token::PARAM_NAMES)
+                        .set_into_module_raw(_m, &add_together_token::param_types(), add_together_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -776,22 +776,22 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("add").with_namespace(FnNamespace::Internal).with_params_info(add_together_token::PARAM_NAMES)
-                        .set_into_module_raw(m, &add_together_token::param_types(), add_together_token().into());
-                    FuncRegistration::new("+").with_namespace(FnNamespace::Internal).with_params_info(add_together_token::PARAM_NAMES)
-                        .set_into_module_raw(m, &add_together_token::param_types(), add_together_token().into());
-                    FuncRegistration::new("add_together").with_namespace(FnNamespace::Internal).with_params_info(add_together_token::PARAM_NAMES)
-                        .set_into_module_raw(m, &add_together_token::param_types(), add_together_token().into());
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("add").with_params_info(add_together_token::PARAM_NAMES)
+                        .set_into_module_raw(_m, &add_together_token::param_types(), add_together_token().into());
+                    FuncRegistration::new("+").with_params_info(add_together_token::PARAM_NAMES)
+                        .set_into_module_raw(_m, &add_together_token::param_types(), add_together_token().into());
+                    FuncRegistration::new("add_together").with_params_info(add_together_token::PARAM_NAMES)
+                        .set_into_module_raw(_m, &add_together_token::param_types(), add_together_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -855,20 +855,20 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("get_mystic_number").with_namespace(FnNamespace::Internal).with_params_info(get_mystic_number_token::PARAM_NAMES)
-                        .set_into_module_raw(m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
-                    m.set_var("MYSTIC_NUMBER", MYSTIC_NUMBER);
-                    m.set_custom_type::<Foo>("Hello");
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("get_mystic_number").with_params_info(get_mystic_number_token::PARAM_NAMES)
+                        .set_into_module_raw(_m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
+                    _m.set_var("MYSTIC_NUMBER", MYSTIC_NUMBER);
+                    _m.set_custom_type::<Foo>("Hello");
                 }
 
                 #[allow(non_camel_case_types)]
@@ -914,17 +914,17 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_var("MYSTIC_NUMBER", MYSTIC_NUMBER);
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    _m.set_var("MYSTIC_NUMBER", MYSTIC_NUMBER);
                 }
             }
         };
@@ -951,17 +951,17 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_var("MYSTIC_NUMBER", MYSTIC_NUMBER);
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    _m.set_var("MYSTIC_NUMBER", MYSTIC_NUMBER);
                 }
             }
         };
@@ -990,16 +990,16 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                 }
             }
         };
@@ -1029,16 +1029,16 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                 }
             }
         };
@@ -1074,18 +1074,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("get_mystic_number").with_namespace(FnNamespace::Internal).with_params_info(get_mystic_number_token::PARAM_NAMES)
-                        .set_into_module_raw(m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("get_mystic_number").with_params_info(get_mystic_number_token::PARAM_NAMES)
+                        .set_into_module_raw(_m, &get_mystic_number_token::param_types(), get_mystic_number_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -1129,16 +1129,16 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                 }
             }
         };
@@ -1167,18 +1167,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("print_out_to").with_namespace(FnNamespace::Internal).with_params_info(print_out_to_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &print_out_to_token::param_types(), print_out_to_token().into());
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("print_out_to").with_params_info(print_out_to_token::PARAM_NAMES)
+                         .set_into_module_raw(_m, &print_out_to_token::param_types(), print_out_to_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -1227,18 +1227,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("print_out_to").with_namespace(FnNamespace::Internal).with_params_info(print_out_to_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &print_out_to_token::param_types(), print_out_to_token().into());
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("print_out_to").with_params_info(print_out_to_token::PARAM_NAMES)
+                         .set_into_module_raw(_m, &print_out_to_token::param_types(), print_out_to_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -1288,18 +1288,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("foo").with_namespace(FnNamespace::Internal).with_params_info(foo_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &foo_token::param_types(), foo_token().into());
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("foo").with_params_info(foo_token::PARAM_NAMES)
+                         .set_into_module_raw(_m, &foo_token::param_types(), foo_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -1349,18 +1349,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("increment").with_namespace(FnNamespace::Internal).with_params_info(increment_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &increment_token::param_types(), increment_token().into());
-                    if flatten {} else {}
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("increment").with_params_info(increment_token::PARAM_NAMES)
+                         .set_into_module_raw(_m, &increment_token::param_types(), increment_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -1413,18 +1413,18 @@ mod generate_tests {
                     use super::*;
 
                     #[doc(hidden)]
+                    #[inline(always)]
                     pub fn rhai_module_generate() -> Module {
                         let mut m = Module::new();
                         rhai_generate_into_module(&mut m, false);
                         m.build_index();
                         m
                     }
-                    #[allow(unused_mut)]
                     #[doc(hidden)]
-                    pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("increment").with_namespace(FnNamespace::Internal).with_params_info(increment_token::PARAM_NAMES)
-                             .set_into_module_raw(m, &increment_token::param_types(), increment_token().into());
-                        if flatten {} else {}
+                    #[inline(always)]
+                    pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("increment").with_params_info(increment_token::PARAM_NAMES)
+                             .set_into_module_raw(_m, &increment_token::param_types(), increment_token().into());
                     }
                     #[allow(non_camel_case_types)]
                     #[doc(hidden)]
@@ -1451,19 +1451,20 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    if flatten {
-                        { self::it_is::rhai_generate_into_module(m, flatten); }
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    if _flatten {
+                        self::it_is::rhai_generate_into_module(_m, _flatten);
                     } else {
-                        { m.set_sub_module("it_is", self::it_is::rhai_module_generate()); }
+                        _m.set_sub_module("it_is", self::it_is::rhai_module_generate());
                     }
                 }
             }
@@ -1499,18 +1500,18 @@ mod generate_tests {
                     use super::*;
 
                     #[doc(hidden)]
+                    #[inline(always)]
                     pub fn rhai_module_generate() -> Module {
                         let mut m = Module::new();
                         rhai_generate_into_module(&mut m, false);
                         m.build_index();
                         m
                     }
-                    #[allow(unused_mut)]
                     #[doc(hidden)]
-                    pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("increment").with_namespace(FnNamespace::Internal).with_params_info(increment_token::PARAM_NAMES)
-                             .set_into_module_raw(m, &increment_token::param_types(), increment_token().into());
-                        if flatten {} else {}
+                    #[inline(always)]
+                    pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("increment").with_params_info(increment_token::PARAM_NAMES)
+                             .set_into_module_raw(_m, &increment_token::param_types(), increment_token().into());
                     }
                     #[allow(non_camel_case_types)]
                     #[doc(hidden)]
@@ -1537,25 +1538,22 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    if flatten {
-                        {
-                            #[cfg(not(feature = "no_float"))]
-                            self::it_is::rhai_generate_into_module(m, flatten);
-                        }
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    if _flatten {
+                        #[cfg(not(feature = "no_float"))]
+                        self::it_is::rhai_generate_into_module(_m, _flatten);
                     } else {
-                        {
-                            #[cfg(not(feature = "no_float"))]
-                            m.set_sub_module("it_is", self::it_is::rhai_module_generate());
-                        }
+                        #[cfg(not(feature = "no_float"))]
+                        _m.set_sub_module("it_is", self::it_is::rhai_module_generate());
                     }
                 }
             }
@@ -1586,18 +1584,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                     FuncRegistration::new("get$square").with_namespace(FnNamespace::Global).with_params_info(int_foo_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
-                    if flatten {} else {}
+                         .set_into_module_raw(_m, &int_foo_token::param_types(), int_foo_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -1647,20 +1645,20 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("square").with_namespace(FnNamespace::Internal).with_params_info(int_foo_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("square").with_params_info(int_foo_token::PARAM_NAMES)
+                         .set_into_module_raw(_m, &int_foo_token::param_types(), int_foo_token().into());
                     FuncRegistration::new("get$square").with_namespace(FnNamespace::Global).with_params_info(int_foo_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
-                    if flatten {} else {}
+                         .set_into_module_raw(_m, &int_foo_token::param_types(), int_foo_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -1710,18 +1708,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                     FuncRegistration::new("set$squared").with_namespace(FnNamespace::Global).with_params_info(int_foo_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
-                    if flatten {} else {}
+                         .set_into_module_raw(_m, &int_foo_token::param_types(), int_foo_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -1772,20 +1770,20 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("set_sq").with_namespace(FnNamespace::Internal).with_params_info(int_foo_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("set_sq").with_params_info(int_foo_token::PARAM_NAMES)
+                         .set_into_module_raw(_m, &int_foo_token::param_types(), int_foo_token().into());
                     FuncRegistration::new("set$squared").with_namespace(FnNamespace::Global).with_params_info(int_foo_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &int_foo_token::param_types(), int_foo_token().into());
-                    if flatten {} else {}
+                         .set_into_module_raw(_m, &int_foo_token::param_types(), int_foo_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -1836,18 +1834,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                     FuncRegistration::new("index$get$").with_namespace(FnNamespace::Global).with_params_info(get_by_index_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &get_by_index_token::param_types(), get_by_index_token().into());
-                    if flatten {} else {}
+                         .set_into_module_raw(_m, &get_by_index_token::param_types(), get_by_index_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -1902,19 +1900,19 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                     #[cfg(hello)]
                     FuncRegistration::new("index$get$").with_namespace(FnNamespace::Global).with_params_info(get_by_index_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &get_by_index_token::param_types(), get_by_index_token().into());
-                    if flatten {} else {}
+                         .set_into_module_raw(_m, &get_by_index_token::param_types(), get_by_index_token().into());
                 }
                 #[cfg(hello)]
                 #[allow(non_camel_case_types)]
@@ -1968,20 +1966,20 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("get").with_namespace(FnNamespace::Internal).with_params_info(get_by_index_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &get_by_index_token::param_types(), get_by_index_token().into());
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("get").with_params_info(get_by_index_token::PARAM_NAMES)
+                         .set_into_module_raw(_m, &get_by_index_token::param_types(), get_by_index_token().into());
                     FuncRegistration::new("index$get$").with_namespace(FnNamespace::Global).with_params_info(get_by_index_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &get_by_index_token::param_types(), get_by_index_token().into());
-                    if flatten {} else {}
+                         .set_into_module_raw(_m, &get_by_index_token::param_types(), get_by_index_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -2032,18 +2030,18 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                     FuncRegistration::new("index$set$").with_namespace(FnNamespace::Global).with_params_info(set_by_index_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &set_by_index_token::param_types(), set_by_index_token().into());
-                    if flatten {} else {}
+                         .set_into_module_raw(_m, &set_by_index_token::param_types(), set_by_index_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -2095,20 +2093,20 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    FuncRegistration::new("set").with_namespace(FnNamespace::Internal).with_params_info(set_by_index_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &set_by_index_token::param_types(), set_by_index_token().into());
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    FuncRegistration::new("set").with_params_info(set_by_index_token::PARAM_NAMES)
+                         .set_into_module_raw(_m, &set_by_index_token::param_types(), set_by_index_token().into());
                     FuncRegistration::new("index$set$").with_namespace(FnNamespace::Global).with_params_info(set_by_index_token::PARAM_NAMES)
-                         .set_into_module_raw(m, &set_by_index_token::param_types(), set_by_index_token().into());
-                    if flatten {} else {}
+                         .set_into_module_raw(_m, &set_by_index_token::param_types(), set_by_index_token().into());
                 }
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
@@ -2159,36 +2157,37 @@ mod generate_tests {
                     use super::*;
 
                     #[doc(hidden)]
+                    #[inline(always)]
                     pub fn rhai_module_generate() -> Module {
                         let mut m = Module::new();
                         rhai_generate_into_module(&mut m, false);
                         m.build_index();
                         m
                     }
-                    #[allow(unused_mut)]
                     #[doc(hidden)]
-                    pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                        m.set_var("MYSTIC_NUMBER", MYSTIC_NUMBER);
-                        if flatten {} else {}
+                    #[inline(always)]
+                    pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                        _m.set_var("MYSTIC_NUMBER", MYSTIC_NUMBER);
                     }
                 }
                 #[allow(unused_imports)]
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    if flatten {
-                        { self::it_is::rhai_generate_into_module(m, flatten); }
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    if _flatten {
+                        self::it_is::rhai_generate_into_module(_m, _flatten);
                     } else {
-                        { m.set_sub_module("it_is", self::it_is::rhai_module_generate()); }
+                        _m.set_sub_module("it_is", self::it_is::rhai_module_generate());
                     }
                 }
             }
@@ -2222,17 +2221,17 @@ mod generate_tests {
                     use super::*;
 
                     #[doc(hidden)]
+                    #[inline(always)]
                     pub fn rhai_module_generate() -> Module {
                         let mut m = Module::new();
                         rhai_generate_into_module(&mut m, false);
                         m.build_index();
                         m
                     }
-                    #[allow(unused_mut)]
                     #[doc(hidden)]
-                    pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                        m.set_var("MYSTIC_NUMBER", MYSTIC_NUMBER);
-                        if flatten {} else {}
+                    #[inline(always)]
+                    pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                        _m.set_var("MYSTIC_NUMBER", MYSTIC_NUMBER);
                     }
                 }
                 #[allow(clippy::needless_pass_by_value, clippy::needless_pass_by_ref_mut)]
@@ -2243,39 +2242,40 @@ mod generate_tests {
                     use super::*;
 
                     #[doc(hidden)]
+                    #[inline(always)]
                     pub fn rhai_module_generate() -> Module {
                         let mut m = Module::new();
                         rhai_generate_into_module(&mut m, false);
                         m.build_index();
                         m
                     }
-                    #[allow(unused_mut)]
                     #[doc(hidden)]
-                    pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
+                    #[inline(always)]
+                    pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                         #[cfg(hello)]
-                        m.set_var("SPECIAL_CPU_NUMBER", SPECIAL_CPU_NUMBER);
-                        if flatten {} else {}
+                        _m.set_var("SPECIAL_CPU_NUMBER", SPECIAL_CPU_NUMBER);
                     }
                 }
                 #[allow(unused_imports)]
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    if flatten {
-                        { self::first_is::rhai_generate_into_module(m, flatten); }
-                        { self::second_is::rhai_generate_into_module(m, flatten); }
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    if _flatten {
+                        self::first_is::rhai_generate_into_module(_m, _flatten);
+                        self::second_is::rhai_generate_into_module(_m, _flatten);
                     } else {
-                        { m.set_sub_module("first_is", self::first_is::rhai_module_generate()); }
-                        { m.set_sub_module("second_is", self::second_is::rhai_module_generate()); }
+                        _m.set_sub_module("first_is", self::first_is::rhai_module_generate());
+                        _m.set_sub_module("second_is", self::second_is::rhai_module_generate());
                     }
                 }
             }
@@ -2334,17 +2334,17 @@ mod generate_tests {
                             use super::*;
 
                             #[doc(hidden)]
+                            #[inline(always)]
                             pub fn rhai_module_generate() -> Module {
                                 let mut m = Module::new();
                                 rhai_generate_into_module(&mut m, false);
                                 m.build_index();
                                 m
                             }
-                            #[allow(unused_mut)]
                             #[doc(hidden)]
-                            pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                                m.set_var("VALUE", VALUE);
-                                if flatten {} else {}
+                            #[inline(always)]
+                            pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                                _m.set_var("VALUE", VALUE);
                             }
                         }
                         #[allow(clippy::needless_pass_by_value, clippy::needless_pass_by_ref_mut)]
@@ -2354,40 +2354,41 @@ mod generate_tests {
                             use super::*;
 
                             #[doc(hidden)]
+                            #[inline(always)]
                             pub fn rhai_module_generate() -> Module {
                                 let mut m = Module::new();
                                 rhai_generate_into_module(&mut m, false);
                                 m.build_index();
                                 m
                             }
-                            #[allow(unused_mut)]
                             #[doc(hidden)]
-                            pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                                m.set_var("VALUE", VALUE);
-                                if flatten {} else {}
+                            #[inline(always)]
+                            pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                                _m.set_var("VALUE", VALUE);
                             }
                         }
                         #[allow(unused_imports)]
                         use super::*;
 
                         #[doc(hidden)]
+                        #[inline(always)]
                         pub fn rhai_module_generate() -> Module {
                             let mut m = Module::new();
                             rhai_generate_into_module(&mut m, false);
                             m.build_index();
                             m
                         }
-                        #[allow(unused_mut)]
                         #[doc(hidden)]
-                        pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                            m.set_var("VALUE", VALUE);
+                        #[inline(always)]
+                        pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                            _m.set_var("VALUE", VALUE);
 
-                            if flatten {
-                                { self::left::rhai_generate_into_module(m, flatten); }
-                                { self::right::rhai_generate_into_module(m, flatten); }
+                            if _flatten {
+                                self::left::rhai_generate_into_module(_m, _flatten);
+                                self::right::rhai_generate_into_module(_m, _flatten);
                             } else {
-                                { m.set_sub_module("left", self::left::rhai_module_generate()); }
-                                { m.set_sub_module("right", self::right::rhai_module_generate()); }
+                                _m.set_sub_module("left", self::left::rhai_module_generate());
+                                _m.set_sub_module("right", self::right::rhai_module_generate());
                             }
                         }
                     }
@@ -2398,40 +2399,41 @@ mod generate_tests {
                         use super::*;
 
                         #[doc(hidden)]
+                        #[inline(always)]
                         pub fn rhai_module_generate() -> Module {
                             let mut m = Module::new();
                             rhai_generate_into_module(&mut m, false);
                             m.build_index();
                             m
                         }
-                        #[allow(unused_mut)]
                         #[doc(hidden)]
-                        pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                            m.set_var("VALUE", VALUE);
-                            if flatten {} else {}
+                        #[inline(always)]
+                        pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                            _m.set_var("VALUE", VALUE);
                         }
                     }
                     #[allow(unused_imports)]
                     use super::*;
 
                     #[doc(hidden)]
+                    #[inline(always)]
                     pub fn rhai_module_generate() -> Module {
                         let mut m = Module::new();
                         rhai_generate_into_module(&mut m, false);
                         m.build_index();
                         m
                     }
-                    #[allow(unused_mut)]
                     #[doc(hidden)]
-                    pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                        m.set_var("VALUE", VALUE);
+                    #[inline(always)]
+                    pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                        _m.set_var("VALUE", VALUE);
 
-                        if flatten {
-                            { self::left::rhai_generate_into_module(m, flatten); }
-                            { self::right::rhai_generate_into_module(m, flatten); }
+                        if _flatten {
+                            self::left::rhai_generate_into_module(_m, _flatten);
+                            self::right::rhai_generate_into_module(_m, _flatten);
                         } else {
-                            { m.set_sub_module("left", self::left::rhai_module_generate()); }
-                            { m.set_sub_module("right", self::right::rhai_module_generate()); }
+                            _m.set_sub_module("left", self::left::rhai_module_generate());
+                            _m.set_sub_module("right", self::right::rhai_module_generate());
                         }
                     }
                 }
@@ -2445,17 +2447,17 @@ mod generate_tests {
                         use super::*;
 
                         #[doc(hidden)]
+                        #[inline(always)]
                         pub fn rhai_module_generate() -> Module {
                             let mut m = Module::new();
                             rhai_generate_into_module(&mut m, false);
                             m.build_index();
                             m
                         }
-                        #[allow(unused_mut)]
                         #[doc(hidden)]
-                        pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                            m.set_var("VALUE", VALUE);
-                            if flatten {} else {}
+                        #[inline(always)]
+                        pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                            _m.set_var("VALUE", VALUE);
                         }
                     }
                     #[allow(clippy::needless_pass_by_value, clippy::needless_pass_by_ref_mut)]
@@ -2465,40 +2467,41 @@ mod generate_tests {
                         use super::*;
 
                         #[doc(hidden)]
+                        #[inline(always)]
                         pub fn rhai_module_generate() -> Module {
                             let mut m = Module::new();
                             rhai_generate_into_module(&mut m, false);
                             m.build_index();
                             m
                         }
-                        #[allow(unused_mut)]
                         #[doc(hidden)]
-                        pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                            m.set_var("VALUE", VALUE);
-                            if flatten {} else {}
+                        #[inline(always)]
+                        pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                            _m.set_var("VALUE", VALUE);
                         }
                     }
                     #[allow(unused_imports)]
                     use super::*;
 
                     #[doc(hidden)]
+                    #[inline(always)]
                     pub fn rhai_module_generate() -> Module {
                         let mut m = Module::new();
                         rhai_generate_into_module(&mut m, false);
                         m.build_index();
                         m
                     }
-                    #[allow(unused_mut)]
                     #[doc(hidden)]
-                    pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                        m.set_var("VALUE", VALUE);
+                    #[inline(always)]
+                    pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                        _m.set_var("VALUE", VALUE);
 
-                        if flatten {
-                            { self::left::rhai_generate_into_module(m, flatten); }
-                            { self::right::rhai_generate_into_module(m, flatten); }
+                        if _flatten {
+                            self::left::rhai_generate_into_module(_m, _flatten);
+                            self::right::rhai_generate_into_module(_m, _flatten);
                         } else {
-                            { m.set_sub_module("left", self::left::rhai_module_generate()); }
-                            { m.set_sub_module("right", self::right::rhai_module_generate()); }
+                            _m.set_sub_module("left", self::left::rhai_module_generate());
+                            _m.set_sub_module("right", self::right::rhai_module_generate());
                         }
                     }
                 }
@@ -2506,23 +2509,24 @@ mod generate_tests {
                 use super::*;
 
                 #[doc(hidden)]
+                #[inline(always)]
                 pub fn rhai_module_generate() -> Module {
                     let mut m = Module::new();
                     rhai_generate_into_module(&mut m, false);
                     m.build_index();
                     m
                 }
-                #[allow(unused_mut)]
                 #[doc(hidden)]
-                pub fn rhai_generate_into_module(m: &mut Module, flatten: bool) {
-                    m.set_var("VALUE", VALUE);
+                #[inline(always)]
+                pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
+                    _m.set_var("VALUE", VALUE);
 
-                    if flatten {
-                        { self::left::rhai_generate_into_module(m, flatten); }
-                        { self::right::rhai_generate_into_module(m, flatten); }
+                    if _flatten {
+                        self::left::rhai_generate_into_module(_m, _flatten);
+                        self::right::rhai_generate_into_module(_m, _flatten);
                     } else {
-                        { m.set_sub_module("left", self::left::rhai_module_generate()); }
-                        { m.set_sub_module("right", self::right::rhai_module_generate()); }
+                        _m.set_sub_module("left", self::left::rhai_module_generate());
+                        _m.set_sub_module("right", self::right::rhai_module_generate());
                     }
                 }
             }

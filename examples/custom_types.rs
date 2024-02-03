@@ -9,7 +9,8 @@ use rhai::{CustomType, Engine, EvalAltResult, TypeBuilder};
 
 #[cfg(not(feature = "no_object"))]
 fn main() -> Result<(), Box<EvalAltResult>> {
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, CustomType)]
+    #[rhai_type(extra = Self::build_extra)]
     struct TestStruct {
         x: i64,
     }
@@ -24,11 +25,13 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         pub fn calculate(&mut self, data: i64) -> i64 {
             self.x * data
         }
-        pub fn get_x(&mut self) -> i64 {
-            self.x
-        }
-        pub fn set_x(&mut self, value: i64) {
-            self.x = value;
+        fn build_extra(builder: &mut TypeBuilder<Self>) {
+            builder
+                .with_name("TestStruct")
+                .with_fn("new_ts", Self::new)
+                .with_fn("update", Self::update)
+                .with_fn("calc", Self::calculate)
+                .is_iterable();
         }
     }
 
@@ -40,19 +43,6 @@ fn main() -> Result<(), Box<EvalAltResult>> {
         #[must_use]
         fn into_iter(self) -> Self::IntoIter {
             vec![self.x - 1, self.x, self.x + 1].into_iter()
-        }
-    }
-
-    impl CustomType for TestStruct {
-        fn build(mut builder: TypeBuilder<Self>) {
-            #[allow(deprecated)] // The TypeBuilder api is volatile.
-            builder
-                .with_name("TestStruct")
-                .with_fn("new_ts", Self::new)
-                .with_fn("update", Self::update)
-                .with_fn("calc", Self::calculate)
-                .is_iterable()
-                .with_get_set("x", Self::get_x, Self::set_x);
         }
     }
 

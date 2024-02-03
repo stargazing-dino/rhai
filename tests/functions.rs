@@ -1,5 +1,5 @@
 #![cfg(not(feature = "no_function"))]
-use rhai::{Dynamic, Engine, EvalAltResult, FnNamespace, FuncRegistration, Module, NativeCallContext, ParseErrorType, Shared, INT};
+use rhai::{Dynamic, Engine, EvalAltResult, FuncRegistration, Module, NativeCallContext, ParseErrorType, Shared, INT};
 
 #[test]
 fn test_functions() {
@@ -86,7 +86,7 @@ fn test_functions_namespaces() {
         let mut m = Module::new();
 
         let f = || 999 as INT;
-        FuncRegistration::new("test").with_namespace(FnNamespace::Global).set_into_module(&mut m, f);
+        FuncRegistration::new("test").in_global_namespace().set_into_module(&mut m, f);
 
         engine.register_static_module("hello", m.into());
 

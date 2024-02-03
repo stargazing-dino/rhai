@@ -802,7 +802,7 @@ impl Module {
     #[cfg(feature = "metadata")]
     #[inline(always)]
     pub fn gen_fn_signatures(&self) -> impl Iterator<Item = String> + '_ {
-        self.gen_fn_signatures_with_mapper(|s| s.into())
+        self.gen_fn_signatures_with_mapper(Into::into)
     }
 }
 

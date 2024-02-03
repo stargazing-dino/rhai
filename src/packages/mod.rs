@@ -230,7 +230,6 @@ macro_rules! def_package {
 
         impl $root::packages::Package for $package {
             fn as_shared_module(&self) -> $root::Shared<$root::Module> {
-                #[allow(deprecated)]
                 self.0.clone()
             }
             fn init($lib: &mut $root::Module) {
