@@ -1,5 +1,6 @@
+use super::iter_basic::CharsStream;
 use crate::plugin::*;
-use crate::{def_package, FnPtr, ImmutableString, SmartString, INT};
+use crate::{def_package, FnPtr, ImmutableString, SmartString, INT, MAX_USIZE_INT};
 use std::any::TypeId;
 use std::fmt::{Binary, LowerHex, Octal, Write};
 #[cfg(feature = "no_std")]
@@ -31,15 +32,15 @@ def_package! {
         combine_with_exported_module!(lib, "char", char_functions);
 
         // Register characters iterator
-        #[cfg(not(feature = "no_index"))]
+        lib.set_iterator::<CharsStream>();
+
         lib.set_iter(TypeId::of::<ImmutableString>(), |value| Box::new(
-            value.cast::<ImmutableString>().chars().map(Into::into).collect::<Array>().into_iter()
+            CharsStream::new(value.cast::<ImmutableString>().as_str(), 0, MAX_USIZE_INT).map(Into::into)
         ));
     }
 }
 
-// Register print and debug
-
+/// Print a value using a named function.
 #[inline]
 pub fn print_with_func(
     fn_name: &str,

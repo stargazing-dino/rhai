@@ -13,6 +13,7 @@ Enhancements
 ------------
 
 * `FuncRegistration::in_global_namespace` and `FuncRegistration::in_internal_namespace` are added to avoid pulling in `FnNamespace`.
+* Array/BLOB/string iterators are defined also within the `BasicIteratorPackage` in addition to the regular array/BLOB/string packages.
 
 
 Version 1.17.2
