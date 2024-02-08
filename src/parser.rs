@@ -53,21 +53,26 @@ impl PERR {
 
 /// _(internals)_ A type that encapsulates the current state of the parser.
 /// Exported under the `internals` feature only.
-pub struct ParseState<'e, 's, 'f> {
-    /// Input stream buffer containing the next character to read.
+pub struct ParseState<'a, 't, 's, 'f> {
+    /// Stream of input tokens.
+    pub input: &'t mut TokenStream<'a>,
+    /// Tokenizer control interface.
     pub tokenizer_control: TokenizerControl,
     /// Script-defined functions.
+    #[cfg(not(feature = "no_function"))]
     pub lib: &'f mut FnLib,
+    #[cfg(feature = "no_function")]
+    pub _dummy: std::marker::PhantomData<&'f ()>,
     /// Controls whether parsing of an expression should stop given the next token.
     pub expr_filter: fn(&Token) -> bool,
     /// Strings interner.
     pub interned_strings: &'s mut StringsInterner,
     /// External [scope][Scope] with constants.
-    pub external_constants: Option<&'e Scope<'e>>,
+    pub external_constants: Option<&'a Scope<'a>>,
     /// Global runtime state.
     pub global: Option<Box<GlobalRuntimeState>>,
     /// Encapsulates a local stack with variable names to simulate an actual runtime scope.
-    pub stack: Scope<'e>,
+    pub stack: Scope<'a>,
     /// Size of the local variables stack upon entry of the current block scope.
     pub frame_pointer: usize,
     /// Tracks a list of external variables (variables that are not explicitly declared in the scope).
@@ -89,7 +94,7 @@ pub struct ParseState<'e, 's, 'f> {
     pub global_imports: ThinVec<ImmutableString>,
 }
 
-impl fmt::Debug for ParseState<'_, '_, '_> {
+impl fmt::Debug for ParseState<'_, '_, '_, '_> {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -114,19 +119,24 @@ impl fmt::Debug for ParseState<'_, '_, '_> {
     }
 }
 
-impl<'e, 's, 'f> ParseState<'e, 's, 'f> {
+impl<'e, 't, 's, 'f> ParseState<'e, 't, 's, 'f> {
     /// Create a new [`ParseState`].
     #[inline]
     #[must_use]
     pub fn new(
         external_constants: Option<&'e Scope>,
         interned_strings: &'s mut StringsInterner,
+        input: &'t mut TokenStream<'e>,
         tokenizer_control: TokenizerControl,
-        lib: &'f mut FnLib,
+        _lib: &'f mut FnLib,
     ) -> Self {
         Self {
+            input,
             tokenizer_control,
-            lib,
+            #[cfg(not(feature = "no_function"))]
+            lib: _lib,
+            #[cfg(feature = "no_function")]
+            _dummy: std::marker::PhantomData,
             expr_filter: |_| true,
             #[cfg(not(feature = "no_closure"))]
             external_vars: ThinVec::new(),
@@ -187,9 +197,7 @@ impl<'e, 's, 'f> ParseState<'e, 's, 'f> {
     /// * `is_func_name`: `true` if the variable is actually the name of a function
     ///                   (in which case it will be converted into a function pointer).
     #[must_use]
-    pub fn access_var(&mut self, name: &str, pos: Position) -> (Option<NonZeroUsize>, bool) {
-        let _pos = pos;
-
+    pub fn access_var(&mut self, name: &str, _pos: Position) -> (Option<NonZeroUsize>, bool) {
         let (index, hit_barrier) = self.find_var(name);
 
         #[cfg(not(feature = "no_function"))]
@@ -469,10 +477,11 @@ fn ensure_not_assignment(input: &mut TokenStream) -> ParseResult<()> {
 /// # Panics
 ///
 /// Panics if the next token is not the expected one, or either tokens is not a literal symbol.
+#[inline(always)]
 fn eat_token(input: &mut TokenStream, expected_token: &Token) -> Position {
     let (t, pos) = input.next().unwrap();
 
-    assert_eq!(
+    debug_assert_eq!(
         &t,
         expected_token,
         "{} expected but gets {} at {}",
@@ -485,6 +494,7 @@ fn eat_token(input: &mut TokenStream, expected_token: &Token) -> Position {
 }
 
 /// Match a particular [token][Token], consuming it if matched.
+#[inline]
 fn match_token(input: &mut TokenStream, token: &Token) -> (bool, Position) {
     let (t, pos) = input.peek().unwrap();
     if t == token {
@@ -623,7 +633,6 @@ impl Engine {
     /// Parse a function call.
     fn parse_fn_call(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         settings: ParseSettings,
         id: ImmutableString,
@@ -634,7 +643,7 @@ impl Engine {
         let (token, token_pos) = if no_args {
             &(Token::RightParen, Position::NONE)
         } else {
-            input.peek().unwrap()
+            state.input.peek().unwrap()
         };
 
         let mut _namespace = namespace;
@@ -654,7 +663,7 @@ impl Engine {
             // id()
             Token::RightParen => {
                 if !no_args {
-                    eat_token(input, &Token::RightParen);
+                    eat_token(state.input, &Token::RightParen);
                 }
 
                 #[cfg(not(feature = "no_module"))]
@@ -712,16 +721,16 @@ impl Engine {
         let settings = settings.level_up()?;
 
         loop {
-            match input.peek().unwrap() {
+            match state.input.peek().unwrap() {
                 // id(...args, ) - handle trailing comma
                 (Token::RightParen, ..) => (),
-                _ => args.push(self.parse_expr(input, state, settings)?),
+                _ => args.push(self.parse_expr(state, settings)?),
             }
 
-            match input.peek().unwrap() {
+            match state.input.peek().unwrap() {
                 // id(...args)
                 (Token::RightParen, ..) => {
-                    eat_token(input, &Token::RightParen);
+                    eat_token(state.input, &Token::RightParen);
 
                     #[cfg(not(feature = "no_module"))]
                     let hash = if _namespace.is_empty() {
@@ -774,7 +783,7 @@ impl Engine {
                 }
                 // id(...args,
                 (Token::Comma, ..) => {
-                    eat_token(input, &Token::Comma);
+                    eat_token(state.input, &Token::Comma);
                 }
                 // id(...args <EOF>
                 (Token::EOF, pos) => {
@@ -803,7 +812,6 @@ impl Engine {
     #[cfg(not(feature = "no_index"))]
     fn parse_index_chain(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         mut settings: ParseSettings,
         lhs: Expr,
@@ -894,22 +902,22 @@ impl Engine {
             }
         }
 
-        let idx_expr = self.parse_expr(input, state, settings.level_up()?)?;
+        let idx_expr = self.parse_expr(state, settings.level_up()?)?;
 
         if check_types {
             check_argument_types(&lhs, &idx_expr)?;
         }
 
         // Check if there is a closing bracket
-        match input.peek().unwrap() {
+        match state.input.peek().unwrap() {
             (Token::RightBracket, ..) => {
-                eat_token(input, &Token::RightBracket);
+                eat_token(state.input, &Token::RightBracket);
 
                 // Any more indexing following?
-                match input.peek().unwrap() {
+                match state.input.peek().unwrap() {
                     // If another indexing level, right-bind it
                     (Token::LeftBracket | Token::QuestionBracket, ..) => {
-                        let (token, pos) = input.next().unwrap();
+                        let (token, pos) = state.input.next().unwrap();
                         let prev_pos = settings.pos;
                         settings.pos = pos;
                         let settings = settings.level_up()?;
@@ -919,8 +927,8 @@ impl Engine {
                             Token::QuestionBracket => ASTFlags::NEGATED,
                             _ => unreachable!("`[` or `?[`"),
                         };
-                        let idx_expr = self
-                            .parse_index_chain(input, state, settings, idx_expr, options, false)?;
+                        let idx_expr =
+                            self.parse_index_chain(state, settings, idx_expr, options, false)?;
                         // Indexing binds to right
                         Ok(Expr::Index(
                             BinaryExpr { lhs, rhs: idx_expr }.into(),
@@ -949,12 +957,11 @@ impl Engine {
     #[cfg(not(feature = "no_index"))]
     fn parse_array_literal(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
         // [ ...
-        settings.pos = eat_token(input, &Token::LeftBracket);
+        settings.pos = eat_token(state.input, &Token::LeftBracket);
 
         let mut array = ThinVec::new();
 
@@ -967,12 +974,12 @@ impl Engine {
                     "Size of array literal".into(),
                     self.max_array_size(),
                 )
-                .into_err(input.peek().unwrap().1));
+                .into_err(state.input.peek().unwrap().1));
             }
 
-            match input.peek().unwrap() {
+            match state.input.peek().unwrap() {
                 (Token::RightBracket, ..) => {
-                    eat_token(input, &Token::RightBracket);
+                    eat_token(state.input, &Token::RightBracket);
                     break;
                 }
                 (Token::EOF, pos) => {
@@ -982,12 +989,12 @@ impl Engine {
                     )
                     .into_err(*pos))
                 }
-                _ => array.push(self.parse_expr(input, state, settings.level_up()?)?),
+                _ => array.push(self.parse_expr(state, settings.level_up()?)?),
             }
 
-            match input.peek().unwrap() {
+            match state.input.peek().unwrap() {
                 (Token::Comma, ..) => {
-                    eat_token(input, &Token::Comma);
+                    eat_token(state.input, &Token::Comma);
                 }
                 (Token::RightBracket, ..) => (),
                 (Token::EOF, pos) => {
@@ -1017,12 +1024,11 @@ impl Engine {
     #[cfg(not(feature = "no_object"))]
     fn parse_map_literal(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
         // #{ ...
-        settings.pos = eat_token(input, &Token::MapStart);
+        settings.pos = eat_token(state.input, &Token::MapStart);
 
         let mut map = StaticVec::<(Ident, Expr)>::new();
         let mut template = std::collections::BTreeMap::<crate::Identifier, crate::Dynamic>::new();
@@ -1030,9 +1036,9 @@ impl Engine {
         loop {
             const MISSING_RBRACE: &str = "to end this object map literal";
 
-            match input.peek().unwrap() {
+            match state.input.peek().unwrap() {
                 (Token::RightBrace, ..) => {
-                    eat_token(input, &Token::RightBrace);
+                    eat_token(state.input, &Token::RightBrace);
                     break;
                 }
                 (Token::EOF, pos) => {
@@ -1044,7 +1050,7 @@ impl Engine {
                 _ => (),
             }
 
-            let (name, pos) = match input.next().unwrap() {
+            let (name, pos) = match state.input.next().unwrap() {
                 (Token::Identifier(..), pos)
                     if settings.has_flag(ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES) =>
                 {
@@ -1080,7 +1086,7 @@ impl Engine {
                 (.., pos) => return Err(PERR::PropertyExpected.into_err(pos)),
             };
 
-            match input.next().unwrap() {
+            match state.input.next().unwrap() {
                 (Token::Colon, ..) => (),
                 (Token::LexError(err), pos) => return Err(err.into_err(pos)),
                 (.., pos) => {
@@ -1098,18 +1104,18 @@ impl Engine {
                     "Number of properties in object map literal".into(),
                     self.max_map_size(),
                 )
-                .into_err(input.peek().unwrap().1));
+                .into_err(state.input.peek().unwrap().1));
             }
 
-            let expr = self.parse_expr(input, state, settings.level_up()?)?;
+            let expr = self.parse_expr(state, settings.level_up()?)?;
             template.insert(name.clone(), crate::Dynamic::UNIT);
 
             let name = state.get_interned_string(name);
             map.push((Ident { name, pos }, expr));
 
-            match input.peek().unwrap() {
+            match state.input.peek().unwrap() {
                 (Token::Comma, ..) => {
-                    eat_token(input, &Token::Comma);
+                    eat_token(state.input, &Token::Comma);
                 }
                 (Token::RightBrace, ..) => (),
                 (Token::Identifier(..), pos) => {
@@ -1135,18 +1141,13 @@ impl Engine {
     }
 
     /// Parse a switch expression.
-    fn parse_switch(
-        &self,
-        input: &mut TokenStream,
-        state: &mut ParseState,
-        settings: ParseSettings,
-    ) -> ParseResult<Stmt> {
+    fn parse_switch(&self, state: &mut ParseState, settings: ParseSettings) -> ParseResult<Stmt> {
         // switch ...
-        let settings = settings.level_up_with_position(eat_token(input, &Token::Switch))?;
+        let settings = settings.level_up_with_position(eat_token(state.input, &Token::Switch))?;
 
-        let item = self.parse_expr(input, state, settings)?;
+        let item = self.parse_expr(state, settings)?;
 
-        match input.next().unwrap() {
+        match state.input.next().unwrap() {
             (Token::LeftBrace, ..) => (),
             (Token::LexError(err), pos) => return Err(err.into_err(pos)),
             (.., pos) => {
@@ -1167,9 +1168,9 @@ impl Engine {
         loop {
             const MISSING_RBRACE: &str = "to end this switch block";
 
-            let (case_expr_list, condition) = match input.peek().unwrap() {
+            let (case_expr_list, condition) = match state.input.peek().unwrap() {
                 (Token::RightBrace, ..) => {
-                    eat_token(input, &Token::RightBrace);
+                    eat_token(state.input, &Token::RightBrace);
                     break;
                 }
                 (Token::EOF, pos) => {
@@ -1180,9 +1181,9 @@ impl Engine {
                 }
                 (Token::Underscore, pos) if def_case.is_none() => {
                     def_case_pos = *pos;
-                    eat_token(input, &Token::Underscore);
+                    eat_token(state.input, &Token::Underscore);
 
-                    let (if_clause, if_pos) = match_token(input, &Token::If);
+                    let (if_clause, if_pos) = match_token(state.input, &Token::If);
 
                     if if_clause {
                         return Err(PERR::WrongSwitchCaseCondition.into_err(if_pos));
@@ -1203,7 +1204,7 @@ impl Engine {
                     loop {
                         let filter = state.expr_filter;
                         state.expr_filter = |t| t != &Token::Pipe;
-                        let expr = self.parse_expr(input, state, settings);
+                        let expr = self.parse_expr(state, settings);
                         state.expr_filter = filter;
 
                         match expr {
@@ -1213,17 +1214,15 @@ impl Engine {
                             }
                         }
 
-                        if !match_token(input, &Token::Pipe).0 {
+                        if !match_token(state.input, &Token::Pipe).0 {
                             break;
                         }
                     }
 
-                    let condition = if match_token(input, &Token::If).0 {
-                        ensure_not_statement_expr(input, "a boolean")?;
-                        let guard = self
-                            .parse_expr(input, state, settings)?
-                            .ensure_bool_expr()?;
-                        ensure_not_assignment(input)?;
+                    let condition = if match_token(state.input, &Token::If).0 {
+                        ensure_not_statement_expr(state.input, "a boolean")?;
+                        let guard = self.parse_expr(state, settings)?.ensure_bool_expr()?;
+                        ensure_not_assignment(state.input)?;
                         guard
                     } else {
                         Expr::BoolConstant(true, Position::NONE)
@@ -1232,7 +1231,7 @@ impl Engine {
                 }
             };
 
-            match input.next().unwrap() {
+            match state.input.next().unwrap() {
                 (Token::DoubleArrow, ..) => (),
                 (Token::LexError(err), pos) => return Err(err.into_err(pos)),
                 (.., pos) => {
@@ -1246,9 +1245,9 @@ impl Engine {
 
             let (action_expr, need_comma) =
                 if settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
-                    (self.parse_expr(input, state, settings)?, true)
+                    (self.parse_expr(state, settings)?, true)
                 } else {
-                    let stmt = self.parse_stmt(input, state, settings)?;
+                    let stmt = self.parse_stmt(state, settings)?;
                     let need_comma = !stmt.is_self_terminated();
 
                     let stmt_block: StmtBlock = stmt.into();
@@ -1312,9 +1311,9 @@ impl Engine {
                 }
             }
 
-            match input.peek().unwrap() {
+            match state.input.peek().unwrap() {
                 (Token::Comma, ..) => {
-                    eat_token(input, &Token::Comma);
+                    eat_token(state.input, &Token::Comma);
                 }
                 (Token::RightBrace, ..) => (),
                 (Token::EOF, pos) => {
@@ -1352,12 +1351,11 @@ impl Engine {
     /// Parse a primary expression.
     fn parse_primary(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         mut settings: ParseSettings,
         options: ChainingFlags,
     ) -> ParseResult<Expr> {
-        let (token, token_pos) = input.peek().unwrap();
+        let (token, token_pos) = state.input.peek().unwrap();
 
         settings.pos = *token_pos;
 
@@ -1369,7 +1367,7 @@ impl Engine {
             Token::EOF => return Err(PERR::UnexpectedEOF.into_err(settings.pos)),
 
             Token::Unit => {
-                input.next();
+                state.input.next();
                 Expr::Unit(settings.pos)
             }
 
@@ -1377,7 +1375,7 @@ impl Engine {
             | Token::CharConstant(..)
             | Token::StringConstant(..)
             | Token::True
-            | Token::False => match input.next().unwrap().0 {
+            | Token::False => match state.input.next().unwrap().0 {
                 Token::IntegerConstant(x) => Expr::IntegerConstant(x, settings.pos),
                 Token::CharConstant(c) => Expr::CharConstant(c, settings.pos),
                 Token::StringConstant(s) => {
@@ -1390,19 +1388,19 @@ impl Engine {
             #[cfg(not(feature = "no_float"))]
             Token::FloatConstant(x) => {
                 let x = x.0;
-                input.next();
+                state.input.next();
                 Expr::FloatConstant(x, settings.pos)
             }
             #[cfg(feature = "decimal")]
             Token::DecimalConstant(x) => {
                 let x = x.0;
-                input.next();
+                state.input.next();
                 Expr::DynamicConstant(Box::new(x.into()), settings.pos)
             }
 
             // { - block statement as expression
             Token::LeftBrace if settings.has_option(LangOptions::STMT_EXPR) => {
-                match self.parse_block(input, state, settings.level_up()?)? {
+                match self.parse_block(state, settings.level_up()?)? {
                     block @ Stmt::Block(..) => Expr::Stmt(Box::new(block.into())),
                     stmt => unreachable!("Stmt::Block expected but gets {:?}", stmt),
                 }
@@ -1410,11 +1408,11 @@ impl Engine {
 
             // ( - grouped expression
             Token::LeftParen => {
-                settings.pos = eat_token(input, &Token::LeftParen);
+                settings.pos = eat_token(state.input, &Token::LeftParen);
 
-                let expr = self.parse_expr(input, state, settings.level_up()?)?;
+                let expr = self.parse_expr(state, settings.level_up()?)?;
 
-                match input.next().unwrap() {
+                match state.input.next().unwrap() {
                     // ( ... )
                     (Token::RightParen, ..) => expr,
                     // ( <error>
@@ -1431,32 +1429,28 @@ impl Engine {
             }
 
             // If statement is allowed to act as expressions
-            Token::If if settings.has_option(LangOptions::IF_EXPR) => Expr::Stmt(Box::new(
-                self.parse_if(input, state, settings.level_up()?)?.into(),
-            )),
+            Token::If if settings.has_option(LangOptions::IF_EXPR) => {
+                Expr::Stmt(Box::new(self.parse_if(state, settings.level_up()?)?.into()))
+            }
             // Loops are allowed to act as expressions
             Token::While | Token::Loop
                 if self.allow_looping() && settings.has_option(LangOptions::LOOP_EXPR) =>
             {
                 Expr::Stmt(Box::new(
-                    self.parse_while_loop(input, state, settings.level_up()?)?
-                        .into(),
+                    self.parse_while_loop(state, settings.level_up()?)?.into(),
                 ))
             }
             Token::Do if self.allow_looping() && settings.has_option(LangOptions::LOOP_EXPR) => {
-                Expr::Stmt(Box::new(
-                    self.parse_do(input, state, settings.level_up()?)?.into(),
-                ))
+                Expr::Stmt(Box::new(self.parse_do(state, settings.level_up()?)?.into()))
             }
             Token::For if self.allow_looping() && settings.has_option(LangOptions::LOOP_EXPR) => {
                 Expr::Stmt(Box::new(
-                    self.parse_for(input, state, settings.level_up()?)?.into(),
+                    self.parse_for(state, settings.level_up()?)?.into(),
                 ))
             }
             // Switch statement is allowed to act as expressions
             Token::Switch if settings.has_option(LangOptions::SWITCH_EXPR) => Expr::Stmt(Box::new(
-                self.parse_switch(input, state, settings.level_up()?)?
-                    .into(),
+                self.parse_switch(state, settings.level_up()?)?.into(),
             )),
 
             // | ...
@@ -1472,12 +1466,12 @@ impl Engine {
             Token::Pipe | Token::Or if settings.has_option(LangOptions::ANON_FN) => {
                 // Build new parse state
                 let new_interner = &mut StringsInterner::new();
-                let lib = &mut <_>::default();
                 let new_state = &mut ParseState::new(
                     state.external_constants,
                     new_interner,
+                    state.input,
                     state.tokenizer_control.clone(),
-                    lib,
+                    state.lib,
                 );
 
                 // We move the strings interner to the new parse state object by swapping it...
@@ -1513,15 +1507,15 @@ impl Engine {
                     ..settings
                 };
 
-                let result = self.parse_anon_fn(input, new_state, new_settings.level_up()?, state);
+                let result = self.parse_anon_fn(new_state, new_settings.level_up()?);
 
                 // Restore the strings interner by swapping it back
                 std::mem::swap(state.interned_strings, new_state.interned_strings);
 
-                let (expr, fn_def) = result?;
+                let (expr, fn_def, _externals) = result?;
 
                 #[cfg(not(feature = "no_closure"))]
-                for Ident { name, pos } in &new_state.external_vars {
+                for Ident { name, pos } in &_externals {
                     let (index, is_func) = state.access_var(name, *pos);
 
                     if !is_func
@@ -1542,6 +1536,9 @@ impl Engine {
                 let hash_script = calc_fn_hash(None, &fn_def.name, fn_def.params.len());
                 state.lib.insert(hash_script, fn_def);
 
+                #[cfg(not(feature = "no_closure"))]
+                let expr = Self::make_curry_from_externals(state, expr, _externals, settings.pos);
+
                 expr
             }
 
@@ -1550,7 +1547,7 @@ impl Engine {
                 let mut segments = ThinVec::new();
                 let settings = settings.level_up()?;
 
-                match input.next().unwrap() {
+                match state.input.next().unwrap() {
                     (Token::InterpolatedString(s), ..) if s.is_empty() => (),
                     (Token::InterpolatedString(s), pos) => {
                         segments.push(Expr::StringConstant(state.get_interned_string(*s), pos))
@@ -1561,7 +1558,7 @@ impl Engine {
                 }
 
                 loop {
-                    let expr = match self.parse_block(input, state, settings)? {
+                    let expr = match self.parse_block(state, settings)? {
                         block @ Stmt::Block(..) => Expr::Stmt(Box::new(block.into())),
                         stmt => unreachable!("Stmt::Block expected but gets {:?}", stmt),
                     };
@@ -1573,7 +1570,7 @@ impl Engine {
                     // Make sure to parse the following as text
                     state.tokenizer_control.borrow_mut().is_within_text = true;
 
-                    match input.next().unwrap() {
+                    match state.input.next().unwrap() {
                         (Token::StringConstant(s), pos) => {
                             if !s.is_empty() {
                                 segments
@@ -1611,11 +1608,11 @@ impl Engine {
 
             // Array literal
             #[cfg(not(feature = "no_index"))]
-            Token::LeftBracket => self.parse_array_literal(input, state, settings.level_up()?)?,
+            Token::LeftBracket => self.parse_array_literal(state, settings.level_up()?)?,
 
             // Map literal
             #[cfg(not(feature = "no_object"))]
-            Token::MapStart => self.parse_map_literal(input, state, settings.level_up()?)?,
+            Token::MapStart => self.parse_map_literal(state, settings.level_up()?)?,
 
             // Custom syntax.
             #[cfg(not(feature = "no_custom_syntax"))]
@@ -1623,21 +1620,21 @@ impl Engine {
                 if self.custom_syntax.contains_key(&**key) =>
             {
                 let (key, syntax) = self.custom_syntax.get_key_value(&**key).unwrap();
-                let (.., pos) = input.next().unwrap();
+                let (.., pos) = state.input.next().unwrap();
                 let settings = settings.level_up_with_position(pos)?;
-                self.parse_custom_syntax(input, state, settings, key, syntax)?
+                self.parse_custom_syntax(state, settings, key, syntax)?
             }
 
             // Identifier
             Token::Identifier(..) => {
                 let ns = Namespace::NONE;
 
-                let s = match input.next().unwrap() {
+                let s = match state.input.next().unwrap() {
                     (Token::Identifier(s), ..) => s,
                     token => unreachable!("Token::Identifier expected but gets {:?}", token),
                 };
 
-                match input.peek().unwrap() {
+                match state.input.peek().unwrap() {
                     // Function call
                     (Token::LeftParen | Token::Bang | Token::Unit, _) => {
                         // Once the identifier consumed we must enable next variables capturing
@@ -1696,12 +1693,12 @@ impl Engine {
             Token::Reserved(..) => {
                 let ns = Namespace::NONE;
 
-                let s = match input.next().unwrap() {
+                let s = match state.input.next().unwrap() {
                     (Token::Reserved(s), ..) => s,
                     token => unreachable!("Token::Reserved expected but gets {:?}", token),
                 };
 
-                match input.peek().unwrap().0 {
+                match state.input.peek().unwrap().0 {
                     // Function call is allowed to have reserved keyword
                     Token::LeftParen | Token::Bang | Token::Unit
                         if is_reserved_keyword_or_symbol(&s).1 =>
@@ -1730,7 +1727,7 @@ impl Engine {
                 }
             }
 
-            Token::LexError(..) => match input.next().unwrap() {
+            Token::LexError(..) => match state.input.next().unwrap() {
                 (Token::LexError(err), ..) => return Err(err.into_err(settings.pos)),
                 token => unreachable!("Token::LexError expected but gets {:?}", token),
             },
@@ -1738,17 +1735,16 @@ impl Engine {
             _ => return Err(LexError::UnexpectedInput(token.to_string()).into_err(settings.pos)),
         };
 
-        if !(state.expr_filter)(&input.peek().unwrap().0) {
+        if !(state.expr_filter)(&state.input.peek().unwrap().0) {
             return Ok(root_expr);
         }
 
-        self.parse_postfix(input, state, settings, root_expr, ChainingFlags::empty())
+        self.parse_postfix(state, settings, root_expr, ChainingFlags::empty())
     }
 
     /// Tail processing of all possible postfix operators of a primary expression.
     fn parse_postfix(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         mut settings: ParseSettings,
         mut lhs: Expr,
@@ -1759,20 +1755,20 @@ impl Engine {
 
         // Tail processing all possible postfix operators
         loop {
-            let (tail_token, ..) = input.peek().unwrap();
+            let (tail_token, ..) = state.input.peek().unwrap();
 
             if !lhs.is_valid_postfix(tail_token) {
                 break;
             }
 
-            let (tail_token, tail_pos) = input.next().unwrap();
+            let (tail_token, tail_pos) = state.input.next().unwrap();
             settings.pos = tail_pos;
 
             lhs = match (lhs, tail_token) {
                 // Qualified function call with !
                 #[cfg(not(feature = "no_module"))]
                 (Expr::Variable(x, ..), Token::Bang) if !x.1.is_empty() => {
-                    return match input.peek().unwrap() {
+                    return match state.input.peek().unwrap() {
                         (Token::LeftParen | Token::Unit, ..) => {
                             Err(LexError::UnexpectedInput(Token::Bang.into()).into_err(tail_pos))
                         }
@@ -1785,7 +1781,7 @@ impl Engine {
                 }
                 // Function call with !
                 (Expr::Variable(x, .., pos), Token::Bang) => {
-                    match input.peek().unwrap() {
+                    match state.input.peek().unwrap() {
                         (Token::LeftParen | Token::Unit, ..) => (),
                         (_, pos) => {
                             return Err(PERR::MissingToken(
@@ -1796,12 +1792,12 @@ impl Engine {
                         }
                     }
 
-                    let no_args = input.next().unwrap().0 == Token::Unit;
+                    let no_args = state.input.next().unwrap().0 == Token::Unit;
 
                     let (.., ns, _, name) = *x;
                     settings.pos = pos;
 
-                    self.parse_fn_call(input, state, settings, name, no_args, true, ns)?
+                    self.parse_fn_call(state, settings, name, no_args, true, ns)?
                 }
                 // Function call
                 (Expr::Variable(x, .., pos), t @ (Token::LeftParen | Token::Unit)) => {
@@ -1809,7 +1805,7 @@ impl Engine {
                     let no_args = t == Token::Unit;
                     settings.pos = pos;
 
-                    self.parse_fn_call(input, state, settings, name, no_args, false, ns)?
+                    self.parse_fn_call(state, settings, name, no_args, false, ns)?
                 }
                 // Disallowed module separator
                 #[cfg(not(feature = "no_module"))]
@@ -1825,7 +1821,7 @@ impl Engine {
                 // module access
                 #[cfg(not(feature = "no_module"))]
                 (Expr::Variable(x, .., pos), Token::DoubleColon) => {
-                    let (id2, pos2) = parse_var_name(input)?;
+                    let (id2, pos2) = parse_var_name(state.input)?;
                     let (.., mut namespace, _, name) = *x;
                     let var_name_def = Ident { name, pos };
 
@@ -1844,13 +1840,13 @@ impl Engine {
                         _ => unreachable!("`[` or `?[`"),
                     };
                     let settings = settings.level_up()?;
-                    self.parse_index_chain(input, state, settings, expr, opt, true)?
+                    self.parse_index_chain(state, settings, expr, opt, true)?
                 }
                 // Property access
                 #[cfg(not(feature = "no_object"))]
                 (expr, op @ (Token::Period | Token::Elvis)) => {
                     // Expression after dot must start with an identifier
-                    match input.peek().unwrap() {
+                    match state.input.peek().unwrap() {
                         (Token::Identifier(..), ..) => {
                             // Prevents capturing of the object properties as vars: xxx.<var>
                             state.allow_capture = false;
@@ -1868,7 +1864,7 @@ impl Engine {
                         _ => unreachable!("`.` or `?.`"),
                     };
                     let options = ChainingFlags::PROPERTY | ChainingFlags::DISALLOW_NAMESPACES;
-                    let rhs = self.parse_primary(input, state, settings.level_up()?, options)?;
+                    let rhs = self.parse_primary(state, settings.level_up()?, options)?;
 
                     Self::make_dot_expr(state, expr, rhs, _parent_options, op_flags, tail_pos)?
                 }
@@ -1938,11 +1934,10 @@ impl Engine {
     /// Parse a potential unary operator.
     fn parse_unary(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         mut settings: ParseSettings,
     ) -> ParseResult<Expr> {
-        let (token, token_pos) = input.peek().unwrap();
+        let (token, token_pos) = state.input.peek().unwrap();
 
         if !(state.expr_filter)(token) {
             return Err(LexError::UnexpectedInput(token.to_string()).into_err(*token_pos));
@@ -1954,9 +1949,9 @@ impl Engine {
             // -expr
             Token::Minus | Token::UnaryMinus => {
                 let token = token.clone();
-                let pos = eat_token(input, &token);
+                let pos = eat_token(state.input, &token);
 
-                match self.parse_unary(input, state, settings.level_up()?)? {
+                match self.parse_unary(state, settings.level_up()?)? {
                     // Negative integer
                     Expr::IntegerConstant(num, ..) => num
                         .checked_neg()
@@ -1988,9 +1983,9 @@ impl Engine {
             // +expr
             Token::Plus | Token::UnaryPlus => {
                 let token = token.clone();
-                let pos = eat_token(input, &token);
+                let pos = eat_token(state.input, &token);
 
-                match self.parse_unary(input, state, settings.level_up()?)? {
+                match self.parse_unary(state, settings.level_up()?)? {
                     expr @ Expr::IntegerConstant(..) => Ok(expr),
                     #[cfg(not(feature = "no_float"))]
                     expr @ Expr::FloatConstant(..) => Ok(expr),
@@ -2010,14 +2005,14 @@ impl Engine {
             // !expr
             Token::Bang => {
                 let token = token.clone();
-                let pos = eat_token(input, &Token::Bang);
+                let pos = eat_token(state.input, &Token::Bang);
 
                 Ok(FnCallExpr {
                     namespace: Namespace::NONE,
                     name: state.get_interned_string("!"),
                     hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "!", 1)),
                     args: {
-                        let expr = self.parse_unary(input, state, settings.level_up()?)?;
+                        let expr = self.parse_unary(state, settings.level_up()?)?;
                         IntoIterator::into_iter([expr]).collect()
                     },
                     op_token: Some(token),
@@ -2028,7 +2023,7 @@ impl Engine {
             // <EOF>
             Token::EOF => Err(PERR::UnexpectedEOF.into_err(settings.pos)),
             // All other tokens
-            _ => self.parse_primary(input, state, settings, ChainingFlags::empty()),
+            _ => self.parse_primary(state, settings, ChainingFlags::empty()),
         }
     }
 
@@ -2300,7 +2295,6 @@ impl Engine {
     /// Parse a binary expression (if any).
     fn parse_binary_op(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         mut settings: ParseSettings,
         parent_precedence: Option<Precedence>,
@@ -2311,7 +2305,7 @@ impl Engine {
         let mut root = lhs;
 
         loop {
-            let (current_op, current_pos) = input.peek().unwrap();
+            let (current_op, current_pos) = state.input.peek().unwrap();
 
             if !(state.expr_filter)(current_op) {
                 return Ok(root);
@@ -2337,11 +2331,11 @@ impl Engine {
                 return Ok(root);
             }
 
-            let (op_token, pos) = input.next().unwrap();
+            let (op_token, pos) = state.input.next().unwrap();
 
-            let rhs = self.parse_unary(input, state, settings)?;
+            let rhs = self.parse_unary(state, settings)?;
 
-            let (next_op, next_pos) = input.peek().unwrap();
+            let (next_op, next_pos) = state.input.peek().unwrap();
             let next_precedence = match next_op {
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(c) => self
@@ -2359,7 +2353,7 @@ impl Engine {
             // If same precedence, then check if the operator binds right
             let rhs =
                 if (precedence == next_precedence && bind_right) || precedence < next_precedence {
-                    self.parse_binary_op(input, state, settings.level_up()?, precedence, rhs)?
+                    self.parse_binary_op(state, settings.level_up()?, precedence, rhs)?
                 } else {
                     // Otherwise bind to left (even if next operator has the same precedence)
                     rhs
@@ -2459,7 +2453,6 @@ impl Engine {
     #[cfg(not(feature = "no_custom_syntax"))]
     fn parse_custom_syntax(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         mut settings: ParseSettings,
         key: impl Into<ImmutableString>,
@@ -2493,7 +2486,7 @@ impl Engine {
         segments.push(required_token.clone());
 
         loop {
-            let (fwd_token, fwd_pos) = input.peek().unwrap();
+            let (fwd_token, fwd_pos) = state.input.peek().unwrap();
             settings.pos = *fwd_pos;
             let settings = settings.level_up()?;
 
@@ -2512,7 +2505,7 @@ impl Engine {
 
             match required_token.as_str() {
                 CUSTOM_SYNTAX_MARKER_IDENT => {
-                    let (name, pos) = parse_var_name(input)?;
+                    let (name, pos) = parse_var_name(state.input)?;
                     let name = state.get_interned_string(name);
 
                     let ns = Namespace::NONE;
@@ -2522,7 +2515,7 @@ impl Engine {
                     inputs.push(Expr::Variable((None, ns, 0, name).into(), None, pos));
                 }
                 CUSTOM_SYNTAX_MARKER_SYMBOL => {
-                    let (symbol, pos) = match input.next().unwrap() {
+                    let (symbol, pos) = match state.input.next().unwrap() {
                         // Standard symbol
                         (token, pos) if token.is_standard_symbol() => {
                             Ok((token.literal_syntax().into(), pos))
@@ -2542,12 +2535,12 @@ impl Engine {
                     inputs.push(Expr::StringConstant(symbol, pos));
                 }
                 CUSTOM_SYNTAX_MARKER_EXPR => {
-                    inputs.push(self.parse_expr(input, state, settings)?);
+                    inputs.push(self.parse_expr(state, settings)?);
                     let keyword = state.get_interned_string(CUSTOM_SYNTAX_MARKER_EXPR);
                     segments.push(keyword.clone());
                     tokens.push(keyword);
                 }
-                CUSTOM_SYNTAX_MARKER_BLOCK => match self.parse_block(input, state, settings)? {
+                CUSTOM_SYNTAX_MARKER_BLOCK => match self.parse_block(state, settings)? {
                     block @ Stmt::Block(..) => {
                         inputs.push(Expr::Stmt(Box::new(block.into())));
                         let keyword = state.get_interned_string(CUSTOM_SYNTAX_MARKER_BLOCK);
@@ -2556,7 +2549,7 @@ impl Engine {
                     }
                     stmt => unreachable!("Stmt::Block expected but gets {:?}", stmt),
                 },
-                CUSTOM_SYNTAX_MARKER_BOOL => match input.next().unwrap() {
+                CUSTOM_SYNTAX_MARKER_BOOL => match state.input.next().unwrap() {
                     (b @ (Token::True | Token::False), pos) => {
                         inputs.push(Expr::BoolConstant(b == Token::True, pos));
                         segments.push(state.get_interned_string(b.literal_syntax()));
@@ -2568,7 +2561,7 @@ impl Engine {
                         )
                     }
                 },
-                CUSTOM_SYNTAX_MARKER_INT => match input.next().unwrap() {
+                CUSTOM_SYNTAX_MARKER_INT => match state.input.next().unwrap() {
                     (Token::IntegerConstant(i), pos) => {
                         inputs.push(Expr::IntegerConstant(i, pos));
                         segments.push(i.to_string().into());
@@ -2581,7 +2574,7 @@ impl Engine {
                     }
                 },
                 #[cfg(not(feature = "no_float"))]
-                CUSTOM_SYNTAX_MARKER_FLOAT => match input.next().unwrap() {
+                CUSTOM_SYNTAX_MARKER_FLOAT => match state.input.next().unwrap() {
                     (Token::FloatConstant(f), pos) => {
                         inputs.push(Expr::FloatConstant(f.0, pos));
                         segments.push(f.1.into());
@@ -2594,7 +2587,7 @@ impl Engine {
                         )
                     }
                 },
-                CUSTOM_SYNTAX_MARKER_STRING => match input.next().unwrap() {
+                CUSTOM_SYNTAX_MARKER_STRING => match state.input.next().unwrap() {
                     (Token::StringConstant(s), pos) => {
                         let s = state.get_interned_string(*s);
                         inputs.push(Expr::StringConstant(s.clone(), pos));
@@ -2605,7 +2598,7 @@ impl Engine {
                         return Err(PERR::MissingSymbol("Expecting a string".into()).into_err(pos))
                     }
                 },
-                s => match input.next().unwrap() {
+                s => match state.input.next().unwrap() {
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
                     (Token::Identifier(t) | Token::Reserved(t) | Token::Custom(t), ..)
                         if *t == s =>
@@ -2653,46 +2646,34 @@ impl Engine {
     }
 
     /// Parse an expression.
-    fn parse_expr(
-        &self,
-        input: &mut TokenStream,
-        state: &mut ParseState,
-        mut settings: ParseSettings,
-    ) -> ParseResult<Expr> {
-        settings.pos = input.peek().unwrap().1;
+    fn parse_expr(&self, state: &mut ParseState, mut settings: ParseSettings) -> ParseResult<Expr> {
+        settings.pos = state.input.peek().unwrap().1;
 
         // Parse expression normally.
         let precedence = Precedence::new(1);
         let settings = settings.level_up()?;
-        let lhs = self.parse_unary(input, state, settings)?;
-        self.parse_binary_op(input, state, settings, precedence, lhs)
+        let lhs = self.parse_unary(state, settings)?;
+        self.parse_binary_op(state, settings, precedence, lhs)
     }
 
     /// Parse an if statement.
-    fn parse_if(
-        &self,
-        input: &mut TokenStream,
-        state: &mut ParseState,
-        settings: ParseSettings,
-    ) -> ParseResult<Stmt> {
+    fn parse_if(&self, state: &mut ParseState, settings: ParseSettings) -> ParseResult<Stmt> {
         // if ...
-        let settings = settings.level_up_with_position(eat_token(input, &Token::If))?;
+        let settings = settings.level_up_with_position(eat_token(state.input, &Token::If))?;
 
         // if guard { if_body }
-        ensure_not_statement_expr(input, "a boolean")?;
-        let expr = self
-            .parse_expr(input, state, settings)?
-            .ensure_bool_expr()?;
-        ensure_not_assignment(input)?;
-        let body = self.parse_block(input, state, settings)?.into();
+        ensure_not_statement_expr(state.input, "a boolean")?;
+        let expr = self.parse_expr(state, settings)?.ensure_bool_expr()?;
+        ensure_not_assignment(state.input)?;
+        let body = self.parse_block(state, settings)?.into();
 
         // if guard { if_body } else ...
-        let branch = if match_token(input, &Token::Else).0 {
-            match input.peek().unwrap() {
+        let branch = if match_token(state.input, &Token::Else).0 {
+            match state.input.peek().unwrap() {
                 // if guard { if_body } else if ...
-                (Token::If, ..) => self.parse_if(input, state, settings)?,
+                (Token::If, ..) => self.parse_if(state, settings)?,
                 // if guard { if_body } else { else-body }
-                _ => self.parse_block(input, state, settings)?,
+                _ => self.parse_block(state, settings)?,
             }
         } else {
             Stmt::Noop(Position::NONE)
@@ -2708,20 +2689,17 @@ impl Engine {
     /// Parse a while loop.
     fn parse_while_loop(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         let mut settings = settings.level_up()?;
 
         // while|loops ...
-        let (expr, token_pos) = match input.next().unwrap() {
+        let (expr, token_pos) = match state.input.next().unwrap() {
             (Token::While, pos) => {
-                ensure_not_statement_expr(input, "a boolean")?;
-                let expr = self
-                    .parse_expr(input, state, settings)?
-                    .ensure_bool_expr()?;
-                ensure_not_assignment(input)?;
+                ensure_not_statement_expr(state.input, "a boolean")?;
+                let expr = self.parse_expr(state, settings)?.ensure_bool_expr()?;
+                ensure_not_assignment(state.input)?;
                 (expr, pos)
             }
             (Token::Loop, pos) => (Expr::Unit(Position::NONE), pos),
@@ -2730,7 +2708,7 @@ impl Engine {
         settings.pos = token_pos;
         settings.flags |= ParseSettingFlags::BREAKABLE;
 
-        let body = self.parse_block(input, state, settings)?.into();
+        let body = self.parse_block(state, settings)?.into();
         let branch = StmtBlock::NONE;
 
         Ok(Stmt::While(
@@ -2740,22 +2718,17 @@ impl Engine {
     }
 
     /// Parse a do loop.
-    fn parse_do(
-        &self,
-        input: &mut TokenStream,
-        state: &mut ParseState,
-        settings: ParseSettings,
-    ) -> ParseResult<Stmt> {
+    fn parse_do(&self, state: &mut ParseState, settings: ParseSettings) -> ParseResult<Stmt> {
         // do ...
-        let mut settings = settings.level_up_with_position(eat_token(input, &Token::Do))?;
+        let mut settings = settings.level_up_with_position(eat_token(state.input, &Token::Do))?;
         let orig_breakable = settings.has_flag(ParseSettingFlags::BREAKABLE);
         settings.flags |= ParseSettingFlags::BREAKABLE;
 
         // do { body } [while|until] guard
 
-        let body = self.parse_block(input, state, settings)?.into();
+        let body = self.parse_block(state, settings)?.into();
 
-        let negated = match input.next().unwrap() {
+        let negated = match state.input.next().unwrap() {
             (Token::While, ..) => ASTFlags::empty(),
             (Token::Until, ..) => ASTFlags::NEGATED,
             (.., pos) => {
@@ -2770,11 +2743,9 @@ impl Engine {
             settings.flags.remove(ParseSettingFlags::BREAKABLE);
         }
 
-        ensure_not_statement_expr(input, "a boolean")?;
-        let expr = self
-            .parse_expr(input, state, settings)?
-            .ensure_bool_expr()?;
-        ensure_not_assignment(input)?;
+        ensure_not_statement_expr(state.input, "a boolean")?;
+        let expr = self.parse_expr(state, settings)?.ensure_bool_expr()?;
+        ensure_not_assignment(state.input)?;
 
         let branch = StmtBlock::NONE;
 
@@ -2786,51 +2757,46 @@ impl Engine {
     }
 
     /// Parse a for loop.
-    fn parse_for(
-        &self,
-        input: &mut TokenStream,
-        state: &mut ParseState,
-        settings: ParseSettings,
-    ) -> ParseResult<Stmt> {
+    fn parse_for(&self, state: &mut ParseState, settings: ParseSettings) -> ParseResult<Stmt> {
         // for ...
-        let mut settings = settings.level_up_with_position(eat_token(input, &Token::For))?;
+        let mut settings = settings.level_up_with_position(eat_token(state.input, &Token::For))?;
 
         // for name ...
-        let (name, name_pos, counter_name, counter_pos) = if match_token(input, &Token::LeftParen).0
-        {
-            // ( name, counter )
-            let (name, name_pos) = parse_var_name(input)?;
-            let (has_comma, pos) = match_token(input, &Token::Comma);
-            if !has_comma {
-                return Err(PERR::MissingToken(
-                    Token::Comma.into(),
-                    "after the iteration variable name".into(),
-                )
-                .into_err(pos));
-            }
-            let (counter_name, counter_pos) = parse_var_name(input)?;
+        let (name, name_pos, counter_name, counter_pos) =
+            if match_token(state.input, &Token::LeftParen).0 {
+                // ( name, counter )
+                let (name, name_pos) = parse_var_name(state.input)?;
+                let (has_comma, pos) = match_token(state.input, &Token::Comma);
+                if !has_comma {
+                    return Err(PERR::MissingToken(
+                        Token::Comma.into(),
+                        "after the iteration variable name".into(),
+                    )
+                    .into_err(pos));
+                }
+                let (counter_name, counter_pos) = parse_var_name(state.input)?;
 
-            if counter_name == name {
-                return Err(PERR::DuplicatedVariable(counter_name.into()).into_err(counter_pos));
-            }
+                if counter_name == name {
+                    return Err(PERR::DuplicatedVariable(counter_name.into()).into_err(counter_pos));
+                }
 
-            let (has_close_paren, pos) = match_token(input, &Token::RightParen);
-            if !has_close_paren {
-                return Err(PERR::MissingToken(
-                    Token::RightParen.into(),
-                    "to close the iteration variable".into(),
-                )
-                .into_err(pos));
-            }
-            (name, name_pos, Some(counter_name), counter_pos)
-        } else {
-            // name
-            let (name, name_pos) = parse_var_name(input)?;
-            (name, name_pos, None, Position::NONE)
-        };
+                let (has_close_paren, pos) = match_token(state.input, &Token::RightParen);
+                if !has_close_paren {
+                    return Err(PERR::MissingToken(
+                        Token::RightParen.into(),
+                        "to close the iteration variable".into(),
+                    )
+                    .into_err(pos));
+                }
+                (name, name_pos, Some(counter_name), counter_pos)
+            } else {
+                // name
+                let (name, name_pos) = parse_var_name(state.input)?;
+                (name, name_pos, None, Position::NONE)
+            };
 
         // for name in ...
-        match input.next().unwrap() {
+        match state.input.next().unwrap() {
             (Token::In, ..) => (),
             (Token::LexError(err), pos) => return Err(err.into_err(pos)),
             (.., pos) => {
@@ -2843,8 +2809,8 @@ impl Engine {
         }
 
         // for name in expr { body }
-        ensure_not_statement_expr(input, "a boolean")?;
-        let expr = self.parse_expr(input, state, settings)?.ensure_iterable()?;
+        ensure_not_statement_expr(state.input, "a boolean")?;
+        let expr = self.parse_expr(state, settings)?.ensure_iterable()?;
 
         let counter_var = counter_name.map(|counter_name| Ident {
             name: state.get_interned_string(counter_name),
@@ -2868,7 +2834,7 @@ impl Engine {
         };
 
         settings.flags |= ParseSettingFlags::BREAKABLE;
-        let body = self.parse_block(input, state, settings)?.into();
+        let body = self.parse_block(state, settings)?.into();
 
         state.stack.rewind(prev_stack_len);
 
@@ -2883,17 +2849,16 @@ impl Engine {
     /// Parse a variable definition statement.
     fn parse_let(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         mut settings: ParseSettings,
         access: AccessMode,
         is_export: bool,
     ) -> ParseResult<Stmt> {
         // let/const... (specified in `var_type`)
-        settings.pos = input.next().unwrap().1;
+        settings.pos = state.input.next().unwrap().1;
 
         // let name ...
-        let (name, pos) = parse_var_name(input)?;
+        let (name, pos) = parse_var_name(state.input)?;
 
         if !self.allow_shadowing() && state.stack.get(&name).is_some() {
             return Err(PERR::VariableExists(name.into()).into_err(pos));
@@ -2927,9 +2892,9 @@ impl Engine {
         let name = state.get_interned_string(name);
 
         // let name = ...
-        let expr = if match_token(input, &Token::Equals).0 {
+        let expr = if match_token(state.input, &Token::Equals).0 {
             // let name = expr
-            self.parse_expr(input, state, settings.level_up()?)?
+            self.parse_expr(state, settings.level_up()?)?
         } else {
             Expr::Unit(Position::NONE)
         };
@@ -2982,21 +2947,16 @@ impl Engine {
 
     /// Parse an import statement.
     #[cfg(not(feature = "no_module"))]
-    fn parse_import(
-        &self,
-        input: &mut TokenStream,
-        state: &mut ParseState,
-        settings: ParseSettings,
-    ) -> ParseResult<Stmt> {
+    fn parse_import(&self, state: &mut ParseState, settings: ParseSettings) -> ParseResult<Stmt> {
         // import ...
-        let settings = settings.level_up_with_position(eat_token(input, &Token::Import))?;
+        let settings = settings.level_up_with_position(eat_token(state.input, &Token::Import))?;
 
         // import expr ...
-        let expr = self.parse_expr(input, state, settings)?;
+        let expr = self.parse_expr(state, settings)?;
 
-        let export = if match_token(input, &Token::As).0 {
+        let export = if match_token(state.input, &Token::As).0 {
             // import expr as name ...
-            let (name, pos) = parse_var_name(input)?;
+            let (name, pos) = parse_var_name(state.input)?;
             Ident {
                 name: state.get_interned_string(name),
                 pos,
@@ -3018,36 +2978,33 @@ impl Engine {
     #[cfg(not(feature = "no_module"))]
     fn parse_export(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         mut settings: ParseSettings,
     ) -> ParseResult<Stmt> {
-        settings.pos = eat_token(input, &Token::Export);
+        settings.pos = eat_token(state.input, &Token::Export);
 
-        match input.peek().unwrap() {
+        match state.input.peek().unwrap() {
             (Token::Let, pos) => {
                 let pos = *pos;
                 let settings = settings.level_up()?;
-                let mut stmt =
-                    self.parse_let(input, state, settings, AccessMode::ReadWrite, true)?;
+                let mut stmt = self.parse_let(state, settings, AccessMode::ReadWrite, true)?;
                 stmt.set_position(pos);
                 return Ok(stmt);
             }
             (Token::Const, pos) => {
                 let pos = *pos;
                 let settings = settings.level_up()?;
-                let mut stmt =
-                    self.parse_let(input, state, settings, AccessMode::ReadOnly, true)?;
+                let mut stmt = self.parse_let(state, settings, AccessMode::ReadOnly, true)?;
                 stmt.set_position(pos);
                 return Ok(stmt);
             }
             _ => (),
         }
 
-        let (id, id_pos) = parse_var_name(input)?;
+        let (id, id_pos) = parse_var_name(state.input)?;
 
-        let (alias, alias_pos) = if match_token(input, &Token::As).0 {
-            parse_var_name(input).map(|(name, pos)| (state.get_interned_string(name), pos))?
+        let (alias, alias_pos) = if match_token(state.input, &Token::As).0 {
+            parse_var_name(state.input).map(|(name, pos)| (state.get_interned_string(name), pos))?
         } else {
             (state.get_interned_string(""), Position::NONE)
         };
@@ -3075,14 +3032,9 @@ impl Engine {
     }
 
     /// Parse a statement block.
-    fn parse_block(
-        &self,
-        input: &mut TokenStream,
-        state: &mut ParseState,
-        settings: ParseSettings,
-    ) -> ParseResult<Stmt> {
+    fn parse_block(&self, state: &mut ParseState, settings: ParseSettings) -> ParseResult<Stmt> {
         // Must start with {
-        let brace_start_pos = match input.next().unwrap() {
+        let brace_start_pos = match state.input.next().unwrap() {
             (Token::LeftBrace, pos) => pos,
             (Token::LexError(err), pos) => return Err(err.into_err(pos)),
             (.., pos) => {
@@ -3098,11 +3050,11 @@ impl Engine {
         let mut block = StmtBlock::empty(settings.pos);
 
         if settings.has_flag(ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS) {
-            let stmt = self.parse_expr_stmt(input, state, settings)?;
+            let stmt = self.parse_expr_stmt(state, settings)?;
             block.statements_mut().push(stmt);
 
             // Must end with }
-            return match input.next().unwrap() {
+            return match state.input.next().unwrap() {
                 (Token::RightBrace, pos) => {
                     Ok(Stmt::Block(StmtBlock::new(block, settings.pos, pos).into()))
                 }
@@ -3123,8 +3075,8 @@ impl Engine {
 
         let end_pos = loop {
             // Terminated?
-            match input.peek().unwrap() {
-                (Token::RightBrace, ..) => break eat_token(input, &Token::RightBrace),
+            match state.input.peek().unwrap() {
+                (Token::RightBrace, ..) => break eat_token(state.input, &Token::RightBrace),
                 (Token::EOF, pos) => {
                     return Err(PERR::MissingToken(
                         Token::RightBrace.into(),
@@ -3138,7 +3090,7 @@ impl Engine {
             // Parse statements inside the block
             settings.flags.remove(ParseSettingFlags::GLOBAL_LEVEL);
 
-            let stmt = self.parse_stmt(input, state, settings)?;
+            let stmt = self.parse_stmt(state, settings)?;
 
             if stmt.is_noop() {
                 continue;
@@ -3149,16 +3101,16 @@ impl Engine {
 
             block.statements_mut().push(stmt);
 
-            match input.peek().unwrap() {
+            match state.input.peek().unwrap() {
                 // { ... stmt }
-                (Token::RightBrace, ..) => break eat_token(input, &Token::RightBrace),
+                (Token::RightBrace, ..) => break eat_token(state.input, &Token::RightBrace),
                 // { ... stmt;
                 (Token::SemiColon, ..) if need_semicolon => {
-                    eat_token(input, &Token::SemiColon);
+                    eat_token(state.input, &Token::SemiColon);
                 }
                 // { ... { stmt } ;
                 (Token::SemiColon, ..) if !need_semicolon => {
-                    eat_token(input, &Token::SemiColon);
+                    eat_token(state.input, &Token::SemiColon);
                 }
                 // { ... { stmt } ???
                 _ if !need_semicolon => (),
@@ -3190,20 +3142,19 @@ impl Engine {
     /// Parse an expression as a statement.
     fn parse_expr_stmt(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         mut settings: ParseSettings,
     ) -> ParseResult<Stmt> {
-        settings.pos = input.peek().unwrap().1;
+        settings.pos = state.input.peek().unwrap().1;
 
-        let expr = self.parse_expr(input, state, settings)?;
+        let expr = self.parse_expr(state, settings)?;
 
-        let (op, pos) = match input.peek().unwrap() {
+        let (op, pos) = match state.input.peek().unwrap() {
             // var = ...
-            (Token::Equals, ..) => (None, eat_token(input, &Token::Equals)),
+            (Token::Equals, ..) => (None, eat_token(state.input, &Token::Equals)),
             // var op= ...
             (token, ..) if token.is_op_assignment() => {
-                input.next().map(|(op, pos)| (Some(op), pos)).unwrap()
+                state.input.next().map(|(op, pos)| (Some(op), pos)).unwrap()
             }
             // Not op-assignment
             _ => return Ok(Stmt::Expr(expr.into())),
@@ -3211,18 +3162,13 @@ impl Engine {
 
         settings.pos = pos;
 
-        let rhs = self.parse_expr(input, state, settings)?;
+        let rhs = self.parse_expr(state, settings)?;
 
         Self::make_assignment_stmt(op, state, expr, rhs, pos)
     }
 
     /// Parse a single statement.
-    fn parse_stmt(
-        &self,
-        input: &mut TokenStream,
-        state: &mut ParseState,
-        mut settings: ParseSettings,
-    ) -> ParseResult<Stmt> {
+    fn parse_stmt(&self, state: &mut ParseState, mut settings: ParseSettings) -> ParseResult<Stmt> {
         use AccessMode::{ReadOnly, ReadWrite};
 
         #[cfg(not(feature = "no_function"))]
@@ -3233,7 +3179,7 @@ impl Engine {
             let mut buf = SmartString::new_const();
 
             // Handle doc-comments.
-            while let (Token::Comment(ref comment), pos) = input.peek().unwrap() {
+            while let (Token::Comment(ref comment), pos) = state.input.peek().unwrap() {
                 if comments_pos.is_none() {
                     comments_pos = *pos;
                 }
@@ -3248,7 +3194,7 @@ impl Engine {
                     return Err(PERR::WrongDocComment.into_err(comments_pos));
                 }
 
-                match input.next().unwrap() {
+                match state.input.next().unwrap() {
                     (Token::Comment(comment), pos) => {
                         if comment.contains('\n') {
                             // Assume block comment
@@ -3266,7 +3212,7 @@ impl Engine {
                             buf.push_str(&comment);
                         }
 
-                        match input.peek().unwrap() {
+                        match state.input.peek().unwrap() {
                             (Token::Fn | Token::Private, ..) => break,
                             (Token::Comment(..), ..) => (),
                             _ => return Err(PERR::WrongDocComment.into_err(comments_pos)),
@@ -3283,7 +3229,7 @@ impl Engine {
             comments
         };
 
-        let (token, token_pos) = match input.peek().unwrap() {
+        let (token, token_pos) = match state.input.peek().unwrap() {
             (Token::EOF, pos) => return Ok(Stmt::Noop(*pos)),
             (x, pos) => (x, *pos),
         };
@@ -3293,12 +3239,12 @@ impl Engine {
         match token {
             // ; - empty statement
             Token::SemiColon => {
-                eat_token(input, &Token::SemiColon);
+                eat_token(state.input, &Token::SemiColon);
                 Ok(Stmt::Noop(token_pos))
             }
 
             // { - statements block
-            Token::LeftBrace => Ok(self.parse_block(input, state, settings.level_up()?)?),
+            Token::LeftBrace => Ok(self.parse_block(state, settings.level_up()?)?),
 
             // fn ...
             #[cfg(not(feature = "no_function"))]
@@ -3309,13 +3255,13 @@ impl Engine {
             #[cfg(not(feature = "no_function"))]
             Token::Fn | Token::Private => {
                 let access = if matches!(token, Token::Private) {
-                    eat_token(input, &Token::Private);
+                    eat_token(state.input, &Token::Private);
                     crate::FnAccess::Private
                 } else {
                     crate::FnAccess::Public
                 };
 
-                match input.next().unwrap() {
+                match state.input.next().unwrap() {
                     #[cfg(not(feature = "unchecked"))]
                     (Token::Fn, pos) if state.lib.len() >= self.max_functions() => {
                         Err(PERR::TooManyFunctions.into_err(pos))
@@ -3325,6 +3271,7 @@ impl Engine {
                         let new_state = &mut ParseState::new(
                             state.external_constants,
                             state.interned_strings,
+                            state.input,
                             state.tokenizer_control.clone(),
                             state.lib,
                         );
@@ -3358,7 +3305,6 @@ impl Engine {
                         };
 
                         let f = self.parse_fn(
-                            input,
                             new_state,
                             new_settings,
                             access,
@@ -3395,28 +3341,26 @@ impl Engine {
                 }
             }
 
-            Token::If => self.parse_if(input, state, settings.level_up()?),
-            Token::Switch => self.parse_switch(input, state, settings.level_up()?),
+            Token::If => self.parse_if(state, settings.level_up()?),
+            Token::Switch => self.parse_switch(state, settings.level_up()?),
             Token::While | Token::Loop if self.allow_looping() => {
-                self.parse_while_loop(input, state, settings.level_up()?)
+                self.parse_while_loop(state, settings.level_up()?)
             }
-            Token::Do if self.allow_looping() => self.parse_do(input, state, settings.level_up()?),
-            Token::For if self.allow_looping() => {
-                self.parse_for(input, state, settings.level_up()?)
-            }
+            Token::Do if self.allow_looping() => self.parse_do(state, settings.level_up()?),
+            Token::For if self.allow_looping() => self.parse_for(state, settings.level_up()?),
 
             Token::Continue
                 if self.allow_looping() && settings.has_flag(ParseSettingFlags::BREAKABLE) =>
             {
-                let pos = eat_token(input, &Token::Continue);
+                let pos = eat_token(state.input, &Token::Continue);
                 Ok(Stmt::BreakLoop(None, ASTFlags::empty(), pos))
             }
             Token::Break
                 if self.allow_looping() && settings.has_flag(ParseSettingFlags::BREAKABLE) =>
             {
-                let pos = eat_token(input, &Token::Break);
+                let pos = eat_token(state.input, &Token::Break);
 
-                let expr = match input.peek().unwrap() {
+                let expr = match state.input.peek().unwrap() {
                     // `break` at <EOF>
                     (Token::EOF, ..) => None,
                     // `break` at end of block
@@ -3424,7 +3368,7 @@ impl Engine {
                     // `break;`
                     (Token::SemiColon, ..) => None,
                     // `break`  with expression
-                    _ => Some(self.parse_expr(input, state, settings.level_up()?)?.into()),
+                    _ => Some(self.parse_expr(state, settings.level_up()?)?.into()),
                 };
 
                 Ok(Stmt::BreakLoop(expr, ASTFlags::BREAK, pos))
@@ -3434,7 +3378,8 @@ impl Engine {
             }
 
             Token::Return | Token::Throw => {
-                let (return_type, token_pos) = input
+                let (return_type, token_pos) = state
+                    .input
                     .next()
                     .map(|(token, pos)| {
                         let flags = match token {
@@ -3449,7 +3394,7 @@ impl Engine {
                     })
                     .unwrap();
 
-                match input.peek().unwrap() {
+                match state.input.peek().unwrap() {
                     // `return`/`throw` at <EOF>
                     (Token::EOF, ..) => Ok(Stmt::Return(None, return_type, token_pos)),
                     // `return`/`throw` at end of block
@@ -3462,19 +3407,19 @@ impl Engine {
                     (Token::SemiColon, ..) => Ok(Stmt::Return(None, return_type, token_pos)),
                     // `return` or `throw` with expression
                     _ => {
-                        let expr = self.parse_expr(input, state, settings.level_up()?)?;
+                        let expr = self.parse_expr(state, settings.level_up()?)?;
                         Ok(Stmt::Return(Some(expr.into()), return_type, token_pos))
                     }
                 }
             }
 
-            Token::Try => self.parse_try_catch(input, state, settings.level_up()?),
+            Token::Try => self.parse_try_catch(state, settings.level_up()?),
 
-            Token::Let => self.parse_let(input, state, settings.level_up()?, ReadWrite, false),
-            Token::Const => self.parse_let(input, state, settings.level_up()?, ReadOnly, false),
+            Token::Let => self.parse_let(state, settings.level_up()?, ReadWrite, false),
+            Token::Const => self.parse_let(state, settings.level_up()?, ReadOnly, false),
 
             #[cfg(not(feature = "no_module"))]
-            Token::Import => self.parse_import(input, state, settings.level_up()?),
+            Token::Import => self.parse_import(state, settings.level_up()?),
 
             #[cfg(not(feature = "no_module"))]
             Token::Export if !settings.has_flag(ParseSettingFlags::GLOBAL_LEVEL) => {
@@ -3482,27 +3427,26 @@ impl Engine {
             }
 
             #[cfg(not(feature = "no_module"))]
-            Token::Export => self.parse_export(input, state, settings.level_up()?),
+            Token::Export => self.parse_export(state, settings.level_up()?),
 
-            _ => self.parse_expr_stmt(input, state, settings.level_up()?),
+            _ => self.parse_expr_stmt(state, settings.level_up()?),
         }
     }
 
     /// Parse a try/catch statement.
     fn parse_try_catch(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         settings: ParseSettings,
     ) -> ParseResult<Stmt> {
         // try ...
-        let settings = settings.level_up_with_position(eat_token(input, &Token::Try))?;
+        let settings = settings.level_up_with_position(eat_token(state.input, &Token::Try))?;
 
         // try { try_block }
-        let body = self.parse_block(input, state, settings)?.into();
+        let body = self.parse_block(state, settings)?.into();
 
         // try { try_block } catch
-        let (matched, catch_pos) = match_token(input, &Token::Catch);
+        let (matched, catch_pos) = match_token(state.input, &Token::Catch);
 
         if !matched {
             return Err(
@@ -3512,9 +3456,9 @@ impl Engine {
         }
 
         // try { try_block } catch (
-        let catch_var = if match_token(input, &Token::LeftParen).0 {
-            let (name, pos) = parse_var_name(input)?;
-            let (matched, err_pos) = match_token(input, &Token::RightParen);
+        let catch_var = if match_token(state.input, &Token::LeftParen).0 {
+            let (name, pos) = parse_var_name(state.input)?;
+            let (matched, err_pos) = match_token(state.input, &Token::RightParen);
 
             if !matched {
                 return Err(PERR::MissingToken(
@@ -3535,7 +3479,7 @@ impl Engine {
         };
 
         // try { try_block } catch ( var ) { catch_block }
-        let branch = self.parse_block(input, state, settings)?.into();
+        let branch = self.parse_block(state, settings)?.into();
 
         let expr = if catch_var.is_empty() {
             Expr::Unit(catch_var.pos)
@@ -3560,7 +3504,6 @@ impl Engine {
     #[cfg(not(feature = "no_function"))]
     fn parse_fn(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         settings: ParseSettings,
         access: crate::FnAccess,
@@ -3568,23 +3511,23 @@ impl Engine {
     ) -> ParseResult<ScriptFuncDef> {
         let settings = settings.level_up()?;
 
-        let (token, pos) = input.next().unwrap();
+        let (token, pos) = state.input.next().unwrap();
 
         // Parse type for `this` pointer
         #[cfg(not(feature = "no_object"))]
         let ((token, pos), this_type) = {
-            let (next_token, next_pos) = input.peek().unwrap();
+            let (next_token, next_pos) = state.input.peek().unwrap();
 
             match token {
                 Token::StringConstant(s) if next_token == &Token::Period => {
-                    eat_token(input, &Token::Period);
+                    eat_token(state.input, &Token::Period);
                     let s = match s.as_str() {
                         "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
                         #[cfg(not(feature = "no_float"))]
                         "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
                         _ => state.get_interned_string(*s),
                     };
-                    (input.next().unwrap(), Some(s))
+                    (state.input.next().unwrap(), Some(s))
                 }
                 Token::StringConstant(..) => {
                     return Err(PERR::MissingToken(
@@ -3594,14 +3537,14 @@ impl Engine {
                     .into_err(*next_pos))
                 }
                 Token::Identifier(s) if next_token == &Token::Period => {
-                    eat_token(input, &Token::Period);
+                    eat_token(state.input, &Token::Period);
                     let s = match s.as_str() {
                         "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
                         #[cfg(not(feature = "no_float"))]
                         "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
                         _ => state.get_interned_string(*s),
                     };
-                    (input.next().unwrap(), Some(s))
+                    (state.input.next().unwrap(), Some(s))
                 }
                 _ => ((token, pos), None),
             }
@@ -3615,13 +3558,13 @@ impl Engine {
             _ => return Err(PERR::FnMissingName.into_err(pos)),
         };
 
-        let no_params = match input.peek().unwrap() {
+        let no_params = match state.input.peek().unwrap() {
             (Token::LeftParen, ..) => {
-                eat_token(input, &Token::LeftParen);
-                match_token(input, &Token::RightParen).0
+                eat_token(state.input, &Token::LeftParen);
+                match_token(state.input, &Token::RightParen).0
             }
             (Token::Unit, ..) => {
-                eat_token(input, &Token::Unit);
+                eat_token(state.input, &Token::Unit);
                 true
             }
             (.., pos) => return Err(PERR::FnMissingParams(name.into()).into_err(*pos)),
@@ -3633,7 +3576,7 @@ impl Engine {
             let sep_err = format!("to separate the parameters of function '{name}'");
 
             loop {
-                match input.next().unwrap() {
+                match state.input.next().unwrap() {
                     (Token::RightParen, ..) => break,
                     (Token::Identifier(s), pos) => {
                         if params.iter().any(|(p, _)| p == &*s) {
@@ -3656,7 +3599,7 @@ impl Engine {
                     }
                 }
 
-                match input.next().unwrap() {
+                match state.input.next().unwrap() {
                     (Token::RightParen, ..) => break,
                     (Token::Comma, ..) => (),
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -3668,8 +3611,8 @@ impl Engine {
         }
 
         // Parse function body
-        let body = match input.peek().unwrap() {
-            (Token::LeftBrace, ..) => self.parse_block(input, state, settings)?,
+        let body = match state.input.peek().unwrap() {
+            (Token::LeftBrace, ..) => self.parse_block(state, settings)?,
             (.., pos) => return Err(PERR::FnMissingBody(name.into()).into_err(*pos)),
         }
         .into();
@@ -3694,7 +3637,6 @@ impl Engine {
     #[cfg(not(feature = "no_closure"))]
     fn make_curry_from_externals(
         state: &mut ParseState,
-        parent: &mut ParseState,
         fn_expr: Expr,
         externals: impl AsRef<[Ident]> + IntoIterator<Item = Ident>,
         pos: Position,
@@ -3715,7 +3657,7 @@ impl Engine {
                 .iter()
                 .cloned()
                 .map(|Ident { name, pos }| {
-                    let (index, is_func) = parent.access_var(&name, pos);
+                    let (index, is_func) = state.access_var(&name, pos);
                     let idx = match index {
                         Some(n) if !is_func => u8::try_from(n.get()).ok().and_then(NonZeroU8::new),
                         _ => None,
@@ -3745,7 +3687,7 @@ impl Engine {
             externals
                 .into_iter()
                 .map(|var| {
-                    let (index, _) = parent.access_var(&var.name, var.pos);
+                    let (index, _) = state.access_var(&var.name, var.pos);
                     (var, index)
                 })
                 .collect::<FnArgsVec<_>>()
@@ -3759,17 +3701,15 @@ impl Engine {
     #[cfg(not(feature = "no_function"))]
     fn parse_anon_fn(
         &self,
-        input: &mut TokenStream,
         state: &mut ParseState,
         settings: ParseSettings,
-        _parent: &mut ParseState,
-    ) -> ParseResult<(Expr, Shared<ScriptFuncDef>)> {
+    ) -> ParseResult<(Expr, Shared<ScriptFuncDef>, ThinVec<Ident>)> {
         let settings = settings.level_up()?;
         let mut params_list = StaticVec::<ImmutableString>::new_const();
 
-        if input.next().unwrap().0 != Token::Or && !match_token(input, &Token::Pipe).0 {
+        if state.input.next().unwrap().0 != Token::Or && !match_token(state.input, &Token::Pipe).0 {
             loop {
-                match input.next().unwrap() {
+                match state.input.next().unwrap() {
                     (Token::Pipe, ..) => break,
                     (Token::Identifier(s), pos) => {
                         if params_list.iter().any(|p| p == &*s) {
@@ -3792,7 +3732,7 @@ impl Engine {
                     }
                 }
 
-                match input.next().unwrap() {
+                match state.input.next().unwrap() {
                     (Token::Pipe, ..) => break,
                     (Token::Comma, ..) => (),
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -3808,18 +3748,13 @@ impl Engine {
         }
 
         // Parse function body
-        let body = self.parse_stmt(input, state, settings)?;
+        let body = self.parse_stmt(state, settings)?;
 
         // External variables may need to be processed in a consistent order,
         // so extract them into a list.
         #[cfg(not(feature = "no_closure"))]
-        let (mut params, externals) = if state.external_vars.is_empty() {
-            (
-                FnArgsVec::with_capacity(params_list.len()),
-                FnArgsVec::new_const(),
-            )
-        } else {
-            let externals: FnArgsVec<_> = state.external_vars.iter().cloned().collect();
+        let (mut params, externals) = {
+            let externals = std::mem::take(&mut state.external_vars);
 
             let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
             params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));
@@ -3827,7 +3762,7 @@ impl Engine {
             (params, externals)
         };
         #[cfg(feature = "no_closure")]
-        let mut params = FnArgsVec::with_capacity(params_list.len());
+        let (mut params, externals) = (FnArgsVec::with_capacity(params_list.len()), ThinVec::new());
 
         params.append(&mut params_list);
 
@@ -3860,16 +3795,12 @@ impl Engine {
         };
         let expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), settings.pos);
 
-        #[cfg(not(feature = "no_closure"))]
-        let expr = Self::make_curry_from_externals(state, _parent, expr, externals, settings.pos);
-
-        Ok((expr, script))
+        Ok((expr, script, externals))
     }
 
     /// Parse a global level expression.
     pub(crate) fn parse_global_expr(
         &self,
-        mut input: TokenStream,
         state: &mut ParseState,
         process_settings: impl FnOnce(&mut ParseSettings),
         _optimization_level: OptimizationLevel,
@@ -3887,9 +3818,9 @@ impl Engine {
         };
         process_settings(&mut settings);
 
-        let expr = self.parse_expr(&mut input, state, settings)?;
+        let expr = self.parse_expr(state, settings)?;
 
-        match input.peek().unwrap() {
+        match state.input.peek().unwrap() {
             (Token::EOF, ..) => (),
             // Return error if the expression doesn't end
             (token, pos) => return Err(LexError::UnexpectedInput(token.to_string()).into_err(*pos)),
@@ -3919,7 +3850,6 @@ impl Engine {
     /// Parse the global level statements.
     fn parse_global_level(
         &self,
-        mut input: TokenStream,
         state: &mut ParseState,
         process_settings: impl FnOnce(&mut ParseSettings),
     ) -> ParseResult<(StmtBlockContainer, Vec<Shared<ScriptFuncDef>>)> {
@@ -3935,8 +3865,8 @@ impl Engine {
         };
         process_settings(&mut settings);
 
-        while input.peek().unwrap().0 != Token::EOF {
-            let stmt = self.parse_stmt(&mut input, state, settings)?;
+        while state.input.peek().unwrap().0 != Token::EOF {
+            let stmt = self.parse_stmt(state, settings)?;
 
             if stmt.is_noop() {
                 continue;
@@ -3946,12 +3876,12 @@ impl Engine {
 
             statements.push(stmt);
 
-            match input.peek().unwrap() {
+            match state.input.peek().unwrap() {
                 // EOF
                 (Token::EOF, ..) => break,
                 // stmt ;
                 (Token::SemiColon, ..) if need_semicolon => {
-                    eat_token(&mut input, &Token::SemiColon);
+                    eat_token(state.input, &Token::SemiColon);
                 }
                 // stmt ;
                 (Token::SemiColon, ..) if !need_semicolon => (),
@@ -3983,11 +3913,10 @@ impl Engine {
     #[inline]
     pub(crate) fn parse(
         &self,
-        input: TokenStream,
         state: &mut ParseState,
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
-        let (statements, _lib) = self.parse_global_level(input, state, |_| {})?;
+        let (statements, _lib) = self.parse_global_level(state, |_| {})?;
 
         #[cfg(not(feature = "no_optimize"))]
         return Ok(crate::optimizer::optimize_into_ast(

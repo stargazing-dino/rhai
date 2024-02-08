@@ -129,11 +129,11 @@ impl Engine {
                 &mut interner
             };
 
+            let input = &mut stream.peekable();
             let lib = &mut <_>::default();
-            let state = &mut ParseState::new(None, interned_strings, tokenizer_control, lib);
+            let state = &mut ParseState::new(None, interned_strings, input, tokenizer_control, lib);
 
             self.parse_global_expr(
-                stream.peekable(),
                 state,
                 |s| s.flags |= ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES,
                 #[cfg(not(feature = "no_optimize"))]

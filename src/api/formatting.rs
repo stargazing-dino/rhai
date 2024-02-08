@@ -262,20 +262,25 @@ impl Engine {
     pub fn compact_script(&self, script: impl AsRef<str>) -> ParseResult<String> {
         let scripts = [script];
         let (mut stream, tc) = lex_raw(self, &scripts, self.token_mapper.as_deref());
+
         tc.borrow_mut().compressed = Some(String::new());
         stream.state.last_token = Some(SmartString::new_const());
         let mut interner = StringsInterner::new();
+
+        let input = &mut stream.peekable();
         let lib = &mut <_>::default();
-        let mut state = ParseState::new(None, &mut interner, tc, lib);
+        let mut state = ParseState::new(None, &mut interner, input, tc, lib);
+
         let mut _ast = self.parse(
-            stream.peekable(),
             &mut state,
             #[cfg(not(feature = "no_optimize"))]
             crate::OptimizationLevel::None,
             #[cfg(feature = "no_optimize")]
             (),
         )?;
+
         let tc = state.tokenizer_control.borrow();
+
         Ok(tc.compressed.as_ref().unwrap().into())
     }
 }

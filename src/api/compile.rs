@@ -231,9 +231,10 @@ impl Engine {
             &mut interner
         };
 
+        let input = &mut stream.peekable();
         let lib = &mut <_>::default();
-        let state = &mut ParseState::new(scope, interned_strings, tc, lib);
-        let mut _ast = self.parse(stream.peekable(), state, optimization_level)?;
+        let state = &mut ParseState::new(scope, interned_strings, input, tc, lib);
+        let mut _ast = self.parse(state, optimization_level)?;
         #[cfg(feature = "metadata")]
         {
             let global_comments = &state.tokenizer_control.borrow().global_comments;
@@ -314,8 +315,10 @@ impl Engine {
             &mut interner
         };
 
+        let input = &mut stream.peekable();
         let lib = &mut <_>::default();
-        let state = &mut ParseState::new(Some(scope), interned_strings, t, lib);
-        self.parse_global_expr(stream.peekable(), state, |_| {}, self.optimization_level)
+        let state = &mut ParseState::new(Some(scope), interned_strings, input, t, lib);
+
+        self.parse_global_expr(state, |_| {}, self.optimization_level)
     }
 }
