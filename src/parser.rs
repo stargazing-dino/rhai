@@ -3835,7 +3835,7 @@ impl Engine {
             state.external_constants,
             statements,
             #[cfg(not(feature = "no_function"))]
-            state.lib.values().cloned().collect(),
+            std::mem::take(state.lib).into_values().collect(),
             _optimization_level,
         ));
 
@@ -3843,7 +3843,7 @@ impl Engine {
         return Ok(AST::new(
             statements,
             #[cfg(not(feature = "no_function"))]
-            crate::Module::from(state.lib.values().cloned().collect()),
+            crate::Module::from(std::mem::take(state.lib).into_values()),
         ));
     }
 
