@@ -128,7 +128,8 @@ impl Engine {
 
             let (stream, tc) = lex_raw(self, &scripts, self.token_mapper.as_deref());
 
-            let state = &mut ParseState::new(Some(scope), interned_strings, tc);
+            let lib = &mut <_>::default();
+            let state = &mut ParseState::new(Some(scope), interned_strings, tc, lib);
 
             // No need to optimize a lone expression
             self.parse_global_expr(

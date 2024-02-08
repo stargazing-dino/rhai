@@ -231,7 +231,8 @@ impl Engine {
             &mut interner
         };
 
-        let state = &mut ParseState::new(scope, interned_strings, tc);
+        let lib = &mut <_>::default();
+        let state = &mut ParseState::new(scope, interned_strings, tc, lib);
         let mut _ast = self.parse(stream.peekable(), state, optimization_level)?;
         #[cfg(feature = "metadata")]
         {
@@ -313,7 +314,8 @@ impl Engine {
             &mut interner
         };
 
-        let state = &mut ParseState::new(Some(scope), interned_strings, t);
+        let lib = &mut <_>::default();
+        let state = &mut ParseState::new(Some(scope), interned_strings, t, lib);
         self.parse_global_expr(stream.peekable(), state, |_| {}, self.optimization_level)
     }
 }

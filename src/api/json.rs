@@ -129,7 +129,8 @@ impl Engine {
                 &mut interner
             };
 
-            let state = &mut ParseState::new(None, interned_strings, tokenizer_control);
+            let lib = &mut <_>::default();
+            let state = &mut ParseState::new(None, interned_strings, tokenizer_control, lib);
 
             self.parse_global_expr(
                 stream.peekable(),

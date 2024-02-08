@@ -265,7 +265,8 @@ impl Engine {
         tc.borrow_mut().compressed = Some(String::new());
         stream.state.last_token = Some(SmartString::new_const());
         let mut interner = StringsInterner::new();
-        let mut state = ParseState::new(None, &mut interner, tc);
+        let lib = &mut <_>::default();
+        let mut state = ParseState::new(None, &mut interner, tc, lib);
         let mut _ast = self.parse(
             stream.peekable(),
             &mut state,

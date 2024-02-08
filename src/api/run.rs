@@ -72,7 +72,8 @@ impl Engine {
                 &mut interner
             };
 
-            let state = &mut ParseState::new(Some(scope), interned_strings, tc);
+            let lib = &mut <_>::default();
+            let state = &mut ParseState::new(Some(scope), interned_strings, tc, lib);
             self.parse(stream.peekable(), state, self.optimization_level)?
         };
         self.run_ast_with_scope(scope, &ast)
