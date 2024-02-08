@@ -36,8 +36,6 @@ pub type ParseResult<T> = Result<T, ParseError>;
 
 #[cfg(not(feature = "no_function"))]
 type FnLib = StraightHashMap<Shared<ScriptFuncDef>>;
-#[cfg(feature = "no_function")]
-type FnLib = ();
 
 /// Invalid variable name that acts as a search barrier in a [`Scope`].
 const SCOPE_SEARCH_BARRIER_MARKER: &str = "$ BARRIER $";
@@ -61,8 +59,6 @@ pub struct ParseState<'a, 't, 's, 'f> {
     /// Script-defined functions.
     #[cfg(not(feature = "no_function"))]
     pub lib: &'f mut FnLib,
-    #[cfg(feature = "no_function")]
-    pub _dummy: std::marker::PhantomData<&'f ()>,
     /// Controls whether parsing of an expression should stop given the next token.
     pub expr_filter: fn(&Token) -> bool,
     /// Strings interner.
@@ -92,6 +88,9 @@ pub struct ParseState<'a, 't, 's, 'f> {
     /// List of globally-imported [module][crate::Module] names.
     #[cfg(not(feature = "no_module"))]
     pub global_imports: ThinVec<ImmutableString>,
+    /// Unused dummy field.
+    #[cfg(feature = "no_function")]
+    pub dummy: &'f (),
 }
 
 impl fmt::Debug for ParseState<'_, '_, '_, '_> {
@@ -119,24 +118,25 @@ impl fmt::Debug for ParseState<'_, '_, '_, '_> {
     }
 }
 
-impl<'e, 't, 's, 'f> ParseState<'e, 't, 's, 'f> {
+impl<'a, 't, 's, 'f> ParseState<'a, 't, 's, 'f> {
     /// Create a new [`ParseState`].
     #[inline]
     #[must_use]
     pub fn new(
-        external_constants: Option<&'e Scope>,
+        external_constants: Option<&'a Scope>,
         interned_strings: &'s mut StringsInterner,
-        input: &'t mut TokenStream<'e>,
+        input: &'t mut TokenStream<'a>,
         tokenizer_control: TokenizerControl,
-        _lib: &'f mut FnLib,
+        #[cfg(not(feature = "no_function"))] lib: &'f mut FnLib,
+        #[cfg(feature = "no_function")] dummy: &'f (),
     ) -> Self {
         Self {
             input,
             tokenizer_control,
             #[cfg(not(feature = "no_function"))]
-            lib: _lib,
+            lib,
             #[cfg(feature = "no_function")]
-            _dummy: std::marker::PhantomData,
+            dummy,
             expr_filter: |_| true,
             #[cfg(not(feature = "no_closure"))]
             external_vars: ThinVec::new(),
@@ -3843,7 +3843,7 @@ impl Engine {
         return Ok(AST::new(
             statements,
             #[cfg(not(feature = "no_function"))]
-            crate::Module::from(functions.into_iter().map(|(.., v)| v)),
+            crate::Module::from(state.lib.values().cloned().collect()),
         ));
     }
 
