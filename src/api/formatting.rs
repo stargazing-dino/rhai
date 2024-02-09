@@ -1,7 +1,6 @@
 //! Module that provide formatting services to the [`Engine`].
 use crate::packages::iter_basic::{BitRange, CharsStream, StepRange};
 use crate::parser::{ParseResult, ParseState};
-use crate::tokenizer::lex_raw;
 use crate::types::StringsInterner;
 use crate::{
     Engine, ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, Position, RhaiError,
@@ -261,20 +260,26 @@ impl Engine {
     #[inline]
     pub fn compact_script(&self, script: impl AsRef<str>) -> ParseResult<String> {
         let scripts = [script];
-        let (mut stream, tc) = lex_raw(self, &scripts, self.token_mapper.as_deref());
+        let (mut stream, tc) = self.lex(&scripts);
+
         tc.borrow_mut().compressed = Some(String::new());
         stream.state.last_token = Some(SmartString::new_const());
         let mut interner = StringsInterner::new();
-        let mut state = ParseState::new(None, &mut interner, tc);
+
+        let input = &mut stream.peekable();
+        let lib = &mut <_>::default();
+        let mut state = ParseState::new(None, &mut interner, input, tc, lib);
+
         let mut _ast = self.parse(
-            stream.peekable(),
             &mut state,
             #[cfg(not(feature = "no_optimize"))]
             crate::OptimizationLevel::None,
             #[cfg(feature = "no_optimize")]
             (),
         )?;
+
         let tc = state.tokenizer_control.borrow();
+
         Ok(tc.compressed.as_ref().unwrap().into())
     }
 }

@@ -1,7 +1,7 @@
 //! Module defining the AST (abstract syntax tree).
 
 use super::{ASTFlags, Expr, FnAccess, Stmt};
-use crate::{Dynamic, FnNamespace, ImmutableString, Position, ThinVec};
+use crate::{expose_under_internals, Dynamic, FnNamespace, ImmutableString, Position, ThinVec};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -67,31 +67,12 @@ impl fmt::Debug for AST {
 }
 
 impl AST {
-    /// Create a new [`AST`].
-    #[cfg(not(feature = "internals"))]
-    #[inline]
-    #[must_use]
-    pub(crate) fn new(
-        statements: impl IntoIterator<Item = Stmt>,
-        #[cfg(not(feature = "no_function"))] functions: impl Into<crate::SharedModule>,
-    ) -> Self {
-        Self {
-            source: None,
-            #[cfg(feature = "metadata")]
-            doc: crate::SmartString::new_const(),
-            body: statements.into_iter().collect(),
-            #[cfg(not(feature = "no_function"))]
-            lib: functions.into(),
-            #[cfg(not(feature = "no_module"))]
-            resolver: None,
-        }
-    }
     /// _(internals)_ Create a new [`AST`].
     /// Exported under the `internals` feature only.
-    #[cfg(feature = "internals")]
+    #[expose_under_internals]
     #[inline]
     #[must_use]
-    pub fn new(
+    fn new(
         statements: impl IntoIterator<Item = Stmt>,
         #[cfg(not(feature = "no_function"))] functions: impl Into<crate::SharedModule>,
     ) -> Self {
@@ -105,30 +86,13 @@ impl AST {
             #[cfg(not(feature = "no_module"))]
             resolver: None,
         }
-    }
-    /// Create a new [`AST`] with a source name.
-    #[cfg(not(feature = "internals"))]
-    #[inline]
-    #[must_use]
-    pub(crate) fn new_with_source(
-        statements: impl IntoIterator<Item = Stmt>,
-        #[cfg(not(feature = "no_function"))] functions: impl Into<crate::SharedModule>,
-        source: impl Into<ImmutableString>,
-    ) -> Self {
-        let mut ast = Self::new(
-            statements,
-            #[cfg(not(feature = "no_function"))]
-            functions,
-        );
-        ast.set_source(source);
-        ast
     }
     /// _(internals)_ Create a new [`AST`] with a source name.
     /// Exported under the `internals` feature only.
-    #[cfg(feature = "internals")]
+    #[expose_under_internals]
     #[inline]
     #[must_use]
-    pub fn new_with_source(
+    fn new_with_source(
         statements: impl IntoIterator<Item = Stmt>,
         #[cfg(not(feature = "no_function"))] functions: impl Into<crate::SharedModule>,
         source: impl Into<ImmutableString>,
@@ -200,19 +164,12 @@ impl AST {
     pub fn doc(&self) -> &str {
         &self.doc
     }
-    /// Get the statements.
-    #[cfg(not(feature = "internals"))]
-    #[inline(always)]
-    #[must_use]
-    pub(crate) fn statements(&self) -> &[Stmt] {
-        &self.body
-    }
     /// _(internals)_ Get the statements.
     /// Exported under the `internals` feature only.
-    #[cfg(feature = "internals")]
+    #[expose_under_internals]
     #[inline(always)]
     #[must_use]
-    pub fn statements(&self) -> &[Stmt] {
+    fn statements(&self) -> &[Stmt] {
         &self.body
     }
     /// Get the statements.
@@ -231,23 +188,15 @@ impl AST {
     pub fn has_functions(&self) -> bool {
         !self.lib.is_empty()
     }
-    /// Get the internal shared [`Module`][crate::Module] containing all script-defined functions.
-    #[cfg(not(feature = "internals"))]
-    #[cfg(not(feature = "no_function"))]
-    #[inline(always)]
-    #[must_use]
-    pub(crate) const fn shared_lib(&self) -> &crate::SharedModule {
-        &self.lib
-    }
     /// _(internals)_ Get the internal shared [`Module`][crate::Module] containing all script-defined functions.
     /// Exported under the `internals` feature only.
     ///
     /// Not available under `no_function`.
-    #[cfg(feature = "internals")]
+    #[expose_under_internals]
     #[cfg(not(feature = "no_function"))]
     #[inline(always)]
     #[must_use]
-    pub const fn shared_lib(&self) -> &crate::SharedModule {
+    const fn shared_lib(&self) -> &crate::SharedModule {
         &self.lib
     }
     /// _(internals)_ Get the embedded [module resolver][crate::ModuleResolver].
@@ -697,20 +646,10 @@ impl AST {
     /// Exported under the `internals` feature only.
     ///
     /// Not available under `no_function`.
-    #[cfg(feature = "internals")]
+    #[expose_under_internals]
     #[cfg(not(feature = "no_function"))]
     #[inline]
-    pub fn iter_fn_def(&self) -> impl Iterator<Item = &crate::Shared<super::ScriptFuncDef>> {
-        self.lib.iter_script_fn().map(|(.., fn_def)| fn_def)
-    }
-    /// Iterate through all function definitions.
-    ///
-    /// Not available under `no_function`.
-    #[cfg(not(feature = "internals"))]
-    #[cfg(not(feature = "no_function"))]
-    #[allow(dead_code)]
-    #[inline]
-    pub(crate) fn iter_fn_def(&self) -> impl Iterator<Item = &crate::Shared<super::ScriptFuncDef>> {
+    fn iter_fn_def(&self) -> impl Iterator<Item = &crate::Shared<super::ScriptFuncDef>> {
         self.lib.iter_script_fn().map(|(.., fn_def)| fn_def)
     }
     /// Iterate through all function definitions.

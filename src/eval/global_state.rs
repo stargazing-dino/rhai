@@ -1,6 +1,6 @@
 //! Global runtime state.
 
-use crate::{Dynamic, Engine, ImmutableString};
+use crate::{expose_under_internals, Dynamic, Engine, ImmutableString};
 use std::fmt;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -75,12 +75,14 @@ pub struct GlobalRuntimeState {
     pub(crate) debugger: Option<Box<super::Debugger>>,
 }
 
-impl GlobalRuntimeState {
-    /// Create a new [`GlobalRuntimeState`] based on an [`Engine`].
+impl Engine {
+    /// _(internals)_ Create a new [`GlobalRuntimeState`] based on an [`Engine`].
+    /// Exported under the `internals` feature only.
+    #[expose_under_internals]
     #[inline(always)]
     #[must_use]
-    pub fn new(engine: &Engine) -> Self {
-        Self {
+    fn new_global_runtime_state(&self) -> GlobalRuntimeState {
+        GlobalRuntimeState {
             #[cfg(not(feature = "no_module"))]
             imports: crate::ThinVec::new(),
             #[cfg(not(feature = "no_module"))]
@@ -100,15 +102,18 @@ impl GlobalRuntimeState {
             #[cfg(not(feature = "no_function"))]
             constants: None,
 
-            tag: engine.default_tag().clone(),
+            tag: self.default_tag().clone(),
 
             #[cfg(feature = "debugging")]
-            debugger: engine.debugger_interface.as_ref().map(|x| {
+            debugger: self.debugger_interface.as_ref().map(|x| {
                 let dbg = crate::eval::Debugger::new(crate::eval::DebuggerStatus::Init);
-                (x.0)(engine, dbg).into()
+                (x.0)(self, dbg).into()
             }),
         }
     }
+}
+
+impl GlobalRuntimeState {
     /// Get the length of the stack of globally-imported [modules][crate::Module].
     ///
     /// Not available under `no_module`.

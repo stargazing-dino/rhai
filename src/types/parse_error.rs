@@ -15,7 +15,7 @@ use std::prelude::v1::*;
 #[non_exhaustive]
 #[must_use]
 pub enum LexError {
-    /// An unexpected symbol is encountered when tokenizing the script text.
+    /// An unexpected symbol is encountered.
     UnexpectedInput(String),
     /// A string literal is not terminated before a new-line or EOF.
     UnterminatedString,
@@ -29,8 +29,10 @@ pub enum LexError {
     MalformedChar(String),
     /// An identifier is in an invalid format.
     MalformedIdentifier(String),
-    /// Bad symbol encountered when tokenizing the script text.
+    /// Bad symbol encountered.
     ImproperSymbol(String, String),
+    /// Runtime error occurred.
+    Runtime(String),
 }
 
 impl Error for LexError {}
@@ -48,7 +50,7 @@ impl fmt::Display for LexError {
             Self::ImproperSymbol(s, d) if d.is_empty() => {
                 write!(f, "Invalid symbol encountered: '{s}'")
             }
-            Self::ImproperSymbol(.., d) => f.write_str(d),
+            Self::ImproperSymbol(.., d) | Self::Runtime(d) => f.write_str(d),
         }
     }
 }

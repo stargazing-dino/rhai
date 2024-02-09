@@ -74,7 +74,7 @@ impl<'a> OptimizerState<'a> {
         scope: Option<&'a Scope<'a>>,
         optimization_level: OptimizationLevel,
     ) -> Self {
-        let mut _global = GlobalRuntimeState::new(engine);
+        let mut _global = engine.new_global_runtime_state();
         let _lib = lib;
 
         #[cfg(not(feature = "no_function"))]
@@ -1364,78 +1364,56 @@ impl Engine {
 
         optimize_stmt_block(statements, &mut state, true, false, true)
     }
-}
 
-/// Optimize a collection of statements and functions into an [`AST`].
-pub fn optimize_into_ast(
-    engine: &Engine,
-    scope: Option<&Scope>,
-    statements: StmtBlockContainer,
-    #[cfg(not(feature = "no_function"))] functions: Vec<crate::Shared<crate::ast::ScriptFuncDef>>,
-    optimization_level: OptimizationLevel,
-) -> AST {
-    let mut statements = statements;
+    /// Optimize a collection of statements and functions into an [`AST`].
+    pub(crate) fn optimize_into_ast(
+        &self,
+        scope: Option<&Scope>,
+        statements: StmtBlockContainer,
+        #[cfg(not(feature = "no_function"))] functions: impl IntoIterator<Item = crate::Shared<crate::ast::ScriptFuncDef>>
+            + AsRef<[crate::Shared<crate::ast::ScriptFuncDef>]>,
+        optimization_level: OptimizationLevel,
+    ) -> AST {
+        let mut statements = statements;
 
-    #[cfg(not(feature = "no_function"))]
-    let lib: crate::Shared<_> = {
-        let mut module = crate::Module::new();
-
-        if optimization_level == OptimizationLevel::None {
-            for fn_def in functions {
-                module.set_script_fn(fn_def);
-            }
+        #[cfg(not(feature = "no_function"))]
+        let lib: crate::Shared<_> = if optimization_level == OptimizationLevel::None {
+            crate::Module::from(functions).into()
         } else {
             // We only need the script library's signatures for optimization purposes
-            let mut lib2 = crate::Module::new();
-
-            functions
-                .iter()
-                .map(|fn_def| crate::ast::ScriptFuncDef {
-                    name: fn_def.name.clone(),
-                    access: fn_def.access,
-                    body: crate::ast::StmtBlock::NONE,
-                    #[cfg(not(feature = "no_object"))]
-                    this_type: fn_def.this_type.clone(),
-                    params: fn_def.params.clone(),
-                    #[cfg(feature = "metadata")]
-                    comments: <_>::default(),
-                })
-                .for_each(|script_def| {
-                    lib2.set_script_fn(script_def);
-                });
+            let lib2 = crate::Module::from(
+                functions
+                    .as_ref()
+                    .iter()
+                    .map(|fn_def| fn_def.clone_function_signatures().into()),
+            );
 
             let lib2 = &[lib2.into()];
 
-            for fn_def in functions {
-                let mut fn_def = crate::func::shared_take_or_clone(fn_def);
-
+            crate::Module::from(functions.into_iter().map(|fn_def| {
                 // Optimize the function body
-                *fn_def.body.statements_mut() = engine.optimize_top_level(
-                    fn_def.body.take_statements(),
-                    scope,
-                    lib2,
-                    optimization_level,
-                );
+                let mut fn_def = crate::func::shared_take_or_clone(fn_def);
+                let statements = fn_def.body.take_statements();
+                *fn_def.body.statements_mut() =
+                    self.optimize_top_level(statements, scope, lib2, optimization_level);
+                fn_def.into()
+            }))
+            .into()
+        };
+        #[cfg(feature = "no_function")]
+        let lib: crate::Shared<_> = crate::Module::new().into();
 
-                module.set_script_fn(fn_def);
-            }
-        }
+        statements.shrink_to_fit();
 
-        module.into()
-    };
-    #[cfg(feature = "no_function")]
-    let lib: crate::Shared<_> = crate::Module::new().into();
-
-    statements.shrink_to_fit();
-
-    AST::new(
-        match optimization_level {
-            OptimizationLevel::None => statements,
-            OptimizationLevel::Simple | OptimizationLevel::Full => {
-                engine.optimize_top_level(statements, scope, &[lib.clone()], optimization_level)
-            }
-        },
-        #[cfg(not(feature = "no_function"))]
-        lib,
-    )
+        AST::new(
+            match optimization_level {
+                OptimizationLevel::None => statements,
+                OptimizationLevel::Simple | OptimizationLevel::Full => {
+                    self.optimize_top_level(statements, scope, &[lib.clone()], optimization_level)
+                }
+            },
+            #[cfg(not(feature = "no_function"))]
+            lib,
+        )
+    }
 }

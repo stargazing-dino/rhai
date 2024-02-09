@@ -1,7 +1,7 @@
 #![cfg(not(feature = "no_module"))]
 use rhai::{
     module_resolvers::{DummyModuleResolver, StaticModuleResolver},
-    Dynamic, Engine, EvalAltResult, FnNamespace, FuncRegistration, ImmutableString, Module, ParseError, ParseErrorType, Scope, INT,
+    Dynamic, Engine, EvalAltResult, FuncRegistration, ImmutableString, Module, ParseError, ParseErrorType, Scope, INT,
 };
 //
 #[cfg(all(not(feature = "no_function"), feature = "internals"))]

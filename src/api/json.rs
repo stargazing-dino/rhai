@@ -3,7 +3,7 @@
 
 use crate::func::native::locked_write;
 use crate::parser::{ParseSettingFlags, ParseState};
-use crate::tokenizer::{lex_raw, Token};
+use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
 use crate::types::StringsInterner;
 use crate::{Dynamic, Engine, LexError, Map, RhaiResultOf};
@@ -65,8 +65,7 @@ impl Engine {
     pub fn parse_json(&self, json: impl AsRef<str>, has_null: bool) -> RhaiResultOf<Map> {
         let scripts = [json.as_ref()];
 
-        let (stream, tokenizer_control) = lex_raw(
-            self,
+        let (stream, tokenizer_control) = self.lex_raw(
             &scripts,
             Some(if has_null {
                 &|token, _, _| {
@@ -129,10 +128,11 @@ impl Engine {
                 &mut interner
             };
 
-            let state = &mut ParseState::new(None, interned_strings, tokenizer_control);
+            let input = &mut stream.peekable();
+            let lib = &mut <_>::default();
+            let state = &mut ParseState::new(None, interned_strings, input, tokenizer_control, lib);
 
             self.parse_global_expr(
-                stream.peekable(),
                 state,
                 |s| s.flags |= ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES,
                 #[cfg(not(feature = "no_optimize"))]

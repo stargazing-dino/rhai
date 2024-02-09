@@ -1,9 +1,8 @@
 //! Module that defines the public evaluation API of [`Engine`].
 
-use crate::eval::{Caches, GlobalRuntimeState};
+use crate::eval::Caches;
 use crate::func::native::locked_write;
 use crate::parser::ParseState;
-use crate::tokenizer::lex_raw;
 use crate::types::StringsInterner;
 use crate::{Engine, RhaiResultOf, Scope, AST};
 #[cfg(feature = "no_std")]
@@ -60,7 +59,7 @@ impl Engine {
     pub fn run_with_scope(&self, scope: &mut Scope, script: &str) -> RhaiResultOf<()> {
         let scripts = [script];
         let ast = {
-            let (stream, tc) = lex_raw(self, &scripts, self.token_mapper.as_deref());
+            let (stream, tc) = self.lex(&scripts);
 
             let mut interner;
             let mut guard;
@@ -72,8 +71,11 @@ impl Engine {
                 &mut interner
             };
 
-            let state = &mut ParseState::new(Some(scope), interned_strings, tc);
-            self.parse(stream.peekable(), state, self.optimization_level)?
+            let input = &mut stream.peekable();
+            let lib = &mut <_>::default();
+            let state = &mut ParseState::new(Some(scope), interned_strings, input, tc, lib);
+
+            self.parse(state, self.optimization_level)?
         };
         self.run_ast_with_scope(scope, &ast)
     }
@@ -127,7 +129,7 @@ impl Engine {
     #[inline]
     pub fn run_ast_with_scope(&self, scope: &mut Scope, ast: &AST) -> RhaiResultOf<()> {
         let caches = &mut Caches::new();
-        let global = &mut GlobalRuntimeState::new(self);
+        let global = &mut self.new_global_runtime_state();
         global.source = ast.source_raw().cloned();
 
         #[cfg(not(feature = "no_function"))]

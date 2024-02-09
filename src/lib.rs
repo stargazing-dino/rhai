@@ -261,19 +261,15 @@ pub mod debugger {
     pub use super::eval::{BreakPoint, Debugger, DebuggerCommand, DebuggerEvent};
 }
 
-/// An identifier in Rhai. [`SmartString`](https://crates.io/crates/smartstring) is used because most
-/// identifiers are ASCII and short, fewer than 23 characters, so they can be stored inline.
-#[cfg(not(feature = "internals"))]
-type Identifier = SmartString;
-
-/// An identifier in Rhai.
+/// _(internals)_ An identifier in Rhai.
+/// Exported under the `internals` feature only.
 ///
 /// Identifiers are assumed to be all-ASCII and short with few exceptions.
 ///
 /// [`SmartString`](https://crates.io/crates/smartstring) is used as the underlying storage type
 /// because most identifiers can be stored inline.
-#[cfg(feature = "internals")]
-pub type Identifier = SmartString;
+#[expose_under_internals]
+type Identifier = SmartString;
 
 /// Alias to [`Rc`][std::rc::Rc] or [`Arc`][std::sync::Arc] depending on the `sync` feature flag.
 pub use func::Shared;
@@ -385,10 +381,6 @@ pub use api::definitions::Definitions;
 /// Number of items to keep inline for [`StaticVec`].
 const STATIC_VEC_INLINE_SIZE: usize = 3;
 
-/// Alias to [`smallvec::SmallVec<[T; 3]>`](https://crates.io/crates/smallvec).
-#[cfg(not(feature = "internals"))]
-type StaticVec<T> = smallvec::SmallVec<[T; STATIC_VEC_INLINE_SIZE]>;
-
 /// _(internals)_ Alias to [`smallvec::SmallVec<[T; 3]>`](https://crates.io/crates/smallvec),
 /// which is a [`Vec`] backed by a small, inline, fixed-size array when there are ≤ 3 items stored.
 /// Exported under the `internals` feature only.
@@ -421,14 +413,11 @@ type StaticVec<T> = smallvec::SmallVec<[T; STATIC_VEC_INLINE_SIZE]>;
 /// In addition, most script blocks either contain many statements, or just one or two lines;
 /// most scripts load fewer than 4 external modules; most module paths contain fewer than 4 levels
 /// (e.g. `std::collections::map::HashMap` is 4 levels and it is just about as long as they get).
-#[cfg(feature = "internals")]
-pub type StaticVec<T> = smallvec::SmallVec<[T; STATIC_VEC_INLINE_SIZE]>;
-
-/// A smaller [`Vec`] alternative.
-#[cfg(not(feature = "internals"))]
-type ThinVec<T> = thin_vec::ThinVec<T>;
+#[expose_under_internals]
+type StaticVec<T> = smallvec::SmallVec<[T; STATIC_VEC_INLINE_SIZE]>;
 
 /// _(internals)_ A smaller [`Vec`] alternative. Exported under the `internals` feature only.
+/// Exported under the `internals` feature only.
 ///
 /// The standard [`Vec`] type uses three machine words (i.e. 24 bytes on 64-bit).
 ///
@@ -437,19 +426,15 @@ type ThinVec<T> = thin_vec::ThinVec<T>;
 ///
 /// This is primarily used in places where a few bytes affect the size of the type
 /// -- e.g. in `enum`'s.
-#[cfg(feature = "internals")]
-pub type ThinVec<T> = thin_vec::ThinVec<T>;
+#[expose_under_internals]
+type ThinVec<T> = thin_vec::ThinVec<T>;
 
 /// Number of items to keep inline for [`FnArgsVec`].
 #[cfg(not(feature = "no_closure"))]
 const FN_ARGS_VEC_INLINE_SIZE: usize = 5;
 
-/// Inline arguments storage for function calls.
-#[cfg(not(feature = "no_closure"))]
-#[cfg(not(feature = "internals"))]
-type FnArgsVec<T> = smallvec::SmallVec<[T; FN_ARGS_VEC_INLINE_SIZE]>;
-
 /// _(internals)_ Inline arguments storage for function calls.
+/// Exported under the `internals` feature only.
 ///
 /// Not available under `no_closure`.
 ///
@@ -463,12 +448,13 @@ type FnArgsVec<T> = smallvec::SmallVec<[T; FN_ARGS_VEC_INLINE_SIZE]>;
 /// scripts with heavy closure usage.
 ///
 /// Under `no_closure`, this type aliases to [`StaticVec`][crate::StaticVec] instead.
+#[expose_under_internals]
 #[cfg(not(feature = "no_closure"))]
-#[cfg(feature = "internals")]
-pub type FnArgsVec<T> = smallvec::SmallVec<[T; FN_ARGS_VEC_INLINE_SIZE]>;
+type FnArgsVec<T> = smallvec::SmallVec<[T; FN_ARGS_VEC_INLINE_SIZE]>;
 
 /// Inline arguments storage for function calls.
 /// This type aliases to [`StaticVec`][crate::StaticVec].
+#[expose_under_internals]
 #[cfg(feature = "no_closure")]
 type FnArgsVec<T> = crate::StaticVec<T>;
 

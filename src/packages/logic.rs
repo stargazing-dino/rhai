@@ -8,13 +8,11 @@ use std::prelude::v1::*;
     all(not(feature = "only_i32"), not(feature = "only_i64"))
 ))]
 macro_rules! gen_cmp_functions {
-    ($root:ident => $($arg_type:ident),+) => {
-        mod $root { $(pub mod $arg_type {
-            use super::super::*;
-
+    ($mod_name:ident => $($arg_type:ident),+) => {
+        $({
             #[export_module]
             #[allow(clippy::missing_const_for_fn)]
-            pub mod functions {
+            pub mod cmp_functions {
                 #[rhai_fn(name = "<")] pub fn lt(x: $arg_type, y: $arg_type) -> bool { x < y }
                 #[rhai_fn(name = "<=")] pub fn lte(x: $arg_type, y: $arg_type) -> bool { x <= y }
                 #[rhai_fn(name = ">")] pub fn gt(x: $arg_type, y: $arg_type) -> bool { x > y }
@@ -24,18 +22,10 @@ macro_rules! gen_cmp_functions {
                 pub fn max(x: $arg_type, y: $arg_type) -> $arg_type { if x >= y { x } else { y } }
                 pub fn min(x: $arg_type, y: $arg_type) -> $arg_type { if x <= y { x } else { y } }
             }
-        })* }
-    };
-}
 
-#[cfg(any(
-    not(feature = "no_float"),
-    all(not(feature = "only_i32"), not(feature = "only_i64"))
-))]
-macro_rules! reg_functions {
-    ($mod_name:ident += $root:ident ; $($arg_type:ident),+) => { $(
-        combine_with_exported_module!($mod_name, "logic", $root::$arg_type::functions);
-    )* }
+            combine_with_exported_module!($mod_name, concat!("logic_", stringify($arg_type)), cmp_functions);
+        })*
+    };
 }
 
 def_package! {
@@ -46,10 +36,10 @@ def_package! {
         #[cfg(not(feature = "only_i32"))]
         #[cfg(not(feature = "only_i64"))]
         {
-            reg_functions!(lib += numbers; i8, u8, i16, u16, i32, u32, u64);
+            gen_cmp_functions!(lib => i8, u8, i16, u16, i32, u32, u64);
 
             #[cfg(not(target_family = "wasm"))]
-            reg_functions!(lib += num_128; i128, u128);
+            gen_cmp_functions!(lib => i128, u128);
         }
 
         #[cfg(not(feature = "no_float"))]
@@ -58,12 +48,12 @@ def_package! {
 
             #[cfg(not(feature = "f32_float"))]
             {
-                reg_functions!(lib += float; f32);
+                gen_cmp_functions!(lib => f32);
                 combine_with_exported_module!(lib, "f32", f32_functions);
             }
             #[cfg(feature = "f32_float")]
             {
-                reg_functions!(lib += float; f64);
+                gen_cmp_functions!(lib => f64);
                 combine_with_exported_module!(lib, "f64", f64_functions);
             }
         }
@@ -76,24 +66,6 @@ def_package! {
         combine_with_exported_module!(lib, "min_max", min_max_functions);
     }
 }
-
-#[cfg(not(feature = "only_i32"))]
-#[cfg(not(feature = "only_i64"))]
-gen_cmp_functions!(numbers => i8, u8, i16, u16, i32, u32, u64);
-
-#[cfg(not(feature = "only_i32"))]
-#[cfg(not(feature = "only_i64"))]
-#[cfg(not(target_family = "wasm"))]
-
-gen_cmp_functions!(num_128 => i128, u128);
-
-#[cfg(not(feature = "no_float"))]
-#[cfg(not(feature = "f32_float"))]
-gen_cmp_functions!(float => f32);
-
-#[cfg(not(feature = "no_float"))]
-#[cfg(feature = "f32_float")]
-gen_cmp_functions!(float => f64);
 
 #[export_module]
 mod logic_functions {

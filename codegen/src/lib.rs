@@ -32,6 +32,7 @@
 //! # }
 //! ```
 
+use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput};
 
@@ -71,10 +72,7 @@ mod test;
 /// # }
 /// ```
 #[proc_macro_attribute]
-pub fn export_module(
-    args: proc_macro::TokenStream,
-    input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
+pub fn export_module(args: TokenStream, input: TokenStream) -> TokenStream {
     let parsed_params = match crate::attrs::outer_item_attributes(args.into(), "export_module") {
         Ok(args) => args,
         Err(err) => return err.to_compile_error().into(),
@@ -85,7 +83,7 @@ pub fn export_module(
     }
 
     let tokens = module_def.generate();
-    proc_macro::TokenStream::from(tokens)
+    TokenStream::from(tokens)
 }
 
 /// Macro to generate a Rhai `Module` from a _plugin module_ defined via [`#[export_module]`][macro@export_module].
@@ -114,9 +112,9 @@ pub fn export_module(
 /// # }
 /// ```
 #[proc_macro]
-pub fn exported_module(module_path: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn exported_module(module_path: TokenStream) -> TokenStream {
     let module_path = parse_macro_input!(module_path as syn::Path);
-    proc_macro::TokenStream::from(quote::quote! {
+    TokenStream::from(quote::quote! {
         #module_path::rhai_module_generate()
     })
 }
@@ -160,9 +158,9 @@ pub fn exported_module(module_path: proc_macro::TokenStream) -> proc_macro::Toke
 /// # }
 /// ```
 #[proc_macro]
-pub fn combine_with_exported_module(args: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn combine_with_exported_module(args: TokenStream) -> TokenStream {
     match crate::register::parse_register_macro(args) {
-        Ok((module_expr, _export_name, module_path)) => proc_macro::TokenStream::from(quote! {
+        Ok((module_expr, _export_name, module_path)) => TokenStream::from(quote! {
             #module_path::rhai_generate_into_module(#module_expr, true)
         }),
         Err(e) => e.to_compile_error().into(),
@@ -178,10 +176,7 @@ pub fn combine_with_exported_module(args: proc_macro::TokenStream) -> proc_macro
 /// This method will be removed in the next major version.
 #[deprecated(since = "1.18.0")]
 #[proc_macro_attribute]
-pub fn export_fn(
-    args: proc_macro::TokenStream,
-    input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
+pub fn export_fn(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut output = quote! {
         #[allow(clippy::needless_pass_by_value)]
     };
@@ -207,7 +202,7 @@ pub fn export_fn(
     }
 
     output.extend(function_def.generate());
-    proc_macro::TokenStream::from(output)
+    TokenStream::from(output)
 }
 
 /// Macro to register a _plugin function_ (defined via [`#[export_fn]`][macro@export_fn]) into an `Engine`.
@@ -219,11 +214,11 @@ pub fn export_fn(
 /// This method will be removed in the next major version.
 #[deprecated(since = "1.18.0")]
 #[proc_macro]
-pub fn register_exported_fn(args: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn register_exported_fn(args: TokenStream) -> TokenStream {
     match crate::register::parse_register_macro(args) {
         Ok((engine_expr, export_name, rust_mod_path)) => {
             let gen_mod_path = crate::register::generated_module_path(&rust_mod_path);
-            proc_macro::TokenStream::from(quote! {
+            TokenStream::from(quote! {
                 #engine_expr.register_fn(#export_name, #gen_mod_path::dynamic_result_fn)
             })
         }
@@ -240,7 +235,7 @@ pub fn register_exported_fn(args: proc_macro::TokenStream) -> proc_macro::TokenS
 /// This method will be removed in the next major version.
 #[deprecated(since = "1.18.0")]
 #[proc_macro]
-pub fn set_exported_fn(args: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn set_exported_fn(args: TokenStream) -> TokenStream {
     match crate::register::parse_register_macro(args) {
         Ok((module_expr, export_name, rust_mod_path)) => {
             let gen_mod_path = crate::register::generated_module_path(&rust_mod_path);
@@ -271,7 +266,7 @@ pub fn set_exported_fn(args: proc_macro::TokenStream) -> proc_macro::TokenStream
 /// This method will be removed in the next major version.
 #[deprecated(since = "1.18.0")]
 #[proc_macro]
-pub fn set_exported_global_fn(args: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn set_exported_global_fn(args: TokenStream) -> TokenStream {
     match crate::register::parse_register_macro(args) {
         Ok((module_expr, export_name, rust_mod_path)) => {
             let gen_mod_path = crate::register::generated_module_path(&rust_mod_path);
@@ -308,8 +303,126 @@ pub fn set_exported_global_fn(args: proc_macro::TokenStream) -> proc_macro::Toke
 /// }
 /// ```
 #[proc_macro_derive(CustomType, attributes(rhai_type,))]
-pub fn derive_custom_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn derive_custom_type(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let expanded = custom_type::derive_custom_type_impl(input);
     expanded.into()
+}
+
+/// Macro to automatically expose a Rust function, type-def or use statement as `pub` when under the
+/// `internals` feature.
+///
+/// If the `internals` is not enabled, the item will be exposed as `pub(crate)`.
+///
+/// In order to avoid confusion, there must not be any visibility modifier on the item.
+#[proc_macro_attribute]
+pub fn expose_under_internals(args: TokenStream, input: TokenStream) -> TokenStream {
+    let args: proc_macro2::TokenStream = args.into();
+    let input: proc_macro2::TokenStream = input.into();
+
+    if !args.is_empty() {
+        return syn::Error::new(
+            args.span(),
+            "`expose_under_internals` cannot have arguments.",
+        )
+        .to_compile_error()
+        .into();
+    }
+
+    // Functions
+    if let Ok(mut item) = syn::parse2::<syn::ItemFn>(input.clone()) {
+        match item.vis {
+            syn::Visibility::Inherited => (),
+            _ => {
+                return syn::Error::new(
+                    item.vis.span(),
+                    "Function with `expose_under_internals` must not have any visibility.",
+                )
+                .to_compile_error()
+                .into();
+            }
+        }
+
+        item.vis = syn::parse2(quote! { pub }).unwrap();
+
+        let mut result = quote! {
+            #[cfg(feature = "internals")]
+            #item
+        };
+
+        item.vis = syn::parse2(quote! { pub(crate) }).unwrap();
+
+        result.extend(quote! {
+            #[cfg(not(feature = "internals"))]
+            #item
+        });
+
+        return result.into();
+    }
+
+    // Type-def's
+    if let Ok(mut item) = syn::parse2::<syn::ItemType>(input.clone()) {
+        match item.vis {
+            syn::Visibility::Inherited => (),
+            _ => {
+                return syn::Error::new(
+                    item.vis.span(),
+                    "`type` definitions with `expose_under_internals` must not have any visibility.",
+                )
+                .to_compile_error()
+                .into();
+            }
+        }
+
+        item.vis = syn::parse2(quote! { pub }).unwrap();
+
+        let mut result = quote! {
+            #[cfg(feature = "internals")]
+            #item
+        };
+
+        item.vis = syn::parse2(quote! { pub(crate) }).unwrap();
+
+        result.extend(quote! {
+            #[cfg(not(feature = "internals"))]
+            #item
+        });
+
+        return result.into();
+    }
+
+    // Use statements
+    if let Ok(mut item) = syn::parse2::<syn::ItemUse>(input.clone()) {
+        match item.vis {
+            syn::Visibility::Inherited => (),
+            _ => {
+                return syn::Error::new(
+                    item.vis.span(),
+                    "`use` statements with `expose_under_internals` must not have any visibility.",
+                )
+                .to_compile_error()
+                .into();
+            }
+        }
+
+        item.vis = syn::parse2(quote! { pub }).unwrap();
+
+        let mut result = quote! {
+            #[cfg(feature = "internals")]
+            #item
+        };
+
+        item.vis = syn::parse2(quote! { pub(crate) }).unwrap();
+
+        result.extend(quote! {
+            #[cfg(not(feature = "internals"))]
+            #item
+        });
+
+        return result.into();
+    }
+
+    syn::Error::new(input.span(), "Cannot use `expose_under_internals` here.")
+        .to_compile_error()
+        .into()
 }

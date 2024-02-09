@@ -43,10 +43,16 @@ where
 // Range iterator with step
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub struct StepRange<T> {
+    /// Start of the range.
     pub from: T,
+    /// End of the range (exclusive).
     pub to: T,
+    /// Step value.
     pub step: T,
+    /// Increment function.
     pub add: fn(T, T) -> Option<T>,
+    /// Direction of iteration.
+    /// > 0 = forward, < 0 = backward, 0 = done.
     pub dir: i8,
 }
 
@@ -63,6 +69,7 @@ impl<T: Debug> Debug for StepRange<T> {
 }
 
 impl<T: Copy + PartialOrd> StepRange<T> {
+    /// Create a new [`StepRange`].
     pub fn new(from: T, to: T, step: T, add: fn(T, T) -> Option<T>) -> RhaiResultOf<Self> {
         let mut dir = 0;
 
@@ -121,11 +128,14 @@ impl<T: Copy + PartialOrd> Iterator for StepRange<T> {
 
 impl<T: Copy + PartialOrd> FusedIterator for StepRange<T> {}
 
-// Bit-field iterator with step
+/// Bit-field iterator with step.
+///
+/// Values are the base number and the number of bits to iterate.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct BitRange(INT, usize);
 
 impl BitRange {
+    /// Create a new [`BitRange`].
     pub fn new(value: INT, from: INT, len: INT) -> RhaiResultOf<Self> {
         let from = calc_index(INT_BITS, from, true, || {
             ERR::ErrorBitFieldBounds(INT_BITS, from, Position::NONE).into()
@@ -173,11 +183,12 @@ impl ExactSizeIterator for BitRange {
     }
 }
 
-// String iterator over characters
+// String iterator over characters.
 #[derive(Debug, Clone)]
 pub struct CharsStream(IntoIter<char>);
 
 impl CharsStream {
+    /// Create a new [`CharsStream`].
     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn new(string: &str, from: INT, len: INT) -> Self {
         if len <= 0 || from > MAX_USIZE_INT {
@@ -337,6 +348,21 @@ def_package! {
     pub BasicIteratorPackage(lib) {
         lib.set_standard_lib(true);
 
+        // Register iterators for standard types.
+        #[cfg(not(feature = "no_index"))]
+        {
+            lib.set_iterable::<crate::Array>();
+            lib.set_iterable::<crate::Blob>();
+        }
+        lib.set_iter(TypeId::of::<ImmutableString>(), |value| Box::new(
+            CharsStream::new(value.cast::<ImmutableString>().as_str(), 0, MAX_USIZE_INT).map(Into::into)
+        ));
+
+        // Register iterator types.
+        lib.set_iterator::<CharsStream>();
+        lib.set_iterator::<BitRange>();
+
+        // Register range functions.
         reg_range!(lib => INT);
 
         #[cfg(not(feature = "only_i32"))]
@@ -364,12 +390,6 @@ def_package! {
 
         #[cfg(feature = "decimal")]
         reg_range!(lib |> Decimal);
-
-        // Register string iterator
-        lib.set_iterator::<CharsStream>();
-
-        // Register bit-field iterator
-        lib.set_iterator::<BitRange>();
 
         // Register iterator functions
         combine_with_exported_module!(lib, "iterator", iterator_functions);

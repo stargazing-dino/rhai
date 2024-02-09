@@ -346,7 +346,7 @@ impl ModuleResolver for FileModuleResolver {
         path: &str,
         pos: Position,
     ) -> RhaiResultOf<SharedModule> {
-        let global = &mut GlobalRuntimeState::new(engine);
+        let global = &mut engine.new_global_runtime_state();
         let scope = &mut Scope::new();
         self.impl_resolve(engine, global, scope, source, path, pos)
     }

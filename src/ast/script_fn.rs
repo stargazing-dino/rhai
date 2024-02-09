@@ -40,6 +40,25 @@ pub struct ScriptFuncDef {
     pub comments: crate::StaticVec<crate::SmartString>,
 }
 
+impl ScriptFuncDef {
+    /// Clone this [`ScriptFuncDef`] but with only signature-related info.
+    ///
+    /// The body of the function is removed, as well as comments (if any).
+    #[allow(dead_code)]
+    pub(crate) fn clone_function_signatures(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            access: self.access,
+            body: StmtBlock::NONE,
+            #[cfg(not(feature = "no_object"))]
+            this_type: self.this_type.clone(),
+            params: self.params.clone(),
+            #[cfg(feature = "metadata")]
+            comments: <_>::default(),
+        }
+    }
+}
+
 impl fmt::Display for ScriptFuncDef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         #[cfg(not(feature = "no_object"))]

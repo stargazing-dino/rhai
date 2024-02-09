@@ -12,27 +12,17 @@ use crate::FLOAT;
 #[cfg(not(feature = "no_float"))]
 use num_traits::Float;
 
-#[cfg(feature = "decimal")]
-use rust_decimal::Decimal;
-
-#[cfg(feature = "decimal")]
-use super::arithmetic::make_err;
-
-macro_rules! gen_conversion_as_function {
+macro_rules! gen_conv_functions {
     ($mod_name:ident => $func_name:ident ( $($arg_type:ident),+ ) -> $result_type:ty) => {
         $(
             FuncRegistration::new(stringify!($func_name)).set_into_module($mod_name, |x: $arg_type| x as $result_type);
         )*
     };
-}
-
-#[cfg(feature = "decimal")]
-macro_rules! gen_conversion_into_function {
-    ($mod_name:ident => $func_name:ident ( $($arg_type:ident),+ ) -> $result_type:ty) => {
+    ($mod_name:ident => $func_name:ident ( $($arg_type:ident),+ ) .into() -> $result_type:ty) => {
         $(
             FuncRegistration::new(stringify!($func_name)).set_into_module($mod_name, |x: $arg_type| -> $result_type { x.into() });
         )*
-    }
+    };
 }
 
 def_package! {
@@ -43,15 +33,16 @@ def_package! {
         // Integer functions
         combine_with_exported_module!(lib, "int", int_functions);
 
-        gen_conversion_as_function!(lib => to_int (char) -> INT);
+        // Conversion functions
+        gen_conv_functions!(lib => to_int(char) -> INT);
 
         #[cfg(not(feature = "only_i32"))]
         #[cfg(not(feature = "only_i64"))]
         {
-            gen_conversion_as_function!(lib => to_int (i8, u8, i16, u16, i32, u32, i64, u64) -> INT);
+            gen_conv_functions!(lib => to_int(i8, u8, i16, u16, i32, u32, i64, u64) -> INT);
 
             #[cfg(not(target_family = "wasm"))]
-            gen_conversion_as_function!(lib => to_int (i128, u128) -> INT);
+            gen_conv_functions!(lib => to_int(i128, u128) -> INT);
         }
 
         #[cfg(not(feature = "no_float"))]
@@ -62,28 +53,30 @@ def_package! {
             // Trig functions
             combine_with_exported_module!(lib, "trig", trig_functions);
 
-            gen_conversion_as_function!(lib => to_float (INT) -> FLOAT);
+            gen_conv_functions!(lib => to_float(INT) -> FLOAT);
 
             #[cfg(not(feature = "only_i32"))]
             #[cfg(not(feature = "only_i64"))]
             {
-                gen_conversion_as_function!(lib => to_float (i8, u8, i16, u16, i32, u32, i64, u64) -> FLOAT);
+                gen_conv_functions!(lib => to_float(i8, u8, i16, u16, i32, u32, i64, u64) -> FLOAT);
 
                 #[cfg(not(target_family = "wasm"))]
-                gen_conversion_as_function!(lib => to_float (i128, u128) -> FLOAT);
+                gen_conv_functions!(lib => to_float(i128, u128) -> FLOAT);
             }
         }
 
         // Decimal functions
         #[cfg(feature = "decimal")]
         {
+            use rust_decimal::Decimal;
+
             combine_with_exported_module!(lib, "decimal", decimal_functions);
 
-            gen_conversion_into_function!(lib => to_decimal (INT) -> Decimal);
+            gen_conv_functions!(lib => to_decimal(INT).into() -> Decimal);
 
             #[cfg(not(feature = "only_i32"))]
             #[cfg(not(feature = "only_i64"))]
-            gen_conversion_into_function!(lib => to_decimal (i8, u8, i16, u16, i32, u32, i64, u64) -> Decimal);
+            gen_conv_functions!(lib => to_decimal(i8, u8, i16, u16, i32, u32, i64, u64).into() -> Decimal);
         }
     }
 }
@@ -346,6 +339,7 @@ mod float_functions {
 #[cfg(feature = "decimal")]
 #[export_module]
 mod decimal_functions {
+    use super::super::arithmetic::make_err;
     use num_traits::ToPrimitive;
     use rust_decimal::{
         prelude::{FromStr, RoundingStrategy},

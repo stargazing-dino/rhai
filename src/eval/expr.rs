@@ -9,215 +9,213 @@ use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, SmartString, ERR};
 use std::prelude::v1::*;
 use std::{fmt::Write, num::NonZeroUsize};
 
-/// Search for a module within an imports stack.
-#[cfg(not(feature = "no_module"))]
-#[inline]
-#[must_use]
-pub fn search_imports(
-    engine: &Engine,
-    global: &GlobalRuntimeState,
-    namespace: &crate::ast::Namespace,
-) -> Option<crate::SharedModule> {
-    debug_assert!(!namespace.is_empty());
+impl Engine {
+    /// Search for a module within an imports stack.
+    #[cfg(not(feature = "no_module"))]
+    #[inline]
+    #[must_use]
+    pub(crate) fn search_imports(
+        &self,
+        global: &GlobalRuntimeState,
+        namespace: &crate::ast::Namespace,
+    ) -> Option<crate::SharedModule> {
+        debug_assert!(!namespace.is_empty());
 
-    let root = namespace.root();
+        let root = namespace.root();
 
-    // Qualified - check if the root module is directly indexed
-    if !global.always_search_scope {
-        if let Some(index) = namespace.index {
-            let offset = global.num_imports() - index.get();
+        // Qualified - check if the root module is directly indexed
+        if !global.always_search_scope {
+            if let Some(index) = namespace.index {
+                let offset = global.num_imports() - index.get();
 
-            if let m @ Some(_) = global.get_shared_import(offset) {
-                return m;
-            }
-        }
-    }
-
-    // Do a text-match search if the index doesn't work
-    global.find_import(root).map_or_else(
-        || engine.global_sub_modules.get(root).cloned(),
-        |offset| global.get_shared_import(offset),
-    )
-}
-
-/// Search for a variable within the scope
-///
-/// # Panics
-///
-/// Panics if `expr` is not [`Expr::Variable`].
-pub fn search_scope_only<'s>(
-    engine: &Engine,
-    global: &mut GlobalRuntimeState,
-    caches: &mut Caches,
-    scope: &'s mut Scope,
-    this_ptr: Option<&'s mut Dynamic>,
-    expr: &Expr,
-) -> RhaiResultOf<Target<'s>> {
-    // Make sure that the pointer indirection is taken only when absolutely necessary.
-
-    let index = match expr {
-        // Check if the variable is `this`
-        Expr::ThisPtr(..) => unreachable!("Expr::ThisPtr should have been handled outside"),
-
-        _ if global.always_search_scope => 0,
-
-        Expr::Variable(_, Some(i), ..) => i.get() as usize,
-        Expr::Variable(v, None, ..) => {
-            // Scripted function with the same name
-            #[cfg(not(feature = "no_function"))]
-            if let Some(fn_def) = global
-                .lib
-                .iter()
-                .flat_map(|m| m.iter_script_fn())
-                .find_map(|(_, _, f, _, func)| if f == v.3 { Some(func) } else { None })
-            {
-                let val: Dynamic = crate::FnPtr {
-                    name: v.3.clone(),
-                    curry: <_>::default(),
-                    environ: None,
-                    fn_def: Some(fn_def.clone()),
+                if let m @ Some(_) = global.get_shared_import(offset) {
+                    return m;
                 }
-                .into();
-                return Ok(val.into());
             }
-
-            v.0.map_or(0, NonZeroUsize::get)
         }
 
-        _ => unreachable!("Expr::Variable expected but gets {:?}", expr),
-    };
-
-    // Check the variable resolver, if any
-    if let Some(ref resolve_var) = engine.resolve_var {
-        let orig_scope_len = scope.len();
-
-        let context = EvalContext::new(engine, global, caches, scope, this_ptr);
-        let var_name = expr.get_variable_name(true).unwrap();
-        let resolved_var = resolve_var(var_name, index, context);
-
-        if orig_scope_len != scope.len() {
-            // The scope is changed, always search from now on
-            global.always_search_scope = true;
-        }
-
-        match resolved_var {
-            Ok(Some(mut result)) => {
-                result.set_access_mode(AccessMode::ReadOnly);
-                return Ok(result.into());
-            }
-            Ok(None) => (),
-            Err(err) => return Err(err.fill_position(expr.position())),
-        }
+        // Do a text-match search if the index doesn't work
+        global.find_import(root).map_or_else(
+            || self.global_sub_modules.get(root).cloned(),
+            |offset| global.get_shared_import(offset),
+        )
     }
+    /// Search for a variable within the scope
+    ///
+    /// # Panics
+    ///
+    /// Panics if `expr` is not [`Expr::Variable`].
+    pub(crate) fn search_scope_only<'s>(
+        &self,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        scope: &'s mut Scope,
+        this_ptr: Option<&'s mut Dynamic>,
+        expr: &Expr,
+    ) -> RhaiResultOf<Target<'s>> {
+        // Make sure that the pointer indirection is taken only when absolutely necessary.
 
-    let index = if index > 0 {
-        scope.len() - index
-    } else {
-        // Find the variable in the scope
-        let var_name = expr.get_variable_name(true).unwrap();
+        let index = match expr {
+            // Check if the variable is `this`
+            Expr::ThisPtr(..) => unreachable!("Expr::ThisPtr should have been handled outside"),
 
-        match scope.search(var_name) {
-            Some(index) => index,
-            None => {
-                return engine
-                    .global_modules
-                    .iter()
-                    .find_map(|m| m.get_var(var_name))
-                    .map_or_else(
-                        || {
-                            Err(
-                                ERR::ErrorVariableNotFound(var_name.to_string(), expr.position())
-                                    .into(),
-                            )
-                        },
-                        |val| Ok(val.into()),
-                    )
-            }
-        }
-    };
+            _ if global.always_search_scope => 0,
 
-    let val = scope.get_mut_by_index(index);
-
-    Ok(val.into())
-}
-
-/// Search for a variable within the scope or within imports,
-/// depending on whether the variable name is namespace-qualified.
-pub fn search_namespace<'s>(
-    engine: &Engine,
-    global: &mut GlobalRuntimeState,
-    caches: &mut Caches,
-    scope: &'s mut Scope,
-    this_ptr: Option<&'s mut Dynamic>,
-    expr: &Expr,
-) -> RhaiResultOf<Target<'s>> {
-    match expr {
-        Expr::Variable(_, Some(_), _) => {
-            search_scope_only(engine, global, caches, scope, this_ptr, expr)
-        }
-        Expr::Variable(v, None, ..) => match &**v {
-            // Normal variable access
-            (_, ns, ..) if ns.is_empty() => {
-                search_scope_only(engine, global, caches, scope, this_ptr, expr)
-            }
-
-            // Qualified variable access
-            #[cfg(not(feature = "no_module"))]
-            (_, ns, hash_var, var_name) => {
-                // foo:bar::baz::VARIABLE
-                if let Some(module) = search_imports(engine, global, ns) {
-                    return module.get_qualified_var(*hash_var).map_or_else(
-                        || {
-                            let sep = crate::engine::NAMESPACE_SEPARATOR;
-
-                            Err(ERR::ErrorVariableNotFound(
-                                format!("{ns}{sep}{var_name}"),
-                                ns.position(),
-                            )
-                            .into())
-                        },
-                        |mut target| {
-                            // Module variables are constant
-                            target.set_access_mode(AccessMode::ReadOnly);
-                            Ok(target.into())
-                        },
-                    );
-                }
-
-                // global::VARIABLE
+            Expr::Variable(_, Some(i), ..) => i.get() as usize,
+            Expr::Variable(v, None, ..) => {
+                // Scripted function with the same name
                 #[cfg(not(feature = "no_function"))]
-                if ns.path.len() == 1 && ns.root() == crate::engine::KEYWORD_GLOBAL {
-                    if let Some(ref constants) = global.constants {
-                        if let Some(value) =
-                            crate::func::locked_write(constants).get_mut(var_name.as_str())
-                        {
-                            let mut target: Target = value.clone().into();
-                            // Module variables are constant
-                            target.as_mut().set_access_mode(AccessMode::ReadOnly);
-                            return Ok(target);
-                        }
+                if let Some(fn_def) = global
+                    .lib
+                    .iter()
+                    .flat_map(|m| m.iter_script_fn())
+                    .find_map(|(_, _, f, _, func)| if f == v.3 { Some(func) } else { None })
+                {
+                    let val: Dynamic = crate::FnPtr {
+                        name: v.3.clone(),
+                        curry: <_>::default(),
+                        environ: None,
+                        fn_def: Some(fn_def.clone()),
+                    }
+                    .into();
+                    return Ok(val.into());
+                }
+
+                v.0.map_or(0, NonZeroUsize::get)
+            }
+
+            _ => unreachable!("Expr::Variable expected but gets {:?}", expr),
+        };
+
+        // Check the variable resolver, if any
+        if let Some(ref resolve_var) = self.resolve_var {
+            let orig_scope_len = scope.len();
+
+            let context = EvalContext::new(self, global, caches, scope, this_ptr);
+            let var_name = expr.get_variable_name(true).unwrap();
+            let resolved_var = resolve_var(var_name, index, context);
+
+            if orig_scope_len != scope.len() {
+                // The scope is changed, always search from now on
+                global.always_search_scope = true;
+            }
+
+            match resolved_var {
+                Ok(Some(mut result)) => {
+                    result.set_access_mode(AccessMode::ReadOnly);
+                    return Ok(result.into());
+                }
+                Ok(None) => (),
+                Err(err) => return Err(err.fill_position(expr.position())),
+            }
+        }
+
+        let index = if index > 0 {
+            scope.len() - index
+        } else {
+            // Find the variable in the scope
+            let var_name = expr.get_variable_name(true).unwrap();
+
+            match scope.search(var_name) {
+                Some(index) => index,
+                None => {
+                    return self
+                        .global_modules
+                        .iter()
+                        .find_map(|m| m.get_var(var_name))
+                        .map_or_else(
+                            || {
+                                Err(ERR::ErrorVariableNotFound(
+                                    var_name.to_string(),
+                                    expr.position(),
+                                )
+                                .into())
+                            },
+                            |val| Ok(val.into()),
+                        )
+                }
+            }
+        };
+
+        let val = scope.get_mut_by_index(index);
+
+        Ok(val.into())
+    }
+    /// Search for a variable within the scope or within imports,
+    /// depending on whether the variable name is namespace-qualified.
+    pub(crate) fn search_namespace<'s>(
+        &self,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
+        scope: &'s mut Scope,
+        this_ptr: Option<&'s mut Dynamic>,
+        expr: &Expr,
+    ) -> RhaiResultOf<Target<'s>> {
+        match expr {
+            Expr::Variable(_, Some(_), _) => {
+                self.search_scope_only(global, caches, scope, this_ptr, expr)
+            }
+            Expr::Variable(v, None, ..) => match &**v {
+                // Normal variable access
+                (_, ns, ..) if ns.is_empty() => {
+                    self.search_scope_only(global, caches, scope, this_ptr, expr)
+                }
+
+                // Qualified variable access
+                #[cfg(not(feature = "no_module"))]
+                (_, ns, hash_var, var_name) => {
+                    // foo:bar::baz::VARIABLE
+                    if let Some(module) = self.search_imports(global, ns) {
+                        return module.get_qualified_var(*hash_var).map_or_else(
+                            || {
+                                let sep = crate::engine::NAMESPACE_SEPARATOR;
+
+                                Err(ERR::ErrorVariableNotFound(
+                                    format!("{ns}{sep}{var_name}"),
+                                    ns.position(),
+                                )
+                                .into())
+                            },
+                            |mut target| {
+                                // Module variables are constant
+                                target.set_access_mode(AccessMode::ReadOnly);
+                                Ok(target.into())
+                            },
+                        );
                     }
 
-                    let sep = crate::engine::NAMESPACE_SEPARATOR;
+                    // global::VARIABLE
+                    #[cfg(not(feature = "no_function"))]
+                    if ns.path.len() == 1 && ns.root() == crate::engine::KEYWORD_GLOBAL {
+                        if let Some(ref constants) = global.constants {
+                            if let Some(value) =
+                                crate::func::locked_write(constants).get_mut(var_name.as_str())
+                            {
+                                let mut target: Target = value.clone().into();
+                                // Module variables are constant
+                                target.as_mut().set_access_mode(AccessMode::ReadOnly);
+                                return Ok(target);
+                            }
+                        }
 
-                    return Err(ERR::ErrorVariableNotFound(
-                        format!("{ns}{sep}{var_name}"),
-                        ns.position(),
-                    )
-                    .into());
+                        let sep = crate::engine::NAMESPACE_SEPARATOR;
+
+                        return Err(ERR::ErrorVariableNotFound(
+                            format!("{ns}{sep}{var_name}"),
+                            ns.position(),
+                        )
+                        .into());
+                    }
+
+                    Err(ERR::ErrorModuleNotFound(ns.to_string(), ns.position()).into())
                 }
 
-                Err(ERR::ErrorModuleNotFound(ns.to_string(), ns.position()).into())
-            }
-
-            #[cfg(feature = "no_module")]
-            _ => unreachable!("Invalid expression {:?}", expr),
-        },
-        _ => unreachable!("Expr::Variable expected but gets {:?}", expr),
+                #[cfg(feature = "no_module")]
+                _ => unreachable!("Invalid expression {:?}", expr),
+            },
+            _ => unreachable!("Expr::Variable expected but gets {:?}", expr),
+        }
     }
-}
-
-impl Engine {
     /// Evaluate an expression.
     pub(crate) fn eval_expr(
         &self,
@@ -254,7 +252,8 @@ impl Engine {
                 .ok_or_else(|| ERR::ErrorUnboundThis(*var_pos).into())
                 .cloned(),
 
-            Expr::Variable(..) => search_namespace(self, global, caches, scope, this_ptr, expr)
+            Expr::Variable(..) => self
+                .search_namespace(global, caches, scope, this_ptr, expr)
                 .map(Target::take_or_clone),
 
             Expr::InterpolatedString(x, _) => {
