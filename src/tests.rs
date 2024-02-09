@@ -48,10 +48,7 @@ fn check_struct_sizes() {
             0
         }
     );
-    assert_eq!(
-        size_of::<LexError>(),
-        if cfg!(feature = "unstable") { 48 } else { 56 }
-    );
+    assert_eq!(size_of::<LexError>(), 48);
     assert_eq!(
         size_of::<ParseError>(),
         16 - if cfg!(feature = "no_position") {

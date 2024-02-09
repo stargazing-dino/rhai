@@ -2,6 +2,8 @@
 #![cfg(not(feature = "no_optimize"))]
 
 use crate::{Engine, OptimizationLevel, Scope, AST};
+#[cfg(feature = "no_std")]
+use std::prelude::v1::*;
 
 impl Engine {
     /// Control whether and how the [`Engine`] will optimize an [`AST`] after compilation.
