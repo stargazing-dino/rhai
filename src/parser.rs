@@ -3830,12 +3830,11 @@ impl Engine {
         statements.push(Stmt::Expr(expr.into()));
 
         #[cfg(not(feature = "no_optimize"))]
-        return Ok(crate::optimizer::optimize_into_ast(
-            self,
+        return Ok(self.optimize_into_ast(
             state.external_constants,
             statements,
             #[cfg(not(feature = "no_function"))]
-            std::mem::take(state.lib).into_values().collect(),
+            std::mem::take(state.lib).into_values().collect::<Vec<_>>(),
             _optimization_level,
         ));
 
@@ -3919,8 +3918,7 @@ impl Engine {
         let (statements, _lib) = self.parse_global_level(state, |_| {})?;
 
         #[cfg(not(feature = "no_optimize"))]
-        return Ok(crate::optimizer::optimize_into_ast(
-            self,
+        return Ok(self.optimize_into_ast(
             state.external_constants,
             statements,
             #[cfg(not(feature = "no_function"))]

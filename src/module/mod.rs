@@ -659,6 +659,15 @@ impl<T: IntoIterator<Item = Shared<crate::ast::ScriptFuncDef>>> From<T> for Modu
     }
 }
 
+#[cfg(not(feature = "no_function"))]
+impl<T: Into<Shared<crate::ast::ScriptFuncDef>>> Extend<T> for Module {
+    fn extend<ITER: IntoIterator<Item = T>>(&mut self, iter: ITER) {
+        iter.into_iter().for_each(|fn_def| {
+            self.set_script_fn(fn_def);
+        });
+    }
+}
+
 impl<M: AsRef<Module>> Add<M> for &Module {
     type Output = Module;
 
