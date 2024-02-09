@@ -1,12 +1,12 @@
 //! The `FnPtr` type.
 
 use crate::ast::EncapsulatedEnviron;
-use crate::eval::GlobalRuntimeState;
 use crate::tokenizer::{is_reserved_keyword_or_symbol, is_valid_function_name, Token};
 use crate::types::dynamic::Variant;
 use crate::{
-    Dynamic, Engine, FnArgsVec, FuncArgs, ImmutableString, NativeCallContext, Position, RhaiError,
-    RhaiResult, RhaiResultOf, Shared, StaticVec, ThinVec, AST, ERR, PERR,
+    expose_under_internals, Dynamic, Engine, FnArgsVec, FuncArgs, ImmutableString,
+    NativeCallContext, Position, RhaiError, RhaiResult, RhaiResultOf, Shared, StaticVec, ThinVec,
+    AST, ERR, PERR,
 };
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -155,7 +155,7 @@ impl FnPtr {
         let mut arg_values = StaticVec::new_const();
         args.parse(&mut arg_values);
 
-        let global = &mut GlobalRuntimeState::new(engine);
+        let global = &mut engine.new_global_runtime_state();
 
         #[cfg(not(feature = "no_function"))]
         global.lib.push(_ast.shared_lib().clone());
@@ -273,40 +273,6 @@ impl FnPtr {
         context.call_fn_raw(self.fn_name(), is_method, is_method, args)
     }
 
-    /// Make a call to a function pointer with either a specified number of arguments, or with extra
-    /// arguments attached.
-    ///
-    /// If `this_ptr` is provided, it is first provided to script-defined functions bound to `this`.
-    ///
-    /// When an appropriate function is not found and `move_this_ptr_to_args` is `Some`, `this_ptr`
-    /// is removed and inserted as the appropriate parameter number.
-    ///
-    /// This is useful for calling predicate closures within an iteration loop where the extra argument
-    /// is the current element's index.
-    ///
-    /// If the function pointer is linked to a scripted function definition, use the appropriate number
-    /// of arguments to call it directly (one version attaches extra arguments).
-    #[cfg(not(feature = "internals"))]
-    #[inline(always)]
-    #[allow(dead_code)]
-    pub(crate) fn call_raw_with_extra_args<const N: usize, const E: usize>(
-        &self,
-        fn_name: &str,
-        ctx: &NativeCallContext,
-        this_ptr: Option<&mut Dynamic>,
-        args: [Dynamic; N],
-        extras: [Dynamic; E],
-        move_this_ptr_to_args: Option<usize>,
-    ) -> RhaiResult {
-        match move_this_ptr_to_args {
-            Some(m) => {
-                self._call_with_extra_args::<true, N, E>(fn_name, ctx, this_ptr, args, extras, m)
-            }
-            None => {
-                self._call_with_extra_args::<false, N, E>(fn_name, ctx, this_ptr, args, extras, 0)
-            }
-        }
-    }
     /// _(internals)_ Make a call to a function pointer with either a specified number of arguments,
     /// or with extra arguments attached.
     /// Exported under the `internals` feature only.
@@ -321,9 +287,9 @@ impl FnPtr {
     ///
     /// If the function pointer is linked to a scripted function definition, use the appropriate
     /// number of arguments to call it directly (one version attaches extra arguments).
-    #[cfg(feature = "internals")]
+    #[expose_under_internals]
     #[inline(always)]
-    pub fn call_raw_with_extra_args<const N: usize, const E: usize>(
+    fn call_raw_with_extra_args<const N: usize, const E: usize>(
         &self,
         fn_name: &str,
         ctx: &NativeCallContext,

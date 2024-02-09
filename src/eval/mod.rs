@@ -26,9 +26,6 @@ pub use debugger::{
     OnDebuggingInit,
 };
 pub use eval_context::EvalContext;
-#[cfg(not(feature = "no_module"))]
-pub use expr::search_imports;
-pub use expr::search_namespace;
 
 pub use global_state::GlobalRuntimeState;
 #[cfg(not(feature = "no_module"))]

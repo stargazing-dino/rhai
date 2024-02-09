@@ -3,7 +3,6 @@
 use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::native::locked_write;
 use crate::parser::ParseState;
-use crate::tokenizer::lex_raw;
 use crate::types::dynamic::Variant;
 use crate::types::StringsInterner;
 use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR};
@@ -126,7 +125,7 @@ impl Engine {
                 &mut interner
             };
 
-            let (stream, tc) = lex_raw(self, &scripts, self.token_mapper.as_deref());
+            let (stream, tc) = self.lex(&scripts);
 
             let input = &mut stream.peekable();
             let lib = &mut <_>::default();
@@ -199,7 +198,7 @@ impl Engine {
         scope: &mut Scope,
         ast: &AST,
     ) -> RhaiResultOf<T> {
-        let global = &mut GlobalRuntimeState::new(self);
+        let global = &mut self.new_global_runtime_state();
         let caches = &mut Caches::new();
 
         let result = self.eval_ast_with_scope_raw(global, caches, scope, ast)?;

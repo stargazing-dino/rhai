@@ -4,7 +4,6 @@ use super::{Caches, EvalContext, GlobalRuntimeState, Target};
 use crate::ast::{
     ASTFlags, BinaryExpr, Expr, FlowControl, OpAssignment, Stmt, SwitchCasesCollection,
 };
-use crate::eval::search_namespace;
 use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::tokenizer::Token;
 use crate::types::dynamic::{AccessMode, Union};
@@ -13,16 +12,16 @@ use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
-/// If the value is a string, intern it.
-#[inline(always)]
-fn intern_string(value: Dynamic, engine: &Engine) -> Dynamic {
-    match value.0 {
-        Union::Str(s, ..) => engine.get_interned_string(s).into(),
-        _ => value,
-    }
-}
-
 impl Engine {
+    /// If the value is a string, intern it.
+    #[inline(always)]
+    fn intern_string(&self, value: Dynamic) -> Dynamic {
+        match value.0 {
+            Union::Str(s, ..) => self.get_interned_string(s).into(),
+            _ => value,
+        }
+    }
+
     /// Evaluate a statements block.
     pub(crate) fn eval_stmt_block(
         &self,
@@ -325,7 +324,7 @@ impl Engine {
 
                     self.track_operation(global, lhs.position())?;
 
-                    let mut target = search_namespace(self, global, caches, scope, this_ptr, lhs)?;
+                    let mut target = self.search_namespace(global, caches, scope, this_ptr, lhs)?;
 
                     let is_temp_result = !target.is_ref();
 
@@ -350,7 +349,7 @@ impl Engine {
                         let rhs_val = self
                             .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), rhs)?
                             .flatten();
-                        let _new_val = Some((intern_string(rhs_val, self), op_info));
+                        let _new_val = Some((self.intern_string(rhs_val), op_info));
 
                         // Must be either `var[index] op= val` or `var.prop op= val`.
                         // The return value of any op-assignment (should be `()`) is thrown away and not used.
@@ -436,7 +435,7 @@ impl Engine {
                 let value = self
                     .eval_expr(global, caches, scope, this_ptr, expr)?
                     .flatten();
-                let mut value = intern_string(value, self);
+                let mut value = self.intern_string(value);
 
                 let _alias = if !rewind_scope {
                     // Put global constants into global module

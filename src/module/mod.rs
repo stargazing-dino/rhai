@@ -8,8 +8,8 @@ use crate::func::{
 };
 use crate::types::{dynamic::Variant, BloomFilterU64, CustomTypeInfo, CustomTypesCollection};
 use crate::{
-    calc_fn_hash, calc_fn_hash_full, Dynamic, Engine, FnArgsVec, Identifier, ImmutableString,
-    RhaiResultOf, Shared, SharedModule, SmartString,
+    calc_fn_hash, calc_fn_hash_full, expose_under_internals, Dynamic, Engine, FnArgsVec,
+    Identifier, ImmutableString, RhaiResultOf, Shared, SharedModule, SmartString,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -1005,29 +1005,15 @@ impl Module {
     }
     /// _(internals)_ Get a registered custom type .
     /// Exported under the `internals` feature only.
-    #[cfg(feature = "internals")]
+    #[expose_under_internals]
     #[inline(always)]
     #[must_use]
-    pub fn get_custom_type_raw<T>(&self) -> Option<&CustomTypeInfo> {
-        self.get_custom_type_by_name_raw(type_name::<T>())
-    }
-    /// Get a registered custom type .
-    #[cfg(not(feature = "internals"))]
-    #[inline(always)]
-    #[must_use]
-    pub fn get_custom_type_raw<T>(&self) -> Option<&CustomTypeInfo> {
+    fn get_custom_type_raw<T>(&self) -> Option<&CustomTypeInfo> {
         self.get_custom_type_by_name_raw(type_name::<T>())
     }
     /// _(internals)_ Get a registered custom type by its type name.
     /// Exported under the `internals` feature only.
-    #[cfg(feature = "internals")]
-    #[inline(always)]
-    #[must_use]
-    pub fn get_custom_type_by_name_raw(&self, type_name: &str) -> Option<&CustomTypeInfo> {
-        self.custom_types.get(type_name)
-    }
-    /// Get a registered custom type by its type name.
-    #[cfg(not(feature = "internals"))]
+    #[expose_under_internals]
     #[inline(always)]
     #[must_use]
     fn get_custom_type_by_name_raw(&self, type_name: &str) -> Option<&CustomTypeInfo> {
@@ -2178,24 +2164,6 @@ impl Module {
         })
     }
 
-    /// Get an iterator over all script-defined functions in the [`Module`].
-    ///
-    /// Function metadata includes:
-    /// 1) Namespace ([`FnNamespace::Global`] or [`FnNamespace::Internal`]).
-    /// 2) Access mode ([`FnAccess::Public`] or [`FnAccess::Private`]).
-    /// 3) Function name (as string slice).
-    /// 4) Number of parameters.
-    #[cfg(not(feature = "no_function"))]
-    #[cfg(not(feature = "internals"))]
-    #[inline]
-    pub fn iter_script_fn_info(
-        &self,
-    ) -> impl Iterator<Item = (FnNamespace, FnAccess, &str, usize)> {
-        self.iter_fn()
-            .filter(|(f, _)| f.is_script())
-            .map(|(_, f)| (f.namespace, f.access, f.name.as_str(), f.num_params))
-    }
-
     /// _(internals)_ Get an iterator over all script-defined functions in the [`Module`].
     /// Exported under the `internals` feature only.
     ///
@@ -2205,10 +2173,10 @@ impl Module {
     /// 3) Function name (as string slice).
     /// 4) Number of parameters.
     /// 5) _(internals)_ Shared reference to function definition [`ScriptFuncDef`][crate::ast::ScriptFuncDef].
+    #[expose_under_internals]
     #[cfg(not(feature = "no_function"))]
-    #[cfg(feature = "internals")]
     #[inline(always)]
-    pub fn iter_script_fn_info(
+    fn iter_script_fn_info(
         &self,
     ) -> impl Iterator<
         Item = (
@@ -2249,7 +2217,7 @@ impl Module {
         engine: &crate::Engine,
     ) -> RhaiResultOf<Self> {
         let mut scope = scope;
-        let global = &mut crate::eval::GlobalRuntimeState::new(engine);
+        let global = &mut engine.new_global_runtime_state();
 
         Self::eval_ast_as_new_raw(engine, &mut scope, global, ast)
     }

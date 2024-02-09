@@ -74,7 +74,7 @@ impl<'a> OptimizerState<'a> {
         scope: Option<&'a Scope<'a>>,
         optimization_level: OptimizationLevel,
     ) -> Self {
-        let mut _global = GlobalRuntimeState::new(engine);
+        let mut _global = engine.new_global_runtime_state();
         let _lib = lib;
 
         #[cfg(not(feature = "no_function"))]

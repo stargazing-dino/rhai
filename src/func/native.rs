@@ -7,8 +7,8 @@ use crate::plugin::PluginFunc;
 use crate::tokenizer::{is_valid_function_name, Token, TokenizeState};
 use crate::types::dynamic::Variant;
 use crate::{
-    calc_fn_hash, Dynamic, Engine, EvalContext, FnArgsVec, FuncArgs, Position, RhaiResult,
-    RhaiResultOf, StaticVec, VarDefInfo, ERR,
+    calc_fn_hash, expose_under_internals, Dynamic, Engine, EvalContext, FnArgsVec, FuncArgs,
+    Position, RhaiResult, RhaiResultOf, StaticVec, VarDefInfo, ERR,
 };
 use std::any::type_name;
 #[cfg(feature = "no_std")]
@@ -256,18 +256,10 @@ impl<'a> NativeCallContext<'a> {
     /// Exported under the `internals` feature only.
     ///
     /// Not available under `no_module`.
-    #[cfg(feature = "internals")]
+    #[expose_under_internals]
     #[inline(always)]
     #[must_use]
-    pub const fn global_runtime_state(&self) -> &GlobalRuntimeState {
-        self.global
-    }
-    /// _(internals)_ The current [`GlobalRuntimeState`], if any.
-    #[cfg(not(feature = "internals"))]
-    #[inline(always)]
-    #[must_use]
-    #[allow(dead_code)]
-    pub(crate) const fn global_runtime_state(&self) -> &GlobalRuntimeState {
+    const fn global_runtime_state(&self) -> &GlobalRuntimeState {
         self.global
     }
     /// Get an iterator over the namespaces containing definitions of all script-defined functions

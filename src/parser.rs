@@ -2869,7 +2869,7 @@ impl Engine {
 
             let global = state
                 .global
-                .get_or_insert_with(|| GlobalRuntimeState::new(self).into());
+                .get_or_insert_with(|| self.new_global_runtime_state().into());
 
             global.level = settings.level;
             let is_const = access == AccessMode::ReadOnly;

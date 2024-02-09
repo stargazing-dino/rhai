@@ -178,7 +178,7 @@ impl Engine {
 
         self._call_fn(
             scope,
-            &mut crate::eval::GlobalRuntimeState::new(self),
+            &mut self.new_global_runtime_state(),
             &mut crate::eval::Caches::new(),
             ast,
             name.as_ref(),
