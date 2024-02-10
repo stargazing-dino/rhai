@@ -26,25 +26,6 @@ Bug fixes
 * The engine no longer crashes when accessing a property or indexed item from a shared value returned from a variables resolver.
 
 
-Version 1.18.0
-==============
-
-Bug fixes
----------
-
-* The engine no longer crashes when accessing a property or indexed item from a shared value returned from a variables resolver.
-
-Deprecated API's
-----------------
-
-* The plugin macros `export_fn`, `register_exported_fn!`, `set_exported_fn!` and `set_exported_global_fn!` are deprecated because they do not add value over existing direct API's.
-
-Enhancements
-------------
-
-* `FuncRegistration::in_global_namespace` and `FuncRegistration::in_internal_namespace` are added to avoid pulling in `FnNamespace`.
-
-
 Version 1.17.1
 ==============
 
