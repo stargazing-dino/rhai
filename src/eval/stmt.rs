@@ -450,6 +450,7 @@ impl Engine {
                                 crate::Locked::new(std::collections::BTreeMap::new()),
                             )
                         }))
+                        .unwrap()
                         .insert(var_name.name.clone(), value.clone());
                     }
 

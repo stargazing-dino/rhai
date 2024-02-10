@@ -524,12 +524,30 @@ pub fn shared_take<T>(value: Shared<T>) -> T {
 #[inline(always)]
 #[must_use]
 #[allow(dead_code)]
-pub fn locked_read<T>(value: &Locked<T>) -> LockGuard<T> {
+pub fn locked_read<T>(value: &Locked<T>) -> Option<LockGuard<T>> {
     #[cfg(not(feature = "sync"))]
-    return value.borrow();
+    return value.try_borrow().ok();
 
     #[cfg(feature = "sync")]
-    return value.read().unwrap();
+    #[cfg(feature = "unchecked")]
+    return value.read().ok();
+
+    #[cfg(feature = "sync")]
+    #[cfg(not(feature = "unchecked"))]
+    {
+        // Spin-lock for a short while before giving up
+        for _ in 0..10 {
+            match value.try_read() {
+                Ok(guard) => return Some(guard),
+                Err(std::sync::TryLockError::WouldBlock) => {
+                    std::thread::sleep(std::time::Duration::from_secs(1))
+                }
+                Err(_) => return None,
+            }
+        }
+
+        return None;
+    }
 }
 
 /// _(internals)_ Lock a [`Locked`] resource for mutable access.
@@ -537,12 +555,30 @@ pub fn locked_read<T>(value: &Locked<T>) -> LockGuard<T> {
 #[inline(always)]
 #[must_use]
 #[allow(dead_code)]
-pub fn locked_write<T>(value: &Locked<T>) -> LockGuardMut<T> {
+pub fn locked_write<T>(value: &Locked<T>) -> Option<LockGuardMut<T>> {
     #[cfg(not(feature = "sync"))]
-    return value.borrow_mut();
+    return value.try_borrow_mut().ok();
 
     #[cfg(feature = "sync")]
-    return value.write().unwrap();
+    #[cfg(feature = "unchecked")]
+    return value.write().ok();
+
+    #[cfg(feature = "sync")]
+    #[cfg(not(feature = "unchecked"))]
+    {
+        // Spin-lock for a short while before giving up
+        for _ in 0..10 {
+            match value.try_write() {
+                Ok(guard) => return Some(guard),
+                Err(std::sync::TryLockError::WouldBlock) => {
+                    std::thread::sleep(std::time::Duration::from_secs(1))
+                }
+                Err(_) => return None,
+            }
+        }
+
+        return None;
+    }
 }
 
 /// General Rust function trail object.

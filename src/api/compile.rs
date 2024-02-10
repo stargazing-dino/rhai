@@ -223,7 +223,7 @@ impl Engine {
         let mut interner;
         let mut guard;
         let interned_strings = if let Some(ref interner) = self.interned_strings {
-            guard = locked_write(interner);
+            guard = locked_write(interner).unwrap();
             &mut *guard
         } else {
             interner = StringsInterner::new();
@@ -307,7 +307,7 @@ impl Engine {
         let mut interner;
         let mut guard;
         let interned_strings = if let Some(ref interner) = self.interned_strings {
-            guard = locked_write(interner);
+            guard = locked_write(interner).unwrap();
             &mut *guard
         } else {
             interner = StringsInterner::new();

@@ -48,10 +48,18 @@ pub const RHAI_SCRIPT_EXTENSION: &str = "rhai";
 /// ```
 #[derive(Debug)]
 pub struct FileModuleResolver {
+    /// Base path of the directory holding script files.
     base_path: Option<PathBuf>,
+    /// File extension of script files, default `.rhai`.
     extension: Identifier,
+    /// Is the cache enabled?
     cache_enabled: bool,
+    /// [`Scope`] holding variables for compiling scripts.
     scope: Scope<'static>,
+    /// Internal cache of resolved modules.
+    ///
+    /// The cache is wrapped in interior mutability because [`resolve`][FileModuleResolver::resolve]
+    /// is immutable.
     cache: Locked<BTreeMap<PathBuf, SharedModule>>,
 }
 
@@ -239,12 +247,14 @@ impl FileModuleResolver {
         if !self.cache_enabled {
             return false;
         }
-        locked_read(&self.cache).contains_key(path.as_ref())
+        locked_read(&self.cache)
+            .unwrap()
+            .contains_key(path.as_ref())
     }
     /// Empty the internal cache.
     #[inline]
     pub fn clear_cache(&mut self) -> &mut Self {
-        locked_write(&self.cache).clear();
+        locked_write(&self.cache).unwrap().clear();
         self
     }
     /// Remove the specified path from internal cache.
@@ -254,6 +264,7 @@ impl FileModuleResolver {
     #[must_use]
     pub fn clear_cache_for_path(&mut self, path: impl AsRef<Path>) -> Option<SharedModule> {
         locked_write(&self.cache)
+            .unwrap()
             .remove_entry(path.as_ref())
             .map(|(.., v)| v)
     }
@@ -298,7 +309,7 @@ impl FileModuleResolver {
         let file_path = self.get_file_path(path, source_path);
 
         if self.is_cache_enabled() {
-            if let Some(module) = locked_read(&self.cache).get(&file_path) {
+            if let Some(module) = locked_read(&self.cache).unwrap().get(&file_path) {
                 return Ok(module.clone());
             }
         }
@@ -319,7 +330,9 @@ impl FileModuleResolver {
             .into();
 
         if self.is_cache_enabled() {
-            locked_write(&self.cache).insert(file_path, m.clone());
+            locked_write(&self.cache)
+                .unwrap()
+                .insert(file_path, m.clone());
         }
 
         Ok(m)

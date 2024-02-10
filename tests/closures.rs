@@ -191,6 +191,9 @@ fn test_closures() {
             .unwrap(),
         42
     );
+
+    let x = engine.eval::<Dynamic>("let x = #{}; x.a = || x; x").unwrap();
+    println!("{x:?}");
 }
 
 #[test]

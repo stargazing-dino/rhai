@@ -112,7 +112,7 @@ enum DynamicReadLockInner<'d, T: Clone> {
     /// A simple reference to a non-shared value.
     Reference(&'d T),
 
-    /// A read guard to a shared value.
+    /// A read guard to a _shared_ value.
     #[cfg(not(feature = "no_closure"))]
     Guard(crate::func::native::LockGuard<'d, Dynamic>),
 }
@@ -146,7 +146,7 @@ enum DynamicWriteLockInner<'d, T: Clone> {
     /// A simple mutable reference to a non-shared value.
     Reference(&'d mut T),
 
-    /// A write guard to a shared value.
+    /// A write guard to a _shared_ value.
     #[cfg(not(feature = "no_closure"))]
     Guard(crate::func::native::LockGuardMut<'d, Dynamic>),
 }
@@ -336,7 +336,7 @@ impl Dynamic {
             Union::Variant(ref v, ..) => (***v).type_id(),
 
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => (*crate::func::locked_read(cell)).type_id(),
+            Union::Shared(ref cell, ..) => (*crate::func::locked_read(cell).unwrap()).type_id(),
         }
     }
     /// Get the name of the type of the value held by this [`Dynamic`].
@@ -370,7 +370,7 @@ impl Dynamic {
             Union::Variant(ref v, ..) => (***v).type_name(),
 
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => (*crate::func::locked_read(cell)).type_name(),
+            Union::Shared(ref cell, ..) => (*crate::func::locked_read(cell).unwrap()).type_name(),
         }
     }
 }
@@ -409,7 +409,7 @@ impl Hash for Dynamic {
             }
 
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => (*crate::func::locked_read(cell)).hash(state),
+            Union::Shared(ref cell, ..) => (*crate::func::locked_read(cell).unwrap()).hash(state),
 
             Union::Variant(ref v, ..) => {
                 let _value_any = (***v).as_any();
@@ -546,16 +546,10 @@ impl fmt::Display for Dynamic {
 
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) if cfg!(feature = "unchecked") => {
-                #[cfg(not(feature = "sync"))]
-                match cell.try_borrow() {
-                    Ok(v) => {
-                        fmt::Display::fmt(&*v, f)?;
-                        f.write_str(" (shared)")
-                    }
-                    Err(_) => f.write_str("<shared>"),
+                match crate::func::locked_read(cell) {
+                    Some(v) => write!(f, "{} (shared)", *v),
+                    _ => f.write_str("<shared>"),
                 }
-                #[cfg(feature = "sync")]
-                fmt::Display::fmt(&*cell.read().unwrap(), f)
             }
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => {
@@ -565,36 +559,24 @@ impl fmt::Display for Dynamic {
                 use std::collections::HashSet;
 
                 // Avoid infinite recursion for shared values in a reference loop.
-                fn display_fmt(
-                    value: &Dynamic,
+                fn display_fmt_print(
                     f: &mut fmt::Formatter<'_>,
+                    value: &Dynamic,
                     dict: &mut HashSet<*const Dynamic>,
                 ) -> fmt::Result {
                     match value.0 {
                         #[cfg(not(feature = "no_closure"))]
-                        #[cfg(not(feature = "sync"))]
-                        Union::Shared(ref cell, ..) => match cell.try_borrow() {
-                            Ok(v) => {
+                        Union::Shared(ref cell, ..) => match crate::func::locked_read(cell) {
+                            Some(v) => {
                                 if dict.insert(value) {
-                                    display_fmt(&v, f, dict)?;
+                                    display_fmt_print(f, &v, dict)?;
                                     f.write_str(" (shared)")
                                 } else {
                                     f.write_str("<shared>")
                                 }
                             }
-                            Err(_) => f.write_str("<shared>"),
+                            _ => f.write_str("<shared>"),
                         },
-                        #[cfg(not(feature = "no_closure"))]
-                        #[cfg(feature = "sync")]
-                        Union::Shared(ref cell, ..) => {
-                            let v = cell.read().unwrap();
-
-                            if dict.insert(value) {
-                                display_fmt(&*v, f, dict)
-                            } else {
-                                f.write_str("<shared>")
-                            }
-                        }
                         #[cfg(not(feature = "no_index"))]
                         Union::Array(ref arr, ..) => {
                             dict.insert(value);
@@ -604,7 +586,7 @@ impl fmt::Display for Dynamic {
                                 if i > 0 {
                                     f.write_str(", ")?;
                                 }
-                                display_fmt(v, f, dict)?;
+                                display_fmt_print(f, v, dict)?;
                             }
                             f.write_str("]")
                         }
@@ -619,7 +601,7 @@ impl fmt::Display for Dynamic {
                                 }
                                 fmt::Display::fmt(k, f)?;
                                 f.write_str(": ")?;
-                                display_fmt(v, f, dict)?;
+                                display_fmt_print(f, v, dict)?;
                             }
                             f.write_str("}")
                         }
@@ -627,7 +609,7 @@ impl fmt::Display for Dynamic {
                     }
                 }
 
-                display_fmt(self, f, &mut <_>::default())
+                display_fmt_print(f, self, &mut <_>::default())
             }
         }
     }
@@ -724,16 +706,10 @@ impl fmt::Debug for Dynamic {
 
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) if cfg!(feature = "unchecked") => {
-                #[cfg(not(feature = "sync"))]
-                match cell.try_borrow() {
-                    Ok(v) => {
-                        fmt::Debug::fmt(&*v, f)?;
-                        f.write_str(" (shared)")
-                    }
-                    Err(_) => f.write_str("<shared>"),
+                match crate::func::locked_read(cell) {
+                    Some(v) => write!(f, "{:?} (shared)", *v),
+                    _ => f.write_str("<shared>"),
                 }
-                #[cfg(feature = "sync")]
-                fmt::Debug::fmt(&*cell.read().unwrap(), f)
             }
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => {
@@ -743,37 +719,24 @@ impl fmt::Debug for Dynamic {
                 use std::collections::HashSet;
 
                 // Avoid infinite recursion for shared values in a reference loop.
-                fn debug_fmt(
-                    value: &Dynamic,
+                fn debug_fmt_print(
                     f: &mut fmt::Formatter<'_>,
+                    value: &Dynamic,
                     dict: &mut HashSet<*const Dynamic>,
                 ) -> fmt::Result {
                     match value.0 {
                         #[cfg(not(feature = "no_closure"))]
-                        #[cfg(not(feature = "sync"))]
-                        Union::Shared(ref cell, ..) => match cell.try_borrow() {
-                            Ok(v) => {
+                        Union::Shared(ref cell, ..) => match crate::func::locked_read(cell) {
+                            Some(v) => {
                                 if dict.insert(value) {
-                                    debug_fmt(&v, f, dict)?;
+                                    debug_fmt_print(f, &v, dict)?;
                                     f.write_str(" (shared)")
                                 } else {
                                     f.write_str("<shared>")
                                 }
                             }
-                            Err(_) => f.write_str("<shared>"),
+                            _ => f.write_str("<shared>"),
                         },
-                        #[cfg(not(feature = "no_closure"))]
-                        #[cfg(feature = "sync")]
-                        Union::Shared(ref cell, ..) => {
-                            let v = cell.read().unwrap();
-
-                            if dict.insert(value) {
-                                debug_fmt(&*v, f, dict)?;
-                                f.write_str(" (shared)")
-                            } else {
-                                f.write_str("<shared>")
-                            }
-                        }
                         #[cfg(not(feature = "no_index"))]
                         Union::Array(ref arr, ..) => {
                             dict.insert(value);
@@ -783,7 +746,7 @@ impl fmt::Debug for Dynamic {
                                 if i > 0 {
                                     f.write_str(", ")?;
                                 }
-                                debug_fmt(v, f, dict)?;
+                                debug_fmt_print(f, v, dict)?;
                             }
                             f.write_str("]")
                         }
@@ -798,7 +761,7 @@ impl fmt::Debug for Dynamic {
                                 }
                                 fmt::Debug::fmt(k, f)?;
                                 f.write_str(": ")?;
-                                debug_fmt(v, f, dict)?;
+                                debug_fmt_print(f, v, dict)?;
                             }
                             f.write_str("}")
                         }
@@ -814,7 +777,7 @@ impl fmt::Debug for Dynamic {
                             fmt::Debug::fmt(fnptr.fn_name(), f)?;
                             for curry in &fnptr.curry {
                                 f.write_str(", ")?;
-                                debug_fmt(curry, f, dict)?;
+                                debug_fmt_print(f, curry, dict)?;
                             }
                             f.write_str(")")
                         }
@@ -822,7 +785,7 @@ impl fmt::Debug for Dynamic {
                     }
                 }
 
-                debug_fmt(self, f, &mut <_>::default())
+                debug_fmt_print(f, self, &mut <_>::default())
             }
         }
     }
@@ -1178,15 +1141,22 @@ impl Dynamic {
     ///
     /// This safe-guards constant values from being modified within Rust functions.
     ///
-    /// # Shared Values
+    /// # Shared Value
     ///
     /// If a [`Dynamic`] holds a _shared_ value, then it is read-only only if the shared value
     /// itself is read-only.
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its access mode cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[must_use]
     pub fn is_read_only(&self) -> bool {
         #[cfg(not(feature = "no_closure"))]
         if let Union::Shared(ref cell, ..) = self.0 {
-            return match crate::func::locked_read(cell).access_mode() {
+            return match crate::func::locked_read(cell).map_or(ReadWrite, |v| v.access_mode()) {
                 ReadWrite => false,
                 ReadOnly => true,
             };
@@ -1198,6 +1168,18 @@ impl Dynamic {
         }
     }
     /// Can this [`Dynamic`] be hashed?
+    ///
+    /// # Shared Value
+    ///
+    /// If a [`Dynamic`] holds a _shared_ value, then it is hashable only if the shared value
+    /// itself is hashable.
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[must_use]
     pub(crate) fn is_hashable(&self) -> bool {
         match self.0 {
@@ -1269,7 +1251,9 @@ impl Dynamic {
             }
 
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell).is_hashable(),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| v.is_hashable())
+            }
         }
     }
     /// Create a [`Dynamic`] from any type.  A [`Dynamic`] value is simply returned as is.
@@ -1410,17 +1394,23 @@ impl Dynamic {
     }
     /// Convert the [`Dynamic`] value into specific type.
     ///
-    /// Casting to a [`Dynamic`] just returns as is, but if it contains a shared value,
-    /// it is cloned into a [`Dynamic`] with a normal value.
+    /// Casting to a [`Dynamic`] simply returns itself.
     ///
-    /// Returns [`None`] if types mismatched.
+    /// # Errors
     ///
-    /// # Panics or Deadlocks
+    /// Returns [`None`] if types mismatch.
     ///
-    /// Under the `sync` feature, this call may deadlock, or [panic](https://doc.rust-lang.org/std/sync/struct.RwLock.html#panics-1).
-    /// Otherwise, this call panics if the data is currently borrowed for write.
+    /// # Shared Value
     ///
-    /// These normally shouldn't occur since most operations in Rhai is single-threaded.
+    /// If the [`Dynamic`] is a _shared_ value, it returns the shared value if there are no
+    /// outstanding references, or a cloned copy otherwise.
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     ///
     /// # Example
     ///
@@ -1439,10 +1429,23 @@ impl Dynamic {
     }
     /// Convert the [`Dynamic`] value into specific type.
     ///
-    /// Casting to a [`Dynamic`] just returns as is, but if it contains a shared value,
-    /// it is cloned into a [`Dynamic`] with a normal value.
+    /// Casting to a [`Dynamic`] simply returns itself.
     ///
-    /// Returns itself if types mismatched.
+    /// # Errors
+    ///
+    /// Returns itself as an error if types mismatch.
+    ///
+    /// # Shared Value
+    ///
+    /// If the [`Dynamic`] is a _shared_ value, it returns the shared value if there are no
+    /// outstanding references, or a cloned copy otherwise.
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[allow(unused_mut)]
     pub(crate) fn try_cast_raw<T: Any>(mut self) -> Result<T, Self> {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
@@ -1544,24 +1547,29 @@ impl Dynamic {
             Union::Variant(v, ..) if TypeId::of::<T>() == (**v).type_id() => {
                 Ok((*v).as_boxed_any().downcast().map(|x| *x).unwrap())
             }
-            #[cfg(not(feature = "no_closure"))]
-            Union::Shared(..) => unreachable!("Union::Shared case should be already handled"),
             _ => Err(self),
         }
     }
     /// Convert the [`Dynamic`] value into a specific type.
     ///
-    /// Casting to a [`Dynamic`] just returns as is, but if it contains a shared value,
-    /// it is cloned into a [`Dynamic`] with a normal value.
+    /// Casting to a [`Dynamic`] just returns as is.
     ///
-    /// # Panics or Deadlocks
+    /// # Panics
     ///
     /// Panics if the cast fails (e.g. the type of the actual value is not the same as the specified type).
     ///
-    /// Under the `sync` feature, this call may deadlock, or [panic](https://doc.rust-lang.org/std/sync/struct.RwLock.html#panics-1).
-    /// Otherwise, this call panics if the data is currently borrowed for write.
+    /// # Shared Value
     ///
-    /// These normally shouldn't occur since most operations in Rhai is single-threaded.
+    /// If the [`Dynamic`] is a _shared_ value, it returns the shared value if there are no
+    /// outstanding references, or a cloned copy otherwise.
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the _shared_ value is simply cloned, which means that the returned
+    /// value is also shared.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     ///
     /// # Example
     ///
@@ -1595,20 +1603,23 @@ impl Dynamic {
     }
     /// Clone the [`Dynamic`] value and convert it into a specific type.
     ///
-    /// Casting to a [`Dynamic`] just returns as is, but if it contains a shared value,
-    /// it is cloned into a [`Dynamic`] with a normal value.
+    /// Casting to a [`Dynamic`] just returns as is.
     ///
-    /// Returns [`None`] if types mismatched.
-    ///
-    /// # Panics or Deadlocks
+    /// # Panics
     ///
     /// Panics if the cast fails (e.g. the type of the actual value is not the
     /// same as the specified type).
     ///
-    /// Under the `sync` feature, this call may deadlock, or [panic](https://doc.rust-lang.org/std/sync/struct.RwLock.html#panics-1).
-    /// Otherwise, this call panics if the data is currently borrowed for write.
+    /// # Shared Value
     ///
-    /// These normally shouldn't occur since most operations in Rhai is single-threaded.
+    /// If the [`Dynamic`] is a _shared_ value, a cloned copy of the shared value is returned.
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the _shared_ value is simply cloned.
+    ///
+    /// This normally shouldn't occur since most operations in Rhai are single-threaded.
     ///
     /// # Example
     ///
@@ -1627,38 +1638,66 @@ impl Dynamic {
     }
     /// Flatten the [`Dynamic`] and clone it.
     ///
-    /// If the [`Dynamic`] is not a shared value, it returns a cloned copy.
+    /// If the [`Dynamic`] is not a _shared_ value, a cloned copy is returned.
     ///
-    /// If the [`Dynamic`] is a shared value, it returns a cloned copy of the shared value.
+    /// If the [`Dynamic`] is a _shared_ value, a cloned copy of the shared value is returned.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the _shared_ value is simply cloned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     pub fn flatten_clone(&self) -> Self {
         match self.0 {
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell).clone(),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or_else(|| self.clone(), |v| v.flatten_clone())
+            }
             _ => self.clone(),
         }
     }
     /// Flatten the [`Dynamic`].
     ///
-    /// If the [`Dynamic`] is not a shared value, it returns itself.
+    /// If the [`Dynamic`] is not a _shared_ value, it simply returns itself.
     ///
-    /// If the [`Dynamic`] is a shared value, it returns the shared value if there are no
-    /// outstanding references, or a cloned copy.
+    /// If the [`Dynamic`] is a _shared_ value, it returns the shared value if there are no
+    /// outstanding references, or a cloned copy otherwise.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the _shared_ value is simply cloned, meaning that the result
+    /// value will also be _shared_.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     pub fn flatten(self) -> Self {
         match self.0 {
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(cell, ..) => crate::func::native::shared_try_take(cell).map_or_else(
-                |ref cell| crate::func::locked_read(cell).clone(),
+            Union::Shared(cell, tag, access) => match crate::func::native::shared_try_take(cell) {
+                // If there are no outstanding references, consume the shared value and return it
                 #[cfg(not(feature = "sync"))]
-                crate::Locked::into_inner,
+                Ok(value) => value.into_inner().flatten(),
                 #[cfg(feature = "sync")]
-                |value| value.into_inner().unwrap(),
-            ),
+                Ok(value) => value.into_inner().unwrap().flatten(),
+                // If there are outstanding references, return a cloned copy
+                Err(cell) => {
+                    if let Some(guard) = crate::func::locked_read(&cell) {
+                        return guard.flatten_clone();
+                    }
+                    Dynamic(Union::Shared(cell, tag, access))
+                }
+            },
             _ => self,
         }
     }
-    /// Is the [`Dynamic`] a shared value that is locked?
+    /// Is the [`Dynamic`] a _shared_ value that is locked?
     ///
     /// Not available under `no_closure`.
     ///
@@ -1682,28 +1721,35 @@ impl Dynamic {
         false
     }
     /// Get a reference of a specific type to the [`Dynamic`].
+    ///
     /// Casting to [`Dynamic`] just returns a reference to it.
     ///
     /// Returns [`None`] if the cast fails.
     ///
-    /// # Panics or Deadlocks When Value is Shared
+    /// # Shared Value
     ///
-    /// Under the `sync` feature, this call may deadlock, or [panic](https://doc.rust-lang.org/std/sync/struct.RwLock.html#panics-1).
-    /// Otherwise, this call panics if the data is currently borrowed for write.
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, this call also fails if the data is currently borrowed for write.
+    ///
+    /// Under these circumstances, [`None`] is also returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     pub fn read_lock<T: Any + Clone>(&self) -> Option<DynamicReadLock<T>> {
         match self.0 {
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) => {
-                let value = crate::func::locked_read(cell);
-
-                return if (*value).type_id() != TypeId::of::<T>()
-                    && TypeId::of::<Self>() != TypeId::of::<T>()
-                {
-                    None
+                if let Some(guard) = crate::func::locked_read(cell) {
+                    return if (*guard).type_id() != TypeId::of::<T>()
+                        && TypeId::of::<Self>() != TypeId::of::<T>()
+                    {
+                        None
+                    } else {
+                        Some(DynamicReadLock(DynamicReadLockInner::Guard(guard)))
+                    };
                 } else {
-                    Some(DynamicReadLock(DynamicReadLockInner::Guard(value)))
-                };
+                    return None;
+                }
             }
             _ => (),
         }
@@ -1713,28 +1759,35 @@ impl Dynamic {
             .map(DynamicReadLock)
     }
     /// Get a mutable reference of a specific type to the [`Dynamic`].
+    ///
     /// Casting to [`Dynamic`] just returns a mutable reference to it.
     ///
     /// Returns [`None`] if the cast fails.
     ///
-    /// # Panics or Deadlocks When Value is Shared
+    /// # Shared Value
     ///
-    /// Under the `sync` feature, this call may deadlock, or [panic](https://doc.rust-lang.org/std/sync/struct.RwLock.html#panics-1).
-    /// Otherwise, this call panics if the data is currently borrowed for write.
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, this call also fails if the data is currently borrowed for write.
+    ///
+    /// Under these circumstances, [`None`] is also returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     pub fn write_lock<T: Any + Clone>(&mut self) -> Option<DynamicWriteLock<T>> {
         match self.0 {
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) => {
-                let guard = crate::func::locked_write(cell);
-
-                return if (*guard).type_id() != TypeId::of::<T>()
-                    && TypeId::of::<Self>() != TypeId::of::<T>()
-                {
-                    None
+                if let Some(guard) = crate::func::locked_write(cell) {
+                    return if (*guard).type_id() != TypeId::of::<T>()
+                        && TypeId::of::<Self>() != TypeId::of::<T>()
+                    {
+                        None
+                    } else {
+                        Some(DynamicWriteLock(DynamicWriteLockInner::Guard(guard)))
+                    };
                 } else {
-                    Some(DynamicWriteLock(DynamicWriteLockInner::Guard(guard)))
-                };
+                    return None;
+                }
             }
             _ => (),
         }
@@ -1744,9 +1797,14 @@ impl Dynamic {
             .map(DynamicWriteLock)
     }
     /// Get a reference of a specific type to the [`Dynamic`].
+    ///
     /// Casting to [`Dynamic`] just returns a reference to it.
     ///
-    /// Returns [`None`] if the cast fails, or if the value is _shared_.
+    /// Returns [`None`] if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Returns [`None`] also if the value is _shared_.
     #[inline]
     #[must_use]
     pub(crate) fn downcast_ref<T: Any + Clone + ?Sized>(&self) -> Option<&T> {
@@ -1842,9 +1900,14 @@ impl Dynamic {
         }
     }
     /// Get a mutable reference of a specific type to the [`Dynamic`].
+    ///
     /// Casting to [`Dynamic`] just returns a mutable reference to it.
     ///
-    /// Returns [`None`] if the cast fails, or if the value is _shared_.
+    /// Returns [`None`] if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Returns [`None`] also if the value is _shared_.
     #[inline]
     #[must_use]
     pub(crate) fn downcast_mut<T: Any + Clone + ?Sized>(&mut self) -> Option<&mut T> {
@@ -1941,34 +2004,61 @@ impl Dynamic {
     }
 
     /// Return `true` if the [`Dynamic`] holds a `()`.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     #[must_use]
     pub fn is_unit(&self) -> bool {
         match self.0 {
             Union::Unit(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::Unit(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::Unit(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
     /// Return `true` if the [`Dynamic`] holds the system integer type [`INT`].
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     #[must_use]
     pub fn is_int(&self) -> bool {
         match self.0 {
             Union::Int(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::Int(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::Int(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
     /// Return `true` if the [`Dynamic`] holds the system floating-point type [`FLOAT`][crate::FLOAT].
     ///
     /// Not available under `no_float`.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_float"))]
     #[inline]
     #[must_use]
@@ -1976,15 +2066,23 @@ impl Dynamic {
         match self.0 {
             Union::Float(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::Float(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::Float(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
     /// _(decimal)_ Return `true` if the [`Dynamic`] holds a [`Decimal`][rust_decimal::Decimal].
-    ///
     /// Exported under the `decimal` feature only.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(feature = "decimal")]
     #[inline]
     #[must_use]
@@ -1992,54 +2090,90 @@ impl Dynamic {
         match self.0 {
             Union::Decimal(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::Decimal(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::Decimal(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
     /// Return `true` if the [`Dynamic`] holds a [`bool`].
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     #[must_use]
     pub fn is_bool(&self) -> bool {
         match self.0 {
             Union::Bool(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::Bool(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::Bool(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
     /// Return `true` if the [`Dynamic`] holds a [`char`].
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     #[must_use]
     pub fn is_char(&self) -> bool {
         match self.0 {
             Union::Char(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::Char(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::Char(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
     /// Return `true` if the [`Dynamic`] holds an [`ImmutableString`].
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     #[must_use]
     pub fn is_string(&self) -> bool {
         match self.0 {
             Union::Str(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::Str(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::Str(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
     /// Return `true` if the [`Dynamic`] holds an [`Array`][crate::Array].
     ///
     /// Not available under `no_index`.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_index"))]
     #[inline]
     #[must_use]
@@ -2047,15 +2181,24 @@ impl Dynamic {
         match self.0 {
             Union::Array(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::Array(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::Array(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
     /// Return `true` if the [`Dynamic`] holds a [`Blob`][crate::Blob].
     ///
     /// Not available under `no_index`.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_index"))]
     #[inline]
     #[must_use]
@@ -2063,15 +2206,24 @@ impl Dynamic {
         match self.0 {
             Union::Blob(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::Blob(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::Blob(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
     /// Return `true` if the [`Dynamic`] holds a [`Map`][crate::Map].
     ///
     /// Not available under `no_object`.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_object"))]
     #[inline]
     #[must_use]
@@ -2079,28 +2231,46 @@ impl Dynamic {
         match self.0 {
             Union::Map(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::Map(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::Map(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
     /// Return `true` if the [`Dynamic`] holds a [`FnPtr`].
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     #[must_use]
     pub fn is_fnptr(&self) -> bool {
         match self.0 {
             Union::FnPtr(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::FnPtr(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::FnPtr(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
     /// Return `true` if the [`Dynamic`] holds a [timestamp][Instant].
     ///
     /// Not available under `no_time`.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, `false` is returned.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_time"))]
     #[inline]
     #[must_use]
@@ -2108,146 +2278,282 @@ impl Dynamic {
         match self.0 {
             Union::TimeStamp(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                matches!(crate::func::locked_read(cell).0, Union::TimeStamp(..))
-            }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .map(|v| matches!(v.0, Union::TimeStamp(..)))
+                .unwrap_or(false),
             _ => false,
         }
     }
 
     /// Cast the [`Dynamic`] as a unit `()`.
-    /// Returns the name of the actual type if the cast fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns the name of the actual type as an error if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     pub fn as_unit(&self) -> Result<(), &'static str> {
         match self.0 {
             Union::Unit(..) => Ok(()),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
-                Union::Unit(..) => Ok(()),
-                _ => Err(cell.type_name()),
-            },
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .and_then(|guard| match guard.0 {
+                    Union::Unit(..) => Some(()),
+                    _ => None,
+                })
+                .ok_or_else(|| cell.type_name()),
             _ => Err(self.type_name()),
         }
     }
     /// Cast the [`Dynamic`] as the system integer type [`INT`].
-    /// Returns the name of the actual type if the cast fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns the name of the actual type as an error if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     pub fn as_int(&self) -> Result<INT, &'static str> {
         match self.0 {
             Union::Int(n, ..) => Ok(n),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
-                Union::Int(n, ..) => Ok(n),
-                _ => Err(cell.type_name()),
-            },
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .and_then(|guard| match guard.0 {
+                    Union::Int(n, ..) => Some(n),
+                    _ => None,
+                })
+                .ok_or_else(|| cell.type_name()),
             _ => Err(self.type_name()),
         }
     }
     /// Cast the [`Dynamic`] as the system floating-point type [`FLOAT`][crate::FLOAT].
-    /// Returns the name of the actual type if the cast fails.
     ///
     /// Not available under `no_float`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the name of the actual type as an error if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_float"))]
     #[inline]
     pub fn as_float(&self) -> Result<crate::FLOAT, &'static str> {
         match self.0 {
             Union::Float(n, ..) => Ok(*n),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
-                Union::Float(n, ..) => Ok(*n),
-                _ => Err(cell.type_name()),
-            },
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .and_then(|guard| match guard.0 {
+                    Union::Float(n, ..) => Some(*n),
+                    _ => None,
+                })
+                .ok_or_else(|| cell.type_name()),
             _ => Err(self.type_name()),
         }
     }
     /// _(decimal)_ Cast the [`Dynamic`] as a [`Decimal`][rust_decimal::Decimal].
-    /// Returns the name of the actual type if the cast fails.
-    ///
     /// Exported under the `decimal` feature only.
+    ///
+    /// # Errors
+    ///
+    /// Returns the name of the actual type as an error if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(feature = "decimal")]
     #[inline]
     pub fn as_decimal(&self) -> Result<rust_decimal::Decimal, &'static str> {
         match self.0 {
             Union::Decimal(ref n, ..) => Ok(**n),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
-                Union::Decimal(ref n, ..) => Ok(**n),
-                _ => Err(cell.type_name()),
-            },
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .and_then(|guard| match guard.0 {
+                    Union::Decimal(ref n, ..) => Some(**n),
+                    _ => None,
+                })
+                .ok_or_else(|| cell.type_name()),
             _ => Err(self.type_name()),
         }
     }
     /// Cast the [`Dynamic`] as a [`bool`].
-    /// Returns the name of the actual type if the cast fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns the name of the actual type as an error if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     pub fn as_bool(&self) -> Result<bool, &'static str> {
         match self.0 {
             Union::Bool(b, ..) => Ok(b),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
-                Union::Bool(b, ..) => Ok(b),
-                _ => Err(cell.type_name()),
-            },
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .and_then(|guard| match guard.0 {
+                    Union::Bool(b, ..) => Some(b),
+                    _ => None,
+                })
+                .ok_or_else(|| cell.type_name()),
             _ => Err(self.type_name()),
         }
     }
     /// Cast the [`Dynamic`] as a [`char`].
-    /// Returns the name of the actual type if the cast fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns the name of the actual type as an error if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     pub fn as_char(&self) -> Result<char, &'static str> {
         match self.0 {
             Union::Char(c, ..) => Ok(c),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
-                Union::Char(c, ..) => Ok(c),
-                _ => Err(cell.type_name()),
-            },
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .and_then(|guard| match guard.0 {
+                    Union::Char(c, ..) => Some(c),
+                    _ => None,
+                })
+                .ok_or_else(|| cell.type_name()),
             _ => Err(self.type_name()),
         }
     }
     /// Convert the [`Dynamic`] into a [`String`].
+    ///
     /// If there are other references to the same string, a cloned copy is returned.
-    /// Returns the name of the actual type if the cast fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns the name of the actual type as an error if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     pub fn into_string(self) -> Result<String, &'static str> {
         self.into_immutable_string()
             .map(ImmutableString::into_owned)
     }
     /// Convert the [`Dynamic`] into an [`ImmutableString`].
-    /// Returns the name of the actual type if the cast fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns the name of the actual type as an error if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
     pub fn into_immutable_string(self) -> Result<ImmutableString, &'static str> {
         match self.0 {
             Union::Str(s, ..) => Ok(s),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
-                Union::Str(ref s, ..) => Ok(s.clone()),
-                _ => Err(cell.type_name()),
-            },
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .and_then(|guard| match guard.0 {
+                    Union::Str(ref s, ..) => Some(s.clone()),
+                    _ => None,
+                })
+                .ok_or_else(|| cell.type_name()),
             _ => Err(self.type_name()),
         }
     }
     /// Convert the [`Dynamic`] into an [`Array`][crate::Array].
-    /// Returns the name of the actual type if the cast fails.
     ///
     /// Not available under `no_index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the name of the actual type as an error if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_index"))]
     #[inline(always)]
     pub fn into_array(self) -> Result<crate::Array, &'static str> {
         match self.0 {
             Union::Array(a, ..) => Ok(*a),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
-                Union::Array(ref a, ..) => Ok(a.as_ref().clone()),
-                _ => Err(cell.type_name()),
-            },
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .and_then(|guard| match guard.0 {
+                    Union::Array(ref a, ..) => Some(a.as_ref().clone()),
+                    _ => None,
+                })
+                .ok_or_else(|| cell.type_name()),
             _ => Err(self.type_name()),
         }
     }
     /// Convert the [`Dynamic`] into a [`Vec`].
-    /// Returns the name of the actual type if any cast fails.
     ///
     /// Not available under `no_index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the name of the actual type as an error if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_index"))]
     #[inline(always)]
     pub fn into_typed_array<T: Variant + Clone>(self) -> Result<Vec<T>, &'static str> {
@@ -2272,54 +2578,57 @@ impl Dynamic {
                 Ok(reify! { *b => !!! Vec<T> })
             }
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                match crate::func::locked_read(cell).0 {
-                    Union::Array(ref a, ..) => {
-                        a.iter()
-                            .map(|v| {
-                                #[cfg(not(feature = "no_closure"))]
-                                let typ = if v.is_shared() {
-                                    // Avoid panics/deadlocks with shared values
-                                    "<shared>"
-                                } else {
-                                    v.type_name()
-                                };
-                                #[cfg(feature = "no_closure")]
-                                let typ = v.type_name();
-
-                                v.read_lock::<T>().ok_or(typ).map(|v| v.clone())
-                            })
-                            .collect()
-                    }
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .and_then(|guard| match guard.0 {
+                    Union::Array(ref a, ..) => a
+                        .iter()
+                        .map(|v| v.read_lock::<T>().map(|v| v.clone()))
+                        .collect(),
                     Union::Blob(ref b, ..) if TypeId::of::<T>() == TypeId::of::<u8>() => {
-                        Ok(reify! { b.clone() => !!! Vec<T> })
+                        Some(reify! { b.clone() => !!! Vec<T> })
                     }
-                    _ => Err(cell.type_name()),
-                }
-            }
+                    _ => None,
+                })
+                .ok_or_else(|| cell.type_name()),
             _ => Err(self.type_name()),
         }
     }
     /// Convert the [`Dynamic`] into a [`Blob`][crate::Blob].
-    /// Returns the name of the actual type if the cast fails.
     ///
     /// Not available under `no_index`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the name of the actual type as an error if the cast fails.
+    ///
+    /// # Shared Value
+    ///
+    /// Under the `sync` feature, a _shared_ value may deadlock.
+    /// Otherwise, the data may currently be borrowed for write (so its type cannot be determined).
+    ///
+    /// Under these circumstances, the cast also fails.
+    ///
+    /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_index"))]
     #[inline(always)]
     pub fn into_blob(self) -> Result<crate::Blob, &'static str> {
         match self.0 {
             Union::Blob(b, ..) => Ok(*b),
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => match crate::func::locked_read(cell).0 {
-                Union::Blob(ref b, ..) => Ok(b.as_ref().clone()),
-                _ => Err(cell.type_name()),
-            },
+            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                .and_then(|guard| match guard.0 {
+                    Union::Blob(ref b, ..) => Some(b.as_ref().clone()),
+                    _ => None,
+                })
+                .ok_or_else(|| cell.type_name()),
             _ => Err(self.type_name()),
         }
     }
 
     /// Recursively scan for [`Dynamic`] values within this [`Dynamic`] (e.g. items in an array or map),
     /// calling a filter function on each.
+    ///
+    /// # Shared Value
     ///
     /// Shared values are _NOT_ scanned.
     #[inline]

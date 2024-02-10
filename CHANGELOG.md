@@ -15,6 +15,7 @@ Enhancements
 * `FuncRegistration::in_global_namespace` and `FuncRegistration::in_internal_namespace` are added to avoid pulling in `FnNamespace`.
 * Array/BLOB/string iterators are defined also within the `BasicIteratorPackage` in addition to the regular array/BLOB/string packages.
 * `LexError::Runtime` is added for use with `Engine::on_parse_token`.
+* Shared values under `sync` are now handled more elegantly -- instead of deadlocking and hanging indefinitely, it spins for a number of tries (waiting one second between each), then errors out.
 
 
 Version 1.17.2

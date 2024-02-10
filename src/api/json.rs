@@ -121,7 +121,7 @@ impl Engine {
             let mut interner;
             let mut guard;
             let interned_strings = if let Some(ref interner) = self.interned_strings {
-                guard = locked_write(interner);
+                guard = locked_write(interner).unwrap();
                 &mut *guard
             } else {
                 interner = StringsInterner::new();
@@ -221,7 +221,10 @@ fn format_dynamic_as_json(result: &mut String, value: &Dynamic) {
             *result += "]";
         }
         #[cfg(not(feature = "no_closure"))]
-        Union::Shared(ref v, _, _) => format_dynamic_as_json(result, &crate::func::locked_read(v)),
+        Union::Shared(ref v, _, _) => {
+            let value = &*crate::func::locked_read(v).unwrap();
+            format_dynamic_as_json(result, value)
+        }
         _ => write!(result, "{value:?}").unwrap(),
     }
 }

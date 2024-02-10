@@ -326,7 +326,7 @@ impl Engine {
         string: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
         match self.interned_strings {
-            Some(ref interner) => locked_write(interner).get(string),
+            Some(ref interner) => locked_write(interner).unwrap().get(string),
             None => string.into(),
         }
     }

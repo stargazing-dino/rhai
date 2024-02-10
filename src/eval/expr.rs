@@ -188,8 +188,9 @@ impl Engine {
                     #[cfg(not(feature = "no_function"))]
                     if ns.path.len() == 1 && ns.root() == crate::engine::KEYWORD_GLOBAL {
                         if let Some(ref constants) = global.constants {
-                            if let Some(value) =
-                                crate::func::locked_write(constants).get_mut(var_name.as_str())
+                            if let Some(value) = crate::func::locked_write(constants)
+                                .unwrap()
+                                .get_mut(var_name.as_str())
                             {
                                 let mut target: Target = value.clone().into();
                                 // Module variables are constant
