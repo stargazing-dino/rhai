@@ -5,7 +5,6 @@ use crate::func::native::locked_write;
 use crate::parser::{ParseSettingFlags, ParseState};
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
-use crate::types::StringsInterner;
 use crate::{Dynamic, Engine, LexError, Map, RhaiResultOf};
 use std::fmt::Write;
 #[cfg(feature = "no_std")]
@@ -118,15 +117,11 @@ impl Engine {
         );
 
         let ast = {
-            let mut interner;
-            let mut guard;
-            let interned_strings = if let Some(ref interner) = self.interned_strings {
-                guard = locked_write(interner).unwrap();
-                &mut *guard
-            } else {
-                interner = StringsInterner::new();
-                &mut interner
-            };
+            let guard = &mut self
+                .interned_strings
+                .as_ref()
+                .and_then(|interner| locked_write(interner));
+            let interned_strings = guard.as_deref_mut();
 
             let input = &mut stream.peekable();
             let lib = &mut <_>::default();

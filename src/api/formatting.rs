@@ -1,7 +1,7 @@
 //! Module that provide formatting services to the [`Engine`].
+use crate::func::locked_write;
 use crate::packages::iter_basic::{BitRange, CharsStream, StepRange};
 use crate::parser::{ParseResult, ParseState};
-use crate::types::StringsInterner;
 use crate::{
     Engine, ExclusiveRange, FnPtr, ImmutableString, InclusiveRange, Position, RhaiError,
     SmartString, ERR,
@@ -264,11 +264,16 @@ impl Engine {
 
         tc.borrow_mut().compressed = Some(String::new());
         stream.state.last_token = Some(SmartString::new_const());
-        let mut interner = StringsInterner::new();
+
+        let guard = &mut self
+            .interned_strings
+            .as_ref()
+            .and_then(|interner| locked_write(interner));
+        let interned_strings = guard.as_deref_mut();
 
         let input = &mut stream.peekable();
         let lib = &mut <_>::default();
-        let mut state = ParseState::new(None, &mut interner, input, tc, lib);
+        let mut state = ParseState::new(None, interned_strings, input, tc, lib);
 
         let mut _ast = self.parse(
             &mut state,

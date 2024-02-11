@@ -1,6 +1,8 @@
 //! Settings for [`Engine`]'s limitations.
 #![cfg(not(feature = "unchecked"))]
 
+use crate::func::{locked_read, locked_write};
+use crate::types::StringsInterner;
 use crate::Engine;
 use std::num::{NonZeroU64, NonZeroUsize};
 #[cfg(feature = "no_std")]
@@ -20,6 +22,8 @@ pub mod default_limits {
     /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     pub const MAX_FUNCTION_EXPR_DEPTH: usize = 16;
+    /// Maximum number of strings interned.
+    pub const MAX_STRINGS_INTERNED: usize = 256;
 }
 #[cfg(not(debug_assertions))]
 pub mod default_limits {
@@ -35,6 +39,8 @@ pub mod default_limits {
     /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     pub const MAX_FUNCTION_EXPR_DEPTH: usize = 32;
+    /// Maximum number of strings interned.
+    pub const MAX_STRINGS_INTERNED: usize = 1024;
 }
 
 /// A type containing all the limits imposed by the [`Engine`].
@@ -343,5 +349,27 @@ impl Engine {
         };
         #[cfg(feature = "no_object")]
         return 0;
+    }
+    /// Set the maximum number of strings to be interned.
+    #[inline(always)]
+    pub fn set_max_strings_interned(&mut self, max: usize) -> &mut Self {
+        if max == 0 {
+            self.interned_strings = None;
+        } else if let Some(ref interner) = self.interned_strings {
+            if let Some(mut guard) = locked_write(interner) {
+                guard.set_max(max);
+            }
+        } else {
+            self.interned_strings = Some(StringsInterner::new(self.max_strings_interned()).into());
+        }
+        self
+    }
+    /// The maximum number of strings to be interned.
+    #[inline(always)]
+    #[must_use]
+    pub fn max_strings_interned(&self) -> usize {
+        self.interned_strings.as_ref().map_or(0, |interner| {
+            locked_read(interner).map_or(0, |guard| guard.max())
+        })
     }
 }

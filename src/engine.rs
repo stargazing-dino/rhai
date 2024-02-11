@@ -1,5 +1,6 @@
 //! Main module defining the script evaluation [`Engine`].
 
+use crate::api::limits::default_limits::MAX_STRINGS_INTERNED;
 use crate::api::options::LangOptions;
 use crate::func::native::{
     locked_write, OnDebugCallback, OnDefVarCallback, OnParseTokenCallback, OnPrintCallback,
@@ -96,7 +97,7 @@ pub struct Engine {
     pub(crate) module_resolver: Option<Box<dyn crate::ModuleResolver>>,
 
     /// Strings interner.
-    pub(crate) interned_strings: Option<Box<Locked<StringsInterner>>>,
+    pub(crate) interned_strings: Option<Locked<StringsInterner>>,
 
     /// A set of symbols to disable.
     pub(crate) disabled_symbols: BTreeSet<Identifier>,
@@ -279,7 +280,7 @@ impl Engine {
                 Some(Box::new(crate::module::resolvers::FileModuleResolver::new()));
         }
 
-        engine.interned_strings = Some(Locked::new(StringsInterner::new()).into());
+        engine.set_max_strings_interned(MAX_STRINGS_INTERNED);
 
         // default print/debug implementations
         #[cfg(not(feature = "no_std"))]

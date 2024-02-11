@@ -62,7 +62,7 @@ pub struct ParseState<'a, 't, 's, 'f> {
     /// Controls whether parsing of an expression should stop given the next token.
     pub expr_filter: fn(&Token) -> bool,
     /// Strings interner.
-    pub interned_strings: &'s mut StringsInterner,
+    pub interned_strings: Option<&'s mut StringsInterner>,
     /// External [scope][Scope] with constants.
     pub external_constants: Option<&'a Scope<'a>>,
     /// Global runtime state.
@@ -124,7 +124,7 @@ impl<'a, 't, 's, 'f> ParseState<'a, 't, 's, 'f> {
     #[must_use]
     pub fn new(
         external_constants: Option<&'a Scope>,
-        interned_strings: &'s mut StringsInterner,
+        interned_strings: Option<&'s mut StringsInterner>,
         input: &'t mut TokenStream<'a>,
         tokenizer_control: TokenizerControl,
         #[cfg(not(feature = "no_function"))] lib: &'f mut FnLib,
@@ -208,7 +208,7 @@ impl<'a, 't, 's, 'f> ParseState<'a, 't, 's, 'f> {
         #[cfg(not(feature = "no_closure"))]
         if self.allow_capture {
             if !is_func_name && index == 0 && !self.external_vars.iter().any(|v| v.name == name) {
-                let name = self.interned_strings.get(name);
+                let name = self.get_interned_string(name);
                 self.external_vars.push(Ident { name, pos: _pos });
             }
         } else {
@@ -247,7 +247,10 @@ impl<'a, 't, 's, 'f> ParseState<'a, 't, 's, 'f> {
         &mut self,
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        self.interned_strings.get(text)
+        match self.interned_strings {
+            Some(ref mut interner) => interner.get(text),
+            None => text.into(),
+        }
     }
 
     /// Get an interned property getter, creating one if it is not yet interned.
@@ -258,11 +261,14 @@ impl<'a, 't, 's, 'f> ParseState<'a, 't, 's, 'f> {
         &mut self,
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        self.interned_strings.get_with_mapper(
-            b'g',
-            |s| crate::engine::make_getter(s.as_ref()).into(),
-            text,
-        )
+        match self.interned_strings {
+            Some(ref mut interner) => interner.get_with_mapper(
+                b'g',
+                |s| crate::engine::make_getter(s.as_ref()).into(),
+                text,
+            ),
+            None => crate::engine::make_getter(text.as_ref()).into(),
+        }
     }
 
     /// Get an interned property setter, creating one if it is not yet interned.
@@ -273,11 +279,14 @@ impl<'a, 't, 's, 'f> ParseState<'a, 't, 's, 'f> {
         &mut self,
         text: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
-        self.interned_strings.get_with_mapper(
-            b's',
-            |s| crate::engine::make_setter(s.as_ref()).into(),
-            text,
-        )
+        match self.interned_strings {
+            Some(ref mut interner) => interner.get_with_mapper(
+                b's',
+                |s| crate::engine::make_setter(s.as_ref()).into(),
+                text,
+            ),
+            None => crate::engine::make_setter(text.as_ref()).into(),
+        }
     }
 }
 
@@ -1465,7 +1474,7 @@ impl Engine {
             #[cfg(not(feature = "no_function"))]
             Token::Pipe | Token::Or if settings.has_option(LangOptions::ANON_FN) => {
                 // Build new parse state
-                let new_interner = &mut StringsInterner::new();
+                let new_interner = None;
                 let new_state = &mut ParseState::new(
                     state.external_constants,
                     new_interner,
@@ -1475,7 +1484,7 @@ impl Engine {
                 );
 
                 // We move the strings interner to the new parse state object by swapping it...
-                std::mem::swap(state.interned_strings, new_state.interned_strings);
+                std::mem::swap(&mut state.interned_strings, &mut new_state.interned_strings);
 
                 #[cfg(not(feature = "no_module"))]
                 {
@@ -1510,7 +1519,7 @@ impl Engine {
                 let result = self.parse_anon_fn(new_state, new_settings.level_up()?);
 
                 // Restore the strings interner by swapping it back
-                std::mem::swap(state.interned_strings, new_state.interned_strings);
+                std::mem::swap(&mut state.interned_strings, &mut new_state.interned_strings);
 
                 let (expr, fn_def, _externals) = result?;
 
@@ -3270,7 +3279,7 @@ impl Engine {
                         // Build new parse state
                         let new_state = &mut ParseState::new(
                             state.external_constants,
-                            state.interned_strings,
+                            state.interned_strings.as_deref_mut(),
                             state.input,
                             state.tokenizer_control.clone(),
                             state.lib,

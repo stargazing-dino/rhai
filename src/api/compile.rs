@@ -2,7 +2,6 @@
 
 use crate::func::native::locked_write;
 use crate::parser::{ParseResult, ParseState};
-use crate::types::StringsInterner;
 use crate::{Engine, OptimizationLevel, Scope, AST};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -220,15 +219,11 @@ impl Engine {
     ) -> ParseResult<AST> {
         let (stream, tc) = self.lex(scripts.as_ref());
 
-        let mut interner;
-        let mut guard;
-        let interned_strings = if let Some(ref interner) = self.interned_strings {
-            guard = locked_write(interner).unwrap();
-            &mut *guard
-        } else {
-            interner = StringsInterner::new();
-            &mut interner
-        };
+        let guard = &mut self
+            .interned_strings
+            .as_ref()
+            .and_then(|interner| locked_write(interner));
+        let interned_strings = guard.as_deref_mut();
 
         let input = &mut stream.peekable();
         let lib = &mut <_>::default();
@@ -304,15 +299,11 @@ impl Engine {
         let scripts = [script];
         let (stream, t) = self.lex(&scripts);
 
-        let mut interner;
-        let mut guard;
-        let interned_strings = if let Some(ref interner) = self.interned_strings {
-            guard = locked_write(interner).unwrap();
-            &mut *guard
-        } else {
-            interner = StringsInterner::new();
-            &mut interner
-        };
+        let guard = &mut self
+            .interned_strings
+            .as_ref()
+            .and_then(|interner| locked_write(interner));
+        let interned_strings = guard.as_deref_mut();
 
         let input = &mut stream.peekable();
         let lib = &mut <_>::default();
