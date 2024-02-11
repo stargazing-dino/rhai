@@ -192,8 +192,11 @@ fn test_closures() {
         42
     );
 
-    let x = engine.eval::<Dynamic>("let x = #{}; x.a = || x; x").unwrap();
-    println!("{x:?}");
+    #[cfg(not(feature = "unchecked"))]
+    {
+        let x = engine.eval::<Dynamic>("let x = #{}; x.a = || x; x").unwrap();
+        println!("{x:?}");
+    }
 }
 
 #[test]

@@ -1474,17 +1474,13 @@ impl Engine {
             #[cfg(not(feature = "no_function"))]
             Token::Pipe | Token::Or if settings.has_option(LangOptions::ANON_FN) => {
                 // Build new parse state
-                let new_interner = None;
                 let new_state = &mut ParseState::new(
                     state.external_constants,
-                    new_interner,
+                    state.interned_strings.as_deref_mut(),
                     state.input,
                     state.tokenizer_control.clone(),
                     state.lib,
                 );
-
-                // We move the strings interner to the new parse state object by swapping it...
-                std::mem::swap(&mut state.interned_strings, &mut new_state.interned_strings);
 
                 #[cfg(not(feature = "no_module"))]
                 {
@@ -1517,9 +1513,6 @@ impl Engine {
                 };
 
                 let result = self.parse_anon_fn(new_state, new_settings.level_up()?);
-
-                // Restore the strings interner by swapping it back
-                std::mem::swap(&mut state.interned_strings, &mut new_state.interned_strings);
 
                 let (expr, fn_def, _externals) = result?;
 

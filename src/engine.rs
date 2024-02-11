@@ -280,6 +280,7 @@ impl Engine {
                 Some(Box::new(crate::module::resolvers::FileModuleResolver::new()));
         }
 
+        // Turn on the strings interner
         engine.set_max_strings_interned(MAX_STRINGS_INTERNED);
 
         // default print/debug implementations
@@ -297,6 +298,7 @@ impl Engine {
             }));
         }
 
+        // Register the standard package
         engine.register_global_module(StandardPackage::new().as_shared_module());
 
         engine
