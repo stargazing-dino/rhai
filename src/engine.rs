@@ -1,6 +1,6 @@
 //! Main module defining the script evaluation [`Engine`].
 
-use crate::api::limits::default_limits::MAX_STRINGS_INTERNED;
+use crate::api::default_limits::MAX_STRINGS_INTERNED;
 use crate::api::options::LangOptions;
 use crate::func::native::{
     locked_write, OnDebugCallback, OnDefVarCallback, OnParseTokenCallback, OnPrintCallback,
