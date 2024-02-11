@@ -238,7 +238,7 @@ impl Engine {
             // Then check sub-modules
             || self.global_sub_modules.values().any(|m| m.contains_qualified_fn(hash_script));
 
-        if !res && !cache.filter.is_absent_and_set(hash_script) {
+        if !res && !cache.bloom_filter.is_absent_and_set(hash_script) {
             // Do not cache "one-hit wonders"
             cache.dict.insert(hash_script, None);
         }

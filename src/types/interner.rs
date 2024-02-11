@@ -16,7 +16,7 @@ use std::{
 };
 
 /// Maximum length of strings interned.
-pub const MAX_STRING_LEN: usize = 24;
+pub const MAX_STRING_LEN: usize = 32;
 
 /// _(internals)_ A cache for interned strings.
 /// Exported under the `internals` feature only.
@@ -61,6 +61,7 @@ impl StringsInterner {
     #[inline(always)]
     pub fn set_max(&mut self, max: usize) {
         self.max_strings_interned = max;
+        self.throttle_cache(None);
     }
     /// The maximum number of strings to be interned.
     #[inline(always)]
@@ -105,14 +106,14 @@ impl StringsInterner {
         };
 
         // Throttle the cache upon exit
-        self.throttle_cache(hash);
+        self.throttle_cache(Some(hash));
 
         result
     }
 
     /// If the interner is over capacity, remove the longest entry that has the lowest count
     #[inline]
-    fn throttle_cache(&mut self, skip_hash: u64) {
+    fn throttle_cache(&mut self, skip_hash: Option<u64>) {
         if self.max() == 0 {
             self.clear();
             return;
@@ -130,7 +131,7 @@ impl StringsInterner {
             let mut index = 0;
 
             for (&k, v) in &self.cache {
-                if k != skip_hash
+                if skip_hash.map_or(true, |hash| k != hash)
                     && (v.strong_count() < min_count
                         || (v.strong_count() == min_count && v.len() > max_len))
                 {

@@ -9,6 +9,11 @@ Deprecated API's
 
 * The plugin macros `export_fn`, `register_exported_fn!`, `set_exported_fn!` and `set_exported_global_fn!` are deprecated because they do not add value over existing direct API's.
 
+New features
+------------
+
+* New options `Engine::set_max_strings_interned` and `Engine::max_strings_interned` are added to limit the maximum number of strings interned in the `Engine`'s string interner.
+
 Enhancements
 ------------
 

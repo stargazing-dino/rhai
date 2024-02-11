@@ -63,7 +63,7 @@ impl Engine {
                 guard.set_max(max);
             }
         } else {
-            self.interned_strings = Some(StringsInterner::new(self.max_strings_interned()).into());
+            self.interned_strings = Some(StringsInterner::new(max).into());
         }
         self
     }
