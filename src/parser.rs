@@ -3,7 +3,7 @@
 use crate::api::options::LangOptions;
 use crate::ast::{
     ASTFlags, BinaryExpr, CaseBlocksList, Expr, FlowControl, FnCallExpr, FnCallHashes, Ident,
-    Namespace, OpAssignment, RangeCase, ScriptFuncDef, Stmt, StmtBlock, StmtBlockContainer,
+    OpAssignment, RangeCase, ScriptFuncDef, Stmt, StmtBlock, StmtBlockContainer,
     SwitchCasesCollection,
 };
 use crate::engine::{Precedence, OP_CONTAINS, OP_NOT};
@@ -401,9 +401,9 @@ impl Expr {
     fn into_property(self, state: &mut ParseState) -> Self {
         match self {
             #[cfg(not(feature = "no_module"))]
-            Self::Variable(x, ..) if !x.1.is_empty() => unreachable!("qualified property"),
+            Self::Variable(x, ..) if !x.2.is_empty() => unreachable!("qualified property"),
             Self::Variable(x, .., pos) => {
-                let ident = x.3.clone();
+                let ident = x.1.clone();
                 let getter = state.get_interned_getter(&ident);
                 let hash_get = calc_fn_hash(None, &getter, 1);
                 let setter = state.get_interned_setter(&ident);
@@ -647,7 +647,7 @@ impl Engine {
         id: ImmutableString,
         no_args: bool,
         capture_parent_scope: bool,
-        namespace: Namespace,
+        #[cfg(not(feature = "no_module"))] mut namespace: crate::ast::Namespace,
     ) -> ParseResult<Expr> {
         let (token, token_pos) = if no_args {
             &(Token::RightParen, Position::NONE)
@@ -655,7 +655,6 @@ impl Engine {
             state.input.peek().unwrap()
         };
 
-        let mut _namespace = namespace;
         let mut args = FnArgsVec::new();
 
         match token {
@@ -676,10 +675,10 @@ impl Engine {
                 }
 
                 #[cfg(not(feature = "no_module"))]
-                let hash = if _namespace.is_empty() {
+                let hash = if namespace.is_empty() {
                     calc_fn_hash(None, &id, 0)
                 } else {
-                    let root = _namespace.root();
+                    let root = namespace.root();
                     let index = state.find_module(root);
                     let is_global = false;
 
@@ -694,13 +693,13 @@ impl Engine {
                         && !self.global_sub_modules.contains_key(root)
                     {
                         return Err(
-                            PERR::ModuleUndefined(root.into()).into_err(_namespace.position())
+                            PERR::ModuleUndefined(root.into()).into_err(namespace.position())
                         );
                     }
 
-                    _namespace.index = index;
+                    namespace.index = index;
 
-                    calc_fn_hash(_namespace.path.iter().map(Ident::as_str), &id, 0)
+                    calc_fn_hash(namespace.path.iter().map(Ident::as_str), &id, 0)
                 };
                 #[cfg(feature = "no_module")]
                 let hash = calc_fn_hash(None, &id, 0);
@@ -717,7 +716,8 @@ impl Engine {
                     name: state.get_interned_string(id),
                     capture_parent_scope,
                     op_token: None,
-                    namespace: _namespace,
+                    #[cfg(not(feature = "no_module"))]
+                    namespace,
                     hashes,
                     args,
                 }
@@ -742,10 +742,10 @@ impl Engine {
                     eat_token(state.input, &Token::RightParen);
 
                     #[cfg(not(feature = "no_module"))]
-                    let hash = if _namespace.is_empty() {
+                    let hash = if namespace.is_empty() {
                         calc_fn_hash(None, &id, args.len())
                     } else {
-                        let root = _namespace.root();
+                        let root = namespace.root();
                         let index = state.find_module(root);
 
                         #[cfg(not(feature = "no_function"))]
@@ -761,13 +761,13 @@ impl Engine {
                             && !self.global_sub_modules.contains_key(root)
                         {
                             return Err(
-                                PERR::ModuleUndefined(root.into()).into_err(_namespace.position())
+                                PERR::ModuleUndefined(root.into()).into_err(namespace.position())
                             );
                         }
 
-                        _namespace.index = index;
+                        namespace.index = index;
 
-                        calc_fn_hash(_namespace.path.iter().map(Ident::as_str), &id, args.len())
+                        calc_fn_hash(namespace.path.iter().map(Ident::as_str), &id, args.len())
                     };
                     #[cfg(feature = "no_module")]
                     let hash = calc_fn_hash(None, &id, args.len());
@@ -784,7 +784,8 @@ impl Engine {
                         name: state.get_interned_string(id),
                         capture_parent_scope,
                         op_token: None,
-                        namespace: _namespace,
+                        #[cfg(not(feature = "no_module"))]
+                        namespace,
                         hashes,
                         args,
                     }
@@ -1629,7 +1630,8 @@ impl Engine {
 
             // Identifier
             Token::Identifier(..) => {
-                let ns = Namespace::NONE;
+                #[cfg(not(feature = "no_module"))]
+                let ns = crate::ast::Namespace::NONE;
 
                 let s = match state.input.next().unwrap() {
                     (Token::Identifier(s), ..) => s,
@@ -1643,7 +1645,10 @@ impl Engine {
                         state.allow_capture = true;
 
                         Expr::Variable(
-                            (None, ns, 0, state.get_interned_string(*s)).into(),
+                            #[cfg(not(feature = "no_module"))]
+                            (None, state.get_interned_string(*s), ns, 0).into(),
+                            #[cfg(feature = "no_module")]
+                            (None, state.get_interned_string(*s)).into(),
                             None,
                             settings.pos,
                         )
@@ -1663,7 +1668,7 @@ impl Engine {
                         state.allow_capture = true;
 
                         let name = state.get_interned_string(*s);
-                        Expr::Variable((None, ns, 0, name).into(), None, settings.pos)
+                        Expr::Variable((None, name, ns, 0).into(), None, settings.pos)
                     }
                     // Normal variable access
                     _ => {
@@ -1686,14 +1691,23 @@ impl Engine {
                             .and_then(|x| u8::try_from(x.get()).ok())
                             .and_then(NonZeroU8::new);
                         let name = state.get_interned_string(*s);
-                        Expr::Variable((index, ns, 0, name).into(), short_index, settings.pos)
+
+                        Expr::Variable(
+                            #[cfg(not(feature = "no_module"))]
+                            (index, name, ns, 0).into(),
+                            #[cfg(feature = "no_module")]
+                            (index, name).into(),
+                            short_index,
+                            settings.pos,
+                        )
                     }
                 }
             }
 
             // Reserved keyword or symbol
             Token::Reserved(..) => {
-                let ns = Namespace::NONE;
+                #[cfg(not(feature = "no_module"))]
+                let ns = crate::ast::Namespace::NONE;
 
                 let s = match state.input.next().unwrap() {
                     (Token::Reserved(s), ..) => s,
@@ -1706,7 +1720,10 @@ impl Engine {
                         if is_reserved_keyword_or_symbol(&s).1 =>
                     {
                         Expr::Variable(
-                            (None, ns, 0, state.get_interned_string(*s)).into(),
+                            #[cfg(not(feature = "no_module"))]
+                            (None, state.get_interned_string(*s), ns, 0).into(),
+                            #[cfg(feature = "no_module")]
+                            (None, state.get_interned_string(*s)).into(),
                             None,
                             settings.pos,
                         )
@@ -1769,7 +1786,7 @@ impl Engine {
             lhs = match (lhs, tail_token) {
                 // Qualified function call with !
                 #[cfg(not(feature = "no_module"))]
-                (Expr::Variable(x, ..), Token::Bang) if !x.1.is_empty() => {
+                (Expr::Variable(x, ..), Token::Bang) if !x.2.is_empty() => {
                     return match state.input.peek().unwrap() {
                         (Token::LeftParen | Token::Unit, ..) => {
                             Err(LexError::UnexpectedInput(Token::Bang.into()).into_err(tail_pos))
@@ -1796,18 +1813,42 @@ impl Engine {
 
                     let no_args = state.input.next().unwrap().0 == Token::Unit;
 
-                    let (.., ns, _, name) = *x;
+                    #[cfg(not(feature = "no_module"))]
+                    let (_, name, ns, ..) = *x;
+                    #[cfg(feature = "no_module")]
+                    let (_, name) = *x;
+
                     settings.pos = pos;
 
-                    self.parse_fn_call(state, settings, name, no_args, true, ns)?
+                    self.parse_fn_call(
+                        state,
+                        settings,
+                        name,
+                        no_args,
+                        true,
+                        #[cfg(not(feature = "no_module"))]
+                        ns,
+                    )?
                 }
                 // Function call
                 (Expr::Variable(x, .., pos), t @ (Token::LeftParen | Token::Unit)) => {
-                    let (.., ns, _, name) = *x;
+                    #[cfg(not(feature = "no_module"))]
+                    let (_, name, ns, ..) = *x;
+                    #[cfg(feature = "no_module")]
+                    let (_, name) = *x;
+
                     let no_args = t == Token::Unit;
                     settings.pos = pos;
 
-                    self.parse_fn_call(state, settings, name, no_args, false, ns)?
+                    self.parse_fn_call(
+                        state,
+                        settings,
+                        name,
+                        no_args,
+                        false,
+                        #[cfg(not(feature = "no_module"))]
+                        ns,
+                    )?
                 }
                 // Disallowed module separator
                 #[cfg(not(feature = "no_module"))]
@@ -1824,14 +1865,14 @@ impl Engine {
                 #[cfg(not(feature = "no_module"))]
                 (Expr::Variable(x, .., pos), Token::DoubleColon) => {
                     let (id2, pos2) = parse_var_name(state.input)?;
-                    let (.., mut namespace, _, name) = *x;
+                    let (_, name, mut namespace, ..) = *x;
                     let var_name_def = Ident { name, pos };
 
                     namespace.path.push(var_name_def);
 
                     let var_name = state.get_interned_string(id2);
 
-                    Expr::Variable((None, namespace, 0, var_name).into(), None, pos2)
+                    Expr::Variable((None, var_name, namespace, 0).into(), None, pos2)
                 }
                 // Indexing
                 #[cfg(not(feature = "no_index"))]
@@ -1890,16 +1931,16 @@ impl Engine {
         // Cache the hash key for namespace-qualified variables
         #[cfg(not(feature = "no_module"))]
         let namespaced_variable = match lhs {
-            Expr::Variable(ref mut x, ..) if !x.1.is_empty() => Some(&mut **x),
+            Expr::Variable(ref mut x, ..) if !x.2.is_empty() => Some(&mut **x),
             Expr::Index(ref mut x, ..) | Expr::Dot(ref mut x, ..) => match x.lhs {
-                Expr::Variable(ref mut x, ..) if !x.1.is_empty() => Some(&mut **x),
+                Expr::Variable(ref mut x, ..) if !x.2.is_empty() => Some(&mut **x),
                 _ => None,
             },
             _ => None,
         };
 
         #[cfg(not(feature = "no_module"))]
-        if let Some((.., namespace, hash, name)) = namespaced_variable {
+        if let Some((.., name, namespace, hash)) = namespaced_variable {
             if !namespace.is_empty() {
                 *hash = crate::calc_var_hash(namespace.path.iter().map(Ident::as_str), name);
 
@@ -1972,7 +2013,8 @@ impl Engine {
 
                     // Call negative function
                     expr => Ok(FnCallExpr {
-                        namespace: Namespace::NONE,
+                        #[cfg(not(feature = "no_module"))]
+                        namespace: crate::ast::Namespace::NONE,
                         name: state.get_interned_string("-"),
                         hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "-", 1)),
                         args: IntoIterator::into_iter([expr]).collect(),
@@ -1994,7 +2036,8 @@ impl Engine {
 
                     // Call plus function
                     expr => Ok(FnCallExpr {
-                        namespace: Namespace::NONE,
+                        #[cfg(not(feature = "no_module"))]
+                        namespace: crate::ast::Namespace::NONE,
                         name: state.get_interned_string("+"),
                         hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "+", 1)),
                         args: IntoIterator::into_iter([expr]).collect(),
@@ -2010,7 +2053,8 @@ impl Engine {
                 let pos = eat_token(state.input, &Token::Bang);
 
                 Ok(FnCallExpr {
-                    namespace: Namespace::NONE,
+                    #[cfg(not(feature = "no_module"))]
+                    namespace: crate::ast::Namespace::NONE,
                     name: state.get_interned_string("!"),
                     hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "!", 1)),
                     args: {
@@ -2078,7 +2122,7 @@ impl Engine {
             }
             // var (indexed) = rhs
             Expr::Variable(ref x, i, var_pos) => {
-                let (index, .., name) = &**x;
+                let (index, name, ..) = &**x;
                 let index = i.map_or_else(
                     || index.expect("long or short index must be `Some`").get(),
                     |n| n.get() as usize,
@@ -2160,7 +2204,7 @@ impl Engine {
             }
             // lhs.module::id - syntax error
             #[cfg(not(feature = "no_module"))]
-            (.., Expr::Variable(x, ..)) if !x.1.is_empty() => unreachable!("lhs.ns::id"),
+            (.., Expr::Variable(x, ..)) if !x.2.is_empty() => unreachable!("lhs.ns::id"),
             // lhs.id
             (lhs, var_expr @ Expr::Variable(..)) => {
                 let rhs = var_expr.into_property(state);
@@ -2230,7 +2274,7 @@ impl Engine {
                 match x.lhs {
                     // lhs.module::id.dot_rhs or lhs.module::id[idx_rhs] - syntax error
                     #[cfg(not(feature = "no_module"))]
-                    Expr::Variable(x, ..) if !x.1.is_empty() => unreachable!("lhs.ns::id..."),
+                    Expr::Variable(x, ..) if !x.2.is_empty() => unreachable!("lhs.ns::id..."),
                     // lhs.module::func().dot_rhs or lhs.module::func()[idx_rhs] - syntax error
                     #[cfg(not(feature = "no_module"))]
                     Expr::FnCall(f, ..) if f.is_qualified() => {
@@ -2369,7 +2413,8 @@ impl Engine {
             let native_only = !is_valid_function_name(&op);
 
             let mut op_base = FnCallExpr {
-                namespace: Namespace::NONE,
+                #[cfg(not(feature = "no_module"))]
+                namespace: crate::ast::Namespace::NONE,
                 name: state.get_interned_string(&op),
                 hashes: FnCallHashes::from_native_only(hash),
                 args: IntoIterator::into_iter([root, rhs]).collect(),
@@ -2378,19 +2423,6 @@ impl Engine {
             };
 
             root = match op_token {
-                // '!=' defaults to true when passed invalid operands
-                Token::NotEqualsTo => op_base.into_fn_call_expr(pos),
-
-                // Comparison operators default to false when passed invalid operands
-                Token::EqualsTo
-                | Token::LessThan
-                | Token::LessThanEqualsTo
-                | Token::GreaterThan
-                | Token::GreaterThanEqualsTo => {
-                    let pos = op_base.args[0].start_position();
-                    op_base.into_fn_call_expr(pos)
-                }
-
                 Token::Or => {
                     let rhs = op_base.args[1].take().ensure_bool_expr()?;
                     let lhs = op_base.args[0].take().ensure_bool_expr()?;
@@ -2409,7 +2441,6 @@ impl Engine {
                 Token::In | Token::NotIn => {
                     // Swap the arguments
                     let (lhs, rhs) = op_base.args.split_first_mut().unwrap();
-                    let pos = lhs.start_position();
                     std::mem::swap(lhs, &mut rhs[0]);
 
                     // Convert into a call to `contains`
@@ -2422,7 +2453,8 @@ impl Engine {
                     } else {
                         // Put a `!` call in front
                         let not_base = FnCallExpr {
-                            namespace: Namespace::NONE,
+                            #[cfg(not(feature = "no_module"))]
+                            namespace: crate::ast::Namespace::NONE,
                             name: state.get_interned_string(OP_NOT),
                             hashes: FnCallHashes::from_native_only(calc_fn_hash(None, OP_NOT, 1)),
                             args: IntoIterator::into_iter([fn_call]).collect(),
@@ -2443,10 +2475,7 @@ impl Engine {
                     op_base.into_fn_call_expr(pos)
                 }
 
-                _ => {
-                    let pos = op_base.args[0].start_position();
-                    op_base.into_fn_call_expr(pos)
-                }
+                _ => op_base.into_fn_call_expr(pos),
             };
         }
     }
@@ -2510,11 +2539,17 @@ impl Engine {
                     let (name, pos) = parse_var_name(state.input)?;
                     let name = state.get_interned_string(name);
 
-                    let ns = Namespace::NONE;
-
                     segments.push(name.clone());
                     tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_IDENT));
-                    inputs.push(Expr::Variable((None, ns, 0, name).into(), None, pos));
+
+                    inputs.push(Expr::Variable(
+                        #[cfg(not(feature = "no_module"))]
+                        (None, name, crate::ast::Namespace::NONE, 0).into(),
+                        #[cfg(feature = "no_module")]
+                        (None, name).into(),
+                        None,
+                        pos,
+                    ));
                 }
                 CUSTOM_SYNTAX_MARKER_SYMBOL => {
                     let (symbol, pos) = match state.input.next().unwrap() {
@@ -3490,7 +3525,10 @@ impl Engine {
             state.stack.pop();
 
             Expr::Variable(
-                (None, <_>::default(), 0, catch_var.name).into(),
+                #[cfg(not(feature = "no_module"))]
+                (None, catch_var.name, <_>::default(), 0).into(),
+                #[cfg(feature = "no_module")]
+                (None, catch_var.name).into(),
                 None,
                 catch_var.pos,
             )
@@ -3664,12 +3702,16 @@ impl Engine {
                         Some(n) if !is_func => u8::try_from(n.get()).ok().and_then(NonZeroU8::new),
                         _ => None,
                     };
-                    Expr::Variable((index, <_>::default(), 0, name).into(), idx, pos)
+                    #[cfg(not(feature = "no_module"))]
+                    return Expr::Variable((index, name, <_>::default(), 0).into(), idx, pos);
+                    #[cfg(feature = "no_module")]
+                    return Expr::Variable((index, name).into(), idx, pos);
                 }),
         );
 
         let expr = FnCallExpr {
-            namespace: Namespace::NONE,
+            #[cfg(not(feature = "no_module"))]
+            namespace: crate::ast::Namespace::NONE,
             name: state.get_interned_string(crate::engine::KEYWORD_FN_PTR_CURRY),
             hashes: FnCallHashes::from_native_only(calc_fn_hash(
                 None,

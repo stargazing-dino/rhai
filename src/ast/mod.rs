@@ -6,7 +6,6 @@ pub mod expr;
 pub mod flags;
 pub mod ident;
 pub mod namespace;
-pub mod namespace_none;
 pub mod script_fn;
 pub mod stmt;
 
@@ -18,8 +17,6 @@ pub use flags::{ASTFlags, FnAccess};
 pub use ident::Ident;
 #[cfg(not(feature = "no_module"))]
 pub use namespace::Namespace;
-#[cfg(feature = "no_module")]
-pub use namespace_none::Namespace;
 #[cfg(not(feature = "no_function"))]
 pub use script_fn::{ScriptFnMetadata, ScriptFuncDef};
 pub use stmt::{

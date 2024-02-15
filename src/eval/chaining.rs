@@ -462,6 +462,7 @@ impl Engine {
         match (expr, ChainType::from(parent)) {
             #[cfg(not(feature = "no_object"))]
             (Expr::MethodCall(x, ..), ChainType::Dotting) => {
+                #[cfg(not(feature = "no_module"))]
                 debug_assert!(
                     !x.is_qualified(),
                     "method call in dot chain should not be namespace-qualified"
@@ -491,6 +492,7 @@ impl Engine {
 
                     #[cfg(not(feature = "no_object"))]
                     (Expr::MethodCall(x, ..), ChainType::Dotting) => {
+                        #[cfg(not(feature = "no_module"))]
                         debug_assert!(
                             !x.is_qualified(),
                             "method call in dot chain should not be namespace-qualified"
@@ -735,6 +737,7 @@ impl Engine {
                     }
                     // xxx.fn_name(arg_expr_list)
                     (Expr::MethodCall(x, pos), None, ..) => {
+                        #[cfg(not(feature = "no_module"))]
                         debug_assert!(
                             !x.is_qualified(),
                             "method call in dot chain should not be namespace-qualified"
@@ -937,6 +940,7 @@ impl Engine {
                             }
                             // {xxx:map}.fn_name(arg_expr_list)[expr] | {xxx:map}.fn_name(arg_expr_list).expr
                             Expr::MethodCall(ref x, pos) => {
+                                #[cfg(not(feature = "no_module"))]
                                 debug_assert!(
                                     !x.is_qualified(),
                                     "method call in dot chain should not be namespace-qualified"
@@ -1058,6 +1062,7 @@ impl Engine {
                             }
                             // xxx.fn_name(arg_expr_list)[expr] | xxx.fn_name(arg_expr_list).expr
                             Expr::MethodCall(ref f, pos) => {
+                                #[cfg(not(feature = "no_module"))]
                                 debug_assert!(
                                     !f.is_qualified(),
                                     "method call in dot chain should not be namespace-qualified"

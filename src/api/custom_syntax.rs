@@ -106,8 +106,8 @@ impl Expression<'_> {
     pub fn get_string_value(&self) -> Option<&str> {
         match self.0 {
             #[cfg(not(feature = "no_module"))]
-            Expr::Variable(x, ..) if !x.1.is_empty() => None,
-            Expr::Variable(x, ..) => Some(&x.3),
+            Expr::Variable(x, ..) if !x.2.is_empty() => None,
+            Expr::Variable(x, ..) => Some(&x.1),
             #[cfg(not(feature = "no_function"))]
             Expr::ThisPtr(..) => Some(crate::engine::KEYWORD_THIS),
             Expr::StringConstant(x, ..) => Some(x),
@@ -138,7 +138,7 @@ impl Expression<'_> {
 
             Expr::CharConstant(x, ..) => reify! { *x => Option<T> },
             Expr::StringConstant(x, ..) => reify! { x.clone() => Option<T> },
-            Expr::Variable(x, ..) => reify! { x.3.clone() => Option<T> },
+            Expr::Variable(x, ..) => reify! { x.1.clone() => Option<T> },
             Expr::BoolConstant(x, ..) => reify! { *x => Option<T> },
             Expr::Unit(..) => reify! { () => Option<T> },
 

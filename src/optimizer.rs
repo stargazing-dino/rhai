@@ -405,7 +405,7 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
     fn is_variable_access(expr: &Expr, _non_qualified: bool) -> bool {
         match expr {
             #[cfg(not(feature = "no_module"))]
-            Expr::Variable(x, ..) if _non_qualified && !x.1.is_empty() => false,
+            Expr::Variable(x, ..) if _non_qualified && !x.2.is_empty() => false,
             Expr::Variable(..) => true,
             _ => false,
         }
@@ -879,6 +879,29 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
     }
 }
 
+// Convert a constant argument into [`Expr::DynamicConstant`].
+fn move_constant_arg(arg_expr: &mut Expr) -> bool {
+    match arg_expr {
+        Expr::DynamicConstant(..)
+        | Expr::Unit(..)
+        | Expr::StringConstant(..)
+        | Expr::CharConstant(..)
+        | Expr::BoolConstant(..)
+        | Expr::IntegerConstant(..) => false,
+        #[cfg(not(feature = "no_float"))]
+        Expr::FloatConstant(..) => false,
+
+        _ => {
+            if let Some(value) = arg_expr.get_literal_value() {
+                *arg_expr = Expr::DynamicConstant(value.into(), arg_expr.start_position());
+                true
+            } else {
+                false
+            }
+        }
+    }
+}
+
 /// Optimize an [expression][Expr].
 fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
     // These keywords are handled specially
@@ -1117,17 +1140,21 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             }
         }
 
+        // nnn::id(args ..) -> optimize function call arguments
+        #[cfg(not(feature = "no_module"))]
+        Expr::FnCall(x, ..) if x.is_qualified() => x.args.iter_mut().for_each(|arg_expr| {
+            optimize_expr(arg_expr, state, false);
+
+            if move_constant_arg(arg_expr) {
+                state.set_dirty();
+            }
+        }),
         // eval!
         Expr::FnCall(x, ..) if x.name == KEYWORD_EVAL => {
             state.propagate_constants = false;
         }
         // Fn
-        Expr::FnCall(x, pos)
-            if !x.is_qualified() // Non-qualified
-            && x.args.len() == 1
-            && x.name == KEYWORD_FN_PTR
-            && x.constant_args()
-        => {
+        Expr::FnCall(x, pos) if x.args.len() == 1 && x.name == KEYWORD_FN_PTR && x.constant_args() => {
             let fn_name = match x.args[0] {
                 Expr::StringConstant(ref s, ..) => s.clone().into(),
                 _ => Dynamic::UNIT
@@ -1141,12 +1168,10 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
             }
         }
         // curry(FnPtr, constants...)
-        Expr::FnCall(x, pos)
-            if !x.is_qualified() // Non-qualified
-            && x.args.len() >= 2
-            && x.name == KEYWORD_FN_PTR_CURRY
-            && matches!(x.args[0], Expr::DynamicConstant(ref v, ..) if v.is_fnptr())
-            && x.constant_args()
+        Expr::FnCall(x, pos) if x.args.len() >= 2
+                                && x.name == KEYWORD_FN_PTR_CURRY
+                                && matches!(x.args[0], Expr::DynamicConstant(ref v, ..) if v.is_fnptr())
+                                && x.constant_args()
         => {
             let mut fn_ptr = x.args[0].get_literal_value().unwrap().cast::<FnPtr>();
             fn_ptr.extend(x.args.iter().skip(1).map(|arg_expr| arg_expr.get_literal_value().unwrap()));
@@ -1160,10 +1185,8 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         }
 
         // Call built-in operators
-        Expr::FnCall(x, pos)
-                if !x.is_qualified() // Non-qualified
-                && state.optimization_level == OptimizationLevel::Simple // simple optimizations
-                && x.constant_args() // all arguments are constants
+        Expr::FnCall(x, pos) if state.optimization_level == OptimizationLevel::Simple // simple optimizations
+                                && x.constant_args() // all arguments are constants
         => {
             let arg_values = &mut x.args.iter().map(|arg_expr| arg_expr.get_literal_value().unwrap()).collect::<FnArgsVec<_>>();
             let arg_types = arg_values.iter().map(Dynamic::type_id).collect::<FnArgsVec<_>>();
@@ -1182,7 +1205,7 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                     return;
                 }
                 // Overloaded operators can override built-in.
-                _ if x.args.len() == 2 && x.op_token.is_some() && (state.engine.fast_operators() || !state.engine.has_native_fn_override(x.hashes.native(), &arg_types)) => {
+                _ if x.args.len() == 2 && x.is_operator_call() && (state.engine.fast_operators() || !state.engine.has_native_fn_override(x.hashes.native(), &arg_types)) => {
                     if let Some((f, ctx)) = get_builtin_binary_op_fn(x.op_token.as_ref().unwrap(), &arg_values[0], &arg_values[1]) {
                         let context = ctx.then(|| (state.engine, x.name.as_str(), None, &state.global, *pos).into());
                         let (first, second) = arg_values.split_first_mut().unwrap();
@@ -1197,29 +1220,17 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
                 _ => ()
             }
 
-            x.args.iter_mut().for_each(|arg_expr| optimize_expr(arg_expr, state, false));
-
-            // Move constant arguments
-            x.args.iter_mut().for_each(|arg_expr| match arg_expr {
-                    Expr::DynamicConstant(..) | Expr::Unit(..)
-                    | Expr::StringConstant(..) | Expr::CharConstant(..)
-                    | Expr::BoolConstant(..) | Expr::IntegerConstant(..) => (),
-
-                    #[cfg(not(feature = "no_float"))]
-                    Expr:: FloatConstant(..) => (),
-
-                    _ => if let Some(value) = arg_expr.get_literal_value() {
-                        state.set_dirty();
-                        *arg_expr = Expr::DynamicConstant(value.into(), arg_expr.start_position());
-                    },
-                });
+            x.args.iter_mut().for_each(|arg_expr| {
+                optimize_expr(arg_expr, state, false);
+                if move_constant_arg(arg_expr) {
+                    state.set_dirty();
+                }
+            });
         }
 
         // Eagerly call functions
-        Expr::FnCall(x, pos)
-                if !x.is_qualified() // non-qualified
-                && state.optimization_level == OptimizationLevel::Full // full optimizations
-                && x.constant_args() // all arguments are constants
+        Expr::FnCall(x, pos) if state.optimization_level == OptimizationLevel::Full // full optimizations
+                                && x.constant_args() // all arguments are constants
         => {
             // First search for script-defined functions (can override built-in)
             let _has_script_fn = false;
@@ -1249,29 +1260,17 @@ fn optimize_expr(expr: &mut Expr, state: &mut OptimizerState, _chaining: bool) {
         // id(args ..) or xxx.id(args ..) -> optimize function call arguments
         Expr::FnCall(x, ..) | Expr::MethodCall(x, ..) => x.args.iter_mut().for_each(|arg_expr| {
             optimize_expr(arg_expr, state, false);
-
-            // Move constant arguments
-            match arg_expr {
-                Expr::DynamicConstant(..) | Expr::Unit(..)
-                | Expr::StringConstant(..) | Expr::CharConstant(..)
-                | Expr::BoolConstant(..) | Expr::IntegerConstant(..) => (),
-
-                #[cfg(not(feature = "no_float"))]
-                Expr:: FloatConstant(..) => (),
-
-                _ => if let Some(value) = arg_expr.get_literal_value() {
-                    state.set_dirty();
-                    *arg_expr = Expr::DynamicConstant(value.into(), arg_expr.start_position());
-                },
+            if move_constant_arg(arg_expr) {
+                state.set_dirty();
             }
         }),
 
         // constant-name
         #[cfg(not(feature = "no_module"))]
-        Expr::Variable(x, ..) if !x.1.is_empty() => (),
-        Expr::Variable(x, .., pos) if state.propagate_constants && state.find_literal_constant(&x.3).is_some() => {
+        Expr::Variable(x, ..) if !x.2.is_empty() => (),
+        Expr::Variable(x, .., pos) if state.propagate_constants && state.find_literal_constant(&x.1).is_some() => {
             // Replace constant with value
-            *expr = Expr::from_dynamic(state.find_literal_constant(&x.3).unwrap().clone(), *pos);
+            *expr = Expr::from_dynamic(state.find_literal_constant(&x.1).unwrap().clone(), *pos);
             state.set_dirty();
         }
 

@@ -4,6 +4,11 @@ Rhai Release Notes
 Version 1.18.0
 ==============
 
+Bug fixes
+---------
+
+* The position of an undefined operation call now points to the operator instead of the first operand.
+
 Deprecated API's
 ----------------
 
