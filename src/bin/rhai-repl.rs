@@ -438,15 +438,21 @@ fn main() {
                 continue;
             }
             #[cfg(not(feature = "no_optimize"))]
-            "optimize" if optimize_level == rhai::OptimizationLevel::Simple => {
-                optimize_level = rhai::OptimizationLevel::None;
-                println!("Script optimization turned OFF.");
-                continue;
-            }
-            #[cfg(not(feature = "no_optimize"))]
             "optimize" => {
-                optimize_level = rhai::OptimizationLevel::Simple;
-                println!("Script optimization turned ON.");
+                match optimize_level {
+                    rhai::OptimizationLevel::Full => {
+                        optimize_level = rhai::OptimizationLevel::None;
+                        println!("Script optimization turned OFF.");
+                    }
+                    rhai::OptimizationLevel::Simple => {
+                        optimize_level = rhai::OptimizationLevel::Full;
+                        println!("Script optimization turned to FULL.");
+                    }
+                    _ => {
+                        optimize_level = rhai::OptimizationLevel::Simple;
+                        println!("Script optimization turned to SIMPLE.");
+                    }
+                }
                 continue;
             }
             "scope" => {
