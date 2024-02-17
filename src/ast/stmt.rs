@@ -913,11 +913,16 @@ impl Stmt {
 
             Self::Expr(e) => match &**e {
                 Expr::Stmt(s) => s.iter().all(Self::is_block_dependent),
-                Expr::FnCall(x, ..) => !x.is_qualified() && x.name == KEYWORD_EVAL,
+                #[cfg(not(feature = "no_module"))]
+                Expr::FnCall(x, ..) if x.is_qualified() => false,
+                Expr::FnCall(x, ..) => x.name == KEYWORD_EVAL,
                 _ => false,
             },
 
-            Self::FnCall(x, ..) => !x.is_qualified() && x.name == KEYWORD_EVAL,
+            #[cfg(not(feature = "no_module"))]
+            Self::FnCall(x, ..) if x.is_qualified() => false,
+
+            Self::FnCall(x, ..) => x.name == KEYWORD_EVAL,
 
             #[cfg(not(feature = "no_module"))]
             Self::Import(..) | Self::Export(..) => true,

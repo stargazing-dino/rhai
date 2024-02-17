@@ -33,6 +33,8 @@ pub mod definitions;
 
 pub mod deprecated;
 
+use crate::func::{locked_read, locked_write};
+use crate::types::StringsInterner;
 use crate::{Dynamic, Engine, Identifier};
 
 #[cfg(feature = "no_std")]
@@ -46,9 +48,34 @@ pub mod default_limits {
 
     /// Maximum number of parameters in functions with [`Dynamic`][crate::Dynamic] support.
     pub const MAX_DYNAMIC_PARAMETERS: usize = 16;
+    /// Maximum number of strings interned.
+    pub const MAX_STRINGS_INTERNED: usize = 256;
 }
 
 impl Engine {
+    /// Set the maximum number of strings to be interned.
+    #[inline(always)]
+    pub fn set_max_strings_interned(&mut self, max: usize) -> &mut Self {
+        if max == 0 {
+            self.interned_strings = None;
+        } else if let Some(ref interner) = self.interned_strings {
+            if let Some(mut guard) = locked_write(interner) {
+                guard.set_max(max);
+            }
+        } else {
+            self.interned_strings = Some(StringsInterner::new(max).into());
+        }
+        self
+    }
+    /// The maximum number of strings to be interned.
+    #[inline(always)]
+    #[must_use]
+    pub fn max_strings_interned(&self) -> usize {
+        self.interned_strings.as_ref().map_or(0, |interner| {
+            locked_read(interner).map_or(0, |guard| guard.max())
+        })
+    }
+
     /// The module resolution service used by the [`Engine`].
     ///
     /// Not available under `no_module`.

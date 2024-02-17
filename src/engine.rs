@@ -1,5 +1,6 @@
 //! Main module defining the script evaluation [`Engine`].
 
+use crate::api::default_limits::MAX_STRINGS_INTERNED;
 use crate::api::options::LangOptions;
 use crate::func::native::{
     locked_write, OnDebugCallback, OnDefVarCallback, OnParseTokenCallback, OnPrintCallback,
@@ -96,7 +97,7 @@ pub struct Engine {
     pub(crate) module_resolver: Option<Box<dyn crate::ModuleResolver>>,
 
     /// Strings interner.
-    pub(crate) interned_strings: Option<Box<Locked<StringsInterner>>>,
+    pub(crate) interned_strings: Option<Locked<StringsInterner>>,
 
     /// A set of symbols to disable.
     pub(crate) disabled_symbols: BTreeSet<Identifier>,
@@ -279,7 +280,8 @@ impl Engine {
                 Some(Box::new(crate::module::resolvers::FileModuleResolver::new()));
         }
 
-        engine.interned_strings = Some(Locked::new(StringsInterner::new()).into());
+        // Turn on the strings interner
+        engine.set_max_strings_interned(MAX_STRINGS_INTERNED);
 
         // default print/debug implementations
         #[cfg(not(feature = "no_std"))]
@@ -296,6 +298,7 @@ impl Engine {
             }));
         }
 
+        // Register the standard package
         engine.register_global_module(StandardPackage::new().as_shared_module());
 
         engine
@@ -326,7 +329,7 @@ impl Engine {
         string: impl AsRef<str> + Into<ImmutableString>,
     ) -> ImmutableString {
         match self.interned_strings {
-            Some(ref interner) => locked_write(interner).get(string),
+            Some(ref interner) => locked_write(interner).unwrap().get(string),
             None => string.into(),
         }
     }

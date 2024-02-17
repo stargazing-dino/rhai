@@ -336,7 +336,7 @@ impl Engine {
                     // Cannot assign to temp result from expression
                     if is_temp_result {
                         return Err(ERR::ErrorAssignmentToConstant(
-                            x.3.to_string(),
+                            x.1.to_string(),
                             lhs.position(),
                         )
                         .into());
@@ -450,6 +450,7 @@ impl Engine {
                                 crate::Locked::new(std::collections::BTreeMap::new()),
                             )
                         }))
+                        .unwrap()
                         .insert(var_name.name.clone(), value.clone());
                     }
 
@@ -849,7 +850,7 @@ impl Engine {
                             if scope.len() >= self.max_variables() {
                                 return Err(ERR::ErrorTooManyVariables(catch_var.position()).into());
                             }
-                            scope.push(x.3.clone(), err_value);
+                            scope.push(x.1.clone(), err_value);
                         }
 
                         let this_ptr = this_ptr.as_deref_mut();

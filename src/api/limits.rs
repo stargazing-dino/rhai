@@ -35,6 +35,8 @@ pub mod default_limits {
     /// Not available under `no_function`.
     #[cfg(not(feature = "no_function"))]
     pub const MAX_FUNCTION_EXPR_DEPTH: usize = 32;
+    /// Maximum number of strings interned.
+    pub const MAX_STRINGS_INTERNED: usize = 1024;
 }
 
 /// A type containing all the limits imposed by the [`Engine`].

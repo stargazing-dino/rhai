@@ -222,7 +222,7 @@ impl Engine {
                             func: f.clone(),
                             source: s.cloned(),
                         };
-                        return if cache.filter.is_absent_and_set(hash) {
+                        return if cache.bloom_filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
                             *local_entry = Some(new_entry);
                             local_entry.as_ref()
@@ -298,7 +298,7 @@ impl Engine {
                                     }),
                             });
 
-                        return if cache.filter.is_absent_and_set(hash) {
+                        return if cache.bloom_filter.is_absent_and_set(hash) {
                             // Do not cache "one-hit wonders"
                             *local_entry = builtin;
                             local_entry.as_ref()

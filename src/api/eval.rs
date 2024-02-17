@@ -4,7 +4,6 @@ use crate::eval::{Caches, GlobalRuntimeState};
 use crate::func::native::locked_write;
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
-use crate::types::StringsInterner;
 use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -115,15 +114,11 @@ impl Engine {
     ) -> RhaiResultOf<T> {
         let scripts = [script];
         let ast = {
-            let mut interner;
-            let mut guard;
-            let interned_strings = if let Some(ref interner) = self.interned_strings {
-                guard = locked_write(interner);
-                &mut *guard
-            } else {
-                interner = StringsInterner::new();
-                &mut interner
-            };
+            let guard = &mut self
+                .interned_strings
+                .as_ref()
+                .and_then(|interner| locked_write(interner));
+            let interned_strings = guard.as_deref_mut();
 
             let (stream, tc) = self.lex(&scripts);
 

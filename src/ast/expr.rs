@@ -1,6 +1,6 @@
 //! Module defining script expressions.
 
-use super::{ASTFlags, ASTNode, Ident, Namespace, Stmt, StmtBlock};
+use super::{ASTFlags, ASTNode, Ident, Stmt, StmtBlock};
 use crate::engine::KEYWORD_FN_PTR;
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
@@ -184,7 +184,8 @@ impl FnCallHashes {
 #[derive(Clone, Hash)]
 pub struct FnCallExpr {
     /// Namespace of the function, if any.
-    pub namespace: Namespace,
+    #[cfg(not(feature = "no_module"))]
+    pub namespace: super::Namespace,
     /// Function name.
     pub name: ImmutableString,
     /// Pre-calculated hashes.
@@ -202,13 +203,14 @@ impl fmt::Debug for FnCallExpr {
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ff = f.debug_struct("FnCallExpr");
+        #[cfg(not(feature = "no_module"))]
         if !self.namespace.is_empty() {
             ff.field("namespace", &self.namespace);
         }
         ff.field("hash", &self.hashes)
             .field("name", &self.name)
             .field("args", &self.args);
-        if self.op_token.is_some() {
+        if self.is_operator_call() {
             ff.field("op_token", &self.op_token);
         }
         if self.capture_parent_scope {
@@ -221,11 +223,18 @@ impl fmt::Debug for FnCallExpr {
 impl FnCallExpr {
     /// Does this function call contain a qualified namespace?
     ///
-    /// Always `false` under `no_module`.
+    /// Not available under [`no_module`]
+    #[cfg(not(feature = "no_module"))]
     #[inline(always)]
     #[must_use]
     pub fn is_qualified(&self) -> bool {
         !self.namespace.is_empty()
+    }
+    /// Is this function call an operator expression?
+    #[inline(always)]
+    #[must_use]
+    pub fn is_operator_call(&self) -> bool {
+        self.op_token.is_some()
     }
     /// Convert this into an [`Expr::FnCall`].
     #[inline(always)]
@@ -276,13 +285,15 @@ pub enum Expr {
     ),
     /// ()
     Unit(Position),
-    /// Variable access - (optional long index, namespace, namespace hash, variable name), optional short index, position
+    /// Variable access - (optional long index, variable name, namespace, namespace hash), optional short index, position
     ///
     /// The short index is [`u8`] which is used when the index is <= 255, which should be
     /// the vast majority of cases (unless there are more than 255 variables defined!).
     /// This is to avoid reading a pointer redirection during each variable access.
     Variable(
-        Box<(Option<NonZeroUsize>, Namespace, u64, ImmutableString)>,
+        #[cfg(not(feature = "no_module"))]
+        Box<(Option<NonZeroUsize>, ImmutableString, super::Namespace, u64)>,
+        #[cfg(feature = "no_module")] Box<(Option<NonZeroUsize>, ImmutableString)>,
         Option<NonZeroU8>,
         Position,
     ),
@@ -371,16 +382,16 @@ impl fmt::Debug for Expr {
                 f.write_str("Variable(")?;
 
                 #[cfg(not(feature = "no_module"))]
-                if !x.1.is_empty() {
+                if !x.2.is_empty() {
                     write!(f, "{}{}", x.1, crate::engine::NAMESPACE_SEPARATOR)?;
-                    let pos = x.1.position();
+                    let pos = x.2.position();
                     if !pos.is_none() {
                         display_pos = pos;
                     }
                 }
-                f.write_str(&x.3)?;
+                f.write_str(&x.1)?;
                 #[cfg(not(feature = "no_module"))]
-                if let Some(n) = x.1.index {
+                if let Some(n) = x.2.index {
                     write!(f, " #{n}")?;
                 }
                 if let Some(n) = i.map_or_else(|| x.0, |n| NonZeroUsize::new(n.get() as usize)) {
@@ -495,18 +506,20 @@ impl Expr {
                 s.into()
             }
 
-            // Fn
-            Self::FnCall(ref x, ..)
-                if !x.is_qualified() && x.args.len() == 1 && x.name == KEYWORD_FN_PTR =>
-            {
+            // Qualified function call
+            #[cfg(not(feature = "no_module"))]
+            Self::FnCall(x, ..) if x.is_qualified() => return None,
+
+            // Function call
+            Self::FnCall(x, ..) if x.args.len() == 1 && x.name == KEYWORD_FN_PTR => {
                 match x.args[0] {
                     Self::StringConstant(ref s, ..) => FnPtr::new(s.clone()).ok()?.into(),
                     _ => return None,
                 }
             }
 
-            // Binary operators
-            Self::FnCall(x, ..) if !x.is_qualified() && x.args.len() == 2 => {
+            // Binary operator call
+            Self::FnCall(x, ..) if x.args.len() == 2 => {
                 pub const OP_EXCLUSIVE_RANGE: &str = Token::ExclusiveRange.literal_syntax();
                 pub const OP_INCLUSIVE_RANGE: &str = Token::InclusiveRange.literal_syntax();
 
@@ -559,7 +572,8 @@ impl Expr {
 
             Union::FnPtr(f, ..) if !f.is_curried() => Self::FnCall(
                 FnCallExpr {
-                    namespace: Namespace::NONE,
+                    #[cfg(not(feature = "no_module"))]
+                    namespace: super::Namespace::NONE,
                     name: KEYWORD_FN_PTR.into(),
                     hashes: FnCallHashes::from_hash(calc_fn_hash(None, f.fn_name(), 1)),
                     args: once(Self::StringConstant(f.fn_name().into(), pos)).collect(),
@@ -581,8 +595,8 @@ impl Expr {
     pub(crate) fn get_variable_name(&self, _non_qualified: bool) -> Option<&str> {
         match self {
             #[cfg(not(feature = "no_module"))]
-            Self::Variable(x, ..) if _non_qualified && !x.1.is_empty() => None,
-            Self::Variable(x, ..) => Some(&x.3),
+            Self::Variable(x, ..) if _non_qualified && !x.2.is_empty() => None,
+            Self::Variable(x, ..) => Some(&x.1),
             _ => None,
         }
     }
@@ -661,10 +675,10 @@ impl Expr {
         match self {
             #[cfg(not(feature = "no_module"))]
             Self::Variable(x, ..) => {
-                if x.1.is_empty() {
+                if x.2.is_empty() {
                     self.position()
                 } else {
-                    x.1.position()
+                    x.2.position()
                 }
             }
 

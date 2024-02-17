@@ -4,10 +4,20 @@ Rhai Release Notes
 Version 1.18.0
 ==============
 
+Bug fixes
+---------
+
+* The position of an undefined operation call now points to the operator instead of the first operand.
+
 Deprecated API's
 ----------------
 
 * The plugin macros `export_fn`, `register_exported_fn!`, `set_exported_fn!` and `set_exported_global_fn!` are deprecated because they do not add value over existing direct API's.
+
+New features
+------------
+
+* New options `Engine::set_max_strings_interned` and `Engine::max_strings_interned` are added to limit the maximum number of strings interned in the `Engine`'s string interner.
 
 Enhancements
 ------------
@@ -15,6 +25,7 @@ Enhancements
 * `FuncRegistration::in_global_namespace` and `FuncRegistration::in_internal_namespace` are added to avoid pulling in `FnNamespace`.
 * Array/BLOB/string iterators are defined also within the `BasicIteratorPackage` in addition to the regular array/BLOB/string packages.
 * `LexError::Runtime` is added for use with `Engine::on_parse_token`.
+* Shared values under `sync` are now handled more elegantly -- instead of deadlocking and hanging indefinitely, it spins for a number of tries (waiting one second between each), then errors out.
 
 
 Version 1.17.2
@@ -24,25 +35,6 @@ Bug fixes
 ---------
 
 * The engine no longer crashes when accessing a property or indexed item from a shared value returned from a variables resolver.
-
-
-Version 1.18.0
-==============
-
-Bug fixes
----------
-
-* The engine no longer crashes when accessing a property or indexed item from a shared value returned from a variables resolver.
-
-Deprecated API's
-----------------
-
-* The plugin macros `export_fn`, `register_exported_fn!`, `set_exported_fn!` and `set_exported_global_fn!` are deprecated because they do not add value over existing direct API's.
-
-Enhancements
-------------
-
-* `FuncRegistration::in_global_namespace` and `FuncRegistration::in_internal_namespace` are added to avoid pulling in `FnNamespace`.
 
 
 Version 1.17.1

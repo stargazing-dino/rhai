@@ -26,7 +26,7 @@ pub struct FnResolutionCache {
     /// Hash map containing cached functions.
     pub dict: StraightHashMap<Option<FnResolutionCacheEntry>>,
     /// Bloom filter to avoid caching "one-hit wonders".
-    pub filter: BloomFilterU64,
+    pub bloom_filter: BloomFilterU64,
 }
 
 impl FnResolutionCache {
@@ -35,7 +35,7 @@ impl FnResolutionCache {
     #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.dict.clear();
-        self.filter.clear();
+        self.bloom_filter.clear();
     }
 }
 

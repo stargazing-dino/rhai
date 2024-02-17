@@ -2655,10 +2655,6 @@ impl Engine {
         self.lex_raw(inputs, Some(token_mapper))
     }
     /// Tokenize an input text stream with an optional mapping function.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there are no input streams.
     #[inline]
     #[must_use]
     pub(crate) fn lex_raw<'a>(

@@ -63,16 +63,19 @@ impl Engine {
 
             Expr::Variable(_, Some(i), ..) => i.get() as usize,
             Expr::Variable(v, None, ..) => {
+                #[cfg(not(feature = "no_module"))]
+                debug_assert!(v.2.is_empty(), "variable should not be namespace-qualified");
+
                 // Scripted function with the same name
                 #[cfg(not(feature = "no_function"))]
                 if let Some(fn_def) = global
                     .lib
                     .iter()
                     .flat_map(|m| m.iter_script_fn())
-                    .find_map(|(_, _, f, _, func)| if f == v.3 { Some(func) } else { None })
+                    .find_map(|(_, _, f, _, func)| if f == v.1 { Some(func) } else { None })
                 {
                     let val: Dynamic = crate::FnPtr {
-                        name: v.3.clone(),
+                        name: v.1.clone(),
                         curry: <_>::default(),
                         environ: None,
                         fn_def: Some(fn_def.clone()),
@@ -156,14 +159,9 @@ impl Engine {
                 self.search_scope_only(global, caches, scope, this_ptr, expr)
             }
             Expr::Variable(v, None, ..) => match &**v {
-                // Normal variable access
-                (_, ns, ..) if ns.is_empty() => {
-                    self.search_scope_only(global, caches, scope, this_ptr, expr)
-                }
-
                 // Qualified variable access
                 #[cfg(not(feature = "no_module"))]
-                (_, ns, hash_var, var_name) => {
+                (_, var_name, ns, hash_var) if !ns.is_empty() => {
                     // foo:bar::baz::VARIABLE
                     if let Some(module) = self.search_imports(global, ns) {
                         return module.get_qualified_var(*hash_var).map_or_else(
@@ -188,8 +186,9 @@ impl Engine {
                     #[cfg(not(feature = "no_function"))]
                     if ns.path.len() == 1 && ns.root() == crate::engine::KEYWORD_GLOBAL {
                         if let Some(ref constants) = global.constants {
-                            if let Some(value) =
-                                crate::func::locked_write(constants).get_mut(var_name.as_str())
+                            if let Some(value) = crate::func::locked_write(constants)
+                                .unwrap()
+                                .get_mut(var_name.as_str())
                             {
                                 let mut target: Target = value.clone().into();
                                 // Module variables are constant
@@ -210,8 +209,8 @@ impl Engine {
                     Err(ERR::ErrorModuleNotFound(ns.to_string(), ns.position()).into())
                 }
 
-                #[cfg(feature = "no_module")]
-                _ => unreachable!("Invalid expression {:?}", expr),
+                // Normal variable access
+                _ => self.search_scope_only(global, caches, scope, this_ptr, expr),
             },
             _ => unreachable!("Expr::Variable expected but gets {:?}", expr),
         }
