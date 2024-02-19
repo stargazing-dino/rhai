@@ -1,7 +1,6 @@
 //! Module that defines the public evaluation API of [`Engine`].
 
 use crate::eval::{Caches, GlobalRuntimeState};
-use crate::func::native::locked_write;
 use crate::parser::ParseState;
 use crate::types::dynamic::Variant;
 use crate::{Dynamic, Engine, Position, RhaiResult, RhaiResultOf, Scope, AST, ERR};
@@ -114,17 +113,11 @@ impl Engine {
     ) -> RhaiResultOf<T> {
         let scripts = [script];
         let ast = {
-            let guard = &mut self
-                .interned_strings
-                .as_ref()
-                .and_then(|interner| locked_write(interner));
-            let interned_strings = guard.as_deref_mut();
-
             let (stream, tc) = self.lex(&scripts);
 
             let input = &mut stream.peekable();
             let lib = &mut <_>::default();
-            let state = &mut ParseState::new(Some(scope), interned_strings, input, tc, lib);
+            let state = ParseState::new(Some(scope), input, tc, lib);
 
             // No need to optimize a lone expression
             self.parse_global_expr(

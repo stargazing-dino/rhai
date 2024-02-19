@@ -79,6 +79,10 @@ fn test_optimizer_parse() {
 
     engine.set_optimization_level(OptimizationLevel::Full);
 
+    let ast = engine.compile(r#"sub_string("", 7)"#).unwrap();
+
+    assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Expr("" @ 1:1)] }"#);
+
     let ast = engine.compile("abs(-42)").unwrap();
 
     assert_eq!(format!("{ast:?}"), r#"AST { source: None, doc: "", resolver: None, body: [Expr(42 @ 1:1)] }"#);

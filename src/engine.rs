@@ -333,6 +333,41 @@ impl Engine {
             None => string.into(),
         }
     }
+    /// Get an interned property getter, creating one if it is not yet interned.
+    #[cfg(not(feature = "no_object"))]
+    #[inline]
+    #[must_use]
+    pub(crate) fn get_interned_getter(
+        &self,
+        text: impl AsRef<str> + Into<ImmutableString>,
+    ) -> ImmutableString {
+        match self.interned_strings {
+            Some(ref interner) => locked_write(interner).unwrap().get_with_mapper(
+                b'g',
+                |s| make_getter(s.as_ref()).into(),
+                text,
+            ),
+            None => make_getter(text.as_ref()).into(),
+        }
+    }
+
+    /// Get an interned property setter, creating one if it is not yet interned.
+    #[cfg(not(feature = "no_object"))]
+    #[inline]
+    #[must_use]
+    pub(crate) fn get_interned_setter(
+        &self,
+        text: impl AsRef<str> + Into<ImmutableString>,
+    ) -> ImmutableString {
+        match self.interned_strings {
+            Some(ref interner) => locked_write(interner).unwrap().get_with_mapper(
+                b's',
+                |s| make_setter(s.as_ref()).into(),
+                text,
+            ),
+            None => make_setter(text.as_ref()).into(),
+        }
+    }
 
     /// Get an empty [`ImmutableString`] which refers to a shared instance.
     #[inline(always)]

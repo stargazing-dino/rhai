@@ -13,10 +13,7 @@ use crate::tokenizer::{
     is_reserved_keyword_or_symbol, is_valid_function_name, is_valid_identifier, Token, TokenStream,
     TokenizerControl,
 };
-use crate::types::{
-    dynamic::{AccessMode, Union},
-    StringsInterner,
-};
+use crate::types::dynamic::{AccessMode, Union};
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
     ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position, Scope,
@@ -51,7 +48,7 @@ impl PERR {
 
 /// _(internals)_ A type that encapsulates the current state of the parser.
 /// Exported under the `internals` feature only.
-pub struct ParseState<'a, 't, 's, 'f> {
+pub struct ParseState<'a, 't, 'f> {
     /// Stream of input tokens.
     pub input: &'t mut TokenStream<'a>,
     /// Tokenizer control interface.
@@ -61,8 +58,6 @@ pub struct ParseState<'a, 't, 's, 'f> {
     pub lib: &'f mut FnLib,
     /// Controls whether parsing of an expression should stop given the next token.
     pub expr_filter: fn(&Token) -> bool,
-    /// Strings interner.
-    pub interned_strings: Option<&'s mut StringsInterner>,
     /// External [scope][Scope] with constants.
     pub external_constants: Option<&'a Scope<'a>>,
     /// Global runtime state.
@@ -93,14 +88,13 @@ pub struct ParseState<'a, 't, 's, 'f> {
     pub dummy: &'f (),
 }
 
-impl fmt::Debug for ParseState<'_, '_, '_, '_> {
+impl fmt::Debug for ParseState<'_, '_, '_> {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut f = f.debug_struct("ParseState");
 
         f.field("tokenizer_control", &self.tokenizer_control)
-            .field("interned_strings", &self.interned_strings)
             .field("external_constants_scope", &self.external_constants)
             .field("global", &self.global)
             .field("stack", &self.stack)
@@ -118,13 +112,12 @@ impl fmt::Debug for ParseState<'_, '_, '_, '_> {
     }
 }
 
-impl<'a, 't, 's, 'f> ParseState<'a, 't, 's, 'f> {
+impl<'a, 't, 'f> ParseState<'a, 't, 'f> {
     /// Create a new [`ParseState`].
     #[inline]
     #[must_use]
     pub fn new(
         external_constants: Option<&'a Scope>,
-        interned_strings: Option<&'s mut StringsInterner>,
         input: &'t mut TokenStream<'a>,
         tokenizer_control: TokenizerControl,
         #[cfg(not(feature = "no_function"))] lib: &'f mut FnLib,
@@ -141,7 +134,6 @@ impl<'a, 't, 's, 'f> ParseState<'a, 't, 's, 'f> {
             #[cfg(not(feature = "no_closure"))]
             external_vars: ThinVec::new(),
             allow_capture: true,
-            interned_strings,
             external_constants,
             global: None,
             stack: Scope::new(),
@@ -182,44 +174,6 @@ impl<'a, 't, 's, 'f> ParseState<'a, 't, 's, 'f> {
         (index, hit_barrier)
     }
 
-    /// Find explicitly declared variable by name in the [`ParseState`], searching in reverse order.
-    ///
-    /// If the variable is not present in the scope adds it to the list of external variables.
-    ///
-    /// The return value is the offset to be deducted from `ParseState::stack::len()`,
-    /// i.e. the top element of [`ParseState`]'s variables stack is offset 1.
-    ///
-    /// # Return value: `(index, is_func_name)`
-    ///
-    /// * `index`: [`None`] when the variable name is not found in the `stack`,
-    ///            otherwise the index value.
-    ///
-    /// * `is_func_name`: `true` if the variable is actually the name of a function
-    ///                   (in which case it will be converted into a function pointer).
-    #[must_use]
-    pub fn access_var(&mut self, name: &str, _pos: Position) -> (Option<NonZeroUsize>, bool) {
-        let (index, hit_barrier) = self.find_var(name);
-
-        #[cfg(not(feature = "no_function"))]
-        let is_func_name = self.lib.values().any(|f| f.name == name);
-        #[cfg(feature = "no_function")]
-        let is_func_name = false;
-
-        #[cfg(not(feature = "no_closure"))]
-        if self.allow_capture {
-            if !is_func_name && index == 0 && !self.external_vars.iter().any(|v| v.name == name) {
-                let name = self.get_interned_string(name);
-                self.external_vars.push(Ident { name, pos: _pos });
-            }
-        } else {
-            self.allow_capture = true;
-        }
-
-        let index = (!hit_barrier).then(|| NonZeroUsize::new(index)).flatten();
-
-        (index, is_func_name)
-    }
-
     /// Find a module by name in the [`ParseState`], searching in reverse.
     ///
     /// Returns the offset to be deducted from `Stack::len`,
@@ -238,55 +192,6 @@ impl<'a, 't, 's, 'f> ParseState<'a, 't, 's, 'f> {
             .rev()
             .rposition(|n| n == name)
             .and_then(|i| NonZeroUsize::new(i + 1))
-    }
-
-    /// Get an interned string, creating one if it is not yet interned.
-    #[inline(always)]
-    #[must_use]
-    pub fn get_interned_string(
-        &mut self,
-        text: impl AsRef<str> + Into<ImmutableString>,
-    ) -> ImmutableString {
-        match self.interned_strings {
-            Some(ref mut interner) => interner.get(text),
-            None => text.into(),
-        }
-    }
-
-    /// Get an interned property getter, creating one if it is not yet interned.
-    #[cfg(not(feature = "no_object"))]
-    #[inline]
-    #[must_use]
-    pub fn get_interned_getter(
-        &mut self,
-        text: impl AsRef<str> + Into<ImmutableString>,
-    ) -> ImmutableString {
-        match self.interned_strings {
-            Some(ref mut interner) => interner.get_with_mapper(
-                b'g',
-                |s| crate::engine::make_getter(s.as_ref()).into(),
-                text,
-            ),
-            None => crate::engine::make_getter(text.as_ref()).into(),
-        }
-    }
-
-    /// Get an interned property setter, creating one if it is not yet interned.
-    #[cfg(not(feature = "no_object"))]
-    #[inline]
-    #[must_use]
-    pub fn get_interned_setter(
-        &mut self,
-        text: impl AsRef<str> + Into<ImmutableString>,
-    ) -> ImmutableString {
-        match self.interned_strings {
-            Some(ref mut interner) => interner.get_with_mapper(
-                b's',
-                |s| crate::engine::make_setter(s.as_ref()).into(),
-                text,
-            ),
-            None => crate::engine::make_setter(text.as_ref()).into(),
-        }
     }
 }
 
@@ -393,30 +298,6 @@ pub fn is_anonymous_fn(fn_name: &str) -> bool {
 }
 
 impl Expr {
-    /// Convert a [`Variable`][Expr::Variable] into a [`Property`][Expr::Property].
-    /// All other variants are untouched.
-    #[cfg(not(feature = "no_object"))]
-    #[inline]
-    #[must_use]
-    fn into_property(self, state: &mut ParseState) -> Self {
-        match self {
-            #[cfg(not(feature = "no_module"))]
-            Self::Variable(x, ..) if !x.2.is_empty() => unreachable!("qualified property"),
-            Self::Variable(x, .., pos) => {
-                let ident = x.1.clone();
-                let getter = state.get_interned_getter(&ident);
-                let hash_get = calc_fn_hash(None, &getter, 1);
-                let setter = state.get_interned_setter(&ident);
-                let hash_set = calc_fn_hash(None, &setter, 2);
-
-                Self::Property(
-                    Box::new(((getter, hash_get), (setter, hash_set), ident)),
-                    pos,
-                )
-            }
-            _ => self,
-        }
-    }
     /// Raise an error if the expression can never yield a boolean value.
     fn ensure_bool_expr(self) -> ParseResult<Self> {
         let type_name = match self {
@@ -639,6 +520,74 @@ fn optimize_combo_chain(expr: &mut Expr) {
 }
 
 impl Engine {
+    /// Find explicitly declared variable by name in the [`ParseState`], searching in reverse order.
+    ///
+    /// If the variable is not present in the scope adds it to the list of external variables.
+    ///
+    /// The return value is the offset to be deducted from `ParseState::stack::len()`,
+    /// i.e. the top element of [`ParseState`]'s variables stack is offset 1.
+    ///
+    /// # Return value: `(index, is_func_name)`
+    ///
+    /// * `index`: [`None`] when the variable name is not found in the `stack`,
+    ///            otherwise the index value.
+    ///
+    /// * `is_func_name`: `true` if the variable is actually the name of a function
+    ///                   (in which case it will be converted into a function pointer).
+    #[must_use]
+    fn access_var(
+        &self,
+        state: &mut ParseState,
+        name: &str,
+        _pos: Position,
+    ) -> (Option<NonZeroUsize>, bool) {
+        let (index, hit_barrier) = state.find_var(name);
+
+        #[cfg(not(feature = "no_function"))]
+        let is_func_name = state.lib.values().any(|f| f.name == name);
+        #[cfg(feature = "no_function")]
+        let is_func_name = false;
+
+        #[cfg(not(feature = "no_closure"))]
+        if state.allow_capture {
+            if !is_func_name && index == 0 && !state.external_vars.iter().any(|v| v.name == name) {
+                let name = self.get_interned_string(name);
+                state.external_vars.push(Ident { name, pos: _pos });
+            }
+        } else {
+            state.allow_capture = true;
+        }
+
+        let index = (!hit_barrier).then(|| NonZeroUsize::new(index)).flatten();
+
+        (index, is_func_name)
+    }
+
+    /// Convert a [`Variable`][Expr::Variable] into a [`Property`][Expr::Property].
+    /// All other variants are untouched.
+    #[cfg(not(feature = "no_object"))]
+    #[inline]
+    #[must_use]
+    fn convert_expr_into_property(&self, expr: Expr) -> Expr {
+        match expr {
+            #[cfg(not(feature = "no_module"))]
+            Expr::Variable(x, ..) if !x.2.is_empty() => unreachable!("qualified property"),
+            Expr::Variable(x, .., pos) => {
+                let ident = x.1.clone();
+                let getter = self.get_interned_getter(&ident);
+                let hash_get = calc_fn_hash(None, &getter, 1);
+                let setter = self.get_interned_setter(&ident);
+                let hash_set = calc_fn_hash(None, &setter, 2);
+
+                Expr::Property(
+                    Box::new(((getter, hash_get), (setter, hash_set), ident)),
+                    pos,
+                )
+            }
+            _ => expr,
+        }
+    }
+
     /// Parse a function call.
     fn parse_fn_call(
         &self,
@@ -713,7 +662,7 @@ impl Engine {
                 args.shrink_to_fit();
 
                 return Ok(FnCallExpr {
-                    name: state.get_interned_string(id),
+                    name: self.get_interned_string(id),
                     capture_parent_scope,
                     op_token: None,
                     #[cfg(not(feature = "no_module"))]
@@ -781,7 +730,7 @@ impl Engine {
                     args.shrink_to_fit();
 
                     return Ok(FnCallExpr {
-                        name: state.get_interned_string(id),
+                        name: self.get_interned_string(id),
                         capture_parent_scope,
                         op_token: None,
                         #[cfg(not(feature = "no_module"))]
@@ -1120,7 +1069,7 @@ impl Engine {
             let expr = self.parse_expr(state, settings.level_up()?)?;
             template.insert(name.clone(), crate::Dynamic::UNIT);
 
-            let name = state.get_interned_string(name);
+            let name = self.get_interned_string(name);
             map.push((Ident { name, pos }, expr));
 
             match state.input.peek().unwrap() {
@@ -1389,7 +1338,7 @@ impl Engine {
                 Token::IntegerConstant(x) => Expr::IntegerConstant(x, settings.pos),
                 Token::CharConstant(c) => Expr::CharConstant(c, settings.pos),
                 Token::StringConstant(s) => {
-                    Expr::StringConstant(state.get_interned_string(*s), settings.pos)
+                    Expr::StringConstant(self.get_interned_string(*s), settings.pos)
                 }
                 Token::True => Expr::BoolConstant(true, settings.pos),
                 Token::False => Expr::BoolConstant(false, settings.pos),
@@ -1477,7 +1426,6 @@ impl Engine {
                 // Build new parse state
                 let new_state = &mut ParseState::new(
                     state.external_constants,
-                    state.interned_strings.as_deref_mut(),
                     state.input,
                     state.tokenizer_control.clone(),
                     state.lib,
@@ -1519,7 +1467,7 @@ impl Engine {
 
                 #[cfg(not(feature = "no_closure"))]
                 for Ident { name, pos } in &_externals {
-                    let (index, is_func) = state.access_var(name, *pos);
+                    let (index, is_func) = self.access_var(state, name, *pos);
 
                     if !is_func
                         && index.is_none()
@@ -1540,7 +1488,7 @@ impl Engine {
                 state.lib.insert(hash_script, fn_def);
 
                 #[cfg(not(feature = "no_closure"))]
-                let expr = Self::make_curry_from_externals(state, expr, _externals, settings.pos);
+                let expr = self.make_curry_from_externals(state, expr, _externals, settings.pos);
 
                 expr
             }
@@ -1553,7 +1501,7 @@ impl Engine {
                 match state.input.next().unwrap() {
                     (Token::InterpolatedString(s), ..) if s.is_empty() => (),
                     (Token::InterpolatedString(s), pos) => {
-                        segments.push(Expr::StringConstant(state.get_interned_string(*s), pos))
+                        segments.push(Expr::StringConstant(self.get_interned_string(*s), pos))
                     }
                     token => {
                         unreachable!("Token::InterpolatedString expected but gets {:?}", token)
@@ -1577,7 +1525,7 @@ impl Engine {
                         (Token::StringConstant(s), pos) => {
                             if !s.is_empty() {
                                 segments
-                                    .push(Expr::StringConstant(state.get_interned_string(*s), pos));
+                                    .push(Expr::StringConstant(self.get_interned_string(*s), pos));
                             }
                             // End the interpolated string if it is terminated by a back-tick.
                             break;
@@ -1585,7 +1533,7 @@ impl Engine {
                         (Token::InterpolatedString(s), pos) => {
                             if !s.is_empty() {
                                 segments
-                                    .push(Expr::StringConstant(state.get_interned_string(*s), pos));
+                                    .push(Expr::StringConstant(self.get_interned_string(*s), pos));
                             }
                         }
                         (Token::LexError(err), pos) => match *err {
@@ -1602,7 +1550,7 @@ impl Engine {
                 }
 
                 if segments.is_empty() {
-                    Expr::StringConstant(state.get_interned_string(""), settings.pos)
+                    Expr::StringConstant(self.get_interned_string(""), settings.pos)
                 } else {
                     segments.shrink_to_fit();
                     Expr::InterpolatedString(segments, settings.pos)
@@ -1646,9 +1594,9 @@ impl Engine {
 
                         Expr::Variable(
                             #[cfg(not(feature = "no_module"))]
-                            (None, state.get_interned_string(*s), ns, 0).into(),
+                            (None, self.get_interned_string(*s), ns, 0).into(),
                             #[cfg(feature = "no_module")]
-                            (None, state.get_interned_string(*s)).into(),
+                            (None, self.get_interned_string(*s)).into(),
                             None,
                             settings.pos,
                         )
@@ -1667,12 +1615,12 @@ impl Engine {
                         // Once the identifier consumed we must enable next variables capturing
                         state.allow_capture = true;
 
-                        let name = state.get_interned_string(*s);
+                        let name = self.get_interned_string(*s);
                         Expr::Variable((None, name, ns, 0).into(), None, settings.pos)
                     }
                     // Normal variable access
                     _ => {
-                        let (index, is_func) = state.access_var(&s, settings.pos);
+                        let (index, is_func) = self.access_var(state, &s, settings.pos);
 
                         if !options.intersects(ChainingFlags::PROPERTY)
                             && !is_func
@@ -1690,7 +1638,7 @@ impl Engine {
                         let short_index = index
                             .and_then(|x| u8::try_from(x.get()).ok())
                             .and_then(NonZeroU8::new);
-                        let name = state.get_interned_string(*s);
+                        let name = self.get_interned_string(*s);
 
                         Expr::Variable(
                             #[cfg(not(feature = "no_module"))]
@@ -1721,9 +1669,9 @@ impl Engine {
                     {
                         Expr::Variable(
                             #[cfg(not(feature = "no_module"))]
-                            (None, state.get_interned_string(*s), ns, 0).into(),
+                            (None, self.get_interned_string(*s), ns, 0).into(),
                             #[cfg(feature = "no_module")]
-                            (None, state.get_interned_string(*s)).into(),
+                            (None, self.get_interned_string(*s)).into(),
                             None,
                             settings.pos,
                         )
@@ -1870,7 +1818,7 @@ impl Engine {
 
                     namespace.path.push(var_name_def);
 
-                    let var_name = state.get_interned_string(id2);
+                    let var_name = self.get_interned_string(id2);
 
                     Expr::Variable((None, var_name, namespace, 0).into(), None, pos2)
                 }
@@ -1909,7 +1857,7 @@ impl Engine {
                     let options = ChainingFlags::PROPERTY | ChainingFlags::DISALLOW_NAMESPACES;
                     let rhs = self.parse_primary(state, settings.level_up()?, options)?;
 
-                    Self::make_dot_expr(state, expr, rhs, _parent_options, op_flags, tail_pos)?
+                    self.make_dot_expr(state, expr, rhs, _parent_options, op_flags, tail_pos)?
                 }
                 // Unknown postfix operator
                 (expr, token) => {
@@ -2015,7 +1963,7 @@ impl Engine {
                     expr => Ok(FnCallExpr {
                         #[cfg(not(feature = "no_module"))]
                         namespace: crate::ast::Namespace::NONE,
-                        name: state.get_interned_string("-"),
+                        name: self.get_interned_string("-"),
                         hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "-", 1)),
                         args: IntoIterator::into_iter([expr]).collect(),
                         op_token: Some(token),
@@ -2038,7 +1986,7 @@ impl Engine {
                     expr => Ok(FnCallExpr {
                         #[cfg(not(feature = "no_module"))]
                         namespace: crate::ast::Namespace::NONE,
-                        name: state.get_interned_string("+"),
+                        name: self.get_interned_string("+"),
                         hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "+", 1)),
                         args: IntoIterator::into_iter([expr]).collect(),
                         op_token: Some(token),
@@ -2055,7 +2003,7 @@ impl Engine {
                 Ok(FnCallExpr {
                     #[cfg(not(feature = "no_module"))]
                     namespace: crate::ast::Namespace::NONE,
-                    name: state.get_interned_string("!"),
+                    name: self.get_interned_string("!"),
                     hashes: FnCallHashes::from_native_only(calc_fn_hash(None, "!", 1)),
                     args: {
                         let expr = self.parse_unary(state, settings.level_up()?)?;
@@ -2186,6 +2134,7 @@ impl Engine {
     /// Make a dot expression.
     #[cfg(not(feature = "no_object"))]
     fn make_dot_expr(
+        &self,
         state: &mut ParseState,
         lhs: Expr,
         rhs: Expr,
@@ -2199,7 +2148,7 @@ impl Engine {
                 if !parent_options.intersects(ASTFlags::BREAK) =>
             {
                 let options = options | parent_options;
-                x.rhs = Self::make_dot_expr(state, x.rhs, rhs, options, op_flags, op_pos)?;
+                x.rhs = self.make_dot_expr(state, x.rhs, rhs, options, op_flags, op_pos)?;
                 Ok(Expr::Index(x, ASTFlags::empty(), pos))
             }
             // lhs.module::id - syntax error
@@ -2207,7 +2156,7 @@ impl Engine {
             (.., Expr::Variable(x, ..)) if !x.2.is_empty() => unreachable!("lhs.ns::id"),
             // lhs.id
             (lhs, var_expr @ Expr::Variable(..)) => {
-                let rhs = var_expr.into_property(state);
+                let rhs = self.convert_expr_into_property( var_expr);
                 Ok(Expr::Dot(BinaryExpr { lhs, rhs }.into(), op_flags, op_pos))
             }
             // lhs.prop
@@ -2283,7 +2232,7 @@ impl Engine {
                     // lhs.id.dot_rhs or lhs.id[idx_rhs]
                     Expr::Variable(..) | Expr::Property(..) => {
                         let new_binary = BinaryExpr {
-                            lhs: x.lhs.into_property(state),
+                            lhs: self.convert_expr_into_property( x.lhs),
                             rhs: x.rhs,
                         }
                         .into();
@@ -2415,7 +2364,7 @@ impl Engine {
             let mut op_base = FnCallExpr {
                 #[cfg(not(feature = "no_module"))]
                 namespace: crate::ast::Namespace::NONE,
-                name: state.get_interned_string(&op),
+                name: self.get_interned_string(&op),
                 hashes: FnCallHashes::from_native_only(hash),
                 args: IntoIterator::into_iter([root, rhs]).collect(),
                 op_token: native_only.then(|| op_token.clone()),
@@ -2445,7 +2394,7 @@ impl Engine {
 
                     // Convert into a call to `contains`
                     op_base.hashes = FnCallHashes::from_hash(calc_fn_hash(None, OP_CONTAINS, 2));
-                    op_base.name = state.get_interned_string(OP_CONTAINS);
+                    op_base.name = self.get_interned_string(OP_CONTAINS);
                     let fn_call = op_base.into_fn_call_expr(pos);
 
                     if op_token == Token::In {
@@ -2455,7 +2404,7 @@ impl Engine {
                         let not_base = FnCallExpr {
                             #[cfg(not(feature = "no_module"))]
                             namespace: crate::ast::Namespace::NONE,
-                            name: state.get_interned_string(OP_NOT),
+                            name: self.get_interned_string(OP_NOT),
                             hashes: FnCallHashes::from_native_only(calc_fn_hash(None, OP_NOT, 1)),
                             args: IntoIterator::into_iter([fn_call]).collect(),
                             op_token: Some(Token::Bang),
@@ -2505,7 +2454,7 @@ impl Engine {
         if syntax.scope_may_be_changed {
             // Add a barrier variable to the stack so earlier variables will not be matched.
             // Variable searches stop at the first barrier.
-            let marker = state.get_interned_string(SCOPE_SEARCH_BARRIER_MARKER);
+            let marker = self.get_interned_string(SCOPE_SEARCH_BARRIER_MARKER);
             state.stack.push(marker, ());
         }
 
@@ -2526,7 +2475,7 @@ impl Engine {
                     if seg.starts_with(CUSTOM_SYNTAX_MARKER_SYNTAX_VARIANT)
                         && seg.len() > CUSTOM_SYNTAX_MARKER_SYNTAX_VARIANT.len() =>
                 {
-                    inputs.push(Expr::StringConstant(state.get_interned_string(seg), pos));
+                    inputs.push(Expr::StringConstant(self.get_interned_string(seg), pos));
                     break;
                 }
                 Ok(Some(seg)) => seg,
@@ -2537,10 +2486,10 @@ impl Engine {
             match required_token.as_str() {
                 CUSTOM_SYNTAX_MARKER_IDENT => {
                     let (name, pos) = parse_var_name(state.input)?;
-                    let name = state.get_interned_string(name);
+                    let name = self.get_interned_string(name);
 
                     segments.push(name.clone());
-                    tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_IDENT));
+                    tokens.push(self.get_interned_string(CUSTOM_SYNTAX_MARKER_IDENT));
 
                     inputs.push(Expr::Variable(
                         #[cfg(not(feature = "no_module"))]
@@ -2566,21 +2515,21 @@ impl Engine {
                         // Not a symbol
                         (.., pos) => Err(PERR::MissingSymbol(String::new()).into_err(pos)),
                     }?;
-                    let symbol = state.get_interned_string(symbol);
+                    let symbol = self.get_interned_string(symbol);
                     segments.push(symbol.clone());
-                    tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_SYMBOL));
+                    tokens.push(self.get_interned_string(CUSTOM_SYNTAX_MARKER_SYMBOL));
                     inputs.push(Expr::StringConstant(symbol, pos));
                 }
                 CUSTOM_SYNTAX_MARKER_EXPR => {
                     inputs.push(self.parse_expr(state, settings)?);
-                    let keyword = state.get_interned_string(CUSTOM_SYNTAX_MARKER_EXPR);
+                    let keyword = self.get_interned_string(CUSTOM_SYNTAX_MARKER_EXPR);
                     segments.push(keyword.clone());
                     tokens.push(keyword);
                 }
                 CUSTOM_SYNTAX_MARKER_BLOCK => match self.parse_block(state, settings)? {
                     block @ Stmt::Block(..) => {
                         inputs.push(Expr::Stmt(Box::new(block.into())));
-                        let keyword = state.get_interned_string(CUSTOM_SYNTAX_MARKER_BLOCK);
+                        let keyword = self.get_interned_string(CUSTOM_SYNTAX_MARKER_BLOCK);
                         segments.push(keyword.clone());
                         tokens.push(keyword);
                     }
@@ -2589,8 +2538,8 @@ impl Engine {
                 CUSTOM_SYNTAX_MARKER_BOOL => match state.input.next().unwrap() {
                     (b @ (Token::True | Token::False), pos) => {
                         inputs.push(Expr::BoolConstant(b == Token::True, pos));
-                        segments.push(state.get_interned_string(b.literal_syntax()));
-                        tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_BOOL));
+                        segments.push(self.get_interned_string(b.literal_syntax()));
+                        tokens.push(self.get_interned_string(CUSTOM_SYNTAX_MARKER_BOOL));
                     }
                     (.., pos) => {
                         return Err(
@@ -2602,7 +2551,7 @@ impl Engine {
                     (Token::IntegerConstant(i), pos) => {
                         inputs.push(Expr::IntegerConstant(i, pos));
                         segments.push(i.to_string().into());
-                        tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_INT));
+                        tokens.push(self.get_interned_string(CUSTOM_SYNTAX_MARKER_INT));
                     }
                     (.., pos) => {
                         return Err(
@@ -2615,7 +2564,7 @@ impl Engine {
                     (Token::FloatConstant(f), pos) => {
                         inputs.push(Expr::FloatConstant(f.0, pos));
                         segments.push(f.1.into());
-                        tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_FLOAT));
+                        tokens.push(self.get_interned_string(CUSTOM_SYNTAX_MARKER_FLOAT));
                     }
                     (.., pos) => {
                         return Err(
@@ -2626,10 +2575,10 @@ impl Engine {
                 },
                 CUSTOM_SYNTAX_MARKER_STRING => match state.input.next().unwrap() {
                     (Token::StringConstant(s), pos) => {
-                        let s = state.get_interned_string(*s);
+                        let s = self.get_interned_string(*s);
                         inputs.push(Expr::StringConstant(s.clone(), pos));
                         segments.push(s);
-                        tokens.push(state.get_interned_string(CUSTOM_SYNTAX_MARKER_STRING));
+                        tokens.push(self.get_interned_string(CUSTOM_SYNTAX_MARKER_STRING));
                     }
                     (.., pos) => {
                         return Err(PERR::MissingSymbol("Expecting a string".into()).into_err(pos))
@@ -2850,12 +2799,12 @@ impl Engine {
         let expr = self.parse_expr(state, settings)?.ensure_iterable()?;
 
         let counter_var = counter_name.map(|counter_name| Ident {
-            name: state.get_interned_string(counter_name),
+            name: self.get_interned_string(counter_name),
             pos: counter_pos,
         });
 
         let loop_var = Ident {
-            name: state.get_interned_string(name),
+            name: self.get_interned_string(name),
             pos: name_pos,
         };
 
@@ -2926,7 +2875,7 @@ impl Engine {
             }
         }
 
-        let name = state.get_interned_string(name);
+        let name = self.get_interned_string(name);
 
         // let name = ...
         let expr = if match_token(state.input, &Token::Equals).0 {
@@ -2995,13 +2944,13 @@ impl Engine {
             // import expr as name ...
             let (name, pos) = parse_var_name(state.input)?;
             Ident {
-                name: state.get_interned_string(name),
+                name: self.get_interned_string(name),
                 pos,
             }
         } else {
             // import expr;
             Ident {
-                name: state.get_interned_string(""),
+                name: self.get_interned_string(""),
                 pos: Position::NONE,
             }
         };
@@ -3041,9 +2990,9 @@ impl Engine {
         let (id, id_pos) = parse_var_name(state.input)?;
 
         let (alias, alias_pos) = if match_token(state.input, &Token::As).0 {
-            parse_var_name(state.input).map(|(name, pos)| (state.get_interned_string(name), pos))?
+            parse_var_name(state.input).map(|(name, pos)| (self.get_interned_string(name), pos))?
         } else {
-            (state.get_interned_string(""), Position::NONE)
+            (self.get_interned_string(""), Position::NONE)
         };
 
         let (existing, hit_barrier) = state.find_var(&id);
@@ -3056,7 +3005,7 @@ impl Engine {
 
         let export = (
             Ident {
-                name: state.get_interned_string(id),
+                name: self.get_interned_string(id),
                 pos: id_pos,
             },
             Ident {
@@ -3307,7 +3256,6 @@ impl Engine {
                         // Build new parse state
                         let new_state = &mut ParseState::new(
                             state.external_constants,
-                            state.interned_strings.as_deref_mut(),
                             state.input,
                             state.tokenizer_control.clone(),
                             state.lib,
@@ -3505,12 +3453,12 @@ impl Engine {
                 .into_err(err_pos));
             }
 
-            let name = state.get_interned_string(name);
+            let name = self.get_interned_string(name);
             state.stack.push(name.clone(), ());
             Ident { name, pos }
         } else {
             Ident {
-                name: state.get_interned_string(""),
+                name: self.get_interned_string(""),
                 pos: Position::NONE,
             }
         };
@@ -3562,10 +3510,10 @@ impl Engine {
                 Token::StringConstant(s) if next_token == &Token::Period => {
                     eat_token(state.input, &Token::Period);
                     let s = match s.as_str() {
-                        "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
+                        "int" => self.get_interned_string(std::any::type_name::<crate::INT>()),
                         #[cfg(not(feature = "no_float"))]
-                        "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
-                        _ => state.get_interned_string(*s),
+                        "float" => self.get_interned_string(std::any::type_name::<crate::FLOAT>()),
+                        _ => self.get_interned_string(*s),
                     };
                     (state.input.next().unwrap(), Some(s))
                 }
@@ -3579,10 +3527,10 @@ impl Engine {
                 Token::Identifier(s) if next_token == &Token::Period => {
                     eat_token(state.input, &Token::Period);
                     let s = match s.as_str() {
-                        "int" => state.get_interned_string(std::any::type_name::<crate::INT>()),
+                        "int" => self.get_interned_string(std::any::type_name::<crate::INT>()),
                         #[cfg(not(feature = "no_float"))]
-                        "float" => state.get_interned_string(std::any::type_name::<crate::FLOAT>()),
-                        _ => state.get_interned_string(*s),
+                        "float" => self.get_interned_string(std::any::type_name::<crate::FLOAT>()),
+                        _ => self.get_interned_string(*s),
                     };
                     (state.input.next().unwrap(), Some(s))
                 }
@@ -3625,7 +3573,7 @@ impl Engine {
                             );
                         }
 
-                        let s = state.get_interned_string(*s);
+                        let s = self.get_interned_string(*s);
                         state.stack.push(s.clone(), ());
                         params.push((s, pos));
                     }
@@ -3661,7 +3609,7 @@ impl Engine {
         params.shrink_to_fit();
 
         Ok(ScriptFuncDef {
-            name: state.get_interned_string(name),
+            name: self.get_interned_string(name),
             access,
             #[cfg(not(feature = "no_object"))]
             this_type,
@@ -3676,6 +3624,7 @@ impl Engine {
     #[cfg(not(feature = "no_function"))]
     #[cfg(not(feature = "no_closure"))]
     fn make_curry_from_externals(
+        &self,
         state: &mut ParseState,
         fn_expr: Expr,
         externals: impl AsRef<[Ident]> + IntoIterator<Item = Ident>,
@@ -3697,7 +3646,7 @@ impl Engine {
                 .iter()
                 .cloned()
                 .map(|Ident { name, pos }| {
-                    let (index, is_func) = state.access_var(&name, pos);
+                    let (index, is_func) = self.access_var(state, &name, pos);
                     let idx = match index {
                         Some(n) if !is_func => u8::try_from(n.get()).ok().and_then(NonZeroU8::new),
                         _ => None,
@@ -3712,7 +3661,7 @@ impl Engine {
         let expr = FnCallExpr {
             #[cfg(not(feature = "no_module"))]
             namespace: crate::ast::Namespace::NONE,
-            name: state.get_interned_string(crate::engine::KEYWORD_FN_PTR_CURRY),
+            name: self.get_interned_string(crate::engine::KEYWORD_FN_PTR_CURRY),
             hashes: FnCallHashes::from_native_only(calc_fn_hash(
                 None,
                 crate::engine::KEYWORD_FN_PTR_CURRY,
@@ -3731,7 +3680,7 @@ impl Engine {
             externals
                 .into_iter()
                 .map(|var| {
-                    let (index, _) = state.access_var(&var.name, var.pos);
+                    let (index, _) = self.access_var(state, &var.name, var.pos);
                     (var, index)
                 })
                 .collect::<FnArgsVec<_>>()
@@ -3762,7 +3711,7 @@ impl Engine {
                             );
                         }
 
-                        let s = state.get_interned_string(*s);
+                        let s = self.get_interned_string(*s);
                         state.stack.push(s.clone(), ());
                         params_list.push(s);
                     }
@@ -3815,7 +3764,7 @@ impl Engine {
         params.iter().for_each(|p| p.hash(hasher));
         body.hash(hasher);
         let hash = hasher.finish();
-        let fn_name = state.get_interned_string(make_anonymous_fn(hash));
+        let fn_name = self.get_interned_string(make_anonymous_fn(hash));
 
         // Define the function
         let script = Shared::new(ScriptFuncDef {
@@ -3845,7 +3794,7 @@ impl Engine {
     /// Parse a global level expression.
     pub(crate) fn parse_global_expr(
         &self,
-        state: &mut ParseState,
+        mut state: ParseState,
         process_settings: impl FnOnce(&mut ParseSettings),
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
@@ -3862,7 +3811,7 @@ impl Engine {
         };
         process_settings(&mut settings);
 
-        let expr = self.parse_expr(state, settings)?;
+        let expr = self.parse_expr(&mut state, settings)?;
 
         match state.input.peek().unwrap() {
             (Token::EOF, ..) => (),
@@ -3878,7 +3827,7 @@ impl Engine {
             state.external_constants,
             statements,
             #[cfg(not(feature = "no_function"))]
-            std::mem::take(state.lib).into_values().collect::<Vec<_>>(),
+            state.lib.values().cloned().collect::<Vec<_>>(),
             _optimization_level,
         ));
 
@@ -3886,7 +3835,7 @@ impl Engine {
         return Ok(AST::new(
             statements,
             #[cfg(not(feature = "no_function"))]
-            crate::Module::from(std::mem::take(state.lib).into_values()),
+            crate::Module::from(state.lib.into_values()),
         ));
     }
 
@@ -3956,10 +3905,10 @@ impl Engine {
     #[inline]
     pub(crate) fn parse(
         &self,
-        state: &mut ParseState,
+        mut state: ParseState,
         _optimization_level: OptimizationLevel,
     ) -> ParseResult<AST> {
-        let (statements, _lib) = self.parse_global_level(state, |_| {})?;
+        let (statements, _lib) = self.parse_global_level(&mut state, |_| {})?;
 
         #[cfg(not(feature = "no_optimize"))]
         return Ok(self.optimize_into_ast(
@@ -3971,23 +3920,14 @@ impl Engine {
         ));
 
         #[cfg(feature = "no_optimize")]
-        #[cfg(not(feature = "no_function"))]
-        {
-            let mut m = crate::Module::new();
-
-            _lib.into_iter().for_each(|fn_def| {
-                m.set_script_fn(fn_def);
-            });
-
-            return Ok(AST::new(statements, m));
-        }
-
-        #[cfg(feature = "no_optimize")]
-        #[cfg(feature = "no_function")]
         return Ok(AST::new(
             statements,
             #[cfg(not(feature = "no_function"))]
-            crate::Module::new(),
+            {
+                let mut new_lib = crate::Module::new();
+                new_lib.extend(_lib);
+                new_lib
+            },
         ));
     }
 }

@@ -1,6 +1,5 @@
 //! Module that defines the public compilation API of [`Engine`].
 
-use crate::func::native::locked_write;
 use crate::parser::{ParseResult, ParseState};
 use crate::{Engine, OptimizationLevel, Scope, AST};
 #[cfg(feature = "no_std")]
@@ -219,19 +218,13 @@ impl Engine {
     ) -> ParseResult<AST> {
         let (stream, tc) = self.lex(scripts.as_ref());
 
-        let guard = &mut self
-            .interned_strings
-            .as_ref()
-            .and_then(|interner| locked_write(interner));
-        let interned_strings = guard.as_deref_mut();
-
         let input = &mut stream.peekable();
         let lib = &mut <_>::default();
-        let state = &mut ParseState::new(scope, interned_strings, input, tc, lib);
+        let state = ParseState::new(scope, input, tc.clone(), lib);
         let mut _ast = self.parse(state, optimization_level)?;
         #[cfg(feature = "metadata")]
         {
-            let global_comments = &state.tokenizer_control.borrow().global_comments;
+            let global_comments = &tc.borrow().global_comments;
             _ast.doc = global_comments.into();
         }
         Ok(_ast)
@@ -299,15 +292,9 @@ impl Engine {
         let scripts = [script];
         let (stream, t) = self.lex(&scripts);
 
-        let guard = &mut self
-            .interned_strings
-            .as_ref()
-            .and_then(|interner| locked_write(interner));
-        let interned_strings = guard.as_deref_mut();
-
         let input = &mut stream.peekable();
         let lib = &mut <_>::default();
-        let state = &mut ParseState::new(Some(scope), interned_strings, input, t, lib);
+        let state = ParseState::new(Some(scope), input, t, lib);
 
         self.parse_global_expr(state, |_| {}, self.optimization_level)
     }

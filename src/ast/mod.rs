@@ -24,7 +24,7 @@ pub use stmt::{
     SwitchCasesCollection,
 };
 
-/// _(internals)_ Placeholder for a script-defined function.
+/// _(internals)_ Empty placeholder for a script-defined function.
 /// Exported under the `internals` feature only.
 #[cfg(feature = "no_function")]
-pub type ScriptFuncDef = ();
+pub struct ScriptFuncDef;

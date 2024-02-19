@@ -1,7 +1,6 @@
 //! Module that defines JSON manipulation functions for [`Engine`].
 #![cfg(not(feature = "no_object"))]
 
-use crate::func::native::locked_write;
 use crate::parser::{ParseSettingFlags, ParseState};
 use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
@@ -117,15 +116,9 @@ impl Engine {
         );
 
         let ast = {
-            let guard = &mut self
-                .interned_strings
-                .as_ref()
-                .and_then(|interner| locked_write(interner));
-            let interned_strings = guard.as_deref_mut();
-
             let input = &mut stream.peekable();
             let lib = &mut <_>::default();
-            let state = &mut ParseState::new(None, interned_strings, input, tokenizer_control, lib);
+            let state = ParseState::new(None, input, tokenizer_control, lib);
 
             self.parse_global_expr(
                 state,
