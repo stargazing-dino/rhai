@@ -1621,8 +1621,6 @@ impl Engine {
             [script],
             #[cfg(not(feature = "no_optimize"))]
             crate::OptimizationLevel::None,
-            #[cfg(feature = "no_optimize")]
-            <_>::default(),
         )?;
 
         // If new functions are defined within the eval string, it is an error

@@ -9,7 +9,7 @@ use crate::func::native::{
 use crate::packages::{Package, StandardPackage};
 use crate::tokenizer::Token;
 use crate::types::StringsInterner;
-use crate::{Dynamic, Identifier, ImmutableString, Locked, OptimizationLevel, SharedModule};
+use crate::{Dynamic, Identifier, ImmutableString, Locked, SharedModule};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{collections::BTreeSet, fmt, num::NonZeroU8};
@@ -131,7 +131,8 @@ pub struct Engine {
     pub(crate) def_tag: Dynamic,
 
     /// Script optimization level.
-    pub(crate) optimization_level: OptimizationLevel,
+    #[cfg(not(feature = "no_optimize"))]
+    pub(crate) optimization_level: crate::OptimizationLevel,
 
     /// Max limits.
     #[cfg(not(feature = "unchecked"))]
@@ -254,9 +255,7 @@ impl Engine {
         def_tag: Dynamic::UNIT,
 
         #[cfg(not(feature = "no_optimize"))]
-        optimization_level: OptimizationLevel::Simple,
-        #[cfg(feature = "no_optimize")]
-        optimization_level: (),
+        optimization_level: crate::OptimizationLevel::Simple,
 
         #[cfg(not(feature = "unchecked"))]
         limits: crate::api::limits::Limits::new(),
@@ -331,6 +330,41 @@ impl Engine {
         match self.interned_strings {
             Some(ref interner) => locked_write(interner).unwrap().get(string),
             None => string.into(),
+        }
+    }
+    /// Get an interned property getter, creating one if it is not yet interned.
+    #[cfg(not(feature = "no_object"))]
+    #[inline]
+    #[must_use]
+    pub(crate) fn get_interned_getter(
+        &self,
+        text: impl AsRef<str> + Into<ImmutableString>,
+    ) -> ImmutableString {
+        match self.interned_strings {
+            Some(ref interner) => locked_write(interner).unwrap().get_with_mapper(
+                b'g',
+                |s| make_getter(s.as_ref()).into(),
+                text,
+            ),
+            None => make_getter(text.as_ref()).into(),
+        }
+    }
+
+    /// Get an interned property setter, creating one if it is not yet interned.
+    #[cfg(not(feature = "no_object"))]
+    #[inline]
+    #[must_use]
+    pub(crate) fn get_interned_setter(
+        &self,
+        text: impl AsRef<str> + Into<ImmutableString>,
+    ) -> ImmutableString {
+        match self.interned_strings {
+            Some(ref interner) => locked_write(interner).unwrap().get_with_mapper(
+                b's',
+                |s| make_setter(s.as_ref()).into(),
+                text,
+            ),
+            None => make_setter(text.as_ref()).into(),
         }
     }
 

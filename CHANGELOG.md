@@ -8,6 +8,7 @@ Bug fixes
 ---------
 
 * The position of an undefined operation call now points to the operator instead of the first operand.
+* The `optimize` command in `rhai-repl` now works properly and cycles through `None`->`Simple`->`Full`.
 
 Deprecated API's
 ----------------

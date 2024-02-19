@@ -1,7 +1,6 @@
 //! Module that defines the public evaluation API of [`Engine`].
 
 use crate::eval::Caches;
-use crate::func::native::locked_write;
 use crate::parser::ParseState;
 use crate::{Engine, RhaiResultOf, Scope, AST};
 #[cfg(feature = "no_std")]
@@ -60,17 +59,15 @@ impl Engine {
         let ast = {
             let (stream, tc) = self.lex(&scripts);
 
-            let guard = &mut self
-                .interned_strings
-                .as_ref()
-                .and_then(|interner| locked_write(interner));
-            let interned_strings = guard.as_deref_mut();
-
             let input = &mut stream.peekable();
             let lib = &mut <_>::default();
-            let state = &mut ParseState::new(Some(scope), interned_strings, input, tc, lib);
+            let state = ParseState::new(Some(scope), input, tc, lib);
 
-            self.parse(state, self.optimization_level)?
+            self.parse(
+                state,
+                #[cfg(not(feature = "no_optimize"))]
+                self.optimization_level,
+            )?
         };
         self.run_ast_with_scope(scope, &ast)
     }
