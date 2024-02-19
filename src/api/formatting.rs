@@ -272,8 +272,6 @@ impl Engine {
             state,
             #[cfg(not(feature = "no_optimize"))]
             crate::OptimizationLevel::None,
-            #[cfg(feature = "no_optimize")]
-            (),
         )?;
 
         let guard = tc.borrow();

@@ -16,8 +16,8 @@ use crate::tokenizer::{
 use crate::types::dynamic::{AccessMode, Union};
 use crate::{
     calc_fn_hash, Dynamic, Engine, EvalAltResult, EvalContext, ExclusiveRange, FnArgsVec,
-    ImmutableString, InclusiveRange, LexError, OptimizationLevel, ParseError, Position, Scope,
-    Shared, SmartString, StaticVec, ThinVec, VarDefInfo, AST, PERR,
+    ImmutableString, InclusiveRange, LexError, ParseError, Position, Scope, Shared, SmartString,
+    StaticVec, ThinVec, VarDefInfo, AST, PERR,
 };
 use bitflags::bitflags;
 #[cfg(feature = "no_std")]
@@ -2156,7 +2156,7 @@ impl Engine {
             (.., Expr::Variable(x, ..)) if !x.2.is_empty() => unreachable!("lhs.ns::id"),
             // lhs.id
             (lhs, var_expr @ Expr::Variable(..)) => {
-                let rhs = self.convert_expr_into_property( var_expr);
+                let rhs = self.convert_expr_into_property(var_expr);
                 Ok(Expr::Dot(BinaryExpr { lhs, rhs }.into(), op_flags, op_pos))
             }
             // lhs.prop
@@ -2232,7 +2232,7 @@ impl Engine {
                     // lhs.id.dot_rhs or lhs.id[idx_rhs]
                     Expr::Variable(..) | Expr::Property(..) => {
                         let new_binary = BinaryExpr {
-                            lhs: self.convert_expr_into_property( x.lhs),
+                            lhs: self.convert_expr_into_property(x.lhs),
                             rhs: x.rhs,
                         }
                         .into();
@@ -3796,7 +3796,7 @@ impl Engine {
         &self,
         mut state: ParseState,
         process_settings: impl FnOnce(&mut ParseSettings),
-        _optimization_level: OptimizationLevel,
+        #[cfg(not(feature = "no_optimize"))] optimization_level: crate::OptimizationLevel,
     ) -> ParseResult<AST> {
         let options = self.options & !LangOptions::STMT_EXPR & !LangOptions::LOOP_EXPR;
 
@@ -3828,14 +3828,14 @@ impl Engine {
             statements,
             #[cfg(not(feature = "no_function"))]
             state.lib.values().cloned().collect::<Vec<_>>(),
-            _optimization_level,
+            optimization_level,
         ));
 
         #[cfg(feature = "no_optimize")]
         return Ok(AST::new(
             statements,
             #[cfg(not(feature = "no_function"))]
-            crate::Module::from(state.lib.into_values()),
+            crate::Module::from(state.lib.values().cloned()),
         ));
     }
 
@@ -3906,7 +3906,7 @@ impl Engine {
     pub(crate) fn parse(
         &self,
         mut state: ParseState,
-        _optimization_level: OptimizationLevel,
+        #[cfg(not(feature = "no_optimize"))] optimization_level: crate::OptimizationLevel,
     ) -> ParseResult<AST> {
         let (statements, _lib) = self.parse_global_level(&mut state, |_| {})?;
 
@@ -3916,7 +3916,7 @@ impl Engine {
             statements,
             #[cfg(not(feature = "no_function"))]
             _lib,
-            _optimization_level,
+            optimization_level,
         ));
 
         #[cfg(feature = "no_optimize")]

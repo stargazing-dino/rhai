@@ -65,8 +65,12 @@ impl Engine {
         scope: &mut Scope,
         script: &str,
     ) -> RhaiResultOf<T> {
-        let ast =
-            self.compile_scripts_with_scope_raw(Some(scope), [script], self.optimization_level)?;
+        let ast = self.compile_scripts_with_scope_raw(
+            Some(scope),
+            [script],
+            #[cfg(not(feature = "no_optimize"))]
+            self.optimization_level,
+        )?;
         self.eval_ast_with_scope(scope, &ast)
     }
     /// Evaluate a string containing an expression, returning the result value or an error.
@@ -125,8 +129,6 @@ impl Engine {
                 |_| {},
                 #[cfg(not(feature = "no_optimize"))]
                 crate::OptimizationLevel::None,
-                #[cfg(feature = "no_optimize")]
-                <_>::default(),
             )?
         };
 

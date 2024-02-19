@@ -1,7 +1,7 @@
 //! Module that defines the public compilation API of [`Engine`].
 
 use crate::parser::{ParseResult, ParseState};
-use crate::{Engine, OptimizationLevel, Scope, AST};
+use crate::{Engine, Scope, AST};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -200,13 +200,18 @@ impl Engine {
         scope: &Scope,
         scripts: impl AsRef<[S]>,
     ) -> ParseResult<AST> {
-        self.compile_scripts_with_scope_raw(Some(scope), scripts, self.optimization_level)
+        self.compile_scripts_with_scope_raw(
+            Some(scope),
+            scripts,
+            #[cfg(not(feature = "no_optimize"))]
+            self.optimization_level,
+        )
     }
     /// Join a list of strings and compile into an [`AST`] using own scope at a specific optimization level.
     ///
     /// ## Constants Propagation
     ///
-    /// If not [`OptimizationLevel::None`], constants defined within the scope are propagated
+    /// If not [`OptimizationLevel::None`][`crate::OptimizationLevel::None`], constants defined within the scope are propagated
     /// throughout the script _including_ functions. This allows functions to be optimized based on
     /// dynamic global constants.
     #[inline]
@@ -214,14 +219,18 @@ impl Engine {
         &self,
         scope: Option<&Scope>,
         scripts: impl AsRef<[S]>,
-        optimization_level: OptimizationLevel,
+        #[cfg(not(feature = "no_optimize"))] optimization_level: crate::OptimizationLevel,
     ) -> ParseResult<AST> {
         let (stream, tc) = self.lex(scripts.as_ref());
 
         let input = &mut stream.peekable();
         let lib = &mut <_>::default();
         let state = ParseState::new(scope, input, tc.clone(), lib);
-        let mut _ast = self.parse(state, optimization_level)?;
+        let mut _ast = self.parse(
+            state,
+            #[cfg(not(feature = "no_optimize"))]
+            optimization_level,
+        )?;
         #[cfg(feature = "metadata")]
         {
             let global_comments = &tc.borrow().global_comments;
@@ -296,6 +305,11 @@ impl Engine {
         let lib = &mut <_>::default();
         let state = ParseState::new(Some(scope), input, t, lib);
 
-        self.parse_global_expr(state, |_| {}, self.optimization_level)
+        self.parse_global_expr(
+            state,
+            |_| {},
+            #[cfg(not(feature = "no_optimize"))]
+            self.optimization_level,
+        )
     }
 }

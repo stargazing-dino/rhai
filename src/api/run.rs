@@ -63,7 +63,11 @@ impl Engine {
             let lib = &mut <_>::default();
             let state = ParseState::new(Some(scope), input, tc, lib);
 
-            self.parse(state, self.optimization_level)?
+            self.parse(
+                state,
+                #[cfg(not(feature = "no_optimize"))]
+                self.optimization_level,
+            )?
         };
         self.run_ast_with_scope(scope, &ast)
     }

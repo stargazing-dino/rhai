@@ -125,8 +125,6 @@ impl Engine {
                 |s| s.flags |= ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES,
                 #[cfg(not(feature = "no_optimize"))]
                 crate::OptimizationLevel::None,
-                #[cfg(feature = "no_optimize")]
-                <_>::default(),
             )?
         };
 
