@@ -1857,7 +1857,7 @@ impl Engine {
                     let options = ChainingFlags::PROPERTY | ChainingFlags::DISALLOW_NAMESPACES;
                     let rhs = self.parse_primary(state, settings.level_up()?, options)?;
 
-                    self.make_dot_expr(state, expr, rhs, _parent_options, op_flags, tail_pos)?
+                    self.make_dot_expr(expr, rhs, _parent_options, op_flags, tail_pos)?
                 }
                 // Unknown postfix operator
                 (expr, token) => {
@@ -2135,7 +2135,6 @@ impl Engine {
     #[cfg(not(feature = "no_object"))]
     fn make_dot_expr(
         &self,
-        state: &mut ParseState,
         lhs: Expr,
         rhs: Expr,
         parent_options: ASTFlags,
@@ -2148,7 +2147,7 @@ impl Engine {
                 if !parent_options.intersects(ASTFlags::BREAK) =>
             {
                 let options = options | parent_options;
-                x.rhs = self.make_dot_expr(state, x.rhs, rhs, options, op_flags, op_pos)?;
+                x.rhs = self.make_dot_expr(x.rhs, rhs, options, op_flags, op_pos)?;
                 Ok(Expr::Index(x, ASTFlags::empty(), pos))
             }
             // lhs.module::id - syntax error

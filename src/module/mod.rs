@@ -314,33 +314,33 @@ impl FuncRegistration {
     }
     /// Set the [namespace][`FnNamespace`] of the function.
     #[must_use]
-    pub fn with_namespace(mut self, namespace: FnNamespace) -> Self {
+    pub const fn with_namespace(mut self, namespace: FnNamespace) -> Self {
         self.metadata.namespace = namespace;
         self
     }
     /// Set the function to the [global namespace][`FnNamespace::Global`].
     #[must_use]
-    pub fn in_global_namespace(mut self) -> Self {
+    pub const fn in_global_namespace(mut self) -> Self {
         self.metadata.namespace = FnNamespace::Global;
         self
     }
     /// Set the function to the [internal namespace][`FnNamespace::Internal`].
     #[must_use]
-    pub fn in_internal_namespace(mut self) -> Self {
+    pub const fn in_internal_namespace(mut self) -> Self {
         self.metadata.namespace = FnNamespace::Internal;
         self
     }
     /// Set whether the function is _pure_.
     /// A pure function has no side effects.
     #[must_use]
-    pub fn with_purity(mut self, pure: bool) -> Self {
+    pub const fn with_purity(mut self, pure: bool) -> Self {
         self.purity = Some(pure);
         self
     }
     /// Set whether the function is _volatile_.
     /// A volatile function does not guarantee the same result for the same input(s).
     #[must_use]
-    pub fn with_volatility(mut self, volatile: bool) -> Self {
+    pub const fn with_volatility(mut self, volatile: bool) -> Self {
         self.volatility = Some(volatile);
         self
     }
