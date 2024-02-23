@@ -116,6 +116,15 @@ pub struct Engine {
     /// Callback closure to remap tokens during parsing.
     pub(crate) token_mapper: Option<Box<OnParseTokenCallback>>,
 
+    /// Callback closure when a [`Array`][crate::Array] property accessed does not exist.
+    #[cfg(not(feature = "no_index"))]
+    #[cfg(feature = "internals")]
+    pub(crate) invalid_array_index: Option<Box<crate::func::native::OnInvalidArrayIndexCallback>>,
+    /// Callback closure when a [`Map`][crate::Map] property accessed does not exist.
+    #[cfg(not(feature = "no_object"))]
+    #[cfg(feature = "internals")]
+    pub(crate) missing_map_property: Option<Box<crate::func::native::OnMissingMapPropertyCallback>>,
+
     /// Callback closure for implementing the `print` command.
     pub(crate) print: Option<Box<OnPrintCallback>>,
     /// Callback closure for implementing the `debug` command.
@@ -243,6 +252,13 @@ impl Engine {
         def_var_filter: None,
         resolve_var: None,
         token_mapper: None,
+
+        #[cfg(not(feature = "no_index"))]
+        #[cfg(feature = "internals")]
+        invalid_array_index: None,
+        #[cfg(not(feature = "no_object"))]
+        #[cfg(feature = "internals")]
+        missing_map_property: None,
 
         print: None,
         debug: None,

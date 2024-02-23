@@ -1691,7 +1691,7 @@ impl Dynamic {
                     if let Some(guard) = crate::func::locked_read(&cell) {
                         return guard.flatten_clone();
                     }
-                    Dynamic(Union::Shared(cell, tag, access))
+                    Self(Union::Shared(cell, tag, access))
                 }
             },
             _ => self,
@@ -1739,17 +1739,15 @@ impl Dynamic {
         match self.0 {
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) => {
-                if let Some(guard) = crate::func::locked_read(cell) {
-                    return if (*guard).type_id() != TypeId::of::<T>()
-                        && TypeId::of::<Self>() != TypeId::of::<T>()
+                return match crate::func::locked_read(cell) {
+                    Some(guard)
+                        if TypeId::of::<Self>() == TypeId::of::<T>()
+                            || (*guard).type_id() == TypeId::of::<T>() =>
                     {
-                        None
-                    } else {
                         Some(DynamicReadLock(DynamicReadLockInner::Guard(guard)))
-                    };
-                } else {
-                    return None;
-                }
+                    }
+                    _ => None,
+                };
             }
             _ => (),
         }
@@ -1777,17 +1775,15 @@ impl Dynamic {
         match self.0 {
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) => {
-                if let Some(guard) = crate::func::locked_write(cell) {
-                    return if (*guard).type_id() != TypeId::of::<T>()
-                        && TypeId::of::<Self>() != TypeId::of::<T>()
+                return match crate::func::locked_write(cell) {
+                    Some(guard)
+                        if TypeId::of::<Self>() == TypeId::of::<T>()
+                            || (*guard).type_id() == TypeId::of::<T>() =>
                     {
-                        None
-                    } else {
                         Some(DynamicWriteLock(DynamicWriteLockInner::Guard(guard)))
-                    };
-                } else {
-                    return None;
-                }
+                    }
+                    _ => None,
+                };
             }
             _ => (),
         }
@@ -2019,9 +2015,9 @@ impl Dynamic {
         match self.0 {
             Union::Unit(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::Unit(..)))
-                .unwrap_or(false),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| matches!(v.0, Union::Unit(..)))
+            }
             _ => false,
         }
     }
@@ -2041,9 +2037,9 @@ impl Dynamic {
         match self.0 {
             Union::Int(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::Int(..)))
-                .unwrap_or(false),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| matches!(v.0, Union::Int(..)))
+            }
             _ => false,
         }
     }
@@ -2066,9 +2062,9 @@ impl Dynamic {
         match self.0 {
             Union::Float(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::Float(..)))
-                .unwrap_or(false),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| matches!(v.0, Union::Float(..)))
+            }
             _ => false,
         }
     }
@@ -2090,9 +2086,9 @@ impl Dynamic {
         match self.0 {
             Union::Decimal(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::Decimal(..)))
-                .unwrap_or(false),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| matches!(v.0, Union::Decimal(..)))
+            }
             _ => false,
         }
     }
@@ -2112,9 +2108,9 @@ impl Dynamic {
         match self.0 {
             Union::Bool(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::Bool(..)))
-                .unwrap_or(false),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| matches!(v.0, Union::Bool(..)))
+            }
             _ => false,
         }
     }
@@ -2134,9 +2130,9 @@ impl Dynamic {
         match self.0 {
             Union::Char(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::Char(..)))
-                .unwrap_or(false),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| matches!(v.0, Union::Char(..)))
+            }
             _ => false,
         }
     }
@@ -2156,9 +2152,9 @@ impl Dynamic {
         match self.0 {
             Union::Str(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::Str(..)))
-                .unwrap_or(false),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| matches!(v.0, Union::Str(..)))
+            }
             _ => false,
         }
     }
@@ -2181,9 +2177,9 @@ impl Dynamic {
         match self.0 {
             Union::Array(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::Array(..)))
-                .unwrap_or(false),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| matches!(v.0, Union::Array(..)))
+            }
             _ => false,
         }
     }
@@ -2206,9 +2202,9 @@ impl Dynamic {
         match self.0 {
             Union::Blob(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::Blob(..)))
-                .unwrap_or(false),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| matches!(v.0, Union::Blob(..)))
+            }
             _ => false,
         }
     }
@@ -2231,9 +2227,9 @@ impl Dynamic {
         match self.0 {
             Union::Map(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::Map(..)))
-                .unwrap_or(false),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| matches!(v.0, Union::Map(..)))
+            }
             _ => false,
         }
     }
@@ -2253,9 +2249,9 @@ impl Dynamic {
         match self.0 {
             Union::FnPtr(..) => true,
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::FnPtr(..)))
-                .unwrap_or(false),
+            Union::Shared(ref cell, ..) => {
+                crate::func::locked_read(cell).map_or(false, |v| matches!(v.0, Union::FnPtr(..)))
+            }
             _ => false,
         }
     }
@@ -2279,8 +2275,7 @@ impl Dynamic {
             Union::TimeStamp(..) => true,
             #[cfg(not(feature = "no_closure"))]
             Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
-                .map(|v| matches!(v.0, Union::TimeStamp(..)))
-                .unwrap_or(false),
+                .map_or(false, |v| matches!(v.0, Union::TimeStamp(..))),
             _ => false,
         }
     }

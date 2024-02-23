@@ -1,5 +1,5 @@
 #![cfg(not(feature = "no_index"))]
-use rhai::{Array, Dynamic, Engine, ParseErrorType, INT};
+use rhai::{Array, Dynamic, Engine, EvalAltResult, ParseErrorType, Position, INT};
 use std::iter::FromIterator;
 
 #[test]
@@ -499,4 +499,32 @@ fn test_arrays_elvis() {
     engine.eval::<()>("let x = (); x?[2]").unwrap();
 
     engine.run("let x = (); x?[2] = 42").unwrap();
+}
+
+#[test]
+#[cfg(feature = "internals")]
+fn test_array_invalid_index_callback() {
+    let mut engine = Engine::new();
+
+    engine.on_invalid_array_index(|arr, index| match index {
+        -100 => {
+            arr.push((42 as INT).into());
+            Ok(arr.last_mut().unwrap().into())
+        }
+        100 => Ok(Dynamic::from(100 as INT).into()),
+        _ => Err(EvalAltResult::ErrorArrayBounds(arr.len(), index, Position::NONE).into()),
+    });
+
+    assert_eq!(
+        engine
+            .eval::<INT>(
+                "
+                    let a = [1, 2, 3];
+                    a[-100] += 1;
+                    a[3] + a[100]
+                "
+            )
+            .unwrap(),
+        143
+    );
 }

@@ -126,9 +126,20 @@ impl Engine {
                     .as_int()
                     .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
                 let len = arr.len();
-                let arr_idx = super::calc_index(len, index, true, || {
+
+                let arr_idx = match super::calc_index(len, index, true, || {
                     ERR::ErrorArrayBounds(len, index, idx_pos).into()
-                })?;
+                }) {
+                    Ok(idx) => idx,
+                    Err(err) => {
+                        #[cfg(not(feature = "no_index"))]
+                        #[cfg(feature = "internals")]
+                        if let Some(ref cb) = self.invalid_array_index {
+                            return cb(arr, index).map_err(|err| err.fill_position(idx_pos));
+                        }
+                        return Err(err);
+                    }
+                };
 
                 Ok(arr.get_mut(arr_idx).map(Target::from).unwrap())
             }
@@ -160,20 +171,25 @@ impl Engine {
                     self.make_type_mismatch_err::<crate::ImmutableString>(idx.type_name(), idx_pos)
                 })?;
 
+                #[cfg(not(feature = "no_object"))]
+                #[cfg(feature = "internals")]
+                if let Some(ref cb) = self.missing_map_property {
+                    if !map.contains_key(index.as_str()) {
+                        return cb(map, index.as_str()).map_err(|err| err.fill_position(idx_pos));
+                    }
+                }
+
                 if _add_if_not_found && (map.is_empty() || !map.contains_key(index.as_str())) {
                     map.insert(index.clone().into(), Dynamic::UNIT);
                 }
 
-                map.get_mut(index.as_str()).map_or_else(
-                    || {
-                        if self.fail_on_invalid_map_property() {
-                            Err(ERR::ErrorPropertyNotFound(index.to_string(), idx_pos).into())
-                        } else {
-                            Ok(Target::from(Dynamic::UNIT))
-                        }
-                    },
-                    |value| Ok(Target::from(value)),
-                )
+                if let Some(value) = map.get_mut(index.as_str()) {
+                    Ok(Target::from(value))
+                } else if self.fail_on_invalid_map_property() {
+                    Err(ERR::ErrorPropertyNotFound(index.to_string(), idx_pos).into())
+                } else {
+                    Ok(Target::from(Dynamic::UNIT))
+                }
             }
 
             #[cfg(not(feature = "no_index"))]

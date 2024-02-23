@@ -289,6 +289,9 @@ impl Engine {
 
         global.lib.truncate(orig_lib_len);
 
-        result
+        result.map_err(|err| match *err {
+            ERR::ErrorInFunctionCall(fn_name, _, inner_err, _) if fn_name == name => inner_err,
+            _ => err,
+        })
     }
 }

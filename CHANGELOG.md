@@ -9,6 +9,7 @@ Bug fixes
 
 * The position of an undefined operation call now points to the operator instead of the first operand.
 * The `optimize` command in `rhai-repl` now works properly and cycles through `None`->`Simple`->`Full`.
+* `Engine::call_fn_XXX` no longer return errors unnecessarily wrapped in `EvalAltResult::ErrorInFunctionCall`.
 
 Deprecated API's
 ----------------
@@ -19,6 +20,8 @@ New features
 ------------
 
 * New options `Engine::set_max_strings_interned` and `Engine::max_strings_interned` are added to limit the maximum number of strings interned in the `Engine`'s string interner.
+* A new advanced callback can now be registered (gated under the `internals` feature), `Engine::on_invalid_array_index`, to handle access to missing properties in object maps.
+* A new advanced callback can now be registered (gated under the `internals` feature), `Engine::on_missing_map_property`, to handle out-of-bound index into arrays.
 
 Enhancements
 ------------

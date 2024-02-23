@@ -34,7 +34,7 @@ def_package! {
         combine_with_exported_module!(lib, "int", int_functions);
 
         // Conversion functions
-        gen_conv_functions!(lib => to_int(char) -> INT);
+        gen_conv_functions!(lib => to_int(INT, char) -> INT);
 
         #[cfg(not(feature = "only_i32"))]
         #[cfg(not(feature = "only_i64"))]
@@ -53,7 +53,7 @@ def_package! {
             // Trig functions
             combine_with_exported_module!(lib, "trig", trig_functions);
 
-            gen_conv_functions!(lib => to_float(INT) -> FLOAT);
+            gen_conv_functions!(lib => to_float(FLOAT, INT) -> FLOAT);
 
             #[cfg(not(feature = "only_i32"))]
             #[cfg(not(feature = "only_i64"))]
@@ -72,6 +72,7 @@ def_package! {
 
             combine_with_exported_module!(lib, "decimal", decimal_functions);
 
+            gen_conv_functions!(lib => to_decimal(Decimal) -> Decimal);
             gen_conv_functions!(lib => to_decimal(INT).into() -> Decimal);
 
             #[cfg(not(feature = "only_i32"))]

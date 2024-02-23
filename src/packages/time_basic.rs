@@ -213,11 +213,11 @@ mod time_functions {
     }
     #[inline(always)]
     fn subtract_inner(timestamp: Instant, seconds: u64) -> Option<Instant> {
-        if cfg!(not(feature = "unchecked")) {
-            timestamp.checked_sub(Duration::from_secs(seconds))
-        } else {
-            Some(timestamp - Duration::from_secs(seconds))
-        }
+        #[cfg(not(feature = "unchecked"))]
+        return timestamp.checked_sub(Duration::from_secs(seconds));
+
+        #[cfg(feature = "unchecked")]
+        return Some(timestamp - Duration::from_secs(seconds));
     }
     #[inline]
     fn subtract_impl(timestamp: Instant, seconds: INT) -> RhaiResultOf<Instant> {
