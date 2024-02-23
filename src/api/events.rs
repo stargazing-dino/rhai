@@ -325,6 +325,78 @@ impl Engine {
         self.debug = Some(Box::new(callback));
         self
     }
+    /// _(internals)_ Register a callback for access to [`Map`][crate::Map] properties that do not exist.
+    /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_index`.
+    ///
+    /// # WARNING - Unstable API
+    ///
+    /// This API is volatile and may change in the future.
+    ///
+    /// # Callback Function Signature
+    ///
+    /// `Fn(array: &mut Array, index: INT) -> Result<Target, Box<EvalAltResult>>`
+    ///
+    /// where:
+    /// * `array`: mutable reference to the [`Array`][crate::Array] instance.
+    /// * `index`: numeric index of the array access.
+    ///
+    /// ## Return value
+    ///
+    /// * `Ok(Target)`: [`Target`][crate::Target] of the indexing access.
+    ///
+    /// ## Raising errors
+    ///
+    /// Return `Err(...)` if there is an error, usually [`EvalAltResult::ErrorPropertyNotFound`][crate::EvalAltResult::ErrorPropertyNotFound].
+    #[cfg(not(feature = "no_index"))]
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    pub fn on_invalid_array_index(
+        &mut self,
+        callback: impl for<'a> Fn(&'a mut crate::Array, crate::INT) -> RhaiResultOf<crate::Target<'a>>
+            + SendSync
+            + 'static,
+    ) -> &mut Self {
+        self.invalid_array_index = Some(Box::new(callback));
+        self
+    }
+    /// _(internals)_ Register a callback for access to [`Map`][crate::Map] properties that do not exist.
+    /// Exported under the `internals` feature only.
+    ///
+    /// Not available under `no_object`.
+    ///
+    /// # WARNING - Unstable API
+    ///
+    /// This API is volatile and may change in the future.
+    ///
+    /// # Callback Function Signature
+    ///
+    /// `Fn(map: &mut Map, prop: &str) -> Result<Target, Box<EvalAltResult>>`
+    ///
+    /// where:
+    /// * `map`: mutable reference to the [`Map`][crate::Map] instance.
+    /// * `prop`: name of the property that does not exist.
+    ///
+    /// ## Return value
+    ///
+    /// * `Ok(Target)`: [`Target`][crate::Target] of the property access.
+    ///
+    /// ## Raising errors
+    ///
+    /// Return `Err(...)` if there is an error, usually [`EvalAltResult::ErrorPropertyNotFound`][crate::EvalAltResult::ErrorPropertyNotFound].
+    #[cfg(not(feature = "no_object"))]
+    #[cfg(feature = "internals")]
+    #[inline(always)]
+    pub fn on_map_missing_property(
+        &mut self,
+        callback: impl for<'a> Fn(&'a mut crate::Map, &str) -> RhaiResultOf<crate::Target<'a>>
+            + SendSync
+            + 'static,
+    ) -> &mut Self {
+        self.missing_map_property = Some(Box::new(callback));
+        self
+    }
     /// _(debugging)_ Register a callback for debugging.
     /// Exported under the `debugging` feature only.
     ///

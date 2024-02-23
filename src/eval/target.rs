@@ -80,7 +80,11 @@ pub fn calc_index<E>(
     err_func()
 }
 
-/// A type that encapsulates a mutation target for an expression with side effects.
+/// _(internals)_ A type that encapsulates a mutation target for an expression with side effects.
+/// Exported under the `internals` feature only.
+///
+/// This type is typically used to hold a mutable reference to the target of an indexing or property
+/// access operation.
 #[derive(Debug)]
 #[must_use]
 pub enum Target<'a> {
@@ -121,7 +125,7 @@ pub enum Target<'a> {
         shift: u8,
     },
     /// The target is a byte inside a [`Blob`][crate::Blob].
-    /// This is necessary because directly pointing to a byte (in [`Dynamic`] form) inside a blob is impossible.
+    /// This is necessary because directly pointing to a [byte][u8] inside a BLOB is impossible.
     #[cfg(not(feature = "no_index"))]
     BlobByte {
         /// Mutable reference to the source [`Dynamic`].
@@ -132,7 +136,7 @@ pub enum Target<'a> {
         index: usize,
     },
     /// The target is a character inside a string.
-    /// This is necessary because directly pointing to a char inside a String is impossible.
+    /// This is necessary because directly pointing to a [`char`] inside a [`String`] is impossible.
     #[cfg(not(feature = "no_index"))]
     StringChar {
         /// Mutable reference to the source [`Dynamic`].

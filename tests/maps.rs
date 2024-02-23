@@ -1,5 +1,5 @@
 #![cfg(not(feature = "no_object"))]
-use rhai::{Engine, EvalAltResult, Map, ParseErrorType, Scope, INT};
+use rhai::{Dynamic, Engine, EvalAltResult, Map, ParseErrorType, Position, Scope, INT};
 
 #[test]
 fn test_map_indexing() {
@@ -253,5 +253,33 @@ fn test_map_oop() {
             )
             .unwrap(),
         42
+    );
+}
+
+#[test]
+#[cfg(feature = "internals")]
+fn test_map_missing_property_callback() {
+    let mut engine = Engine::new();
+
+    engine.on_map_missing_property(|map, prop| match prop {
+        "x" => {
+            map.insert("y".into(), (42 as INT).into());
+            Ok(map.get_mut("y").unwrap().into())
+        }
+        "z" => Ok(Dynamic::from(100 as INT).into()),
+        _ => Err(EvalAltResult::ErrorPropertyNotFound(prop.to_string(), Position::NONE).into()),
+    });
+
+    assert_eq!(
+        engine
+            .eval::<INT>(
+                "
+                    let obj = #{ a:1, b:2 };
+                    obj.x += 1;
+                    obj.y + obj.z
+                "
+            )
+            .unwrap(),
+        143
     );
 }

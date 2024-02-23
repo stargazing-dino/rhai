@@ -364,7 +364,7 @@ pub use ast::CustomExpr;
 pub use ast::Namespace;
 
 #[cfg(feature = "internals")]
-pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeState};
+pub use eval::{Caches, FnResolutionCache, FnResolutionCacheEntry, GlobalRuntimeState, Target};
 
 #[cfg(feature = "internals")]
 #[allow(deprecated)]
