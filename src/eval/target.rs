@@ -89,6 +89,7 @@ pub fn calc_index<E>(
 /// # Example
 ///
 /// ```
+/// # #[cfg(feature = "internals")] {
 /// # use rhai::{Dynamic, Target};
 /// // Normal `Dynamic` value
 /// let mut value = Dynamic::from(42_i64);
@@ -98,6 +99,7 @@ pub fn calc_index<E>(
 /// let mut value = Dynamic::from(42_i64);
 /// let value_ref = &mut value;
 /// let target: Target = value.into();
+/// # }
 /// ```
 #[derive(Debug)]
 #[must_use]
