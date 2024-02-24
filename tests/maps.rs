@@ -261,7 +261,7 @@ fn test_map_oop() {
 fn test_map_missing_property_callback() {
     let mut engine = Engine::new();
 
-    engine.on_map_missing_property(|map, prop| match prop {
+    engine.on_map_missing_property(|map, prop, _| match prop {
         "x" => {
             map.insert("y".into(), (42 as INT).into());
             Ok(map.get_mut("y").unwrap().into())

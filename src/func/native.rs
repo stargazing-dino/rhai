@@ -637,14 +637,17 @@ pub type OnDebugCallback = dyn Fn(&str, Option<&str>, Position) + Send + Sync;
 #[cfg(not(feature = "sync"))]
 #[cfg(not(feature = "no_index"))]
 #[cfg(feature = "internals")]
-pub type OnInvalidArrayIndexCallback =
-    dyn for<'a> Fn(&'a mut crate::Array, crate::INT) -> RhaiResultOf<crate::Target<'a>>;
+pub type OnInvalidArrayIndexCallback = dyn for<'a> Fn(
+    &'a mut crate::Array,
+    crate::INT,
+    EvalContext,
+) -> RhaiResultOf<crate::Target<'a>>;
 /// Callback function when a property accessed is not found in a [`Map`][crate::Map].
 /// Exported under the `internals` feature only.
 #[cfg(feature = "sync")]
 #[cfg(not(feature = "no_index"))]
 #[cfg(feature = "internals")]
-pub type OnInvalidArrayIndexCallback = dyn for<'a> Fn(&'a mut crate::Array, crate::INT) -> RhaiResultOf<crate::Target<'a>>
+pub type OnInvalidArrayIndexCallback = dyn for<'a> Fn(&'a mut crate::Array, crate::INT, EvalContext) -> RhaiResultOf<crate::Target<'a>>
     + Send
     + Sync;
 
@@ -654,14 +657,15 @@ pub type OnInvalidArrayIndexCallback = dyn for<'a> Fn(&'a mut crate::Array, crat
 #[cfg(not(feature = "no_object"))]
 #[cfg(feature = "internals")]
 pub type OnMissingMapPropertyCallback =
-    dyn for<'a> Fn(&'a mut crate::Map, &str) -> RhaiResultOf<crate::eval::Target<'a>>;
+    dyn for<'a> Fn(&'a mut crate::Map, &str, EvalContext) -> RhaiResultOf<crate::eval::Target<'a>>;
 /// Callback function when a property accessed is not found in a [`Map`][crate::Map].
 /// Exported under the `internals` feature only.
 #[cfg(feature = "sync")]
 #[cfg(not(feature = "no_object"))]
 #[cfg(feature = "internals")]
-pub type OnMissingMapPropertyCallback =
-    dyn for<'a> Fn(&'a mut crate::Map, &str) -> RhaiResultOf<crate::eval::Target<'a>> + Send + Sync;
+pub type OnMissingMapPropertyCallback = dyn for<'a> Fn(&'a mut crate::Map, &str, EvalContext) -> RhaiResultOf<crate::eval::Target<'a>>
+    + Send
+    + Sync;
 
 /// Callback function for mapping tokens during parsing.
 #[cfg(not(feature = "sync"))]

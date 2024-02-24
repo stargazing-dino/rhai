@@ -506,7 +506,7 @@ fn test_arrays_elvis() {
 fn test_array_invalid_index_callback() {
     let mut engine = Engine::new();
 
-    engine.on_invalid_array_index(|arr, index| match index {
+    engine.on_invalid_array_index(|arr, index, _| match index {
         -100 => {
             arr.push((42 as INT).into());
             Ok(arr.last_mut().unwrap().into())

@@ -275,7 +275,7 @@ impl Engine {
         if self.is_debugger_registered() {
             global.debugger_mut().status = crate::eval::DebuggerStatus::Terminate;
             let node = &crate::ast::Stmt::Noop(Position::NONE);
-            self.run_debugger(global, caches, scope, this_ptr, node)?;
+            self.dbg(global, caches, scope, this_ptr, node)?;
         }
 
         #[cfg(not(feature = "no_module"))]

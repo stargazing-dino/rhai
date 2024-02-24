@@ -109,6 +109,8 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
+        _scope: &mut Scope,
+        _this_ptr: Option<&mut Dynamic>,
         target: &'t mut Dynamic,
         idx: &mut Dynamic,
         idx_pos: Position,
@@ -135,7 +137,10 @@ impl Engine {
                         #[cfg(not(feature = "no_index"))]
                         #[cfg(feature = "internals")]
                         if let Some(ref cb) = self.invalid_array_index {
-                            return cb(arr, index).map_err(|err| err.fill_position(idx_pos));
+                            let context =
+                                super::EvalContext::new(self, global, caches, _scope, _this_ptr);
+                            return cb(arr, index, context)
+                                .map_err(|err| err.fill_position(idx_pos));
                         }
                         return Err(err);
                     }
@@ -175,7 +180,10 @@ impl Engine {
                 #[cfg(feature = "internals")]
                 if let Some(ref cb) = self.missing_map_property {
                     if !map.contains_key(index.as_str()) {
-                        return cb(map, index.as_str()).map_err(|err| err.fill_position(idx_pos));
+                        let context =
+                            super::EvalContext::new(self, global, caches, _scope, _this_ptr);
+                        return cb(map, index.as_str(), context)
+                            .map_err(|err| err.fill_position(idx_pos));
                     }
                 }
 
@@ -406,26 +414,21 @@ impl Engine {
             )?,
         }
 
-        #[cfg(feature = "debugging")]
-        let scope2 = &mut Scope::new();
-        #[cfg(not(feature = "debugging"))]
-        let scope2 = ();
-
         match (lhs, new_val) {
             // this.??? or this[???]
             (Expr::ThisPtr(var_pos), new_val) => {
                 self.track_operation(global, *var_pos)?;
 
                 #[cfg(feature = "debugging")]
-                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), lhs)?;
+                self.dbg(global, caches, scope, this_ptr.as_deref_mut(), lhs)?;
 
                 this_ptr.map_or_else(
                     || Err(ERR::ErrorUnboundThis(*var_pos).into()),
                     |this_ptr| {
                         let target = &mut this_ptr.into();
-
+                        let scope = Some(scope);
                         self.eval_dot_index_chain_raw(
-                            global, caches, scope2, None, lhs, expr, target, rhs, idx_values,
+                            global, caches, scope, None, lhs, expr, target, rhs, idx_values,
                             new_val,
                         )
                     },
@@ -436,12 +439,11 @@ impl Engine {
                 self.track_operation(global, *var_pos)?;
 
                 #[cfg(feature = "debugging")]
-                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), lhs)?;
+                self.dbg(global, caches, scope, this_ptr.as_deref_mut(), lhs)?;
 
                 let target = &mut self.search_namespace(global, caches, scope, this_ptr, lhs)?;
-
                 self.eval_dot_index_chain_raw(
-                    global, caches, scope2, None, lhs, expr, target, rhs, idx_values, new_val,
+                    global, caches, None, None, lhs, expr, target, rhs, idx_values, new_val,
                 )
             }
             // {expr}.??? = ??? or {expr}[???] = ???
@@ -452,9 +454,9 @@ impl Engine {
                     .eval_expr(global, caches, scope, this_ptr.as_deref_mut(), lhs_expr)?
                     .flatten();
                 let item_ptr = &mut value.into();
-
+                let scope = Some(scope);
                 self.eval_dot_index_chain_raw(
-                    global, caches, scope2, this_ptr, lhs_expr, expr, item_ptr, rhs, idx_values,
+                    global, caches, scope, this_ptr, lhs_expr, expr, item_ptr, rhs, idx_values,
                     None,
                 )
             }
@@ -558,9 +560,8 @@ impl Engine {
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
-        #[cfg(feature = "debugging")] _scope: &mut Scope,
-        #[cfg(not(feature = "debugging"))] _scope: (),
-        this_ptr: Option<&mut Dynamic>,
+        scope: Option<&mut Scope>,
+        mut this_ptr: Option<&mut Dynamic>,
         root: &Expr,
         parent: &Expr,
         target: &mut Target,
@@ -568,12 +569,21 @@ impl Engine {
         idx_values: &mut FnArgsVec<Dynamic>,
         new_val: Option<(Dynamic, &OpAssignment)>,
     ) -> RhaiResultOf<(Dynamic, bool)> {
+        let mut b;
+        let mut s = scope;
+
+        macro_rules! x {
+            ($var:ident, $base:ident) => {{
+                if $var.is_none() {
+                    $base = Scope::new();
+                    $var = Some(&mut $base);
+                }
+                $var.as_deref_mut().unwrap()
+            }};
+        }
+
         let is_ref_mut = target.is_ref();
         let op_pos = parent.position();
-
-        #[cfg(feature = "debugging")]
-        #[allow(unused_mut)]
-        let mut this_ptr = this_ptr;
 
         match ChainType::from(parent) {
             #[cfg(not(feature = "no_index"))]
@@ -591,7 +601,7 @@ impl Engine {
                         if !parent.options().intersects(ASTFlags::BREAK) =>
                     {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, _scope, this_ptr.as_deref_mut(), parent)?;
+                        self.dbg(global, caches, x!(s, b), this_ptr.as_deref_mut(), parent)?;
 
                         let idx_val = &mut idx_values.pop().unwrap();
                         let mut idx_val_for_setter = idx_val.clone();
@@ -610,14 +620,17 @@ impl Engine {
                                 obj
                             };
 
+                            let tp = this_ptr.as_deref_mut();
+                            let new_scope = x!(s, b);
                             let mut item = self.get_indexed_mut(
-                                global, caches, obj, idx_val, idx_pos, op_pos, false, true,
+                                global, caches, new_scope, tp, obj, idx_val, idx_pos, op_pos,
+                                false, true,
                             )?;
                             let is_item_temp_val = item.is_temp_value();
                             let item_ptr = &mut item;
 
                             match self.eval_dot_index_chain_raw(
-                                global, caches, _scope, this_ptr, root, rhs, item_ptr, &x.rhs,
+                                global, caches, s, this_ptr, root, rhs, item_ptr, &x.rhs,
                                 idx_values, new_val,
                             ) {
                                 Ok((result, true)) if is_item_temp_val => {
@@ -649,7 +662,7 @@ impl Engine {
                     // xxx[rhs] op= new_val
                     (_, Some((new_val, op_info))) => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, _scope, this_ptr, parent)?;
+                        self.dbg(global, caches, x!(s, b), this_ptr.as_deref_mut(), parent)?;
 
                         let obj = target.as_mut();
 
@@ -663,12 +676,12 @@ impl Engine {
                             obj
                         };
 
+                        let new_scope = x!(s, b);
                         let idx_val = &mut idx_values.pop().unwrap();
                         let idx = &mut idx_val.clone();
-
-                        let try_setter = match self
-                            .get_indexed_mut(global, caches, obj, idx, pos, op_pos, true, false)
-                        {
+                        let try_setter = match self.get_indexed_mut(
+                            global, caches, new_scope, this_ptr, obj, idx, pos, op_pos, true, false,
+                        ) {
                             // Indexed value is not a temp value - update directly
                             Ok(ref mut item_ptr) => {
                                 self.eval_op_assignment(
@@ -717,7 +730,7 @@ impl Engine {
                     // xxx[rhs]
                     (_, None) => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, _scope, this_ptr, parent)?;
+                        self.dbg(global, caches, x!(s, b), this_ptr.as_deref_mut(), parent)?;
 
                         let obj = target.as_mut();
 
@@ -731,10 +744,14 @@ impl Engine {
                             obj
                         };
 
+                        let new_scope = x!(s, b);
                         let idx_val = &mut idx_values.pop().unwrap();
 
-                        self.get_indexed_mut(global, caches, obj, idx_val, pos, op_pos, false, true)
-                            .map(|v| (v.take_or_clone(), false))
+                        self.get_indexed_mut(
+                            global, caches, new_scope, this_ptr, obj, idx_val, pos, op_pos, false,
+                            true,
+                        )
+                        .map(|v| (v.take_or_clone(), false))
                     }
                 }
             }
@@ -760,8 +777,7 @@ impl Engine {
                         );
 
                         #[cfg(feature = "debugging")]
-                        let reset =
-                            self.run_debugger_with_reset(global, caches, _scope, this_ptr, rhs)?;
+                        let reset = self.dbg_reset(global, caches, x!(s, b), this_ptr, rhs)?;
                         #[cfg(feature = "debugging")]
                         defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
@@ -782,7 +798,7 @@ impl Engine {
                     // {xxx:map}.id op= ???
                     (Expr::Property(x, pos), Some((new_val, op_info)), true) => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, _scope, this_ptr, rhs)?;
+                        self.dbg(global, caches, x!(s, b), this_ptr.as_deref_mut(), rhs)?;
 
                         let index = &mut x.2.clone().into();
                         {
@@ -798,8 +814,11 @@ impl Engine {
                                 obj
                             };
 
+                            let new_scope = x!(s, b);
+
                             let item = &mut self.get_indexed_mut(
-                                global, caches, obj, index, *pos, op_pos, true, false,
+                                global, caches, new_scope, this_ptr, obj, index, *pos, op_pos,
+                                true, false,
                             )?;
                             self.eval_op_assignment(global, caches, op_info, root, item, new_val)?;
                         }
@@ -809,7 +828,7 @@ impl Engine {
                     // {xxx:map}.id
                     (Expr::Property(x, pos), None, true) => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, _scope, this_ptr, rhs)?;
+                        self.dbg(global, caches, x!(s, b), this_ptr.as_deref_mut(), rhs)?;
 
                         let obj = target.as_mut();
 
@@ -824,15 +843,18 @@ impl Engine {
                         };
 
                         let index = &mut x.2.clone().into();
+                        let new_scope = x!(s, b);
+
                         let item = self.get_indexed_mut(
-                            global, caches, obj, index, *pos, op_pos, false, false,
+                            global, caches, new_scope, this_ptr, obj, index, *pos, op_pos, false,
+                            false,
                         )?;
                         Ok((item.take_or_clone(), false))
                     }
                     // xxx.id op= ???
                     (Expr::Property(x, pos), Some((mut new_val, op_info)), false) => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, _scope, this_ptr, rhs)?;
+                        self.dbg(global, caches, x!(s, b), this_ptr, rhs)?;
 
                         let ((getter, hash_get), (setter, hash_set), name) = &**x;
 
@@ -899,7 +921,7 @@ impl Engine {
                     // xxx.id
                     (Expr::Property(x, pos), None, false) => {
                         #[cfg(feature = "debugging")]
-                        self.run_debugger(global, caches, _scope, this_ptr, rhs)?;
+                        self.dbg(global, caches, x!(s, b), this_ptr, rhs)?;
 
                         let ((getter, hash_get), _, name) = &**x;
                         let args = &mut [target.as_mut()];
@@ -929,15 +951,14 @@ impl Engine {
                     // {xxx:map}.sub_lhs[expr] | {xxx:map}.sub_lhs.expr
                     (Expr::Index(x, ..) | Expr::Dot(x, ..), new_val, true) => {
                         let _node = &x.lhs;
-                        let mut _this_ptr = this_ptr;
-                        let _tp = _this_ptr.as_deref_mut();
+                        let mut _tp = this_ptr.as_deref_mut();
                         #[cfg(not(feature = "no_closure"))]
                         let mut target_guard;
 
                         let item = &mut match x.lhs {
                             Expr::Property(ref p, pos) => {
                                 #[cfg(feature = "debugging")]
-                                self.run_debugger(global, caches, _scope, _tp, _node)?;
+                                self.dbg(global, caches, x!(s, b), _tp.as_deref_mut(), _node)?;
 
                                 let obj = target.as_mut();
 
@@ -949,9 +970,12 @@ impl Engine {
                                     obj
                                 };
 
+                                let new_scope = x!(s, b);
                                 let index = &mut p.2.clone().into();
+
                                 self.get_indexed_mut(
-                                    global, caches, obj, index, pos, op_pos, false, true,
+                                    global, caches, new_scope, _tp, obj, index, pos, op_pos, false,
+                                    true,
                                 )?
                             }
                             // {xxx:map}.fn_name(arg_expr_list)[expr] | {xxx:map}.fn_name(arg_expr_list).expr
@@ -963,8 +987,7 @@ impl Engine {
                                 );
 
                                 #[cfg(feature = "debugging")]
-                                let reset = self
-                                    .run_debugger_with_reset(global, caches, _scope, _tp, _node)?;
+                                let reset = self.dbg_reset(global, caches, x!(s, b), _tp, _node)?;
                                 #[cfg(feature = "debugging")]
                                 defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
@@ -989,7 +1012,7 @@ impl Engine {
                         };
 
                         self.eval_dot_index_chain_raw(
-                            global, caches, _scope, _this_ptr, root, rhs, item, &x.rhs, idx_values,
+                            global, caches, s, this_ptr, root, rhs, item, &x.rhs, idx_values,
                             new_val,
                         )
                     }
@@ -1003,7 +1026,7 @@ impl Engine {
                             // xxx.prop[expr] | xxx.prop.expr
                             Expr::Property(ref p, pos) => {
                                 #[cfg(feature = "debugging")]
-                                self.run_debugger(global, caches, _scope, _tp, _node)?;
+                                self.dbg(global, caches, x!(s, b), _tp, _node)?;
 
                                 let ((getter, hash_get), (setter, hash_set), name) = &**p;
                                 let args = &mut [target.as_mut()];
@@ -1036,7 +1059,7 @@ impl Engine {
                                 let val = &mut (&mut val).into();
 
                                 let (result, may_be_changed) = self.eval_dot_index_chain_raw(
-                                    global, caches, _scope, _this_ptr, root, rhs, val, &x.rhs,
+                                    global, caches, s, _this_ptr, root, rhs, val, &x.rhs,
                                     idx_values, new_val,
                                 )?;
 
@@ -1086,9 +1109,8 @@ impl Engine {
 
                                 let val = {
                                     #[cfg(feature = "debugging")]
-                                    let reset = self.run_debugger_with_reset(
-                                        global, caches, _scope, _tp, _node,
-                                    )?;
+                                    let reset =
+                                        self.dbg_reset(global, caches, x!(s, b), _tp, _node)?;
                                     #[cfg(feature = "debugging")]
                                     defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 
@@ -1111,7 +1133,7 @@ impl Engine {
                                 let val = &mut val.into();
 
                                 self.eval_dot_index_chain_raw(
-                                    global, caches, _scope, _this_ptr, root, rhs, val, &x.rhs,
+                                    global, caches, s, _this_ptr, root, rhs, val, &x.rhs,
                                     idx_values, new_val,
                                 )
                             }
