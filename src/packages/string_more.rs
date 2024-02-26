@@ -861,6 +861,17 @@ mod string_functions {
         }
     }
 
+    /// Parse a JSON string into an [`object map`](crate::Map).
+    ///
+    /// Not available under `no_object`.
+    ///
+    /// The JSON string must be an object hash. It cannot be a simple primitive value.
+    #[cfg(not(feature = "no_object"))]
+    #[rhai_fn(name = "parse_json", return_raw)]
+    pub fn parse_json(ctx: NativeCallContext, string: &str) -> RhaiResultOf<crate::Map> {
+        ctx.engine().parse_json(string, true)
+    }
+
     /// Copy an exclusive range of characters from the string and return it as a new string.
     ///
     /// # Example

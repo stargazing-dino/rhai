@@ -1,4 +1,4 @@
-use rhai::{Engine, LexError, ParseErrorType, Scope, INT};
+use rhai::{Engine, LexError, Map, ParseErrorType, Scope, INT};
 
 #[test]
 fn test_eval() {
@@ -92,7 +92,7 @@ fn test_eval_globals() {
                 r#"
                     const XYZ = 123;
 
-                    fn foo() { global::XYZ } 
+                    fn foo() { global::XYZ }
                     {
                         eval("const XYZ = 42;");
                     }
@@ -110,7 +110,7 @@ fn test_eval_globals() {
                 r#"
                     const XYZ = 123;
 
-                    fn foo() { global::XYZ } 
+                    fn foo() { global::XYZ }
 
                     eval("const XYZ = 42;");
 
@@ -164,4 +164,41 @@ fn test_eval_disabled() {
         engine.compile(r#"eval("40 + 2")"#).unwrap_err().err_type(),
         ParseErrorType::BadInput(LexError::ImproperSymbol(err, ..)) if err == "eval"
     ));
+}
+
+#[test]
+#[cfg(not(feature = "no_function"))]
+#[cfg(feature = "serde")]
+fn test_parse_json() {
+    let engine = Engine::new();
+    let mut scope = Scope::new();
+
+    let map = engine
+        .eval_with_scope::<Map>(
+            &mut scope,
+            r#"
+            parse_json("{\
+                \"name\": \"John Doe\",\
+                \"age\": 43,\
+                \"address\": {\
+                    \"street\": \"10 Downing Street\",\
+                    \"city\": \"London\"\
+                },\
+                \"phones\": [\
+                    \"+44 1234567\",\
+                    \"+44 2345678\"\
+                ]\
+            }")
+        "#,
+        )
+        .unwrap();
+
+    assert_eq!(map.len(), 4);
+    assert_eq!(map["name"].clone().into_immutable_string().expect("name should exist"), "John Doe");
+    assert_eq!(map["age"].as_int().expect("age should exist"), 43);
+    assert_eq!(map["phones"].clone().into_typed_array::<String>().expect("phones should exist"), ["+44 1234567", "+44 2345678"]);
+
+    let address = map["address"].clone().try_cast::<Map>().expect("address should exist");
+    assert_eq!(address["city"].clone().into_immutable_string().expect("address.city should exist"), "London");
+    assert_eq!(address["street"].clone().into_immutable_string().expect("address.street should exist"), "10 Downing Street");
 }
