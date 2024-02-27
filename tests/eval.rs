@@ -169,6 +169,7 @@ fn test_eval_disabled() {
 #[test]
 #[cfg(not(feature = "no_function"))]
 #[cfg(not(feature = "no_index"))]
+#[cfg(not(feature = "no_object"))]
 fn test_parse_json() {
     let engine = Engine::new();
     let mut scope = Scope::new();
@@ -211,7 +212,7 @@ fn test_parse_json_err_no_index() {
     let mut scope = Scope::new();
 
     let err = engine
-        .eval_with_scope::<rhai::Map>(
+        .eval_with_scope::<rhai::Dynamic>(
             &mut scope,
             r#"
             parse_json("{\
@@ -224,5 +225,32 @@ fn test_parse_json_err_no_index() {
         )
         .unwrap_err();
 
-    assert!(matches!(err.as_ref(), rhai::EvalAltResult::ErrorParsing(ParseErrorType::BadInput(LexError::UnexpectedInput(token)), pos) if token == "[" && *pos == rhai::Position::new(1, 7)));
+    assert!(matches!(err.as_ref(), rhai::EvalAltResult::ErrorParsing(
+        ParseErrorType::BadInput(LexError::UnexpectedInput(token)), pos)
+            if token == "[" && *pos == rhai::Position::new(1, 7)));
+}
+
+#[test]
+#[cfg(feature = "no_object")]
+#[cfg(not(feature = "no_function"))]
+fn test_parse_json_err_no_object() {
+    let engine = Engine::new();
+    let mut scope = Scope::new();
+
+    let err = engine
+        .eval_with_scope::<rhai::Dynamic>(
+            &mut scope,
+            r#"
+            parse_json("{\
+                \"v\": {\
+                    \"a\": 1,\
+                    \"b\": 2,\
+                }\
+            }")
+        "#,
+        )
+        .unwrap_err();
+
+    assert!(matches!(err.as_ref(), rhai::EvalAltResult::ErrorFunctionNotFound(msg, pos)
+        if msg == "parse_json (&str | ImmutableString | String)" && *pos == rhai::Position::new(2, 13)));
 }
