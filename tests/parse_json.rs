@@ -1,5 +1,8 @@
+use rhai::{Engine, LexError, ParseErrorType, Scope, INT};
+
 #[cfg(not(feature = "metadata"))]
 mod without_metadata {
+    use super::*;
 
     #[test]
     #[cfg(not(feature = "no_function"))]
@@ -93,6 +96,7 @@ mod without_metadata {
 
 #[cfg(feature = "metadata")]
 mod with_metadata {
+    use super::*;
 
     #[test]
     #[cfg(not(feature = "no_function"))]
