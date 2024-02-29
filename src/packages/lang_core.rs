@@ -179,6 +179,22 @@ mod core_functions {
     pub fn parse_json(_ctx: NativeCallContext, json: &str) -> RhaiResultOf<Dynamic> {
         serde_json::from_str(json).map_err(|err| err.to_string().into())
     }
+
+    /// Parse a JSON string into a value.
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let m = parse_json(`{"a":1, "b":2, "c":3}`);
+    ///
+    /// print(m);       // prints #{"a":1, "b":2, "c":3}
+    /// ```
+    #[cfg(not(feature = "no_object"))]
+    #[cfg(not(feature = "metadata"))]
+    #[rhai_fn(name = "parse_json", return_raw)]
+    pub fn parse_json(ctx: NativeCallContext, json: &str) -> RhaiResultOf<crate::Map> {
+        ctx.engine().parse_json(json, true)
+    }
 }
 
 #[cfg(not(feature = "no_function"))]
