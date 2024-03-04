@@ -30,6 +30,7 @@ Enhancements
 * Array/BLOB/string iterators are defined also within the `BasicIteratorPackage` in addition to the regular array/BLOB/string packages.
 * `LexError::Runtime` is added for use with `Engine::on_parse_token`.
 * Shared values under `sync` are now handled more elegantly -- instead of deadlocking and hanging indefinitely, it spins for a number of tries (waiting one second between each), then errors out.
+* `parse_json` is also available without the `metadata` or `serde` feature -- it uses `Engine::parse_json` to parse the JSON text.
 
 
 Version 1.17.2

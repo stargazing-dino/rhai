@@ -266,8 +266,7 @@ impl Engine {
         self.track_operation(global, stmt.position())?;
 
         #[cfg(feature = "debugging")]
-        let reset =
-            self.run_debugger_with_reset(global, caches, scope, this_ptr.as_deref_mut(), stmt)?;
+        let reset = self.dbg_reset(global, caches, scope, this_ptr.as_deref_mut(), stmt)?;
         #[cfg(feature = "debugging")]
         defer! { global if Some(reset) => move |g| g.debugger_mut().reset_status(reset) }
 

@@ -1,4 +1,7 @@
-use rhai::{Engine, ParseErrorType, Scope, INT};
+use rhai::{Dynamic, Engine, EvalAltResult, LexError, ParseErrorType, Position, Scope, INT};
+
+#[cfg(not(feature = "no_object"))]
+use rhai::Map;
 
 #[cfg(not(feature = "metadata"))]
 mod without_metadata {
@@ -13,7 +16,7 @@ mod without_metadata {
         let mut scope = Scope::new();
 
         let map = engine
-            .eval_with_scope::<rhai::Map>(
+            .eval_with_scope::<Map>(
                 &mut scope,
                 r#"
                 parse_json("{\
@@ -37,20 +40,21 @@ mod without_metadata {
         assert_eq!(map["age"].as_int().expect("age should exist"), 43);
         assert_eq!(map["phones"].clone().into_typed_array::<String>().expect("phones should exist"), ["+44 1234567", "+44 2345678"]);
 
-        let address = map["address"].read_lock::<rhai::Map>().expect("address should exist");
+        let address = map["address"].read_lock::<Map>().expect("address should exist");
         assert_eq!(address["city"].clone().into_immutable_string().expect("address.city should exist"), "London");
         assert_eq!(address["street"].clone().into_immutable_string().expect("address.street should exist"), "10 Downing Street");
     }
 
     #[test]
     #[cfg(feature = "no_index")]
+    #[cfg(not(feature = "no_object"))]
     #[cfg(not(feature = "no_function"))]
     fn test_parse_json_err_no_index() {
         let engine = Engine::new();
         let mut scope = Scope::new();
 
         let err = engine
-            .eval_with_scope::<rhai::Dynamic>(
+            .eval_with_scope::<Dynamic>(
                 &mut scope,
                 r#"
                 parse_json("{\
@@ -63,9 +67,9 @@ mod without_metadata {
             )
             .unwrap_err();
 
-        assert!(matches!(err.as_ref(), rhai::EvalAltResult::ErrorParsing(
+        assert!(matches!(err.as_ref(), EvalAltResult::ErrorParsing(
             ParseErrorType::BadInput(LexError::UnexpectedInput(token)), pos)
-                if token == "[" && *pos == rhai::Position::new(1, 7)));
+                if token == "[" && *pos == Position::new(1, 7)));
     }
 
     #[test]
@@ -76,7 +80,7 @@ mod without_metadata {
         let mut scope = Scope::new();
 
         let err = engine
-            .eval_with_scope::<rhai::Dynamic>(
+            .eval_with_scope::<Dynamic>(
                 &mut scope,
                 r#"
                 parse_json("{\
@@ -89,8 +93,8 @@ mod without_metadata {
             )
             .unwrap_err();
 
-        assert!(matches!(err.as_ref(), rhai::EvalAltResult::ErrorFunctionNotFound(msg, pos)
-            if msg == "parse_json (&str | ImmutableString | String)" && *pos == rhai::Position::new(2, 13)));
+        assert!(matches!(err.as_ref(), EvalAltResult::ErrorFunctionNotFound(msg, pos)
+            if msg == "parse_json (&str | ImmutableString | String)" && *pos == Position::new(2, 13)));
     }
 }
 
@@ -107,7 +111,7 @@ mod with_metadata {
         let mut scope = Scope::new();
 
         let map = engine
-            .eval_with_scope::<rhai::Map>(
+            .eval_with_scope::<Map>(
                 &mut scope,
                 r#"
                 parse_json("{\
@@ -131,20 +135,21 @@ mod with_metadata {
         assert_eq!(map["age"].as_int().expect("age should exist"), 43);
         assert_eq!(map["phones"].clone().into_typed_array::<String>().expect("phones should exist"), ["+44 1234567", "+44 2345678"]);
 
-        let address = map["address"].read_lock::<rhai::Map>().expect("address should exist");
+        let address = map["address"].read_lock::<Map>().expect("address should exist");
         assert_eq!(address["city"].clone().into_immutable_string().expect("address.city should exist"), "London");
         assert_eq!(address["street"].clone().into_immutable_string().expect("address.street should exist"), "10 Downing Street");
     }
 
     #[test]
     #[cfg(feature = "no_index")]
+    #[cfg(not(feature = "no_object"))]
     #[cfg(not(feature = "no_function"))]
     fn test_parse_json_err_no_index() {
         let engine = Engine::new();
         let mut scope = Scope::new();
 
         let err = engine
-            .eval_with_scope::<rhai::Dynamic>(
+            .eval_with_scope::<Dynamic>(
                 &mut scope,
                 r#"
                 parse_json("{\
@@ -157,9 +162,8 @@ mod with_metadata {
             )
             .unwrap_err();
 
-        assert!(matches!(err.as_ref(), rhai::EvalAltResult::ErrorParsing(
-            ParseErrorType::BadInput(LexError::UnexpectedInput(token)), pos)
-                if token == "[" && *pos == rhai::Position::new(1, 7)));
+        assert!(matches!(err.as_ref(), EvalAltResult::ErrorRuntime(msg, pos)
+                if msg.is_string() && *pos == Position::new(2, 17)));
     }
 
     #[test]
@@ -170,7 +174,7 @@ mod with_metadata {
         let mut scope = Scope::new();
 
         let err = engine
-            .eval_with_scope::<rhai::Dynamic>(
+            .eval_with_scope::<Dynamic>(
                 &mut scope,
                 r#"
                 parse_json("{\
@@ -183,7 +187,7 @@ mod with_metadata {
             )
             .unwrap_err();
 
-        assert!(matches!(err.as_ref(), rhai::EvalAltResult::ErrorFunctionNotFound(msg, pos)
-            if msg == "parse_json (&str | ImmutableString | String)" && *pos == rhai::Position::new(2, 13)));
+        assert!(matches!(err.as_ref(), EvalAltResult::ErrorFunctionNotFound(msg, pos)
+            if msg == "parse_json (&str | ImmutableString | String)" && *pos == Position::new(2, 17)));
     }
 }

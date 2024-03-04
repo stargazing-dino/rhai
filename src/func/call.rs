@@ -436,7 +436,7 @@ impl Engine {
                         Err(ref err) => DebuggerEvent::FunctionExitWithError(err),
                     };
 
-                    match self.run_debugger_raw(global, caches, scope, None, node, event) {
+                    match self.dbg_raw(global, caches, scope, None, node, event) {
                         Ok(..) => (),
                         Err(err) => _result = Err(err),
                     }
@@ -699,7 +699,7 @@ impl Engine {
             self.track_operation(global, arg_expr.start_position())?;
 
             #[cfg(feature = "debugging")]
-            self.run_debugger(global, caches, scope, this_ptr, arg_expr)?;
+            self.dbg(global, caches, scope, this_ptr, arg_expr)?;
 
             return Ok((value, arg_expr.start_position()));
         }
@@ -1322,14 +1322,12 @@ impl Engine {
         // convert to method-call style in order to leverage potential &mut first argument
         // and avoid cloning the value.
         match first_arg {
-            Some(_first_expr @ Expr::ThisPtr(pos))
-                if curry.is_empty() && has_non_shared_this_ptr =>
-            {
+            Some(_first @ Expr::ThisPtr(pos)) if curry.is_empty() && has_non_shared_this_ptr => {
                 // Turn it into a method call only if the object is not shared
                 self.track_operation(global, *pos)?;
 
                 #[cfg(feature = "debugging")]
-                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), _first_expr)?;
+                self.dbg(global, caches, scope, this_ptr.as_deref_mut(), _first)?;
 
                 // func(x, ...) -> x.func(...)
                 for expr in args_expr {
@@ -1341,11 +1339,11 @@ impl Engine {
                 is_ref_mut = true;
                 args.push(this_ptr.unwrap());
             }
-            Some(first_expr @ Expr::Variable(.., pos)) if curry.is_empty() => {
+            Some(first @ Expr::Variable(.., pos)) if curry.is_empty() => {
                 self.track_operation(global, *pos)?;
 
                 #[cfg(feature = "debugging")]
-                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), first_expr)?;
+                self.dbg(global, caches, scope, this_ptr.as_deref_mut(), first)?;
 
                 // func(x, ...) -> x.func(...)
                 for expr in args_expr {
@@ -1354,8 +1352,7 @@ impl Engine {
                     arg_values.push(value.flatten());
                 }
 
-                let mut target =
-                    self.search_namespace(global, caches, scope, this_ptr, first_expr)?;
+                let mut target = self.search_namespace(global, caches, scope, this_ptr, first)?;
 
                 if target.as_ref().is_read_only() {
                     target = target.into_owned();
@@ -1416,11 +1413,11 @@ impl Engine {
         // If so, convert to method-call style in order to leverage potential
         // &mut first argument and avoid cloning the value.
         match args_expr.first() {
-            Some(_first_expr @ Expr::ThisPtr(pos)) if has_non_shared_this_ptr => {
+            Some(_first @ Expr::ThisPtr(pos)) if has_non_shared_this_ptr => {
                 self.track_operation(global, *pos)?;
 
                 #[cfg(feature = "debugging")]
-                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), _first_expr)?;
+                self.dbg(global, caches, scope, this_ptr.as_deref_mut(), _first)?;
 
                 // The first value is a placeholder (for later if it needs to be cloned)
                 arg_values.push(Dynamic::UNIT);
@@ -1437,11 +1434,11 @@ impl Engine {
                 args.push(this_ptr.unwrap());
                 args.extend(rest.iter_mut());
             }
-            Some(first_expr @ Expr::Variable(.., pos)) => {
+            Some(first @ Expr::Variable(.., pos)) => {
                 self.track_operation(global, *pos)?;
 
                 #[cfg(feature = "debugging")]
-                self.run_debugger(global, caches, scope, this_ptr.as_deref_mut(), first_expr)?;
+                self.dbg(global, caches, scope, this_ptr.as_deref_mut(), first)?;
 
                 // The first value is a placeholder (for later if it needs to be cloned)
                 arg_values.push(Dynamic::UNIT);
@@ -1452,7 +1449,7 @@ impl Engine {
                     arg_values.push(value.flatten());
                 }
 
-                let target = self.search_namespace(global, caches, scope, this_ptr, first_expr)?;
+                let target = self.search_namespace(global, caches, scope, this_ptr, first)?;
 
                 if target.is_shared() || target.is_temp_value() {
                     arg_values[0] = target.take_or_clone().flatten();

@@ -348,13 +348,55 @@ impl Engine {
     ///
     /// ## Raising errors
     ///
-    /// Return `Err(...)` if there is an error, usually [`EvalAltResult::ErrorPropertyNotFound`][crate::EvalAltResult::ErrorPropertyNotFound].
+    /// Return `Err(...)` if there is an error, usually
+    /// [`EvalAltResult::ErrorPropertyNotFound`][crate::EvalAltResult::ErrorPropertyNotFound].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
+    /// # use rhai::{Engine, Dynamic, EvalAltResult, Position};
+    /// let mut engine = Engine::new();
+    ///
+    /// engine.on_invalid_array_index(|arr, index, _| match index
+    /// {
+    ///     -100 => {
+    ///         // The array can be modified in place
+    ///         arr.push((42_i64).into());
+    ///         // Return a mutable reference to an element
+    ///         let value_ref = arr.last_mut().unwrap();
+    ///         Ok(value_ref.into())
+    ///     }
+    ///     100 => {
+    ///         let value = Dynamic::from(100_i64);
+    ///         // Return a temporary value (not a reference)
+    ///         Ok(value.into())
+    ///     }
+    ///     // Return the standard out-of-bounds error
+    ///     _ => Err(EvalAltResult::ErrorArrayBounds(
+    ///                 arr.len(), index, Position::NONE
+    ///          ).into()),
+    /// });
+    ///
+    /// let r = engine.eval::<i64>("
+    ///             let a = [1, 2, 3];
+    ///             a[-100] += 1;
+    ///             a[3] + a[100]
+    ///         ")?;
+    ///
+    /// assert_eq!(r, 143);
+    /// # Ok(()) }
+    /// ```
     #[cfg(not(feature = "no_index"))]
     #[cfg(feature = "internals")]
     #[inline(always)]
     pub fn on_invalid_array_index(
         &mut self,
-        callback: impl for<'a> Fn(&'a mut crate::Array, crate::INT) -> RhaiResultOf<crate::Target<'a>>
+        callback: impl for<'a> Fn(
+                &'a mut crate::Array,
+                crate::INT,
+                EvalContext,
+            ) -> RhaiResultOf<crate::Target<'a>>
             + SendSync
             + 'static,
     ) -> &mut Self {
@@ -385,12 +427,49 @@ impl Engine {
     /// ## Raising errors
     ///
     /// Return `Err(...)` if there is an error, usually [`EvalAltResult::ErrorPropertyNotFound`][crate::EvalAltResult::ErrorPropertyNotFound].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
+    /// # use rhai::{Engine, Dynamic, EvalAltResult, Position};
+    /// let mut engine = Engine::new();
+    ///
+    /// engine.on_map_missing_property(|map, prop, _| match prop
+    /// {
+    ///     "x" => {
+    ///         // The object-map can be modified in place
+    ///         map.insert("y".into(), (42_i64).into());
+    ///         // Return a mutable reference to an element
+    ///         let value_ref = map.get_mut("y").unwrap();
+    ///         Ok(value_ref.into())
+    ///     }
+    ///     "z" => {
+    ///         // Return a temporary value (not a reference)
+    ///         let value = Dynamic::from(100_i64);
+    ///         Ok(value.into())
+    ///     }
+    ///     // Return the standard property-not-found error
+    ///     _ => Err(EvalAltResult::ErrorPropertyNotFound(
+    ///                 prop.to_string(), Position::NONE
+    ///          ).into()),
+    /// });
+    ///
+    /// let r = engine.eval::<i64>("
+    ///             let obj = #{ a:1, b:2 };
+    ///             obj.x += 1;
+    ///             obj.y + obj.z
+    ///         ")?;
+    ///
+    /// assert_eq!(r, 143);
+    /// # Ok(()) }
+    /// ```
     #[cfg(not(feature = "no_object"))]
     #[cfg(feature = "internals")]
     #[inline(always)]
     pub fn on_map_missing_property(
         &mut self,
-        callback: impl for<'a> Fn(&'a mut crate::Map, &str) -> RhaiResultOf<crate::Target<'a>>
+        callback: impl for<'a> Fn(&'a mut crate::Map, &str, EvalContext) -> RhaiResultOf<crate::Target<'a>>
             + SendSync
             + 'static,
     ) -> &mut Self {

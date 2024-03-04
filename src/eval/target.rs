@@ -85,6 +85,22 @@ pub fn calc_index<E>(
 ///
 /// This type is typically used to hold a mutable reference to the target of an indexing or property
 /// access operation.
+///
+/// # Example
+///
+/// ```
+/// # #[cfg(feature = "internals")] {
+/// # use rhai::{Dynamic, Target};
+/// // Normal `Dynamic` value
+/// let mut value = Dynamic::from(42_i64);
+/// let target: Target = value.into();
+///
+/// // Mutable reference to a `Dynamic` value
+/// let mut value = Dynamic::from(42_i64);
+/// let value_ref = &mut value;
+/// let target: Target = value.into();
+/// # }
+/// ```
 #[derive(Debug)]
 #[must_use]
 pub enum Target<'a> {

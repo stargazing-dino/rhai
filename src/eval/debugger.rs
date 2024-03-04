@@ -398,7 +398,7 @@ impl Debugger {
 impl Engine {
     /// Run the debugger callback if there is a debugging interface registered.
     #[inline(always)]
-    pub(crate) fn run_debugger<'a>(
+    pub(crate) fn dbg<'a>(
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
@@ -407,9 +407,7 @@ impl Engine {
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<()> {
         if self.is_debugger_registered() {
-            if let Some(cmd) =
-                self.run_debugger_with_reset_raw(global, caches, scope, this_ptr, node)?
-            {
+            if let Some(cmd) = self.dbg_reset_raw(global, caches, scope, this_ptr, node)? {
                 global.debugger_mut().status = cmd;
             }
         }
@@ -423,7 +421,7 @@ impl Engine {
     ///
     /// It is up to the [`Engine`] to reactivate the debugger.
     #[inline(always)]
-    pub(crate) fn run_debugger_with_reset<'a>(
+    pub(crate) fn dbg_reset<'a>(
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
@@ -432,7 +430,7 @@ impl Engine {
         node: impl Into<ASTNode<'a>>,
     ) -> RhaiResultOf<Option<DebuggerStatus>> {
         if self.is_debugger_registered() {
-            self.run_debugger_with_reset_raw(global, caches, scope, this_ptr, node)
+            self.dbg_reset_raw(global, caches, scope, this_ptr, node)
         } else {
             Ok(None)
         }
@@ -444,7 +442,7 @@ impl Engine {
     ///
     /// It is up to the [`Engine`] to reactivate the debugger.
     #[inline]
-    pub(crate) fn run_debugger_with_reset_raw<'a>(
+    pub(crate) fn dbg_reset_raw<'a>(
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
@@ -479,7 +477,7 @@ impl Engine {
                     },
                 };
 
-                self.run_debugger_raw(global, caches, scope, this_ptr, node, event)
+                self.dbg_raw(global, caches, scope, this_ptr, node, event)
             }
             None => Ok(None),
         }
@@ -491,7 +489,7 @@ impl Engine {
     ///
     /// It is up to the [`Engine`] to reactivate the debugger.
     #[inline]
-    pub(crate) fn run_debugger_raw(
+    pub(crate) fn dbg_raw(
         &self,
         global: &mut GlobalRuntimeState,
         caches: &mut Caches,
