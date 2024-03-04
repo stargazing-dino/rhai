@@ -1,4 +1,4 @@
-use rhai::{Engine, LexError, ParseErrorType, Scope, INT};
+use rhai::{Engine, ParseErrorType, Scope, INT};
 
 #[cfg(not(feature = "metadata"))]
 mod without_metadata {
