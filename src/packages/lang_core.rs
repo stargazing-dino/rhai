@@ -179,7 +179,7 @@ mod core_functions {
         let out = serde_json::from_str(json).map_err(|err| err.to_string().into());
 
         #[cfg(not(feature = "metadata"))]
-        let out = ctx
+        let out = _ctx
             .engine()
             .parse_json(json, true)
             .map(|map_object| Dynamic::from(map_object));

@@ -1,4 +1,4 @@
-use rhai::{Engine, ParseErrorType, Scope, INT};
+use rhai::{Engine, LexError, ParseErrorType, Scope, INT};
 
 #[cfg(not(feature = "metadata"))]
 mod without_metadata {
@@ -184,6 +184,6 @@ mod with_metadata {
             .unwrap_err();
 
         assert!(matches!(err.as_ref(), rhai::EvalAltResult::ErrorFunctionNotFound(msg, pos)
-            if msg == "parse_json (&str | ImmutableString | String)" && *pos == rhai::Position::new(2, 13)));
+            if msg == "parse_json (&str | ImmutableString | String)" && *pos == rhai::Position::new(2, 17)));
     }
 }
