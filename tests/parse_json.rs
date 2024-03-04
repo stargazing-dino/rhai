@@ -163,7 +163,7 @@ mod with_metadata {
             .unwrap_err();
 
         assert!(matches!(err.as_ref(), EvalAltResult::ErrorRuntime(msg, pos)
-                if msg.is_string() && *pos == Position::new(1, 7)));
+                if msg.is_string() && *pos == Position::new(2, 17)));
     }
 
     #[test]
