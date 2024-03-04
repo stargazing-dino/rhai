@@ -92,7 +92,7 @@ fn test_eval_globals() {
                 r#"
                     const XYZ = 123;
 
-                    fn foo() { global::XYZ } 
+                    fn foo() { global::XYZ }
                     {
                         eval("const XYZ = 42;");
                     }
@@ -110,7 +110,7 @@ fn test_eval_globals() {
                 r#"
                     const XYZ = 123;
 
-                    fn foo() { global::XYZ } 
+                    fn foo() { global::XYZ }
 
                     eval("const XYZ = 42;");
 

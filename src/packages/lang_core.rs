@@ -172,12 +172,19 @@ mod core_functions {
     ///
     /// print(m);       // prints #{"a":1, "b":2, "c":3}
     /// ```
-    #[cfg(not(feature = "no_index"))]
     #[cfg(not(feature = "no_object"))]
-    #[cfg(feature = "metadata")]
     #[rhai_fn(return_raw)]
     pub fn parse_json(_ctx: NativeCallContext, json: &str) -> RhaiResultOf<Dynamic> {
-        serde_json::from_str(json).map_err(|err| err.to_string().into())
+        #[cfg(feature = "metadata")]
+        let out = serde_json::from_str(json).map_err(|err| err.to_string().into());
+
+        #[cfg(not(feature = "metadata"))]
+        let out = ctx
+            .engine()
+            .parse_json(json, true)
+            .map(|map_object| Dynamic::from(map_object));
+
+        out
     }
 }
 
