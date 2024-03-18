@@ -530,6 +530,9 @@ impl Expr {
                             Self::IntegerConstant(ref start, ..),
                             Self::IntegerConstant(ref end, ..),
                         ) => (*start..*end).into(),
+                        (Self::IntegerConstant(ref start, ..), Self::Unit(..)) => {
+                            (*start..INT::MAX).into()
+                        }
                         _ => return None,
                     },
                     // x..=y
@@ -538,6 +541,9 @@ impl Expr {
                             Self::IntegerConstant(ref start, ..),
                             Self::IntegerConstant(ref end, ..),
                         ) => (*start..=*end).into(),
+                        (Self::IntegerConstant(ref start, ..), Self::Unit(..)) => {
+                            (*start..=INT::MAX).into()
+                        }
                         _ => return None,
                     },
                     _ => return None,

@@ -53,7 +53,60 @@ fn test_string() {
     #[cfg(not(feature = "no_float"))]
     assert_eq!(engine.eval::<String>(r#""foo" + 123.4556"#).unwrap(), "foo123.4556");
 }
+#[cfg(not(feature = "no_index"))]
+#[test]
+fn test_string_index() {
+    let engine = Engine::new();
+    // char index
+    assert_eq!(engine.eval::<char>(r#"let y = "hello"; y[-4]"#).unwrap(), 'e');
 
+    // slice index
+
+    // 1..3
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..3]"#).unwrap(), "el");
+    // 0..5
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[..]"#).unwrap(), "hello");
+    // 0..2
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[..2]"#).unwrap(), "he");
+    // 1..4
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..-1]"#).unwrap(), "ell");
+    // 1..1
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..-4]"#).unwrap(), "");
+    // 2..1
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[2..-4]"#).unwrap(), "");
+    // overflow index
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[0..18]"#).unwrap(), "hello");
+    // overflow negative index
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[2..-18]"#).unwrap(), "");
+
+    // inclusive range
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..=3]"#).unwrap(), "ell");
+    // 0..=5
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[..=]"#).unwrap(), "hello");
+    // 0..=2
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[..=2]"#).unwrap(), "hel");
+    // 1..=4
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..=-1]"#).unwrap(), "ello");
+    // 1..=1
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..=-4]"#).unwrap(), "");
+    // 2..=1
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[2..-4]"#).unwrap(), "");
+    // overflow index
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[0..18]"#).unwrap(), "hello");
+    // overflow negative index
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[2..-18]"#).unwrap(), "");
+
+    // mut slice index
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1] = 'i'; y"#).unwrap(), "hillo");
+    // mut slice index
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..2] = "i"; y"#).unwrap(), "hillo");
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..3] = "i"; y"#).unwrap(), "hilo");
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..3] = "iii"; y"#).unwrap(), "hiiilo");
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..=2] = "iii"; y"#).unwrap(), "hiiilo");
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..=2] = y[2..]; y"#).unwrap(), "hllolo");
+
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..=2] = y[2..]; let s2 = y[1..]; s2[1..20] = "abc"; y"#).unwrap(), "hllolo");
+}
 #[test]
 fn test_string_dynamic() {
     let engine = Engine::new();

@@ -4,6 +4,7 @@
 use super::{Caches, GlobalRuntimeState, Target};
 use crate::ast::{ASTFlags, BinaryExpr, Expr, OpAssignment};
 use crate::engine::{FN_IDX_GET, FN_IDX_SET};
+use crate::tokenizer::Token;
 use crate::types::dynamic::Union;
 use crate::{
     calc_fn_hash, Dynamic, Engine, FnArgsVec, OnceCell, Position, RhaiResult, RhaiResultOf, Scope,
@@ -295,53 +296,127 @@ impl Engine {
 
             #[cfg(not(feature = "no_index"))]
             Dynamic(Union::Str(s, ..)) => {
-                // val_string[idx]
-                let index = idx
-                    .as_int()
-                    .map_err(|typ| self.make_type_mismatch_err::<crate::INT>(typ, idx_pos))?;
+                match idx.as_int() {
+                    Ok(index) => {
+                        let (ch, offset) = if index >= 0 {
+                            #[allow(clippy::absurd_extreme_comparisons)]
+                            if index >= crate::MAX_USIZE_INT {
+                                return Err(ERR::ErrorStringBounds(
+                                    s.chars().count(),
+                                    index,
+                                    idx_pos,
+                                )
+                                .into());
+                            }
 
-                let (ch, offset) = if index >= 0 {
-                    #[allow(clippy::absurd_extreme_comparisons)]
-                    if index >= crate::MAX_USIZE_INT {
-                        return Err(
-                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
-                        );
+                            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+                            let offset = index as usize;
+                            (
+                                s.chars().nth(offset).ok_or_else(|| {
+                                    ERR::ErrorStringBounds(s.chars().count(), index, idx_pos)
+                                })?,
+                                offset,
+                            )
+                        } else {
+                            let abs_index = index.unsigned_abs();
+
+                            #[allow(clippy::unnecessary_cast)]
+                            if abs_index as u64 > usize::MAX as u64 {
+                                return Err(ERR::ErrorStringBounds(
+                                    s.chars().count(),
+                                    index,
+                                    idx_pos,
+                                )
+                                .into());
+                            }
+
+                            #[allow(clippy::cast_possible_truncation)]
+                            let offset = abs_index as usize;
+                            (
+                                // Count from end if negative
+                                s.chars().rev().nth(offset - 1).ok_or_else(|| {
+                                    ERR::ErrorStringBounds(s.chars().count(), index, idx_pos)
+                                })?,
+                                offset,
+                            )
+                        };
+
+                        Ok(Target::StringChar {
+                            source: target,
+                            value: ch.into(),
+                            index: offset,
+                        })
                     }
+                    Err(typ) => {
+                        if typ == "core::ops::range::Range<i64>" {
+                            // val_str[range]
+                            let idx = idx.read_lock::<core::ops::Range<i64>>().unwrap();
+                            let range = &*idx;
+                            let chars_count = s.chars().count();
+                            let start = if range.start >= 0 {
+                                range.start as usize
+                            } else {
+                                super::calc_index(chars_count, range.start, true, || {
+                                    ERR::ErrorStringBounds(chars_count, range.start, idx_pos).into()
+                                })?
+                            };
+                            let end = if range.end >= 0 {
+                                range.end as usize
+                            } else {
+                                super::calc_index(chars_count, range.end, true, || {
+                                    ERR::ErrorStringBounds(chars_count, range.end, idx_pos).into()
+                                })
+                                .unwrap_or(0)
+                            };
 
-                    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-                    let offset = index as usize;
-                    (
-                        s.chars().nth(offset).ok_or_else(|| {
-                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos)
-                        })?,
-                        offset,
-                    )
-                } else {
-                    let abs_index = index.unsigned_abs();
+                            let take = if end > start { end - start } else { 0 };
 
-                    #[allow(clippy::unnecessary_cast)]
-                    if abs_index as u64 > usize::MAX as u64 {
-                        return Err(
-                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos).into()
-                        );
+                            let value = s.chars().skip(start).take(take).collect::<String>();
+                            return Ok(Target::StringSlice {
+                                source: target,
+                                value: value.into(),
+                                start: start,
+                                end: end,
+                                exclusive: true,
+                            });
+                        } else if typ == "core::ops::range::RangeInclusive<i64>" {
+                            // val_str[range]
+                            let idx = idx.read_lock::<core::ops::RangeInclusive<i64>>().unwrap();
+                            let range = &*idx;
+                            let chars_count = s.chars().count();
+                            let start = if *range.start() >= 0 {
+                                *range.start() as usize
+                            } else {
+                                super::calc_index(chars_count, *range.start(), true, || {
+                                    ERR::ErrorStringBounds(chars_count, *range.start(), idx_pos)
+                                        .into()
+                                })?
+                            };
+                            let end = if *range.end() >= 0 {
+                                *range.end() as usize
+                            } else {
+                                super::calc_index(chars_count, *range.end(), true, || {
+                                    ERR::ErrorStringBounds(chars_count, *range.end(), idx_pos)
+                                        .into()
+                                })
+                                .unwrap_or(0)
+                            };
+
+                            let take = if end > start { end - start + 1 } else { 0 };
+
+                            let value = s.chars().skip(start).take(take).collect::<String>();
+                            return Ok(Target::StringSlice {
+                                source: target,
+                                value: value.into(),
+                                start,
+                                end,
+                                exclusive: false,
+                            });
+                        } else {
+                            return Err(self.make_type_mismatch_err::<crate::INT>(typ, idx_pos));
+                        }
                     }
-
-                    #[allow(clippy::cast_possible_truncation)]
-                    let offset = abs_index as usize;
-                    (
-                        // Count from end if negative
-                        s.chars().rev().nth(offset - 1).ok_or_else(|| {
-                            ERR::ErrorStringBounds(s.chars().count(), index, idx_pos)
-                        })?,
-                        offset,
-                    )
-                };
-
-                Ok(Target::StringChar {
-                    source: target,
-                    value: ch.into(),
-                    index: offset,
-                })
+                }
             }
 
             #[cfg(not(feature = "no_closure"))]
@@ -397,6 +472,13 @@ impl Engine {
             // Short-circuit for indexing with literal: {expr}[1]
             #[cfg(not(feature = "no_index"))]
             (_, ChainType::Indexing) if rhs.is_constant() => {
+                idx_values.push(rhs.get_literal_value().unwrap())
+            }
+            #[cfg(not(feature = "no_index"))]
+            (Expr::FnCall(fnc, _), ChainType::Indexing)
+                if fnc.op_token == Some(Token::InclusiveRange)
+                    || fnc.op_token == Some(Token::ExclusiveRange) =>
+            {
                 idx_values.push(rhs.get_literal_value().unwrap())
             }
             // Short-circuit for simple method call: {expr}.func()
