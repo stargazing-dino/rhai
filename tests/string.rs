@@ -60,7 +60,10 @@ fn test_string_index() {
     // char index
     assert_eq!(engine.eval::<char>(r#"let y = "hello"; y[-4]"#).unwrap(), 'e');
 
-    // slice index
+    // range index
+
+    // range index returns a string
+    assert_eq!(engine.eval::<char>(r#"let y = "hello"; y[1..2]"#).unwrap_err().to_string(), "Output type incorrect: string (expecting char)");
 
     // 1..3
     assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..3]"#).unwrap(), "el");
@@ -105,7 +108,29 @@ fn test_string_index() {
     assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..=2] = "iii"; y"#).unwrap(), "hiiilo");
     assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..=2] = y[2..]; y"#).unwrap(), "hllolo");
 
+    // new string will not be affected by mut slice index on old string.
     assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1..=2] = y[2..]; let s2 = y[1..]; s2[1..20] = "abc"; y"#).unwrap(), "hllolo");
+
+    assert_eq!(
+        engine
+            .eval::<String>(
+                r#"
+                    let y = "hello";
+                    let s2 = y[1..];
+                    s2[1..20] = "abc";
+                    if (s2 == "eabc") {
+                        y[2] = 'd';
+                    }
+                    y[3..] = "xyz";
+                    y[4] = '\u2764';
+                    y[6..] = "\u2764\u2764";
+                    
+                    y
+                "#
+            )
+            .unwrap(),
+        "hedx❤z❤❤"
+    );
 }
 #[test]
 fn test_string_dynamic() {
