@@ -189,14 +189,13 @@ impl<'a> Target<'a> {
             Self::RefMut(..) => true,
             #[cfg(not(feature = "no_closure"))]
             Self::SharedValue { .. } => true,
-            #[cfg(not(feature = "no_index"))]
-            Self::StringSlice { .. } => true,
             Self::TempValue(..) => false,
             #[cfg(not(feature = "no_index"))]
             Self::Bit { .. }
             | Self::BitField { .. }
             | Self::BlobByte { .. }
-            | Self::StringChar { .. } => false,
+            | Self::StringChar { .. }
+            | Self::StringSlice { .. } => false,
         }
     }
     /// Is the [`Target`] a temp value?
@@ -207,14 +206,13 @@ impl<'a> Target<'a> {
             Self::RefMut(..) => false,
             #[cfg(not(feature = "no_closure"))]
             Self::SharedValue { .. } => false,
-            #[cfg(not(feature = "no_index"))]
-            Self::StringSlice { .. } => true,
             Self::TempValue(..) => true,
             #[cfg(not(feature = "no_index"))]
             Self::Bit { .. }
             | Self::BitField { .. }
             | Self::BlobByte { .. }
-            | Self::StringChar { .. } => false,
+            | Self::StringChar { .. }
+            | Self::StringSlice { .. } => false,
         }
     }
     /// Is the [`Target`] a shared value?
@@ -225,13 +223,13 @@ impl<'a> Target<'a> {
         return match self {
             Self::RefMut(r) => r.is_shared(),
             Self::SharedValue { .. } => true,
-            Self::StringSlice { .. } => true,
             Self::TempValue(value) => value.is_shared(),
             #[cfg(not(feature = "no_index"))]
             Self::Bit { .. }
             | Self::BitField { .. }
             | Self::BlobByte { .. }
-            | Self::StringChar { .. } => false,
+            | Self::StringChar { .. }
+            | Self::StringSlice { .. } => false,
         };
         #[cfg(feature = "no_closure")]
         return false;
@@ -245,18 +243,11 @@ impl<'a> Target<'a> {
             Self::SharedValue { shared_value, .. } => shared_value, // Original shared value is simply taken
             Self::TempValue(value) => value, // Owned value is simply taken
             #[cfg(not(feature = "no_index"))]
-            Self::Bit { value, .. } => value, // boolean is taken
-            #[cfg(not(feature = "no_index"))]
-            Self::BitField { value, .. } => value, // INT is taken
-            #[cfg(not(feature = "no_index"))]
-            Self::BlobByte { value, .. } => value, // byte is taken
-            #[cfg(not(feature = "no_index"))]
-            Self::StringChar { value, .. } => value, // char is taken
-            #[cfg(not(feature = "no_index"))]
-            Self::StringSlice { value, .. } => {
-                // Slice of a string is cloned
-                Dynamic::from(value.to_string())
-            }
+            Self::Bit { value, .. }
+            | Self::BitField { value, .. }
+            | Self::BlobByte { value, .. }
+            | Self::StringChar { value, .. }
+            | Self::StringSlice { value, .. } => value, // Intermediate value is simply taken
         }
     }
     /// Take a `&mut Dynamic` reference from the `Target`.
@@ -288,15 +279,11 @@ impl<'a> Target<'a> {
             Self::SharedValue { guard, .. } => guard,
             Self::TempValue(value) => value,
             #[cfg(not(feature = "no_index"))]
-            Self::Bit { source, .. } => source,
-            #[cfg(not(feature = "no_index"))]
-            Self::BitField { source, .. } => source,
-            #[cfg(not(feature = "no_index"))]
-            Self::BlobByte { source, .. } => source,
-            #[cfg(not(feature = "no_index"))]
-            Self::StringChar { source, .. } => source,
-            #[cfg(not(feature = "no_index"))]
-            Self::StringSlice { source, .. } => source,
+            Self::Bit { source, .. }
+            | Self::BitField { source, .. }
+            | Self::BlobByte { source, .. }
+            | Self::StringChar { source, .. }
+            | Self::StringSlice { source, .. } => source,
         }
     }
     /// Propagate a changed value back to the original source.

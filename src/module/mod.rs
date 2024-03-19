@@ -2029,7 +2029,7 @@ impl Module {
                         })
                         .map(|(&k, f)| (k, f.clone())),
                 ),
-                None => self.functions = other.functions.clone(),
+                None => self.functions.clone_from(&other.functions),
             }
         }
         self.dynamic_functions_filter += &other.dynamic_functions_filter;
