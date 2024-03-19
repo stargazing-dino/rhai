@@ -1344,6 +1344,7 @@ impl Engine {
                 Token::False => Expr::BoolConstant(false, settings.pos),
                 token => unreachable!("token is {:?}", token),
             },
+            Token::ExclusiveRange | Token::InclusiveRange => Expr::IntegerConstant(0, settings.pos),
             #[cfg(not(feature = "no_float"))]
             Token::FloatConstant(x) => {
                 let x = x.0;
@@ -2014,6 +2015,13 @@ impl Engine {
                 }
                 .into_fn_call_expr(pos))
             }
+            Token::RightBracket => {
+                let v = state.input.peek();
+                match v {
+                    Some((Token::RightBracket, _)) => Ok(Expr::Unit(settings.pos.clone())),
+                    _ => self.parse_primary(state, settings, ChainingFlags::empty()),
+                }
+            }
             // <EOF>
             Token::EOF => Err(PERR::UnexpectedEOF.into_err(settings.pos)),
             // All other tokens
@@ -2411,6 +2419,12 @@ impl Engine {
                         };
                         not_base.into_fn_call_expr(pos)
                     }
+                }
+                Token::ExclusiveRange | Token::InclusiveRange => {
+                    if op_base.args[1].is_unit() {
+                        let _ = op_base.args[1].take();
+                    }
+                    op_base.into_fn_call_expr(pos)
                 }
 
                 #[cfg(not(feature = "no_custom_syntax"))]
