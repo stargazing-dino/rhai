@@ -122,6 +122,15 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         self
     }
 
+    /// Set a pretty-print name for the `type_of` function and comments.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn with_name_and_comments(&mut self, name: &str, comments: &[&str]) -> &mut Self {
+        self.engine
+            .register_type_with_name_and_comments::<T>(name, comments);
+        self
+    }
+
     /// Pretty-print this custom type.
     #[inline(always)]
     pub fn on_print(

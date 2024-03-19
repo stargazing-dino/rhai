@@ -17,7 +17,7 @@ const OPTION_EXTRA: &str = "extra";
 
 /// Derive the `CustomType` trait for a struct.
 pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
-    let type_name = input.ident;
+    let type_name = input.ident.clone();
     let mut display_name = quote! { stringify!(#type_name) };
     let mut field_accessors = Vec::new();
     let mut extras = Vec::new();
@@ -112,11 +112,28 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
         }
     };
 
+    let docs = {
+        #[cfg(feature = "metadata")]
+        {
+            let Ok(docs) = crate::attrs::doc_attributes(&input.attrs) else {
+                return syn::Error::new(Span::call_site(), "failed to parse doc comments")
+                    .into_compile_error();
+            };
+            // Not sure how to make a Vec<String> a literal, using a string instead.
+            let docs = proc_macro2::Literal::string(&docs.join("\n"));
+            quote! { builder.with_name_and_comments(#display_name, &#docs.lines().collect::<Vec<_>>()[..]); }
+        }
+        #[cfg(not(feature = "metadata"))]
+        {
+            quote! { builder.with_name(#display_name); }
+        }
+    };
+
     quote! {
         impl CustomType for #type_name {
             fn build(mut builder: TypeBuilder<Self>) {
                 #(#errors)*
-                builder.with_name(#display_name);
+                #docs
                 #(#field_accessors)*
                 #(#extras(&mut builder);)*
             }
@@ -220,6 +237,7 @@ fn scan_fields(fields: &[&Field], accessors: &mut Vec<TokenStream>, errors: &mut
                         errors.push(syn::Error::new(path.span(), msg).into_compile_error());
                         continue;
                     }
+
                     // Error
                     _ => {
                         errors.push(

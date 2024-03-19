@@ -244,6 +244,60 @@ impl Engine {
         self
     }
     /// Register a custom type for use with the [`Engine`], with a pretty-print name
+    /// for the `type_of` function and comments. The type must implement [`Clone`],
+    /// and the "metadata" feature must be enabled.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// #[derive(Clone)]
+    /// struct TestStruct {
+    ///     field: i64
+    /// }
+    ///
+    /// impl TestStruct {
+    ///     fn new() -> Self {
+    ///         Self { field: 1 }
+    ///     }
+    /// }
+    ///
+    /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
+    /// use rhai::Engine;
+    ///
+    /// let mut engine = Engine::new();
+    ///
+    /// // Register API for the custom type.
+    /// engine
+    ///     .register_type::<TestStruct>()
+    ///     .register_fn("new_ts", TestStruct::new);
+    ///
+    /// assert_eq!(
+    ///     engine.eval::<String>("let x = new_ts(); type_of(x)")?,
+    ///     "rust_out::TestStruct"
+    /// );
+    ///
+    /// // Re-register the custom type with a name and comments.
+    /// engine.register_type_with_name_and_comments::<TestStruct>("Hello", &vec!["A comment for this type"]);
+    ///
+    /// assert_eq!(
+    ///     engine.eval::<String>("let x = new_ts(); type_of(x)")?,
+    ///     "Hello"
+    /// );
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn register_type_with_name_and_comments<T: Variant + Clone>(
+        &mut self,
+        name: &str,
+        comments: &[&str],
+    ) -> &mut Self {
+        self.global_namespace_mut()
+            .set_custom_type_with_comments::<T>(name, comments);
+        self
+    }
+    /// Register a custom type for use with the [`Engine`], with a pretty-print name
     /// for the `type_of` function. The type must implement [`Clone`].
     ///
     /// # WARNING - Low Level API

@@ -9,6 +9,8 @@ use rhai::{CustomType, Engine, EvalAltResult, TypeBuilder};
 
 #[cfg(not(feature = "no_object"))]
 fn main() -> Result<(), Box<EvalAltResult>> {
+    /// This is a test structure. If the metadata feature
+    /// is enabled, this comment will be exported.
     #[derive(Debug, Clone, CustomType)]
     #[rhai_type(extra = Self::build_extra)]
     struct TestStruct {
@@ -46,6 +48,8 @@ fn main() -> Result<(), Box<EvalAltResult>> {
             .gen_fn_signatures(false)
             .into_iter()
             .for_each(|func| println!("{func}"));
+
+        println!("{}", engine.gen_fn_metadata_to_json(false).unwrap());
 
         println!();
     }
