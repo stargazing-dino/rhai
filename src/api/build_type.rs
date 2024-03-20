@@ -194,6 +194,24 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         self
     }
 
+    /// Register a getter function with comments.
+    ///
+    /// The function signature must start with `&mut self` and not `&self`.
+    ///
+    /// Not available under `no_object`.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn with_get_and_comments<const X: bool, R: Variant + Clone, const F: bool>(
+        &mut self,
+        name: impl AsRef<str>,
+        comments: &[&str],
+        get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X, R, F> + SendSync + 'static,
+    ) -> &mut Self {
+        self.engine
+            .register_get_with_comments(name, comments, get_fn);
+        self
+    }
+
     /// Register a setter function.
     ///
     /// Not available under `no_object`.
@@ -204,6 +222,22 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_set(name, set_fn);
+        self
+    }
+
+    /// Register a setter function.
+    ///
+    /// Not available under `no_object`.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn with_set_and_comments<const X: bool, R: Variant + Clone, const F: bool>(
+        &mut self,
+        name: impl AsRef<str>,
+        comments: &[&str],
+        set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X, (), F> + SendSync + 'static,
+    ) -> &mut Self {
+        self.engine
+            .register_set_with_comments(name, comments, set_fn);
         self
     }
 
@@ -226,6 +260,31 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_get_set(name, get_fn, set_fn);
+        self
+    }
+
+    /// Short-hand for registering both getter and setter functions.
+    ///
+    /// All function signatures must start with `&mut self` and not `&self`.
+    ///
+    /// Not available under `no_object`.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn with_get_set_and_comments<
+        const X1: bool,
+        const X2: bool,
+        R: Variant + Clone,
+        const F1: bool,
+        const F2: bool,
+    >(
+        &mut self,
+        name: impl AsRef<str>,
+        comments: &[&str],
+        get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X1, R, F1> + SendSync + 'static,
+        set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X2, (), F2> + SendSync + 'static,
+    ) -> &mut Self {
+        self.engine
+            .register_get_set_with_comments(name, comments, get_fn, set_fn);
         self
     }
 }
@@ -251,6 +310,28 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         self
     }
 
+    /// Register an index getter.
+    ///
+    /// The function signature must start with `&mut self` and not `&self`.
+    ///
+    /// Not available under both `no_index` and `no_object`.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn with_indexer_get_and_comments<
+        IDX: Variant + Clone,
+        const X: bool,
+        R: Variant + Clone,
+        const F: bool,
+    >(
+        &mut self,
+        comments: &[&str],
+        get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X, R, F> + SendSync + 'static,
+    ) -> &mut Self {
+        self.engine
+            .register_indexer_get_with_comments(comments, get_fn);
+        self
+    }
+
     /// Register an index setter.
     ///
     /// Not available under both `no_index` and `no_object`.
@@ -265,6 +346,27 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_set(set_fn);
+        self
+    }
+
+    /// Register an index setter.
+    ///
+    /// Not available under both `no_index` and `no_object`.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn with_indexer_set_and_comments<
+        IDX: Variant + Clone,
+        const X: bool,
+        R: Variant + Clone,
+        const F: bool,
+        S: AsRef<str>,
+    >(
+        &mut self,
+        comments: impl IntoIterator<Item = S>,
+        set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X, (), F> + SendSync + 'static,
+    ) -> &mut Self {
+        self.engine
+            .register_indexer_set_with_comments(comments, set_fn);
         self
     }
 
@@ -285,6 +387,29 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
         self.engine.register_indexer_get_set(get_fn, set_fn);
+        self
+    }
+
+    /// Short-hand for registering both index getter and setter functions.
+    ///
+    /// Not available under both `no_index` and `no_object`.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn with_indexer_get_set_and_comments<
+        IDX: Variant + Clone,
+        const X1: bool,
+        const X2: bool,
+        R: Variant + Clone,
+        const F1: bool,
+        const F2: bool,
+    >(
+        &mut self,
+        comments: &[&str],
+        get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X1, R, F1> + SendSync + 'static,
+        set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X2, (), F2> + SendSync + 'static,
+    ) -> &mut Self {
+        self.engine
+            .register_indexer_get_set_with_comments(comments, get_fn, set_fn);
         self
     }
 }

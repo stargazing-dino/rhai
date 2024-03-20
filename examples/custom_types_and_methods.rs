@@ -14,6 +14,13 @@ fn main() -> Result<(), Box<EvalAltResult>> {
     #[derive(Debug, Clone, CustomType)]
     #[rhai_type(extra = Self::build_extra)]
     struct TestStruct {
+        /// A number.
+        ///
+        /// ```js
+        /// let t = new_ts();
+        /// print(t.x); // Get the value of x.
+        /// t.x = 42;   // Set the value of x.
+        /// ```
         x: i64,
     }
 
