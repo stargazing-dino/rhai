@@ -103,8 +103,10 @@ mod custom_type_tests {
                 #[cfg(not(feature = "no_float"))]
                 rhai::FLOAT,
                 INT,
+                /// boo comments.
                 #[rhai_type(name = "boo", readonly)]
                 String,
+                /// This is a vector.
                 Vec<INT>
             );
         };
@@ -116,13 +118,15 @@ mod custom_type_tests {
         let expected = quote! {
             impl CustomType for Bar {
                 fn build(mut builder: TypeBuilder<Self>) {
-                    builder.with_name_and_comments(stringify!(Bar));
+                    builder.with_name_and_comments(stringify!(Bar), &"/// Bar comments.".lines().collect::<Vec<_>>()[..]);
                     builder.with_get_set_and_comments("field1",
+                        &"".lines().collect::<Vec<_>>()[..],
                         |obj: &mut Self| obj.1.clone(),
                         |obj: &mut Self, val| obj.1 = val
                     );
-                    builder.with_get_and_comments("boo", |obj: &mut Self| obj.2.clone());
+                    builder.with_get_and_comments("boo", &"/// boo comments.".lines().collect::<Vec<_>>()[..], |obj: &mut Self| obj.2.clone());
                     builder.with_get_set_and_comments("field3",
+                        &"/// This is a vector.".lines().collect::<Vec<_>>()[..],
                         |obj: &mut Self| obj.3.clone(),
                         |obj: &mut Self, val| obj.3 = val
                     );
@@ -136,6 +140,7 @@ mod custom_type_tests {
     #[test]
     fn test_custom_type_struct() {
         let input = quote! {
+            /// Foo comments.
             #[derive(CustomType)]
             #[rhai_type(skip, name = "MyFoo", extra = Self::build_extra)]
             pub struct Foo {
@@ -144,6 +149,7 @@ mod custom_type_tests {
                 _dummy: rhai::FLOAT,
                 #[rhai_type(get = get_bar)]
                 pub bar: INT,
+                /// boo comments.
                 #[rhai_type(name = "boo", readonly)]
                 pub(crate) baz: String,
                 #[rhai_type(set = Self::set_qux)]
@@ -158,13 +164,14 @@ mod custom_type_tests {
         let expected = quote! {
             impl CustomType for Foo {
                 fn build(mut builder: TypeBuilder<Self>) {
-                    builder.with_name_and_comments("MyFoo");
-                    builder.with_get_set_and_comments(stringify!(bar),
+                    builder.with_name_and_comments("MyFoo", &"/// Foo comments.".lines().collect::<Vec<_>>()[..]);
+                    builder.with_get_set_and_comments(stringify!(bar), &"".lines().collect::<Vec<_>>()[..],
                         |obj: &mut Self| get_bar(&*obj),
                         |obj: &mut Self, val| obj.bar = val
                     );
-                    builder.with_get_and_comments("boo", |obj: &mut Self| obj.baz.clone());
+                    builder.with_get_and_comments("boo", &"/// boo comments.".lines().collect::<Vec<_>>()[..], |obj: &mut Self| obj.baz.clone());
                     builder.with_get_set_and_comments(stringify!(qux),
+                        &"".lines().collect::<Vec<_>>()[..],
                         |obj: &mut Self| obj.qux.clone(),
                         Self::set_qux
                     );
