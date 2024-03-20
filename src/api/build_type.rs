@@ -3,11 +3,15 @@ use crate::func::SendSync;
 use crate::packages::string_basic::{FUNC_TO_DEBUG, FUNC_TO_STRING};
 use crate::{types::dynamic::Variant, Engine, Identifier, RhaiNativeFunc};
 use std::marker::PhantomData;
+
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
 #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
 use crate::func::register::Mut;
+
+#[cfg(feature = "metadata")]
+use crate::FuncRegistration;
 
 /// Trait to build the API of a custom type for use with an [`Engine`]
 /// (i.e. register the type and its getters, setters, methods, etc.).
@@ -209,8 +213,9 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         comments: &[&str],
         get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine
-            .register_get_with_comments(name, comments, get_fn);
+        FuncRegistration::new_getter(name)
+            .with_comments(comments)
+            .register_into_engine(self.engine, get_fn);
         self
     }
 
@@ -239,8 +244,9 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         comments: &[&str],
         set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine
-            .register_set_with_comments(name, comments, set_fn);
+        FuncRegistration::new_setter(name)
+            .with_comments(comments)
+            .register_into_engine(self.engine, set_fn);
         self
     }
 
@@ -287,9 +293,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X1, R, F1> + SendSync + 'static,
         set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine
-            .register_get_set_with_comments(name, comments, get_fn, set_fn);
-        self
+        self.with_get_and_comments(&name, comments, get_fn)
+            .with_set_and_comments(&name, comments, set_fn)
     }
 }
 
@@ -332,8 +337,10 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         comments: &[&str],
         get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine
-            .register_indexer_get_with_comments(comments, get_fn);
+        FuncRegistration::new_index_getter()
+            .with_comments(comments)
+            .register_into_engine(self.engine, get_fn);
+
         self
     }
 
@@ -371,8 +378,9 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         comments: impl IntoIterator<Item = S>,
         set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine
-            .register_indexer_set_with_comments(comments, set_fn);
+        FuncRegistration::new_index_setter()
+            .with_comments(comments)
+            .register_into_engine(self.engine, set_fn);
         self
     }
 
@@ -415,8 +423,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X1, R, F1> + SendSync + 'static,
         set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine
-            .register_indexer_get_set_with_comments(comments, get_fn, set_fn);
-        self
+        self.with_indexer_get_and_comments(comments, get_fn)
+            .with_indexer_set_and_comments(comments, set_fn)
     }
 }

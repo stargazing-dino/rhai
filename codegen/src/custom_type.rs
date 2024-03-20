@@ -294,7 +294,6 @@ fn scan_fields(fields: &[&Field], accessors: &mut Vec<TokenStream>, errors: &mut
                         } else {
                             quote! { builder.with_get_set_and_comments(#name, &#docs.lines().collect::<Vec<_>>()[..], #get, #set); }
                         }
-                
                     },
                     Err(_) => {
                         errors.push(syn::Error::new(Span::call_site(), format!("failed to parse doc comments for field {}", quote! { #name })).into_compile_error());
