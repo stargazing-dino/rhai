@@ -479,8 +479,8 @@ impl AST {
             other.resolver.as_deref().map_or(true, |r| r.is_empty()),
         ) {
             (true, true) => (),
-            (false, true) => _ast.resolver = self.resolver.clone(),
-            (true, false) => _ast.resolver = other.resolver.clone(),
+            (false, true) => _ast.resolver.clone_from(&self.resolver),
+            (true, false) => _ast.resolver.clone_from(&other.resolver),
             (false, false) => {
                 let mut resolver = self.resolver.as_deref().unwrap().clone();
                 for (k, v) in other.resolver.as_deref().unwrap() {
@@ -573,7 +573,7 @@ impl AST {
             other.resolver.as_deref().map_or(true, |r| r.is_empty()),
         ) {
             (_, true) => (),
-            (true, false) => self.resolver = other.resolver.clone(),
+            (true, false) => self.resolver.clone_from(&other.resolver),
             (false, false) => {
                 let resolver = crate::func::shared_make_mut(self.resolver.as_mut().unwrap());
                 let other_resolver = crate::func::shared_take_or_clone(other.resolver.unwrap());

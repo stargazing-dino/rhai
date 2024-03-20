@@ -19,9 +19,10 @@ Deprecated API's
 New features
 ------------
 
+* Sub-strings can now be selected from full strings by indexing via ranges (e.g. `s[1..4]`).
 * New options `Engine::set_max_strings_interned` and `Engine::max_strings_interned` are added to limit the maximum number of strings interned in the `Engine`'s string interner.
-* A new advanced callback can now be registered (gated under the `internals` feature), `Engine::on_invalid_array_index`, to handle access to missing properties in object maps.
-* A new advanced callback can now be registered (gated under the `internals` feature), `Engine::on_missing_map_property`, to handle out-of-bound index into arrays.
+* A new advanced callback, `Engine::on_invalid_array_index`, is added (gated under the `internals` feature) to handle access to missing properties in object maps.
+* A new advanced callback, `Engine::on_missing_map_property`, is added (gated under the `internals` feature) to handle out-of-bound index into arrays.
 
 Enhancements
 ------------

@@ -448,6 +448,29 @@ pub fn get_builtin_binary_op_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Option<
         impl_decimal!(INT, as_int, Decimal, as_decimal);
     }
 
+    // Ranges
+    if *op == ExclusiveRange && type1 == TypeId::of::<INT>() && type2 == TypeId::of::<()>() {
+        return Some((
+            |_ctx, args| Ok((args[0].as_int().unwrap()..INT::MAX).into()),
+            false,
+        ));
+    } else if *op == ExclusiveRange && type1 == TypeId::of::<()>() && type2 == TypeId::of::<INT>() {
+        return Some((
+            |_ctx, args| Ok((0..args[1].as_int().unwrap()).into()),
+            false,
+        ));
+    } else if *op == ExclusiveRange && type1 == TypeId::of::<INT>() && type2 == TypeId::of::<()>() {
+        return Some((
+            |_ctx, args| Ok((args[0].as_int().unwrap()..=INT::MAX).into()),
+            false,
+        ));
+    } else if *op == ExclusiveRange && type1 == TypeId::of::<()>() && type2 == TypeId::of::<INT>() {
+        return Some((
+            |_ctx, args| Ok((0..=args[1].as_int().unwrap()).into()),
+            false,
+        ));
+    }
+
     // char op string
     if (type1, type2) == (TypeId::of::<char>(), TypeId::of::<ImmutableString>()) {
         fn get_s1s2(args: &FnCallArgs) -> ([Option<char>; 2], [Option<char>; 2]) {
