@@ -99,7 +99,7 @@ impl Engine {
 
         self
     }
-    /// Register a custom function with the [`Engine`].
+    /// Register a custom function with the [`Engine`] with a set of comments.
     /// This method is only available with the metadata feature enabled.
     ///
     /// # Assumptions
@@ -353,7 +353,7 @@ impl Engine {
     /// );
     ///
     /// // Re-register the custom type with a name and comments.
-    /// engine.register_type_with_name_and_comments::<TestStruct>("Hello", &vec!["A comment for this type"]);
+    /// engine.register_type_with_name_and_comments::<TestStruct>("Hello", &["A comment for this type"]);
     ///
     /// assert_eq!(
     ///     engine.eval::<String>("let x = new_ts(); type_of(x)")?,
@@ -462,7 +462,7 @@ impl Engine {
         self.register_fn(crate::engine::make_getter(name.as_ref()), get_fn)
     }
 
-    /// Register a getter function for a member of a registered type with the [`Engine`].
+    /// Register a getter function for a member of a registered type with the [`Engine`] with comments.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
     ///
@@ -496,7 +496,7 @@ impl Engine {
     ///     .register_type::<TestStruct>()
     ///     .register_fn("new_ts", TestStruct::new)
     ///     // Register a getter on a property (notice it doesn't have to be the same name).
-    ///     .register_get("xyz", TestStruct::get_field);
+    ///     .register_get_with_comments("xyz", &["get the field"], TestStruct::get_field);
     ///
     /// assert_eq!(engine.eval::<i64>("let a = new_ts(); a.xyz")?, 1);
     /// # Ok(())
@@ -568,7 +568,7 @@ impl Engine {
     ) -> &mut Self {
         self.register_fn(crate::engine::make_setter(name.as_ref()), set_fn)
     }
-    /// Register a setter function for a member of a registered type with the [`Engine`].
+    /// Register a setter function for a member of a registered type with the [`Engine`] with comments.
     ///
     /// Not available under `no_object`.
     ///
@@ -599,7 +599,7 @@ impl Engine {
     ///     .register_type::<TestStruct>()
     ///     .register_fn("new_ts", TestStruct::new)
     ///     // Register a setter on a property (notice it doesn't have to be the same name)
-    ///     .register_set("xyz", TestStruct::set_field);
+    ///     .register_set_with_comments("xyz", &["setter comments"], TestStruct::set_field);
     ///
     /// // Notice that, with a getter, there is no way to get the property value
     /// assert_eq!(
@@ -688,7 +688,7 @@ impl Engine {
         self.register_get(&name, get_fn).register_set(&name, set_fn)
     }
     /// Short-hand for registering both getter and setter functions
-    /// of a registered type with the [`Engine`].
+    /// of a registered type with the [`Engine`] with comments.
     ///
     /// All function signatures must start with `&mut self` and not `&self`.
     ///
@@ -726,7 +726,7 @@ impl Engine {
     ///     .register_fn("new_ts", TestStruct::new)
     ///     // Register both a getter and a setter on a property
     ///     // (notice it doesn't have to be the same name)
-    ///     .register_get_set("xyz", TestStruct::get_field, TestStruct::set_field);
+    ///     .register_get_set_with_comments("xyz", &["comments"], TestStruct::get_field, TestStruct::set_field);
     ///
     /// assert_eq!(engine.eval::<i64>("let a = new_ts(); a.xyz = 42; a.xyz")?, 42);
     /// # Ok(())
@@ -857,7 +857,7 @@ impl Engine {
     /// engine
     ///     .register_fn("new_ts", TestStruct::new)
     ///     // Register an indexer.
-    ///     .register_indexer_get(TestStruct::get_field);
+    ///     .register_indexer_get_with_comments(&["comments"], TestStruct::get_field);
     ///
     /// # #[cfg(not(feature = "no_index"))]
     /// assert_eq!(engine.eval::<i64>("let a = new_ts(); a[2]")?, 3);
@@ -943,7 +943,7 @@ impl Engine {
     ) -> &mut Self {
         self.register_fn(crate::engine::FN_IDX_SET, set_fn)
     }
-    /// Register an index setter for a custom type with the [`Engine`].
+    /// Register an index setter for a custom type with the [`Engine`] with comments.
     ///
     /// Not available under both `no_index` and `no_object`.
     ///
@@ -982,7 +982,7 @@ impl Engine {
     /// engine
     ///     .register_fn("new_ts", TestStruct::new)
     ///     // Register an indexer.
-    ///     .register_indexer_set(TestStruct::set_field);
+    ///     .register_indexer_set_with_comments(&["comments"], TestStruct::set_field);
     ///
     /// # #[cfg(not(feature = "no_index"))]
     /// let result = engine.eval::<TestStruct>("let a = new_ts(); a[2] = 42; a")?;
@@ -1077,7 +1077,7 @@ impl Engine {
         self.register_indexer_get(get_fn)
             .register_indexer_set(set_fn)
     }
-    /// Short-hand for registering both index getter and setter functions for a custom type with the [`Engine`].
+    /// Short-hand for registering both index getter and setter functions for a custom type with the [`Engine`] with comments.
     ///
     /// Not available under both `no_index` and `no_object`.
     ///
@@ -1120,7 +1120,7 @@ impl Engine {
     /// engine
     ///     .register_fn("new_ts", TestStruct::new)
     ///     // Register an indexer.
-    ///     .register_indexer_get_set(TestStruct::get_field, TestStruct::set_field);
+    ///     .register_indexer_get_set_with_comments(&["comments"], TestStruct::get_field, TestStruct::set_field);
     ///
     /// # #[cfg(not(feature = "no_index"))]
     /// assert_eq!(engine.eval::<i64>("let a = new_ts(); a[2] = 42; a[2]")?, 42);

@@ -123,6 +123,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     }
 
     /// Set a pretty-print name for the `type_of` function and comments.
+    /// Available with the metadata feature only.
     #[cfg(feature = "metadata")]
     #[inline(always)]
     pub fn with_name_and_comments(&mut self, name: &str, comments: &[&str]) -> &mut Self {
@@ -195,6 +196,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     }
 
     /// Register a getter function with comments.
+    /// Available with the metadata feature only.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
     ///
@@ -225,7 +227,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         self
     }
 
-    /// Register a setter function.
+    /// Register a setter function with comments.
+    /// Available with the metadata feature only.
     ///
     /// Not available under `no_object`.
     #[cfg(feature = "metadata")]
@@ -263,7 +266,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         self
     }
 
-    /// Short-hand for registering both getter and setter functions.
+    /// Short-hand for registering both getter and setter functions with comments.
+    /// Available with the metadata feature only.
     ///
     /// All function signatures must start with `&mut self` and not `&self`.
     ///
@@ -310,7 +314,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         self
     }
 
-    /// Register an index getter.
+    /// Register an index getter with comments.
+    /// Available with the metadata feature only.
     ///
     /// The function signature must start with `&mut self` and not `&self`.
     ///
@@ -349,7 +354,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         self
     }
 
-    /// Register an index setter.
+    /// Register an index setter with comments.
+    /// Available with the metadata feature only.
     ///
     /// Not available under both `no_index` and `no_object`.
     #[cfg(feature = "metadata")]
@@ -390,7 +396,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         self
     }
 
-    /// Short-hand for registering both index getter and setter functions.
+    /// Short-hand for registering both index getter and setter functions with comments.
+    /// Available with the metadata feature only.
     ///
     /// Not available under both `no_index` and `no_object`.
     #[cfg(feature = "metadata")]
