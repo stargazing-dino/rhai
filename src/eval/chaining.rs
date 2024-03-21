@@ -207,13 +207,25 @@ impl Engine {
                 // val_int[range]
                 let (shift, mask) = if let Some(range) = idx.read_lock::<crate::ExclusiveRange>() {
                     let start = range.start;
-                    let end = range.end;
+                    let end = if range.end == crate::INT::MAX {
+                        crate::INT_BITS as crate::INT
+                    } else {
+                        range.end
+                    };
 
                     let start = super::calc_index(crate::INT_BITS, start, false, || {
                         ERR::ErrorBitFieldBounds(crate::INT_BITS, start, idx_pos).into()
                     })?;
                     let end = super::calc_index(crate::INT_BITS, end, false, || {
-                        ERR::ErrorBitFieldBounds(crate::INT_BITS, end, idx_pos).into()
+                        if end >= 0
+                            && end < crate::MAX_USIZE_INT
+                            && (end as usize) <= crate::INT_BITS
+                        {
+                            // Handle largest value
+                            Ok(end as usize)
+                        } else {
+                            ERR::ErrorBitFieldBounds(crate::INT_BITS, end, idx_pos).into()
+                        }
                     })?;
 
                     #[allow(clippy::cast_possible_truncation)]
@@ -233,7 +245,11 @@ impl Engine {
                     }
                 } else if let Some(range) = idx.read_lock::<crate::InclusiveRange>() {
                     let start = *range.start();
-                    let end = *range.end();
+                    let end = if *range.end() == crate::INT::MAX {
+                        (crate::INT_BITS - 1) as crate::INT
+                    } else {
+                        *range.end()
+                    };
 
                     let start = super::calc_index(crate::INT_BITS, start, false, || {
                         ERR::ErrorBitFieldBounds(crate::INT_BITS, start, idx_pos).into()
