@@ -1314,13 +1314,13 @@ impl Engine {
         mut settings: ParseSettings,
         options: ChainingFlags,
     ) -> ParseResult<Expr> {
-        let (token, token_pos) = state.input.peek().unwrap();
+        let (next_token, next_token_pos) = state.input.peek().unwrap();
 
-        settings.pos = *token_pos;
+        settings.pos = *next_token_pos;
 
-        let root_expr = match token {
-            _ if !(state.expr_filter)(token) => {
-                return Err(LexError::UnexpectedInput(token.to_string()).into_err(settings.pos))
+        let root_expr = match next_token {
+            _ if !(state.expr_filter)(next_token) => {
+                return Err(LexError::UnexpectedInput(next_token.to_string()).into_err(settings.pos))
             }
 
             Token::EOF => return Err(PERR::UnexpectedEOF.into_err(settings.pos)),
@@ -1700,7 +1700,9 @@ impl Engine {
                 token => unreachable!("Token::LexError expected but gets {:?}", token),
             },
 
-            _ => return Err(LexError::UnexpectedInput(token.to_string()).into_err(settings.pos)),
+            _ => {
+                return Err(LexError::UnexpectedInput(next_token.to_string()).into_err(settings.pos))
+            }
         };
 
         if !(state.expr_filter)(&state.input.peek().unwrap().0) {
@@ -2015,13 +2017,6 @@ impl Engine {
                 }
                 .into_fn_call_expr(pos))
             }
-            Token::RightBracket => {
-                let v = state.input.peek();
-                match v {
-                    Some((Token::RightBracket, _)) => Ok(Expr::Unit(settings.pos.clone())),
-                    _ => self.parse_primary(state, settings, ChainingFlags::empty()),
-                }
-            }
             // <EOF>
             Token::EOF => Err(PERR::UnexpectedEOF.into_err(settings.pos)),
             // All other tokens
@@ -2335,7 +2330,25 @@ impl Engine {
 
             let (op_token, pos) = state.input.next().unwrap();
 
-            let rhs = self.parse_unary(state, settings)?;
+            // Parse the RHS
+            let rhs = match op_token {
+                // [xxx..] | (xxx..) | {xxx..} | xxx.., | xxx..; | xxx.. =>
+                // [xxx..=] | (xxx..=) | {xxx..=} | xxx..=, | xxx..=; | xxx..= =>
+                Token::ExclusiveRange | Token::InclusiveRange => {
+                    let (next_op, next_pos) = state.input.peek().unwrap();
+
+                    match next_op {
+                        Token::RightBracket
+                        | Token::RightParen
+                        | Token::RightBrace
+                        | Token::Comma
+                        | Token::SemiColon
+                        | Token::DoubleArrow => Expr::Unit(*next_pos),
+                        _ => self.parse_unary(state, settings)?,
+                    }
+                }
+                _ => self.parse_unary(state, settings)?,
+            };
 
             let (next_op, next_pos) = state.input.peek().unwrap();
             let next_precedence = match next_op {
@@ -2420,12 +2433,7 @@ impl Engine {
                         not_base.into_fn_call_expr(pos)
                     }
                 }
-                Token::ExclusiveRange | Token::InclusiveRange => {
-                    if op_base.args[1].is_unit() {
-                        let _ = op_base.args[1].take();
-                    }
-                    op_base.into_fn_call_expr(pos)
-                }
+                Token::ExclusiveRange | Token::InclusiveRange => op_base.into_fn_call_expr(pos),
 
                 #[cfg(not(feature = "no_custom_syntax"))]
                 Token::Custom(s) if self.custom_keywords.contains_key(&*s) => {
