@@ -398,6 +398,27 @@ impl FuncRegistration {
         R: Variant + Clone,
         FUNC: RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
     {
+        #[cfg(feature = "metadata")]
+        {
+            let mut param_type_names = FUNC::param_names()
+                .iter()
+                .map(|ty| format!("_: {}", engine.format_param_type(ty)))
+                .collect::<crate::FnArgsVec<_>>();
+
+            if FUNC::return_type() != TypeId::of::<()>() {
+                param_type_names.push(engine.format_param_type(FUNC::return_type_name()).into());
+            }
+
+            let param_type_names = param_type_names
+                .iter()
+                .map(String::as_str)
+                .collect::<crate::FnArgsVec<_>>();
+
+            self.with_params_info(param_type_names)
+                .in_global_namespace()
+                .set_into_module(engine.global_namespace_mut(), func)
+        }
+        #[cfg(not(feature = "metadata"))]
         self.in_global_namespace()
             .set_into_module(engine.global_namespace_mut(), func)
     }
