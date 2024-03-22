@@ -550,13 +550,6 @@ impl FuncRegistration {
 
         &entry.1
     }
-
-    /// Get the hash value of the function.
-    #[cfg(feature = "metadata")]
-    #[must_use]
-    pub fn hash(&self) -> u64 {
-        self.metadata.hash
-    }
 }
 
 bitflags! {
