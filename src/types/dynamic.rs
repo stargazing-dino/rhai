@@ -536,9 +536,17 @@ impl fmt::Display for Dynamic {
                 }
 
                 if let Some(range) = _value_any.downcast_ref::<ExclusiveRange>() {
-                    return write!(f, "{}..{}", range.start, range.end);
+                    return if range.end == INT::MAX {
+                        write!(f, "{}..", range.start)
+                    } else {
+                        write!(f, "{}..{}", range.start, range.end)
+                    };
                 } else if let Some(range) = _value_any.downcast_ref::<InclusiveRange>() {
-                    return write!(f, "{}..={}", range.start(), range.end());
+                    return if *range.end() == INT::MAX {
+                        write!(f, "{}..=", range.start())
+                    } else {
+                        write!(f, "{}..={}", range.start(), range.end())
+                    };
                 }
 
                 f.write_str((***v).type_name())
@@ -696,9 +704,17 @@ impl fmt::Debug for Dynamic {
                 }
 
                 if let Some(range) = _value_any.downcast_ref::<ExclusiveRange>() {
-                    return write!(f, "{}..{}", range.start, range.end);
+                    return if range.end == INT::MAX {
+                        write!(f, "{}..", range.start)
+                    } else {
+                        write!(f, "{}..{}", range.start, range.end)
+                    };
                 } else if let Some(range) = _value_any.downcast_ref::<InclusiveRange>() {
-                    return write!(f, "{}..={}", range.start(), range.end());
+                    return if *range.end() == INT::MAX {
+                        write!(f, "{}..=", range.start())
+                    } else {
+                        write!(f, "{}..={}", range.start(), range.end())
+                    };
                 }
 
                 f.write_str((***v).type_name())
