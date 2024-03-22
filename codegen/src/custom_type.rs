@@ -113,6 +113,10 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
     };
 
     let register = {
+        let method = {
+            quote! { builder.with_name(#display_name) }
+        };
+
         #[cfg(feature = "metadata")]
         {
             let Ok(docs) = crate::attrs::doc_attributes(&input.attrs) else {
@@ -121,12 +125,10 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
             };
             // Not sure how to make a Vec<String> a literal, using a string instead.
             let docs = proc_macro2::Literal::string(&docs.join("\n"));
-            quote! { builder.with_name_and_comments(#display_name, &#docs.lines().collect::<Vec<_>>()[..]); }
+            quote! {  #method.with_comments(&#docs.lines().collect::<Vec<_>>()[..]); }
         }
         #[cfg(not(feature = "metadata"))]
-        {
-            quote! { builder.with_name(#display_name); }
-        }
+        quote! { #method; }
     };
 
     quote! {

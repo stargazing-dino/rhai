@@ -118,7 +118,7 @@ mod custom_type_tests {
         let expected = quote! {
             impl CustomType for Bar {
                 fn build(mut builder: TypeBuilder<Self>) {
-                    builder.with_name_and_comments(stringify!(Bar), &"/// Bar comments.".lines().collect::<Vec<_>>()[..]);
+                    builder.with_name(stringify!(Bar)).with_comments(&"/// Bar comments.".lines().collect::<Vec<_>>()[..]);
                     builder.with_get_set("field1",
                         |obj: &mut Self| obj.1.clone(),
                         |obj: &mut Self, val| obj.1 = val
@@ -163,7 +163,7 @@ mod custom_type_tests {
         let expected = quote! {
             impl CustomType for Foo {
                 fn build(mut builder: TypeBuilder<Self>) {
-                    builder.with_name_and_comments("MyFoo", &"/// Foo comments.".lines().collect::<Vec<_>>()[..]);
+                    builder.with_name("MyFoo").with_comments(&"/// Foo comments.".lines().collect::<Vec<_>>()[..]);
                     builder.with_get_set(stringify!(bar),
                         |obj: &mut Self| get_bar(&*obj),
                         |obj: &mut Self, val| obj.bar = val

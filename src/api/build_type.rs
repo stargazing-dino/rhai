@@ -128,7 +128,27 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         self
     }
 
+    /// Set a comments for the type.
+    /// `TypeBuilder::with_name` must be called before this function, otherwise
+    /// the comments will not be registered.
+    ///
+    /// Available with the metadata feature only.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn with_comments(&mut self, comments: &[&str]) -> &mut Self {
+        let namespace = self.engine.global_namespace_mut();
+        if let Some(name) = namespace
+            .get_custom_type_raw::<T>()
+            .map(|ty| ty.display_name.clone())
+        {
+            namespace.set_custom_type_with_comments::<T>(name.as_str(), comments);
+        }
+
+        self
+    }
+
     /// Set a pretty-print name for the `type_of` function and comments.
+    ///
     /// Available with the metadata feature only.
     #[cfg(feature = "metadata")]
     #[inline(always)]
