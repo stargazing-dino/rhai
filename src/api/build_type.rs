@@ -1,6 +1,8 @@
 //! Trait to build a custom type for use with [`Engine`].
 use crate::func::SendSync;
+use crate::module::FuncMetadata;
 use crate::packages::string_basic::{FUNC_TO_DEBUG, FUNC_TO_STRING};
+use crate::FuncRegistration;
 use crate::{types::dynamic::Variant, Engine, Identifier, RhaiNativeFunc};
 use std::marker::PhantomData;
 
@@ -9,9 +11,6 @@ use std::prelude::v1::*;
 
 #[cfg(any(not(feature = "no_index"), not(feature = "no_object")))]
 use crate::func::register::Mut;
-
-#[cfg(feature = "metadata")]
-use crate::FuncRegistration;
 
 /// Trait to build the API of a custom type for use with an [`Engine`]
 /// (i.e. register the type and its getters, setters, methods, etc.).
@@ -104,6 +103,8 @@ impl Engine {
 /// to use [`Engine::register_type_with_name`] instead.
 pub struct TypeBuilder<'a, T: Variant + Clone> {
     engine: &'a mut Engine,
+    /// Keep the latest registered function(s) in cache to add additional metadata.
+    hashes: Option<Vec<u64>>,
     _marker: PhantomData<T>,
 }
 
@@ -113,6 +114,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     fn new(engine: &'a mut Engine) -> Self {
         Self {
             engine,
+            hashes: None,
             _marker: PhantomData,
         }
     }
@@ -142,7 +144,9 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         &mut self,
         on_print: impl Fn(&mut T) -> String + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_fn(FUNC_TO_STRING, on_print);
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new(FUNC_TO_STRING).register_into_engine(self.engine, on_print);
+        self.hashes = Some(vec![*hash]);
         self
     }
 
@@ -150,9 +154,11 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     #[inline(always)]
     pub fn on_debug(
         &mut self,
-        on_print: impl Fn(&mut T) -> String + SendSync + 'static,
+        on_debug: impl Fn(&mut T) -> String + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_fn(FUNC_TO_DEBUG, on_print);
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new(FUNC_TO_DEBUG).register_into_engine(self.engine, on_debug);
+        self.hashes = Some(vec![*hash]);
         self
     }
 
@@ -163,7 +169,24 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         name: impl AsRef<str> + Into<Identifier>,
         method: impl RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_fn(name, method);
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new(name).register_into_engine(self.engine, method);
+        self.hashes = Some(vec![*hash]);
+        self
+    }
+
+    /// Add comments to the last registered function.
+    /// Available under the metadata feature only.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn and_comments(&mut self, comments: &[&str]) -> &mut Self {
+        if let Some(hashes) = &self.hashes {
+            let module = self.engine.global_namespace_mut();
+
+            for hash in hashes {
+                module.update_fn_comments(*hash, comments);
+            }
+        }
         self
     }
 }
@@ -195,27 +218,10 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         name: impl AsRef<str>,
         get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_get(name, get_fn);
-        self
-    }
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new_getter(name).register_into_engine(self.engine, get_fn);
+        self.hashes = Some(vec![*hash]);
 
-    /// Register a getter function with comments.
-    /// Available with the metadata feature only.
-    ///
-    /// The function signature must start with `&mut self` and not `&self`.
-    ///
-    /// Not available under `no_object`.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    pub fn with_get_and_comments<const X: bool, R: Variant + Clone, const F: bool>(
-        &mut self,
-        name: impl AsRef<str>,
-        comments: &[&str],
-        get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X, R, F> + SendSync + 'static,
-    ) -> &mut Self {
-        FuncRegistration::new_getter(name)
-            .with_comments(comments)
-            .register_into_engine(self.engine, get_fn);
         self
     }
 
@@ -228,25 +234,10 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         name: impl AsRef<str>,
         set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_set(name, set_fn);
-        self
-    }
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new_setter(name).register_into_engine(self.engine, set_fn);
+        self.hashes = Some(vec![*hash]);
 
-    /// Register a setter function with comments.
-    /// Available with the metadata feature only.
-    ///
-    /// Not available under `no_object`.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    pub fn with_set_and_comments<const X: bool, R: Variant + Clone, const F: bool>(
-        &mut self,
-        name: impl AsRef<str>,
-        comments: &[&str],
-        set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X, (), F> + SendSync + 'static,
-    ) -> &mut Self {
-        FuncRegistration::new_setter(name)
-            .with_comments(comments)
-            .register_into_engine(self.engine, set_fn);
         self
     }
 
@@ -268,33 +259,15 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X1, R, F1> + SendSync + 'static,
         set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_get_set(name, get_fn, set_fn);
-        self
-    }
+        let hash_1 = FuncRegistration::new_getter(&name)
+            .register_into_engine(self.engine, get_fn)
+            .hash;
+        let hash_2 = FuncRegistration::new_setter(&name)
+            .register_into_engine(self.engine, set_fn)
+            .hash;
+        self.hashes = Some(vec![hash_1, hash_2]);
 
-    /// Short-hand for registering both getter and setter functions with comments.
-    /// Available with the metadata feature only.
-    ///
-    /// All function signatures must start with `&mut self` and not `&self`.
-    ///
-    /// Not available under `no_object`.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    pub fn with_get_set_and_comments<
-        const X1: bool,
-        const X2: bool,
-        R: Variant + Clone,
-        const F1: bool,
-        const F2: bool,
-    >(
-        &mut self,
-        name: impl AsRef<str>,
-        comments: &[&str],
-        get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X1, R, F1> + SendSync + 'static,
-        set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X2, (), F2> + SendSync + 'static,
-    ) -> &mut Self {
-        self.with_get_and_comments(&name, comments, get_fn)
-            .with_set_and_comments(&name, comments, set_fn)
+        self
     }
 }
 
@@ -315,31 +288,9 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         &mut self,
         get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_indexer_get(get_fn);
-        self
-    }
-
-    /// Register an index getter with comments.
-    /// Available with the metadata feature only.
-    ///
-    /// The function signature must start with `&mut self` and not `&self`.
-    ///
-    /// Not available under both `no_index` and `no_object`.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    pub fn with_indexer_get_and_comments<
-        IDX: Variant + Clone,
-        const X: bool,
-        R: Variant + Clone,
-        const F: bool,
-    >(
-        &mut self,
-        comments: &[&str],
-        get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X, R, F> + SendSync + 'static,
-    ) -> &mut Self {
-        FuncRegistration::new_index_getter()
-            .with_comments(comments)
-            .register_into_engine(self.engine, get_fn);
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new_index_getter().register_into_engine(self.engine, get_fn);
+        self.hashes = Some(vec![*hash]);
 
         self
     }
@@ -357,30 +308,10 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         &mut self,
         set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_indexer_set(set_fn);
-        self
-    }
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new_index_setter().register_into_engine(self.engine, set_fn);
+        self.hashes = Some(vec![*hash]);
 
-    /// Register an index setter with comments.
-    /// Available with the metadata feature only.
-    ///
-    /// Not available under both `no_index` and `no_object`.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    pub fn with_indexer_set_and_comments<
-        IDX: Variant + Clone,
-        const X: bool,
-        R: Variant + Clone,
-        const F: bool,
-        S: AsRef<str>,
-    >(
-        &mut self,
-        comments: impl IntoIterator<Item = S>,
-        set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X, (), F> + SendSync + 'static,
-    ) -> &mut Self {
-        FuncRegistration::new_index_setter()
-            .with_comments(comments)
-            .register_into_engine(self.engine, set_fn);
         self
     }
 
@@ -400,30 +331,14 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X1, R, F1> + SendSync + 'static,
         set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_indexer_get_set(get_fn, set_fn);
-        self
-    }
+        let hash_1 = FuncRegistration::new_index_getter()
+            .register_into_engine(self.engine, get_fn)
+            .hash;
+        let hash_2 = FuncRegistration::new_index_setter()
+            .register_into_engine(self.engine, set_fn)
+            .hash;
+        self.hashes = Some(vec![hash_1, hash_2]);
 
-    /// Short-hand for registering both index getter and setter functions with comments.
-    /// Available with the metadata feature only.
-    ///
-    /// Not available under both `no_index` and `no_object`.
-    #[cfg(feature = "metadata")]
-    #[inline(always)]
-    pub fn with_indexer_get_set_and_comments<
-        IDX: Variant + Clone,
-        const X1: bool,
-        const X2: bool,
-        R: Variant + Clone,
-        const F1: bool,
-        const F2: bool,
-    >(
-        &mut self,
-        comments: &[&str],
-        get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X1, R, F1> + SendSync + 'static,
-        set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X2, (), F2> + SendSync + 'static,
-    ) -> &mut Self {
-        self.with_indexer_get_and_comments(comments, get_fn)
-            .with_indexer_set_and_comments(comments, set_fn)
+        self
     }
 }

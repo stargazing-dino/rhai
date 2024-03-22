@@ -282,33 +282,38 @@ fn scan_fields(fields: &[&Field], accessors: &mut Vec<TokenStream>, errors: &mut
         let set = set_fn.unwrap_or_else(|| quote! { |obj: &mut Self, val| obj.#field_name = val });
         let name = map_name.unwrap_or_else(|| quote! { stringify!(#field_name) });
 
-        accessors.push(
+        accessors.push({
+            let method = if readonly {
+                quote! { builder.with_get(#name, #get) }
+            } else {
+                quote! { builder.with_get_set(#name, #get, #set) }
+            };
+
             #[cfg(feature = "metadata")]
             {
                 match crate::attrs::doc_attributes(&field.attrs) {
                     Ok(docs) => {
                         // Not sure how to make a Vec<String> a literal, using a string instead.
                         let docs = proc_macro2::Literal::string(&docs.join("\n"));
-                        if readonly {
-                            quote! { builder.with_get_and_comments(#name, &#docs.lines().collect::<Vec<_>>()[..], #get); }
-                        } else {
-                            quote! { builder.with_get_set_and_comments(#name, &#docs.lines().collect::<Vec<_>>()[..], #get, #set); }
-                        }
-                    },
+                        quote! { #method.and_comments(&#docs.lines().collect::<Vec<_>>()[..]); }
+                    }
                     Err(_) => {
-                        errors.push(syn::Error::new(Span::call_site(), format!("failed to parse doc comments for field {}", quote! { #name })).into_compile_error());
+                        errors.push(
+                            syn::Error::new(
+                                Span::call_site(),
+                                format!(
+                                    "failed to parse doc comments for field {}",
+                                    quote! { #name }
+                                ),
+                            )
+                            .into_compile_error(),
+                        );
                         continue;
-                    },
+                    }
                 }
-            },
+            }
             #[cfg(not(feature = "metadata"))]
-            {
-                if readonly {
-                    quote! { builder.with_get(#name, #get); }
-                } else {
-                    quote! { builder.with_get_set(#name, #get, #set); }
-                }
-            },
-        );
+            quote! { #method; }
+        });
     }
 }

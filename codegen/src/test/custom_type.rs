@@ -119,17 +119,16 @@ mod custom_type_tests {
             impl CustomType for Bar {
                 fn build(mut builder: TypeBuilder<Self>) {
                     builder.with_name_and_comments(stringify!(Bar), &"/// Bar comments.".lines().collect::<Vec<_>>()[..]);
-                    builder.with_get_set_and_comments("field1",
-                        &"".lines().collect::<Vec<_>>()[..],
+                    builder.with_get_set("field1",
                         |obj: &mut Self| obj.1.clone(),
                         |obj: &mut Self, val| obj.1 = val
-                    );
-                    builder.with_get_and_comments("boo", &"/// boo comments.".lines().collect::<Vec<_>>()[..], |obj: &mut Self| obj.2.clone());
-                    builder.with_get_set_and_comments("field3",
-                        &"/// This is a vector.".lines().collect::<Vec<_>>()[..],
+                    ).and_comments(&"".lines().collect::<Vec<_>>()[..]);
+                    builder.with_get("boo", |obj: &mut Self| obj.2.clone())
+                    .and_comments(&"/// boo comments.".lines().collect::<Vec<_>>()[..]);
+                    builder.with_get_set("field3",
                         |obj: &mut Self| obj.3.clone(),
                         |obj: &mut Self, val| obj.3 = val
-                    );
+                    ).and_comments(&"/// This is a vector.".lines().collect::<Vec<_>>()[..]);
                 }
             }
         };
@@ -165,16 +164,16 @@ mod custom_type_tests {
             impl CustomType for Foo {
                 fn build(mut builder: TypeBuilder<Self>) {
                     builder.with_name_and_comments("MyFoo", &"/// Foo comments.".lines().collect::<Vec<_>>()[..]);
-                    builder.with_get_set_and_comments(stringify!(bar), &"".lines().collect::<Vec<_>>()[..],
+                    builder.with_get_set(stringify!(bar),
                         |obj: &mut Self| get_bar(&*obj),
                         |obj: &mut Self, val| obj.bar = val
-                    );
-                    builder.with_get_and_comments("boo", &"/// boo comments.".lines().collect::<Vec<_>>()[..], |obj: &mut Self| obj.baz.clone());
-                    builder.with_get_set_and_comments(stringify!(qux),
-                        &"".lines().collect::<Vec<_>>()[..],
+                    ).and_comments(&"".lines().collect::<Vec<_>>()[..]);
+                    builder.with_get("boo", |obj: &mut Self| obj.baz.clone())
+                    .and_comments(&"/// boo comments.".lines().collect::<Vec<_>>()[..]);
+                    builder.with_get_set(stringify!(qux),
                         |obj: &mut Self| obj.qux.clone(),
                         Self::set_qux
-                    );
+                    ).and_comments(&"".lines().collect::<Vec<_>>()[..]);
                     Self::build_extra(&mut builder);
                 }
             }

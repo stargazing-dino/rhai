@@ -550,6 +550,13 @@ impl FuncRegistration {
 
         &entry.1
     }
+
+    /// Get the hash value of the function.
+    #[cfg(feature = "metadata")]
+    #[must_use]
+    pub fn hash(&self) -> u64 {
+        self.metadata.hash
+    }
 }
 
 bitflags! {
@@ -1449,6 +1456,22 @@ impl Module {
             self.flags
                 .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
         }
+        self
+    }
+
+    /// _(metadata)_ Update the comments of a registered function.
+    /// Exported under the `metadata` feature only.
+    #[cfg(feature = "metadata")]
+    #[inline]
+    pub(crate) fn update_fn_comments<S: AsRef<str>>(
+        &mut self,
+        hash_fn: u64,
+        comments: impl IntoIterator<Item = S>,
+    ) -> &mut Self {
+        if let Some((_, f)) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
+            f.comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
+        }
+
         self
     }
 
