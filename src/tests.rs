@@ -15,7 +15,16 @@ fn check_struct_sizes() {
     ));
     const WORD_SIZE: usize = size_of::<usize>();
 
-    assert_eq!(size_of::<Dynamic>(), if PACKED { 8 } else { 16 });
+    assert_eq!(
+        size_of::<Dynamic>(),
+        if PACKED {
+            8
+        } else if IS_32_BIT {
+            12
+        } else {
+            16
+        }
+    );
     assert_eq!(size_of::<Option<Dynamic>>(), if PACKED { 8 } else { 16 });
     assert_eq!(
         size_of::<Position>(),
