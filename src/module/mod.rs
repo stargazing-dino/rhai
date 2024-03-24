@@ -400,24 +400,34 @@ impl FuncRegistration {
     {
         #[cfg(feature = "metadata")]
         {
-            let mut param_type_names = FUNC::param_names()
-                .iter()
-                .map(|ty| format!("_: {}", engine.format_param_type(ty)))
-                .collect::<crate::FnArgsVec<_>>();
+            // Do not update parameter informations if `with_params_info` was called previously.
+            if self.metadata.params_info.is_empty() {
+                let mut param_type_names = FUNC::param_names()
+                    .iter()
+                    .map(|ty| format!("_: {}", engine.format_param_type(ty)))
+                    .collect::<crate::FnArgsVec<_>>();
 
-            if FUNC::return_type() != TypeId::of::<()>() {
-                param_type_names.push(engine.format_param_type(FUNC::return_type_name()).into());
+                if FUNC::return_type() != TypeId::of::<()>() {
+                    param_type_names
+                        .push(engine.format_param_type(FUNC::return_type_name()).into());
+                }
+
+                let param_type_names = param_type_names
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<crate::FnArgsVec<_>>();
+
+                self.with_params_info(param_type_names)
+            } else {
+                self
             }
-
-            let param_type_names = param_type_names
-                .iter()
-                .map(String::as_str)
-                .collect::<crate::FnArgsVec<_>>();
-
-            self.with_params_info(param_type_names)
-                .in_global_namespace()
-                .set_into_module(engine.global_namespace_mut(), func)
+            // Duplicate of code without metadata feature because it would
+            // require to set self as mut, which would trigger a warning without
+            // the metadata feature.
+            .in_global_namespace()
+            .set_into_module(engine.global_namespace_mut(), func)
         }
+
         #[cfg(not(feature = "metadata"))]
         self.in_global_namespace()
             .set_into_module(engine.global_namespace_mut(), func)
