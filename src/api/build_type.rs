@@ -104,7 +104,7 @@ impl Engine {
 pub struct TypeBuilder<'a, T: Variant + Clone> {
     engine: &'a mut Engine,
     /// Keep the latest registered function(s) in cache to add additional metadata.
-    hashes: Option<Vec<u64>>,
+    hashes: Vec<u64>,
     _marker: PhantomData<T>,
 }
 
@@ -114,7 +114,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     fn new(engine: &'a mut Engine) -> Self {
         Self {
             engine,
-            hashes: None,
+            hashes: vec![],
             _marker: PhantomData,
         }
     }
@@ -155,7 +155,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new(FUNC_TO_STRING).register_into_engine(self.engine, on_print);
-        self.hashes = Some(vec![*hash]);
+        self.hashes = vec![*hash];
         self
     }
 
@@ -167,7 +167,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new(FUNC_TO_DEBUG).register_into_engine(self.engine, on_debug);
-        self.hashes = Some(vec![*hash]);
+        self.hashes = vec![*hash];
         self
     }
 
@@ -180,7 +180,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new(name).register_into_engine(self.engine, method);
-        self.hashes = Some(vec![*hash]);
+        self.hashes = vec![*hash];
         self
     }
 
@@ -189,13 +189,12 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     #[cfg(feature = "metadata")]
     #[inline(always)]
     pub fn and_comments(&mut self, comments: &[&str]) -> &mut Self {
-        if let Some(hashes) = &self.hashes {
-            let module = self.engine.global_namespace_mut();
+        let module = self.engine.global_namespace_mut();
 
-            for hash in hashes {
-                module.update_fn_comments(*hash, comments);
-            }
+        for hash in &self.hashes {
+            module.update_fn_comments(*hash, comments);
         }
+
         self
     }
 }
@@ -229,7 +228,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new_getter(name).register_into_engine(self.engine, get_fn);
-        self.hashes = Some(vec![*hash]);
+        self.hashes = vec![*hash];
 
         self
     }
@@ -245,7 +244,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new_setter(name).register_into_engine(self.engine, set_fn);
-        self.hashes = Some(vec![*hash]);
+        self.hashes = vec![*hash];
 
         self
     }
@@ -274,7 +273,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         let hash_2 = FuncRegistration::new_setter(&name)
             .register_into_engine(self.engine, set_fn)
             .hash;
-        self.hashes = Some(vec![hash_1, hash_2]);
+        self.hashes = vec![hash_1, hash_2];
 
         self
     }
@@ -299,7 +298,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new_index_getter().register_into_engine(self.engine, get_fn);
-        self.hashes = Some(vec![*hash]);
+        self.hashes = vec![*hash];
 
         self
     }
@@ -319,7 +318,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new_index_setter().register_into_engine(self.engine, set_fn);
-        self.hashes = Some(vec![*hash]);
+        self.hashes = vec![*hash];
 
         self
     }
@@ -346,7 +345,7 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         let hash_2 = FuncRegistration::new_index_setter()
             .register_into_engine(self.engine, set_fn)
             .hash;
-        self.hashes = Some(vec![hash_1, hash_2]);
+        self.hashes = vec![hash_1, hash_2];
 
         self
     }
