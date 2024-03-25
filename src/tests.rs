@@ -15,13 +15,42 @@ fn check_struct_sizes() {
     ));
     const WORD_SIZE: usize = size_of::<usize>();
 
-    assert_eq!(size_of::<Dynamic>(), if PACKED { 8 } else { 16 });
-    assert_eq!(size_of::<Option<Dynamic>>(), if PACKED { 8 } else { 16 });
+    assert_eq!(
+        size_of::<Dynamic>(),
+        if PACKED {
+            8
+        } else if IS_32_BIT {
+            12
+        } else {
+            16
+        }
+    );
+    assert_eq!(
+        size_of::<Option<Dynamic>>(),
+        if PACKED {
+            8
+        } else if IS_32_BIT {
+            12
+        } else {
+            16
+        }
+    );
     assert_eq!(
         size_of::<Position>(),
         if cfg!(feature = "no_position") { 0 } else { 4 }
     );
-    assert_eq!(size_of::<tokenizer::Token>(), 2 * WORD_SIZE);
+    assert_eq!(
+        size_of::<tokenizer::Token>(),
+        if IS_32_BIT {
+            if cfg!(feature = "only_i32") {
+                2 * WORD_SIZE
+            } else {
+                3 * WORD_SIZE
+            }
+        } else {
+            2 * WORD_SIZE
+        }
+    );
     assert_eq!(size_of::<ast::Expr>(), if PACKED { 12 } else { 16 });
     assert_eq!(size_of::<Option<ast::Expr>>(), if PACKED { 12 } else { 16 });
     assert_eq!(size_of::<ast::Stmt>(), if IS_32_BIT { 12 } else { 16 });

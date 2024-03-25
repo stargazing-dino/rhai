@@ -563,7 +563,6 @@ fn main() {
             .compile_with_scope(&scope, &input)
             .map_err(Into::into)
             .and_then(|r| {
-                println!("AST: {r:#?}");
                 #[cfg(not(feature = "no_optimize"))]
                 {
                     ast_u = r.clone();

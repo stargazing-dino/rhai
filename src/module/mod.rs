@@ -1483,20 +1483,14 @@ impl Module {
         self
     }
 
-    /// _(metadata)_ Update the comments of a registered function.
-    /// Exported under the `metadata` feature only.
-    #[cfg(feature = "metadata")]
+    /// Get a registered function's metadata.
     #[inline]
-    pub(crate) fn update_fn_comments<S: AsRef<str>>(
-        &mut self,
-        hash_fn: u64,
-        comments: impl IntoIterator<Item = S>,
-    ) -> &mut Self {
-        if let Some((_, f)) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
-            f.comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
-        }
-
-        self
+    #[allow(dead_code)]
+    pub(crate) fn get_fn_metadata_mut(&mut self, hash_fn: u64) -> Option<&mut FuncMetadata> {
+        self.functions
+            .as_mut()
+            .and_then(|m| m.get_mut(&hash_fn))
+            .map(|(_, f)| f.as_mut())
     }
 
     /// Remap type ID.

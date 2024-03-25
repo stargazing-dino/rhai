@@ -482,29 +482,19 @@ impl Engine {
             }
             // Short-circuit for indexing with literal: {expr}[1]
             #[cfg(not(feature = "no_index"))]
-            (_, ChainType::Indexing) if rhs.is_constant() => {
-                idx_values.push(rhs.get_literal_value().unwrap())
-            }
-            #[cfg(not(feature = "no_index"))]
-            (Expr::FnCall(fnc, _), ChainType::Indexing)
-                if fnc.op_token == Some(crate::tokenizer::Token::InclusiveRange)
-                    || fnc.op_token == Some(crate::tokenizer::Token::ExclusiveRange) =>
-            {
+            (_, ChainType::Indexing) if rhs.get_literal_value().is_some() => {
                 idx_values.push(rhs.get_literal_value().unwrap())
             }
             // Short-circuit for simple method call: {expr}.func()
             #[cfg(not(feature = "no_object"))]
             (Expr::MethodCall(x, ..), ChainType::Dotting) if x.args.is_empty() => (),
             // All other patterns - evaluate the arguments chain
-            _ => self.eval_dot_index_chain_arguments(
-                global,
-                caches,
-                scope,
-                this_ptr.as_deref_mut(),
-                expr,
-                rhs,
-                idx_values,
-            )?,
+            _ => {
+                let this_ptr = this_ptr.as_deref_mut();
+                self.eval_dot_index_chain_arguments(
+                    global, caches, scope, this_ptr, expr, rhs, idx_values,
+                )?
+            }
         }
 
         match (lhs, new_val) {
