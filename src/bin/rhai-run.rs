@@ -20,7 +20,8 @@ fn eprint_error(input: &str, mut err: EvalAltResult) {
         eprintln!();
     }
 
-    let lines: Vec<_> = input.lines().collect();
+    // Do not use `line` because it "eats" the last empty line if the script ends with a newline.
+    let lines: Vec<_> = input.split('\n').collect();
 
     // Print error
     let pos = err.take_position();
