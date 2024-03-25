@@ -9,9 +9,18 @@ use rhai::{CustomType, Engine, EvalAltResult, TypeBuilder};
 
 #[cfg(not(feature = "no_object"))]
 fn main() -> Result<(), Box<EvalAltResult>> {
+    /// This is a test structure. If the metadata feature
+    /// is enabled, this comment will be exported.
     #[derive(Debug, Clone, CustomType)]
     #[rhai_type(extra = Self::build_extra)]
     struct TestStruct {
+        /// A number.
+        ///
+        /// ```js
+        /// let t = new_ts();
+        /// print(t.x); // Get the value of x.
+        /// t.x = 42;   // Set the value of x.
+        /// ```
         x: i64,
     }
 
@@ -48,6 +57,46 @@ fn main() -> Result<(), Box<EvalAltResult>> {
             .for_each(|func| println!("{func}"));
 
         println!();
+
+        let docs: serde_json::Value =
+            serde_json::from_str(&engine.gen_fn_metadata_to_json(false).unwrap()).unwrap();
+
+        // compare comments from the type.
+        assert_eq!(
+            docs["customTypes"][0]["docComments"],
+            serde_json::json!([
+                "/// This is a test structure. If the metadata feature",
+                "/// is enabled, this comment will be exported."
+            ])
+        );
+
+        // compare comments from the getter.
+        assert_eq!(
+            docs["functions"][1]["docComments"],
+            serde_json::json!([
+                "/// A number.",
+                "///",
+                "/// ```js",
+                "/// let t = new_ts();",
+                "/// print(t.x); // Get the value of x.",
+                "/// t.x = 42;   // Set the value of x.",
+                "/// ```"
+            ])
+        );
+
+        // compare comments from the setter.
+        assert_eq!(
+            docs["functions"][3]["docComments"],
+            serde_json::json!([
+                "/// A number.",
+                "///",
+                "/// ```js",
+                "/// let t = new_ts();",
+                "/// print(t.x); // Get the value of x.",
+                "/// t.x = 42;   // Set the value of x.",
+                "/// ```"
+            ])
+        );
     }
 
     let result = engine.eval::<i64>(

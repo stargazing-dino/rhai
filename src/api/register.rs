@@ -74,28 +74,7 @@ impl Engine {
         name: impl AsRef<str> + Into<Identifier>,
         func: FUNC,
     ) -> &mut Self {
-        let reg = FuncRegistration::new(name.into()).in_global_namespace();
-
-        #[cfg(feature = "metadata")]
-        let reg = {
-            let mut param_type_names = FUNC::param_names()
-                .iter()
-                .map(|ty| format!("_: {}", self.format_param_type(ty)))
-                .collect::<crate::FnArgsVec<_>>();
-
-            if FUNC::return_type() != TypeId::of::<()>() {
-                param_type_names.push(self.format_param_type(FUNC::return_type_name()).into());
-            }
-
-            let param_type_names = param_type_names
-                .iter()
-                .map(String::as_str)
-                .collect::<crate::FnArgsVec<_>>();
-
-            reg.with_params_info(param_type_names)
-        };
-
-        reg.set_into_module(self.global_namespace_mut(), func);
+        FuncRegistration::new(name.into()).register_into_engine(self, func);
 
         self
     }
@@ -331,6 +310,7 @@ impl Engine {
     ) -> &mut Self {
         self.register_fn(crate::engine::make_getter(name.as_ref()), get_fn)
     }
+
     /// Register a setter function for a member of a registered type with the [`Engine`].
     ///
     /// Not available under `no_object`.
