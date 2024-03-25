@@ -2,8 +2,8 @@
 use crate::func::SendSync;
 use crate::module::FuncMetadata;
 use crate::packages::string_basic::{FUNC_TO_DEBUG, FUNC_TO_STRING};
-use crate::FuncRegistration;
-use crate::{types::dynamic::Variant, Engine, Identifier, RhaiNativeFunc};
+use crate::types::dynamic::Variant;
+use crate::{Engine, FuncRegistration, Identifier, RhaiNativeFunc, StaticVec};
 use std::marker::PhantomData;
 
 #[cfg(feature = "no_std")]
@@ -104,7 +104,7 @@ impl Engine {
 pub struct TypeBuilder<'a, T: Variant + Clone> {
     engine: &'a mut Engine,
     /// Keep the latest registered function(s) in cache to add additional metadata.
-    hashes: Vec<u64>,
+    hashes: StaticVec<u64>,
     _marker: PhantomData<T>,
 }
 
@@ -114,7 +114,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     fn new(engine: &'a mut Engine) -> Self {
         Self {
             engine,
-            hashes: vec![],
+            hashes: StaticVec::new_const(),
             _marker: PhantomData,
         }
     }
@@ -155,7 +155,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new(FUNC_TO_STRING).register_into_engine(self.engine, on_print);
-        self.hashes = vec![*hash];
+        self.hashes.clear();
+        self.hashes.push(*hash);
         self
     }
 
@@ -167,7 +168,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new(FUNC_TO_DEBUG).register_into_engine(self.engine, on_debug);
-        self.hashes = vec![*hash];
+        self.hashes.clear();
+        self.hashes.push(*hash);
         self
     }
 
@@ -180,19 +182,22 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new(name).register_into_engine(self.engine, method);
-        self.hashes = vec![*hash];
+        self.hashes.clear();
+        self.hashes.push(*hash);
         self
     }
 
-    /// Add comments to the last registered function.
-    /// Available under the metadata feature only.
+    /// _(metadata)_ Add comments to the last registered function.
+    /// Available under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     #[inline(always)]
     pub fn and_comments(&mut self, comments: &[&str]) -> &mut Self {
         let module = self.engine.global_namespace_mut();
 
-        for hash in &self.hashes {
-            module.update_fn_comments(*hash, comments);
+        for &hash in &self.hashes {
+            if let Some(f) = module.get_fn_metadata_mut(hash) {
+                f.comments = comments.into_iter().map(|&s| s.into()).collect();
+            }
         }
 
         self
@@ -228,7 +233,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new_getter(name).register_into_engine(self.engine, get_fn);
-        self.hashes = vec![*hash];
+        self.hashes.clear();
+        self.hashes.push(*hash);
 
         self
     }
@@ -244,7 +250,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new_setter(name).register_into_engine(self.engine, set_fn);
-        self.hashes = vec![*hash];
+        self.hashes.clear();
+        self.hashes.push(*hash);
 
         self
     }
@@ -273,7 +280,9 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         let hash_2 = FuncRegistration::new_setter(&name)
             .register_into_engine(self.engine, set_fn)
             .hash;
-        self.hashes = vec![hash_1, hash_2];
+        self.hashes.clear();
+        self.hashes.push(hash_1);
+        self.hashes.push(hash_2);
 
         self
     }
@@ -298,7 +307,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new_index_getter().register_into_engine(self.engine, get_fn);
-        self.hashes = vec![*hash];
+        self.hashes.clear();
+        self.hashes.push(*hash);
 
         self
     }
@@ -318,7 +328,8 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     ) -> &mut Self {
         let FuncMetadata { hash, .. } =
             FuncRegistration::new_index_setter().register_into_engine(self.engine, set_fn);
-        self.hashes = vec![*hash];
+        self.hashes.clear();
+        self.hashes.push(*hash);
 
         self
     }
@@ -345,7 +356,9 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         let hash_2 = FuncRegistration::new_index_setter()
             .register_into_engine(self.engine, set_fn)
             .hash;
-        self.hashes = vec![hash_1, hash_2];
+        self.hashes.clear();
+        self.hashes.push(hash_1);
+        self.hashes.push(hash_2);
 
         self
     }
