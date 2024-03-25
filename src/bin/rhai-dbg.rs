@@ -84,7 +84,8 @@ fn print_current_source(
 
 /// Pretty-print error.
 fn print_error(input: &str, mut err: EvalAltResult) {
-    let lines: Vec<_> = input.trim().lines().collect();
+    // Do not use `line` because it "eats" the last empty line if the script ends with a newline.
+    let lines: Vec<_> = input.split('\n').collect();
     let pos = err.take_position();
 
     let line_no = if lines.len() > 1 {
