@@ -1,8 +1,11 @@
 //! Trait to build a custom type for use with [`Engine`].
 use crate::func::SendSync;
+use crate::module::FuncMetadata;
 use crate::packages::string_basic::{FUNC_TO_DEBUG, FUNC_TO_STRING};
+use crate::FuncRegistration;
 use crate::{types::dynamic::Variant, Engine, Identifier, RhaiNativeFunc};
 use std::marker::PhantomData;
+
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -100,6 +103,8 @@ impl Engine {
 /// to use [`Engine::register_type_with_name`] instead.
 pub struct TypeBuilder<'a, T: Variant + Clone> {
     engine: &'a mut Engine,
+    /// Keep the latest registered function(s) in cache to add additional metadata.
+    hashes: Vec<u64>,
     _marker: PhantomData<T>,
 }
 
@@ -109,6 +114,7 @@ impl<'a, T: Variant + Clone> TypeBuilder<'a, T> {
     fn new(engine: &'a mut Engine) -> Self {
         Self {
             engine,
+            hashes: vec![],
             _marker: PhantomData,
         }
     }
@@ -122,13 +128,34 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         self
     }
 
+    /// Set a comments for the type.
+    /// `TypeBuilder::with_name` must be called before this function, otherwise
+    /// the comments will not be registered.
+    ///
+    /// Available with the metadata feature only.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn with_comments(&mut self, comments: &[&str]) -> &mut Self {
+        let namespace = self.engine.global_namespace_mut();
+        if let Some(name) = namespace
+            .get_custom_type_raw::<T>()
+            .map(|ty| ty.display_name.clone())
+        {
+            namespace.set_custom_type_with_comments::<T>(name.as_str(), comments);
+        }
+
+        self
+    }
+
     /// Pretty-print this custom type.
     #[inline(always)]
     pub fn on_print(
         &mut self,
         on_print: impl Fn(&mut T) -> String + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_fn(FUNC_TO_STRING, on_print);
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new(FUNC_TO_STRING).register_into_engine(self.engine, on_print);
+        self.hashes = vec![*hash];
         self
     }
 
@@ -136,9 +163,11 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
     #[inline(always)]
     pub fn on_debug(
         &mut self,
-        on_print: impl Fn(&mut T) -> String + SendSync + 'static,
+        on_debug: impl Fn(&mut T) -> String + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_fn(FUNC_TO_DEBUG, on_print);
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new(FUNC_TO_DEBUG).register_into_engine(self.engine, on_debug);
+        self.hashes = vec![*hash];
         self
     }
 
@@ -149,7 +178,23 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         name: impl AsRef<str> + Into<Identifier>,
         method: impl RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_fn(name, method);
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new(name).register_into_engine(self.engine, method);
+        self.hashes = vec![*hash];
+        self
+    }
+
+    /// Add comments to the last registered function.
+    /// Available under the metadata feature only.
+    #[cfg(feature = "metadata")]
+    #[inline(always)]
+    pub fn and_comments(&mut self, comments: &[&str]) -> &mut Self {
+        let module = self.engine.global_namespace_mut();
+
+        for hash in &self.hashes {
+            module.update_fn_comments(*hash, comments);
+        }
+
         self
     }
 }
@@ -181,7 +226,10 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         name: impl AsRef<str>,
         get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_get(name, get_fn);
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new_getter(name).register_into_engine(self.engine, get_fn);
+        self.hashes = vec![*hash];
+
         self
     }
 
@@ -194,7 +242,10 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         name: impl AsRef<str>,
         set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_set(name, set_fn);
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new_setter(name).register_into_engine(self.engine, set_fn);
+        self.hashes = vec![*hash];
+
         self
     }
 
@@ -216,7 +267,14 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         get_fn: impl RhaiNativeFunc<(Mut<T>,), 1, X1, R, F1> + SendSync + 'static,
         set_fn: impl RhaiNativeFunc<(Mut<T>, R), 2, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_get_set(name, get_fn, set_fn);
+        let hash_1 = FuncRegistration::new_getter(&name)
+            .register_into_engine(self.engine, get_fn)
+            .hash;
+        let hash_2 = FuncRegistration::new_setter(&name)
+            .register_into_engine(self.engine, set_fn)
+            .hash;
+        self.hashes = vec![hash_1, hash_2];
+
         self
     }
 }
@@ -238,7 +296,10 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         &mut self,
         get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_indexer_get(get_fn);
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new_index_getter().register_into_engine(self.engine, get_fn);
+        self.hashes = vec![*hash];
+
         self
     }
 
@@ -255,7 +316,10 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         &mut self,
         set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X, (), F> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_indexer_set(set_fn);
+        let FuncMetadata { hash, .. } =
+            FuncRegistration::new_index_setter().register_into_engine(self.engine, set_fn);
+        self.hashes = vec![*hash];
+
         self
     }
 
@@ -275,7 +339,14 @@ impl<T: Variant + Clone> TypeBuilder<'_, T> {
         get_fn: impl RhaiNativeFunc<(Mut<T>, IDX), 2, X1, R, F1> + SendSync + 'static,
         set_fn: impl RhaiNativeFunc<(Mut<T>, IDX, R), 3, X2, (), F2> + SendSync + 'static,
     ) -> &mut Self {
-        self.engine.register_indexer_get_set(get_fn, set_fn);
+        let hash_1 = FuncRegistration::new_index_getter()
+            .register_into_engine(self.engine, get_fn)
+            .hash;
+        let hash_2 = FuncRegistration::new_index_setter()
+            .register_into_engine(self.engine, set_fn)
+            .hash;
+        self.hashes = vec![hash_1, hash_2];
+
         self
     }
 }

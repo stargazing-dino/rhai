@@ -112,11 +112,30 @@ pub fn derive_custom_type_impl(input: DeriveInput) -> TokenStream {
         }
     };
 
+    let register = {
+        let method = {
+            quote! { builder.with_name(#display_name) }
+        };
+
+        #[cfg(feature = "metadata")]
+        {
+            let Ok(docs) = crate::attrs::doc_attributes(&input.attrs) else {
+                return syn::Error::new(Span::call_site(), "failed to parse doc comments")
+                    .into_compile_error();
+            };
+            // Not sure how to make a Vec<String> a literal, using a string instead.
+            let docs = proc_macro2::Literal::string(&docs.join("\n"));
+            quote! {  #method.with_comments(&#docs.lines().collect::<Vec<_>>()[..]); }
+        }
+        #[cfg(not(feature = "metadata"))]
+        quote! { #method; }
+    };
+
     quote! {
         impl CustomType for #type_name {
             fn build(mut builder: TypeBuilder<Self>) {
                 #(#errors)*
-                builder.with_name(#display_name);
+                #register
                 #(#field_accessors)*
                 #(#extras(&mut builder);)*
             }
@@ -220,6 +239,7 @@ fn scan_fields(fields: &[&Field], accessors: &mut Vec<TokenStream>, errors: &mut
                         errors.push(syn::Error::new(path.span(), msg).into_compile_error());
                         continue;
                     }
+
                     // Error
                     _ => {
                         errors.push(
@@ -264,10 +284,38 @@ fn scan_fields(fields: &[&Field], accessors: &mut Vec<TokenStream>, errors: &mut
         let set = set_fn.unwrap_or_else(|| quote! { |obj: &mut Self, val| obj.#field_name = val });
         let name = map_name.unwrap_or_else(|| quote! { stringify!(#field_name) });
 
-        accessors.push(if readonly {
-            quote! { builder.with_get(#name, #get); }
-        } else {
-            quote! { builder.with_get_set(#name, #get, #set); }
+        accessors.push({
+            let method = if readonly {
+                quote! { builder.with_get(#name, #get) }
+            } else {
+                quote! { builder.with_get_set(#name, #get, #set) }
+            };
+
+            #[cfg(feature = "metadata")]
+            {
+                match crate::attrs::doc_attributes(&field.attrs) {
+                    Ok(docs) => {
+                        // Not sure how to make a Vec<String> a literal, using a string instead.
+                        let docs = proc_macro2::Literal::string(&docs.join("\n"));
+                        quote! { #method.and_comments(&#docs.lines().collect::<Vec<_>>()[..]); }
+                    }
+                    Err(_) => {
+                        errors.push(
+                            syn::Error::new(
+                                Span::call_site(),
+                                format!(
+                                    "failed to parse doc comments for field {}",
+                                    quote! { #name }
+                                ),
+                            )
+                            .into_compile_error(),
+                        );
+                        continue;
+                    }
+                }
+            }
+            #[cfg(not(feature = "metadata"))]
+            quote! { #method; }
         });
     }
 }

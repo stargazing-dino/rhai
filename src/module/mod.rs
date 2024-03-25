@@ -398,6 +398,37 @@ impl FuncRegistration {
         R: Variant + Clone,
         FUNC: RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
     {
+        #[cfg(feature = "metadata")]
+        {
+            // Do not update parameter informations if `with_params_info` was called previously.
+            if self.metadata.params_info.is_empty() {
+                let mut param_type_names = FUNC::param_names()
+                    .iter()
+                    .map(|ty| format!("_: {}", engine.format_param_type(ty)))
+                    .collect::<crate::FnArgsVec<_>>();
+
+                if FUNC::return_type() != TypeId::of::<()>() {
+                    param_type_names
+                        .push(engine.format_param_type(FUNC::return_type_name()).into());
+                }
+
+                let param_type_names = param_type_names
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<crate::FnArgsVec<_>>();
+
+                self.with_params_info(param_type_names)
+            } else {
+                self
+            }
+            // Duplicate of code without metadata feature because it would
+            // require to set self as mut, which would trigger a warning without
+            // the metadata feature.
+            .in_global_namespace()
+            .set_into_module(engine.global_namespace_mut(), func)
+        }
+
+        #[cfg(not(feature = "metadata"))]
         self.in_global_namespace()
             .set_into_module(engine.global_namespace_mut(), func)
     }
@@ -1449,6 +1480,22 @@ impl Module {
             self.flags
                 .remove(ModuleFlags::INDEXED | ModuleFlags::INDEXED_GLOBAL_FUNCTIONS);
         }
+        self
+    }
+
+    /// _(metadata)_ Update the comments of a registered function.
+    /// Exported under the `metadata` feature only.
+    #[cfg(feature = "metadata")]
+    #[inline]
+    pub(crate) fn update_fn_comments<S: AsRef<str>>(
+        &mut self,
+        hash_fn: u64,
+        comments: impl IntoIterator<Item = S>,
+    ) -> &mut Self {
+        if let Some((_, f)) = self.functions.as_mut().and_then(|m| m.get_mut(&hash_fn)) {
+            f.comments = comments.into_iter().map(|s| s.as_ref().into()).collect();
+        }
+
         self
     }
 
