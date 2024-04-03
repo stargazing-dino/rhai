@@ -13,6 +13,7 @@ Bug fixes
 * The `optimize` command in `rhai-repl` now works properly and cycles through `None`->`Simple`->`Full`.
 * `Engine::call_fn_XXX` no longer return errors unnecessarily wrapped in `EvalAltResult::ErrorInFunctionCall`.
 * Some tests that panic on 32-bit architecture are fixed (thanks [`@alexanderkjall`](https://github.com/alexanderkjall) [851](https://github.com/rhaiscript/rhai/issues/851)).
+* The optimizer no longer goes into an infinite loop when optimizing a `try` statement with an empty body.
 
 Deprecated API's
 ----------------
