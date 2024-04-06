@@ -4,13 +4,16 @@ Rhai Release Notes
 Version 1.18.0
 ==============
 
+Starting from this version, we try to put contributors' names on features/enhancements/fixes that they contributed. We apologize for neglecting to adopt this practice earlier, but late is better than never!
+
 Bug fixes
 ---------
 
 * The position of an undefined operation call now points to the operator instead of the first operand.
 * The `optimize` command in `rhai-repl` now works properly and cycles through `None`->`Simple`->`Full`.
 * `Engine::call_fn_XXX` no longer return errors unnecessarily wrapped in `EvalAltResult::ErrorInFunctionCall`.
-* Some tests that panic on 32-bit architecture are fixed.
+* Some tests that panic on 32-bit architecture are fixed (thanks [`@alexanderkjall`](https://github.com/alexanderkjall) [851](https://github.com/rhaiscript/rhai/issues/851)).
+* The optimizer no longer goes into an infinite loop when optimizing a `try` statement with an empty body.
 
 Deprecated API's
 ----------------
@@ -20,20 +23,20 @@ Deprecated API's
 New features
 ------------
 
-* Sub-strings can now be selected from full strings by indexing via ranges (e.g. `s[1..4]`).
+* Sub-strings can now be selected from full strings by indexing via ranges, e.g. `s[1..4]` (thanks [`@zitsen`](https://github.com/zitsen) [#845](https://github.com/rhaiscript/rhai/pull/845)).
+* Doc-comments are now automatically added to function registrations and custom types via the `CustomType` derive macro (thanks [`@Itabis`](https://github.com/ltabis) [#847](https://github.com/rhaiscript/rhai/pull/847)).
 * New options `Engine::set_max_strings_interned` and `Engine::max_strings_interned` are added to limit the maximum number of strings interned in the `Engine`'s string interner.
 * A new advanced callback, `Engine::on_invalid_array_index`, is added (gated under the `internals` feature) to handle access to missing properties in object maps.
 * A new advanced callback, `Engine::on_missing_map_property`, is added (gated under the `internals` feature) to handle out-of-bound index into arrays.
-* Doc-comments are now automatically added to function registrations and custom types via the `CustomType` derive macro.
 
 Enhancements
 ------------
 
+* `parse_json` is also available without the `metadata` or `serde` feature -- it uses `Engine::parse_json` to parse the JSON text (thanks [`@Mathieu-Lala`](https://github.com/Mathieu-Lala) [#840](https://github.com/rhaiscript/rhai/pull/840)).
 * `FuncRegistration::in_global_namespace` and `FuncRegistration::in_internal_namespace` are added to avoid pulling in `FnNamespace`.
 * Array/BLOB/string iterators are defined also within the `BasicIteratorPackage` in addition to the regular array/BLOB/string packages.
 * `LexError::Runtime` is added for use with `Engine::on_parse_token`.
 * Shared values under `sync` are now handled more elegantly -- instead of deadlocking and hanging indefinitely, it spins for a number of tries (waiting one second between each), then errors out.
-* `parse_json` is also available without the `metadata` or `serde` feature -- it uses `Engine::parse_json` to parse the JSON text.
 
 
 Version 1.17.2
@@ -71,7 +74,8 @@ Potentially breaking changes
 New features
 ------------
 
-* `#[derive(CustomType)]` is now available, driven by procedural macros in `rhai_codegen`.
+* Great thanks to [`@silvergasp`](https://github.com/silvergasp) for setting up fuzzing.
+* `#[derive(CustomType)]` is now available, driven by procedural macros in `rhai_codegen` (thanks [`@MavethGH`](https://github.com/MavethGH) [#817](https://github.com/rhaiscript/rhai/pull/817)).
 * A new `FuncRegistration` API is added to assist in registering native Rust functions into modules with various settings. Some of the original `Module::set_fn...` API is now deprecated.
 * Functions defined in plugin modules can now be marked as `volatile` which prevents it from being optimized away even under `OptimizationLevel::Full`.
 * Added `Engine::max_functions` and `Engine::set_max_functions` to limit the maximum number of functions allowed in a script. This is to guard against DOS attacks -- e.g. a simple closure `||` (two characters) is a function. When `max_function` is exceeded during script compilation, a new parse error, `ParseErrorType::TooManyFunctions`, is returned.

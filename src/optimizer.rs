@@ -798,8 +798,12 @@ fn optimize_stmt(stmt: &mut Stmt, state: &mut OptimizerState, preserve_result: b
         Stmt::TryCatch(x, ..) if x.body.iter().all(Stmt::is_pure) => {
             // If try block is pure, there will never be any exceptions
             state.set_dirty();
-            *x.body.statements_mut() =
-                optimize_stmt_block(x.body.take_statements(), state, false, true, false);
+            let statements = x.body.take_statements();
+            let block = StmtBlock::new_with_span(
+                optimize_stmt_block(statements, state, false, true, false),
+                x.body.span(),
+            );
+            *stmt = Stmt::Block(block.into());
         }
         // try { try_block } catch ( var ) { catch_block }
         Stmt::TryCatch(x, ..) => {
