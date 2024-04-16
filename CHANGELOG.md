@@ -1,6 +1,15 @@
 Rhai Release Notes
 ==================
 
+Version 1.18.1
+==============
+
+Bug fixes
+---------
+
+* Variable resolver now correctly resolves variables that are captured in a closure.
+
+
 Version 1.18.0
 ==============
 
