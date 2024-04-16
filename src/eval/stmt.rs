@@ -8,6 +8,7 @@ use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::tokenizer::Token;
 use crate::types::dynamic::{AccessMode, Union};
 use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, VarDefInfo, ERR, INT};
+use core::num::NonZeroUsize;
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -971,6 +972,29 @@ impl Engine {
             #[cfg(not(feature = "no_closure"))]
             Stmt::Share(x) => {
                 for (var, index) in &**x {
+                    // Check the variable resolver, if any
+                    if let Some(ref resolve_var) = self.resolve_var {
+                        let orig_scope_len = scope.len();
+
+                        let context =
+                            EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());
+                        let resolved_var =
+                            resolve_var(&var.name, index.map_or(0, NonZeroUsize::get), context);
+
+                        if orig_scope_len != scope.len() {
+                            // The scope is changed, always search from now on
+                            global.always_search_scope = true;
+                        }
+
+                        match resolved_var {
+                            // If resolved to a variable, skip it (because we cannot make it shared)
+                            Ok(Some(_)) => continue,
+                            Ok(None) => (),
+                            Err(err) => return Err(err.fill_position(var.pos)),
+                        }
+                    }
+
+                    // Search the scope
                     let index = index
                         .map(|n| scope.len() - n.get())
                         .or_else(|| scope.search(&var.name))

@@ -324,7 +324,7 @@ fn test_scope_eval() {
 }
 
 #[test]
-fn test_var_resolver() {
+fn test_var_resolver1() {
     let mut engine = Engine::new();
 
     let mut scope = Scope::new();
@@ -390,6 +390,22 @@ fn test_var_resolver() {
     assert!(matches!(
         *engine.eval_with_scope::<INT>(&mut scope, "DO_NOT_USE").unwrap_err(),
         EvalAltResult::ErrorVariableNotFound(n, ..) if n == "DO_NOT_USE"));
+}
+
+#[cfg(not(feature = "no_closure"))]
+#[cfg(not(feature = "no_function"))]
+#[cfg(not(feature = "no_object"))]
+#[test]
+fn test_var_resolver2() {
+    let mut engine = Engine::new();
+    let shared_state: INT = 42;
+
+    #[allow(deprecated)]
+    engine.on_var(move |name, _, _| if name == "state" { Ok(Some(Dynamic::from(shared_state))) } else { Ok(None) });
+
+    assert_eq!(engine.eval::<INT>("state").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("fn f() { state }; f()").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("let f = || state; f.call()").unwrap(), 42);
 }
 
 #[test]
