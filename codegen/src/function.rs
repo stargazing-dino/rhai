@@ -287,8 +287,12 @@ impl Parse for ExportedFn {
         let str_type_path = syn::parse2::<syn::Path>(quote! { str }).unwrap();
 
         let context_type_path1 = syn::parse2::<syn::Path>(quote! { NativeCallContext }).unwrap();
+        let context_type_path1x =
+            syn::parse2::<syn::Path>(quote! { NativeCallContext<'_> }).unwrap();
         let context_type_path2 =
             syn::parse2::<syn::Path>(quote! { rhai::NativeCallContext }).unwrap();
+        let context_type_path2x =
+            syn::parse2::<syn::Path>(quote! { rhai::NativeCallContext<'_> }).unwrap();
         let mut pass_context = false;
 
         let cfg_attrs = crate::attrs::collect_cfg_attr(&fn_all.attrs);
@@ -299,7 +303,10 @@ impl Parse for ExportedFn {
         if let Some(syn::FnArg::Typed(syn::PatType { ref ty, .. })) = fn_all.sig.inputs.first() {
             match flatten_type_groups(ty.as_ref()) {
                 syn::Type::Path(p)
-                    if p.path == context_type_path1 || p.path == context_type_path2 =>
+                    if p.path == context_type_path1
+                        || p.path == context_type_path1x
+                        || p.path == context_type_path2
+                        || p.path == context_type_path2x =>
                 {
                     pass_context = true;
                 }
