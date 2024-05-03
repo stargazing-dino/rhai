@@ -296,7 +296,7 @@ impl<'a> NativeCallContext<'a> {
 
         self._call_fn_raw(fn_name, args, false, false, false)
             .and_then(|result| {
-                result.try_cast_raw().map_err(|r| {
+                result.try_cast_result().map_err(|r| {
                     let result_type = self.engine().map_type_name(r.type_name());
                     let cast_type = match type_name::<T>() {
                         typ if typ.contains("::") => self.engine.map_type_name(typ),
@@ -329,7 +329,7 @@ impl<'a> NativeCallContext<'a> {
 
         self._call_fn_raw(fn_name, args, true, false, false)
             .and_then(|result| {
-                result.try_cast_raw().map_err(|r| {
+                result.try_cast_result().map_err(|r| {
                     let result_type = self.engine().map_type_name(r.type_name());
                     let cast_type = match type_name::<T>() {
                         typ if typ.contains("::") => self.engine.map_type_name(typ),

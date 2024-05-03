@@ -903,7 +903,7 @@ impl Engine {
 
                 let v = self.eval_expr(global, caches, scope, this_ptr, expr)?;
 
-                let path = v.try_cast_raw::<crate::ImmutableString>().map_err(|v| {
+                let path = v.try_cast_result::<crate::ImmutableString>().map_err(|v| {
                     self.make_type_mismatch_err::<crate::ImmutableString>(
                         v.type_name(),
                         expr.position(),

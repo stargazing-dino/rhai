@@ -163,7 +163,7 @@ impl FnPtr {
         let ctx = (engine, self.fn_name(), None, &*global, Position::NONE).into();
 
         self.call_raw(&ctx, None, arg_values).and_then(|result| {
-            result.try_cast_raw().map_err(|r| {
+            result.try_cast_result().map_err(|r| {
                 let result_type = engine.map_type_name(r.type_name());
                 let cast_type = match type_name::<T>() {
                     typ if typ.contains("::") => engine.map_type_name(typ),
@@ -190,7 +190,7 @@ impl FnPtr {
         args.parse(&mut arg_values);
 
         self.call_raw(context, None, arg_values).and_then(|result| {
-            result.try_cast_raw().map_err(|r| {
+            result.try_cast_result().map_err(|r| {
                 let result_type = context.engine().map_type_name(r.type_name());
                 let cast_type = match type_name::<T>() {
                     typ if typ.contains("::") => context.engine().map_type_name(typ),
