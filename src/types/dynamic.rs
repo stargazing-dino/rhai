@@ -1441,7 +1441,7 @@ impl Dynamic {
     #[must_use]
     #[allow(unused_mut)]
     pub fn try_cast<T: Any>(mut self) -> Option<T> {
-        self.try_cast_raw().ok()
+        self.try_cast_result().ok()
     }
     /// Convert the [`Dynamic`] value into specific type.
     ///
@@ -1463,7 +1463,7 @@ impl Dynamic {
     ///
     /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[allow(unused_mut)]
-    pub(crate) fn try_cast_raw<T: Any>(mut self) -> Result<T, Self> {
+    pub fn try_cast_result<T: Any>(mut self) -> Result<T, Self> {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
 
         #[cfg(not(feature = "no_closure"))]
