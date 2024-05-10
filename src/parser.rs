@@ -1426,7 +1426,7 @@ impl Engine {
             Token::Pipe | Token::Or if settings.has_option(LangOptions::ANON_FN) => {
                 let (expr, fn_def, _externals) = self.parse_anon_fn(
                     state,
-                    settings.level_up()?,
+                    settings,
                     false,
                     #[cfg(not(feature = "no_closure"))]
                     true,
@@ -2535,7 +2535,7 @@ impl Engine {
 
                     let (expr, fn_def, _) = self.parse_anon_fn(
                         state,
-                        settings.level_up()?,
+                        settings,
                         skip,
                         #[cfg(not(feature = "no_closure"))]
                         false,
@@ -3755,11 +3755,11 @@ impl Engine {
 
         // Parse parameters
         if !skip_parameters
-            && state.input.next().unwrap().0 != Token::Or
-            && !match_token(state.input, &Token::Pipe).0
+            && new_state.input.next().unwrap().0 != Token::Or
+            && !match_token(new_state.input, &Token::Pipe).0
         {
             loop {
-                match state.input.next().unwrap() {
+                match new_state.input.next().unwrap() {
                     (Token::Pipe, ..) => break,
                     (Token::Identifier(s), pos) => {
                         if params_list.iter().any(|p| p == &*s) {
@@ -3769,7 +3769,7 @@ impl Engine {
                         }
 
                         let s = self.get_interned_string(*s);
-                        state.stack.push(s.clone(), ());
+                        new_state.stack.push(s.clone(), ());
                         params_list.push(s);
                     }
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -3782,7 +3782,7 @@ impl Engine {
                     }
                 }
 
-                match state.input.next().unwrap() {
+                match new_state.input.next().unwrap() {
                     (Token::Pipe, ..) => break,
                     (Token::Comma, ..) => (),
                     (Token::LexError(err), pos) => return Err(err.into_err(pos)),
@@ -3798,13 +3798,13 @@ impl Engine {
         }
 
         // Parse function body
-        let body = self.parse_stmt(state, new_settings)?;
+        let body = self.parse_stmt(new_state, new_settings.level_up()?)?;
 
         // External variables may need to be processed in a consistent order,
         // so extract them into a list.
         #[cfg(not(feature = "no_closure"))]
         let (mut params, externals) = if allow_capture {
-            let externals = std::mem::take(&mut state.external_vars);
+            let externals = std::mem::take(&mut new_state.external_vars);
 
             let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
             params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));
