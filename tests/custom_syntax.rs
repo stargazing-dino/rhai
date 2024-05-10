@@ -281,8 +281,8 @@ fn test_custom_syntax_func() {
         .register_custom_syntax(["hello", "$func$"], false, |context, inputs| context.eval_expression_tree(&inputs[0]))
         .unwrap();
 
-    assert_eq!(engine.eval::<INT>("(hello |x| { x + 1 }).call(41)").unwrap(), 42);
-    assert_eq!(engine.eval::<INT>("(hello { 42 }).call()").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("call(hello |x| { x + 1 }, 41)").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("call(hello { 42 })").unwrap(), 42);
 }
 
 #[test]
