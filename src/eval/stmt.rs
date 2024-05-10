@@ -8,7 +8,6 @@ use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::tokenizer::Token;
 use crate::types::dynamic::{AccessMode, Union};
 use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, VarDefInfo, ERR, INT};
-use core::num::NonZeroUsize;
 use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -978,8 +977,11 @@ impl Engine {
 
                         let context =
                             EvalContext::new(self, global, caches, scope, this_ptr.as_deref_mut());
-                        let resolved_var =
-                            resolve_var(&var.name, index.map_or(0, NonZeroUsize::get), context);
+                        let resolved_var = resolve_var(
+                            &var.name,
+                            index.map_or(0, core::num::NonZeroUsize::get),
+                            context,
+                        );
 
                         if orig_scope_len != scope.len() {
                             // The scope is changed, always search from now on

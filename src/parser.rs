@@ -1424,47 +1424,13 @@ impl Engine {
             }
             #[cfg(not(feature = "no_function"))]
             Token::Pipe | Token::Or if settings.has_option(LangOptions::ANON_FN) => {
-                // Build new parse state
-                let new_state = &mut ParseState::new(
-                    state.external_constants,
-                    state.input,
-                    state.tokenizer_control.clone(),
-                    state.lib,
-                );
-
-                #[cfg(not(feature = "no_module"))]
-                {
-                    // Do not allow storing an index to a globally-imported module
-                    // just in case the function is separated from this `AST`.
-                    //
-                    // Keep them in `global_imports` instead so that strict variables
-                    // mode will not complain.
-                    new_state.global_imports.clone_from(&state.global_imports);
-                    new_state.global_imports.extend(state.imports.clone());
-                }
-
-                // Brand new options
-                #[cfg(not(feature = "no_closure"))]
-                let options = self.options & !LangOptions::STRICT_VAR; // a capturing closure can access variables not defined locally, so turn off Strict Variables mode
-                #[cfg(feature = "no_closure")]
-                let options = self.options | (settings.options & LangOptions::STRICT_VAR);
-
-                // Brand new flags, turn on function scope and closure scope
-                let flags = ParseSettingFlags::FN_SCOPE
-                    | ParseSettingFlags::CLOSURE_SCOPE
-                    | (settings.flags
-                        & (ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES
-                            | ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS));
-
-                let new_settings = ParseSettings {
-                    flags,
-                    options,
-                    ..settings
-                };
-
-                let result = self.parse_anon_fn(new_state, new_settings.level_up()?);
-
-                let (expr, fn_def, _externals) = result?;
+                let (expr, fn_def, _externals) = self.parse_anon_fn(
+                    state,
+                    settings.level_up()?,
+                    false,
+                    #[cfg(not(feature = "no_closure"))]
+                    true,
+                )?;
 
                 #[cfg(not(feature = "no_closure"))]
                 for Ident { name, pos } in &_externals {
@@ -2556,6 +2522,33 @@ impl Engine {
                     }
                     stmt => unreachable!("Stmt::Block expected but gets {:?}", stmt),
                 },
+                #[cfg(not(feature = "no_function"))]
+                CUSTOM_SYNTAX_MARKER_FUNC => {
+                    let skip = match fwd_token {
+                        Token::Or | Token::Pipe => false,
+                        Token::LeftBrace => true,
+                        _ => {
+                            return Err(PERR::MissingSymbol("Expecting '{' or '|'".into())
+                                .into_err(*fwd_pos))
+                        }
+                    };
+
+                    let (expr, fn_def, _) = self.parse_anon_fn(
+                        state,
+                        settings.level_up()?,
+                        skip,
+                        #[cfg(not(feature = "no_closure"))]
+                        false,
+                    )?;
+
+                    let hash_script = calc_fn_hash(None, &fn_def.name, fn_def.params.len());
+                    state.lib.insert(hash_script, fn_def);
+
+                    inputs.push(expr);
+                    let keyword = self.get_interned_string(CUSTOM_SYNTAX_MARKER_FUNC);
+                    segments.push(keyword.clone());
+                    tokens.push(keyword);
+                }
                 CUSTOM_SYNTAX_MARKER_BOOL => match state.input.next().unwrap() {
                     (b @ (Token::True | Token::False), pos) => {
                         inputs.push(Expr::BoolConstant(b == Token::True, pos));
@@ -3717,11 +3710,54 @@ impl Engine {
         &self,
         state: &mut ParseState,
         settings: ParseSettings,
+        skip_parameters: bool,
+        #[cfg(not(feature = "no_closure"))] allow_capture: bool,
     ) -> ParseResult<(Expr, Shared<ScriptFuncDef>, ThinVec<Ident>)> {
-        let settings = settings.level_up()?;
+        // Build new parse state
+        let new_state = &mut ParseState::new(
+            state.external_constants,
+            state.input,
+            state.tokenizer_control.clone(),
+            state.lib,
+        );
+
+        #[cfg(not(feature = "no_module"))]
+        {
+            // Do not allow storing an index to a globally-imported module
+            // just in case the function is separated from this `AST`.
+            //
+            // Keep them in `global_imports` instead so that strict variables
+            // mode will not complain.
+            new_state.global_imports.clone_from(&state.global_imports);
+            new_state.global_imports.extend(state.imports.clone());
+        }
+
+        // Brand new options
+        #[cfg(not(feature = "no_closure"))]
+        let options = self.options & !LangOptions::STRICT_VAR; // a capturing closure can access variables not defined locally, so turn off Strict Variables mode
+        #[cfg(feature = "no_closure")]
+        let options = self.options | (settings.options & LangOptions::STRICT_VAR);
+
+        // Brand new flags, turn on function scope and closure scope
+        let flags = ParseSettingFlags::FN_SCOPE
+            | ParseSettingFlags::CLOSURE_SCOPE
+            | (settings.flags
+                & (ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES
+                    | ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS));
+
+        let new_settings = ParseSettings {
+            flags,
+            options,
+            ..settings
+        };
+
         let mut params_list = StaticVec::<ImmutableString>::new_const();
 
-        if state.input.next().unwrap().0 != Token::Or && !match_token(state.input, &Token::Pipe).0 {
+        // Parse parameters
+        if !skip_parameters
+            && state.input.next().unwrap().0 != Token::Or
+            && !match_token(state.input, &Token::Pipe).0
+        {
             loop {
                 match state.input.next().unwrap() {
                     (Token::Pipe, ..) => break,
@@ -3762,18 +3798,20 @@ impl Engine {
         }
 
         // Parse function body
-        let body = self.parse_stmt(state, settings)?;
+        let body = self.parse_stmt(state, new_settings)?;
 
         // External variables may need to be processed in a consistent order,
         // so extract them into a list.
         #[cfg(not(feature = "no_closure"))]
-        let (mut params, externals) = {
+        let (mut params, externals) = if allow_capture {
             let externals = std::mem::take(&mut state.external_vars);
 
             let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
             params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));
 
             (params, externals)
+        } else {
+            (FnArgsVec::with_capacity(params_list.len()), ThinVec::new())
         };
         #[cfg(feature = "no_closure")]
         let (mut params, externals) = (FnArgsVec::with_capacity(params_list.len()), ThinVec::new());
@@ -3807,7 +3845,7 @@ impl Engine {
             #[cfg(not(feature = "no_function"))]
             fn_def: Some(script.clone()),
         };
-        let expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), settings.pos);
+        let expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), new_settings.pos);
 
         Ok((expr, script, externals))
     }

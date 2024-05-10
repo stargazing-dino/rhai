@@ -1,7 +1,7 @@
 Rhai Release Notes
 ==================
 
-Version 1.18.1
+Version 1.19.0
 ==============
 
 Bug fixes
@@ -9,6 +9,11 @@ Bug fixes
 
 * Variable resolver now correctly resolves variables that are captured in a closure.
 * `NativeCallContext<'_>` (with a lifetime parameter) now parses correctly in the `#[export_module]` macro. This is to allow for `rust_2018_idioms` lints.
+
+New features
+------------
+
+* A new symbol, `$func$`, is added to custom syntax to allow parsing of anonymous functions.
 
 
 Version 1.18.0

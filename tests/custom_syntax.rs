@@ -272,6 +272,19 @@ fn test_custom_syntax_scope() {
     );
 }
 
+#[cfg(not(feature = "no_function"))]
+#[test]
+fn test_custom_syntax_func() {
+    let mut engine = Engine::new();
+
+    engine
+        .register_custom_syntax(["hello", "$func$"], false, |context, inputs| context.eval_expression_tree(&inputs[0]))
+        .unwrap();
+
+    assert_eq!(engine.eval::<INT>("(hello |x| { x + 1 }).call(41)").unwrap(), 42);
+    assert_eq!(engine.eval::<INT>("(hello { 42 }).call()").unwrap(), 42);
+}
+
 #[test]
 fn test_custom_syntax_matrix() {
     let mut engine = Engine::new();
