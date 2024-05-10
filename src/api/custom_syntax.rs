@@ -131,9 +131,10 @@ impl Expression<'_> {
     /// Returns [`None`] also if the constant is not of the specified type.
     #[inline]
     #[must_use]
-    pub fn get_literal_value<T: Variant>(&self) -> Option<T> {
+    pub fn get_literal_value<T: Variant + Clone>(&self) -> Option<T> {
         // Coded this way in order to maximally leverage potentials for dead-code removal.
         match self.0 {
+            Expr::DynamicConstant(x, ..) => x.clone().try_cast::<T>(),
             Expr::IntegerConstant(x, ..) => reify! { *x => Option<T> },
 
             #[cfg(not(feature = "no_float"))]
