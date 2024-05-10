@@ -389,8 +389,8 @@ impl Engine {
                         Ok(Target::StringSlice {
                             source: target,
                             value: value.into(),
-                            start: start,
-                            end: end,
+                            start,
+                            end,
                             exclusive: true,
                         })
                     }

@@ -19,6 +19,9 @@ pub mod markers {
     pub const CUSTOM_SYNTAX_MARKER_EXPR: &str = "$expr$";
     /// Special marker for matching a statements block.
     pub const CUSTOM_SYNTAX_MARKER_BLOCK: &str = "$block$";
+    /// Special marker for matching a function body.
+    #[cfg(not(feature = "no_function"))]
+    pub const CUSTOM_SYNTAX_MARKER_FUNC: &str = "$func$";
     /// Special marker for matching an identifier.
     pub const CUSTOM_SYNTAX_MARKER_IDENT: &str = "$ident$";
     /// Special marker for matching a single symbol.
@@ -251,6 +254,11 @@ impl Engine {
                 {
                     s.into()
                 }
+
+                // Markers not in first position
+                #[cfg(not(feature = "no_function"))]
+                CUSTOM_SYNTAX_MARKER_FUNC if !segments.is_empty() => s.into(),
+
                 // Markers not in first position
                 #[cfg(not(feature = "no_float"))]
                 CUSTOM_SYNTAX_MARKER_FLOAT if !segments.is_empty() => s.into(),
