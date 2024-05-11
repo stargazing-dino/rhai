@@ -3689,25 +3689,6 @@ impl Engine {
             new_state.global_imports.extend(state.imports.clone());
         }
 
-        // Brand new options
-        #[cfg(not(feature = "no_closure"))]
-        let options = self.options & !LangOptions::STRICT_VAR; // a capturing closure can access variables not defined locally, so turn off Strict Variables mode
-        #[cfg(feature = "no_closure")]
-        let options = self.options | (settings.options & LangOptions::STRICT_VAR);
-
-        // Brand new flags, turn on function scope and closure scope
-        let flags = ParseSettingFlags::FN_SCOPE
-            | ParseSettingFlags::CLOSURE_SCOPE
-            | (settings.flags
-                & (ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES
-                    | ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS));
-
-        let new_settings = ParseSettings {
-            flags,
-            options,
-            ..settings
-        };
-
         let mut params_list = StaticVec::<ImmutableString>::new_const();
 
         // Parse parameters
@@ -3754,13 +3735,34 @@ impl Engine {
             }
         }
 
+        // Brand new options
+        #[cfg(not(feature = "no_closure"))]
+        let options = self.options & !LangOptions::STRICT_VAR; // a capturing closure can access variables not defined locally, so turn off Strict Variables mode
+        #[cfg(feature = "no_closure")]
+        let options = self.options | (settings.options & LangOptions::STRICT_VAR);
+
+        // Brand new flags, turn on function scope and closure scope
+        let flags = ParseSettingFlags::FN_SCOPE
+            | ParseSettingFlags::CLOSURE_SCOPE
+            | (settings.flags
+                & (ParseSettingFlags::DISALLOW_UNQUOTED_MAP_PROPERTIES
+                    | ParseSettingFlags::DISALLOW_STATEMENTS_IN_BLOCKS));
+
+        let new_settings = ParseSettings {
+            flags,
+            options,
+            ..settings
+        };
+
         // Parse function body
         let body = self.parse_stmt(new_state, new_settings.level_up()?)?;
+
+        let _ = new_settings; // Make sure it doesn't leak into code below
 
         // External variables may need to be processed in a consistent order,
         // so extract them into a list.
         #[cfg(not(feature = "no_closure"))]
-        let (mut params, externals) = {
+        let (mut params, _externals) = {
             let externals = std::mem::take(&mut new_state.external_vars);
 
             let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
@@ -3769,7 +3771,12 @@ impl Engine {
             (params, externals)
         };
         #[cfg(feature = "no_closure")]
-        let (mut params, externals) = (FnArgsVec::with_capacity(params_list.len()), ThinVec::new());
+        let (mut params, _externals) = (
+            FnArgsVec::with_capacity(params_list.len()),
+            ThinVec::<Ident>::new(),
+        );
+
+        let _ = new_state; // Make sure it doesn't leak into code below
 
         params.append(&mut params_list);
 
@@ -3807,7 +3814,7 @@ impl Engine {
         // Finished with `new_state` here. Revert back to using `state`.
 
         #[cfg(not(feature = "no_closure"))]
-        for Ident { name, pos } in &externals {
+        for Ident { name, pos } in &_externals {
             let (index, is_func) = self.access_var(state, name, *pos);
 
             if !is_func
@@ -3829,7 +3836,7 @@ impl Engine {
         state.lib.insert(hash_script, fn_def);
 
         #[cfg(not(feature = "no_closure"))]
-        let expr = self.make_curry_from_externals(state, expr, externals, settings.pos);
+        let expr = self.make_curry_from_externals(state, expr, _externals, settings.pos);
 
         Ok(expr)
     }
