@@ -1424,40 +1424,7 @@ impl Engine {
             }
             #[cfg(not(feature = "no_function"))]
             Token::Pipe | Token::Or if settings.has_option(LangOptions::ANON_FN) => {
-                let (expr, fn_def, _externals) = self.parse_anon_fn(
-                    state,
-                    settings,
-                    false,
-                    #[cfg(not(feature = "no_closure"))]
-                    true,
-                )?;
-
-                #[cfg(not(feature = "no_closure"))]
-                for Ident { name, pos } in &_externals {
-                    let (index, is_func) = self.access_var(state, name, *pos);
-
-                    if !is_func
-                        && index.is_none()
-                        && !settings.has_flag(ParseSettingFlags::CLOSURE_SCOPE)
-                        && settings.has_option(LangOptions::STRICT_VAR)
-                        && !state
-                            .external_constants
-                            .map_or(false, |scope| scope.contains(name))
-                    {
-                        // If the parent scope is not inside another capturing closure
-                        // then we can conclude that the captured variable doesn't exist.
-                        // Under Strict Variables mode, this is not allowed.
-                        return Err(PERR::VariableUndefined(name.to_string()).into_err(*pos));
-                    }
-                }
-
-                let hash_script = calc_fn_hash(None, &fn_def.name, fn_def.params.len());
-                state.lib.insert(hash_script, fn_def);
-
-                #[cfg(not(feature = "no_closure"))]
-                let expr = self.make_curry_from_externals(state, expr, _externals, settings.pos);
-
-                expr
+                self.parse_anon_fn(state, settings, false)?
             }
 
             // Interpolated string
@@ -2532,19 +2499,7 @@ impl Engine {
                                 .into_err(*fwd_pos))
                         }
                     };
-
-                    let (expr, fn_def, _) = self.parse_anon_fn(
-                        state,
-                        settings,
-                        skip,
-                        #[cfg(not(feature = "no_closure"))]
-                        false,
-                    )?;
-
-                    let hash_script = calc_fn_hash(None, &fn_def.name, fn_def.params.len());
-                    state.lib.insert(hash_script, fn_def);
-
-                    inputs.push(expr);
+                    inputs.push(self.parse_anon_fn(state, settings, skip)?);
                     let keyword = self.get_interned_string(CUSTOM_SYNTAX_MARKER_FUNC);
                     segments.push(keyword.clone());
                     tokens.push(keyword);
@@ -2631,6 +2586,9 @@ impl Engine {
             // If the last symbol is `;` or `}`, it is self-terminating
             KEYWORD_SEMICOLON | KEYWORD_CLOSE_BRACE
         );
+        // It is self-terminating if the last symbol is a block
+        #[cfg(not(feature = "no_function"))]
+        let self_terminated = required_token == CUSTOM_SYNTAX_MARKER_FUNC || self_terminated;
 
         Ok(Expr::Custom(
             crate::ast::CustomExpr {
@@ -3711,8 +3669,7 @@ impl Engine {
         state: &mut ParseState,
         settings: ParseSettings,
         skip_parameters: bool,
-        #[cfg(not(feature = "no_closure"))] allow_capture: bool,
-    ) -> ParseResult<(Expr, Shared<ScriptFuncDef>, ThinVec<Ident>)> {
+    ) -> ParseResult<Expr> {
         // Build new parse state
         let new_state = &mut ParseState::new(
             state.external_constants,
@@ -3803,15 +3760,13 @@ impl Engine {
         // External variables may need to be processed in a consistent order,
         // so extract them into a list.
         #[cfg(not(feature = "no_closure"))]
-        let (mut params, externals) = if allow_capture {
+        let (mut params, externals) = {
             let externals = std::mem::take(&mut new_state.external_vars);
 
             let mut params = FnArgsVec::with_capacity(params_list.len() + externals.len());
             params.extend(externals.iter().map(|Ident { name, .. }| name.clone()));
 
             (params, externals)
-        } else {
-            (FnArgsVec::with_capacity(params_list.len()), ThinVec::new())
         };
         #[cfg(feature = "no_closure")]
         let (mut params, externals) = (FnArgsVec::with_capacity(params_list.len()), ThinVec::new());
@@ -3826,7 +3781,7 @@ impl Engine {
         let fn_name = self.get_interned_string(make_anonymous_fn(hash));
 
         // Define the function
-        let script = Shared::new(ScriptFuncDef {
+        let fn_def = Shared::new(ScriptFuncDef {
             name: fn_name.clone(),
             access: crate::FnAccess::Public,
             #[cfg(not(feature = "no_object"))]
@@ -3838,16 +3793,45 @@ impl Engine {
             comments: <_>::default(),
         });
 
+        // Define the function pointer
         let fn_ptr = crate::FnPtr {
             name: fn_name,
             curry: ThinVec::new(),
             environ: None,
             #[cfg(not(feature = "no_function"))]
-            fn_def: Some(script.clone()),
+            fn_def: Some(fn_def.clone()),
         };
+
         let expr = Expr::DynamicConstant(Box::new(fn_ptr.into()), new_settings.pos);
 
-        Ok((expr, script, externals))
+        // Finished with `new_state` here. Revert back to using `state`.
+
+        #[cfg(not(feature = "no_closure"))]
+        for Ident { name, pos } in &externals {
+            let (index, is_func) = self.access_var(state, name, *pos);
+
+            if !is_func
+                && index.is_none()
+                && !settings.has_flag(ParseSettingFlags::CLOSURE_SCOPE)
+                && settings.has_option(LangOptions::STRICT_VAR)
+                && !state
+                    .external_constants
+                    .map_or(false, |scope| scope.contains(name))
+            {
+                // If the parent scope is not inside another capturing closure
+                // then we can conclude that the captured variable doesn't exist.
+                // Under Strict Variables mode, this is not allowed.
+                return Err(PERR::VariableUndefined(name.to_string()).into_err(*pos));
+            }
+        }
+
+        let hash_script = calc_fn_hash(None, &fn_def.name, fn_def.params.len());
+        state.lib.insert(hash_script, fn_def);
+
+        #[cfg(not(feature = "no_closure"))]
+        let expr = self.make_curry_from_externals(state, expr, externals, settings.pos);
+
+        Ok(expr)
     }
 
     /// Parse a global level expression.
