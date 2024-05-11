@@ -278,11 +278,25 @@ fn test_custom_syntax_func() {
     let mut engine = Engine::new();
 
     engine
-        .register_custom_syntax(["hello", "$func$"], false, |_, inputs| Ok(inputs[0].get_literal_value::<FnPtr>().unwrap().into()))
+        .register_custom_syntax(["hello", "$func$"], false, |context, inputs| context.eval_expression_tree(&inputs[0]))
         .unwrap();
 
     assert_eq!(engine.eval::<INT>("call(hello |x| { x + 1 }, 41)").unwrap(), 42);
     assert_eq!(engine.eval::<INT>("call(hello { 42 })").unwrap(), 42);
+
+    #[cfg(not(feature = "no_closure"))]
+    assert_eq!(
+        engine
+            .eval::<INT>(
+                "
+                    let a = 1;
+                    let f = hello |x| { x + a };
+                    call(f, 41)
+                "
+            )
+            .unwrap(),
+        42
+    );
 }
 
 #[test]
