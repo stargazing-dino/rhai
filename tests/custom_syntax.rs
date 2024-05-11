@@ -283,6 +283,8 @@ fn test_custom_syntax_func() {
 
     assert_eq!(engine.eval::<INT>("call(hello |x| { x + 1 }, 41)").unwrap(), 42);
     assert_eq!(engine.eval::<INT>("call(hello { 42 })").unwrap(), 42);
+
+    #[cfg(not(feature = "no_closure"))]
     assert_eq!(
         engine
             .eval::<INT>(
