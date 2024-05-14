@@ -534,20 +534,7 @@ pub fn locked_read<T>(value: &Locked<T>) -> Option<LockGuard<T>> {
 
     #[cfg(feature = "sync")]
     #[cfg(not(feature = "unchecked"))]
-    {
-        // Spin-lock for a short while before giving up
-        for _ in 0..10 {
-            match value.try_read() {
-                Ok(guard) => return Some(guard),
-                Err(std::sync::TryLockError::WouldBlock) => {
-                    std::thread::sleep(std::time::Duration::from_secs(1))
-                }
-                Err(_) => return None,
-            }
-        }
-
-        return None;
-    }
+    return value.try_read();
 }
 
 /// _(internals)_ Lock a [`Locked`] resource for mutable access.
@@ -565,20 +552,7 @@ pub fn locked_write<T>(value: &Locked<T>) -> Option<LockGuardMut<T>> {
 
     #[cfg(feature = "sync")]
     #[cfg(not(feature = "unchecked"))]
-    {
-        // Spin-lock for a short while before giving up
-        for _ in 0..10 {
-            match value.try_write() {
-                Ok(guard) => return Some(guard),
-                Err(std::sync::TryLockError::WouldBlock) => {
-                    std::thread::sleep(std::time::Duration::from_secs(1))
-                }
-                Err(_) => return None,
-            }
-        }
-
-        return None;
-    }
+    return value.try_write();
 }
 
 /// General Rust function trail object.
