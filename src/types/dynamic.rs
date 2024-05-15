@@ -1701,6 +1701,10 @@ impl Dynamic {
                 #[cfg(not(feature = "sync"))]
                 Ok(value) => value.into_inner().flatten(),
                 #[cfg(feature = "sync")]
+                #[cfg(not(feature = "no_std"))]
+                Ok(value) => value.into_inner().unwrap().flatten(),
+                #[cfg(feature = "sync")]
+                #[cfg(feature = "no_std")]
                 Ok(value) => value.into_inner().flatten(),
                 // If there are outstanding references, return a cloned copy
                 Err(cell) => {

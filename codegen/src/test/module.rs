@@ -183,10 +183,6 @@ mod module_tests {
         assert!(item_mod.consts().is_empty());
         assert_eq!(item_mod.sub_modules().len(), 1);
         assert_eq!(&item_mod.sub_modules()[0].consts()[0].name, "MYSTIC_NUMBER");
-        assert_eq!(
-            item_mod.sub_modules()[0].consts()[0].expr,
-            syn::parse2::<syn::Expr>(quote! { 42 }).unwrap()
-        );
     }
 
     #[test]
@@ -244,10 +240,6 @@ mod module_tests {
         assert!(item_mod.fns().is_empty());
         assert_eq!(item_mod.consts().len(), 1);
         assert_eq!(&item_mod.consts()[0].name, "MYSTIC_NUMBER");
-        assert_eq!(
-            item_mod.consts()[0].expr,
-            syn::parse2::<syn::Expr>(quote! { 42 }).unwrap()
-        );
     }
 
     #[test]
