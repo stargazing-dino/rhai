@@ -1701,7 +1701,7 @@ impl Dynamic {
                 #[cfg(not(feature = "sync"))]
                 Ok(value) => value.into_inner().flatten(),
                 #[cfg(feature = "sync")]
-                Ok(value) => value.into_inner().unwrap().flatten(),
+                Ok(value) => value.into_inner().flatten(),
                 // If there are outstanding references, return a cloned copy
                 Err(cell) => {
                     if let Some(guard) = crate::func::locked_read(&cell) {
