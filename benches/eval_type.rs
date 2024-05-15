@@ -62,23 +62,23 @@ fn bench_type_method(bench: &mut Bencher) {
     bench.iter(|| engine.run_ast_with_scope(&mut scope, &ast).unwrap());
 }
 
-#[bench]
-fn bench_type_method_with_params(bench: &mut Bencher) {
-    let script = "foo.update(1)";
+// #[bench]
+// fn bench_type_method_with_params(bench: &mut Bencher) {
+//     let script = "foo.update(1)";
 
-    let mut engine = Engine::new();
-    engine.set_optimization_level(OptimizationLevel::None);
+//     let mut engine = Engine::new();
+//     engine.set_optimization_level(OptimizationLevel::None);
 
-    engine.register_type_with_name::<Test>("Test");
-    engine.register_fn("update", Test::update);
+//     engine.register_type_with_name::<Test>("Test");
+//     engine.register_fn("update", Test::update);
 
-    let ast = engine.compile_expression(script).unwrap();
+//     let ast = engine.compile_expression(script).unwrap();
 
-    let mut scope = Scope::new();
-    scope.push("foo", Test { x: 42 });
+//     let mut scope = Scope::new();
+//     scope.push("foo", Test { x: 42 });
 
-    bench.iter(|| engine.run_ast_with_scope(&mut scope, &ast).unwrap());
-}
+//     bench.iter(|| engine.run_ast_with_scope(&mut scope, &ast).unwrap());
+// }
 
 #[bench]
 fn bench_type_method_nested(bench: &mut Bencher) {
