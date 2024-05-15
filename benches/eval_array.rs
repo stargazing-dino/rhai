@@ -67,7 +67,7 @@ fn bench_eval_array_loop(bench: &mut Bencher) {
     let script = "
             let list = [];
             
-            for i in 0..10_000 {
+            for i in 0..1_888 {
                 list.push(i);
             }
 
