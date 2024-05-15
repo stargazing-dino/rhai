@@ -13,8 +13,6 @@ use crate::module::Module;
 #[derive(Debug)]
 pub struct ExportedConst {
     pub name: String,
-    pub typ: Box<syn::Type>,
-    pub expr: syn::Expr,
     pub cfg_attrs: Vec<syn::Attribute>,
 }
 

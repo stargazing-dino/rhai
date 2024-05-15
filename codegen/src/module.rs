@@ -139,17 +139,13 @@ impl Parse for Module {
             for item in &*content {
                 if let syn::Item::Const(syn::ItemConst {
                     vis: syn::Visibility::Public(..),
-                    ref expr,
                     ident,
                     attrs,
-                    ty,
                     ..
                 }) = item
                 {
                     consts.push(ExportedConst {
                         name: ident.to_string(),
-                        typ: ty.clone(),
-                        expr: expr.as_ref().clone(),
                         cfg_attrs: crate::attrs::collect_cfg_attr(attrs),
                     })
                 }
