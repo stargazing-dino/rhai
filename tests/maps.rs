@@ -1,5 +1,6 @@
 #![cfg(not(feature = "no_object"))]
 use rhai::{Dynamic, Engine, EvalAltResult, Map, ParseErrorType, Position, Scope, INT};
+use std::convert::TryInto;
 
 #[test]
 fn test_map_indexing() {
@@ -264,7 +265,7 @@ fn test_map_missing_property_callback() {
     engine.on_map_missing_property(|map, prop, _| match prop {
         "x" => {
             map.insert("y".into(), (42 as INT).into());
-            Ok(map.get_mut("y").unwrap().into())
+            map.get_mut("y").unwrap().try_into()
         }
         "z" => Ok(Dynamic::from(100 as INT).into()),
         _ => Err(EvalAltResult::ErrorPropertyNotFound(prop.to_string(), Position::NONE).into()),

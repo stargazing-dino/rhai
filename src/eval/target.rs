@@ -1,9 +1,12 @@
 //! Type to hold a mutable reference to the target of an evaluation.
 
-use crate::{Dynamic, Position, RhaiResultOf};
-use std::borrow::{Borrow, BorrowMut};
+use crate::{Dynamic, EvalAltResult, Position, RhaiError, RhaiResultOf};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+use std::{
+    borrow::{Borrow, BorrowMut},
+    convert::TryFrom,
+};
 
 /// Calculate an offset+len pair given an actual length of the underlying array.
 ///
@@ -413,21 +416,25 @@ impl<'a> Target<'a> {
     }
 }
 
-impl<'a> From<&'a mut Dynamic> for Target<'a> {
+impl<'a> TryFrom<&'a mut Dynamic> for Target<'a> {
+    type Error = RhaiError;
+
     #[inline]
-    fn from(value: &'a mut Dynamic) -> Self {
+    fn try_from(value: &'a mut Dynamic) -> Result<Self, Self::Error> {
         #[cfg(not(feature = "no_closure"))]
         if value.is_shared() {
             // Cloning is cheap for a shared value
             let shared_value = value.clone();
-            let guard = value.write_lock::<Dynamic>().unwrap();
-            return Self::SharedValue {
+            let Some(guard) = value.write_lock::<Dynamic>() else {
+                return Err(EvalAltResult::ErrorDataRace(String::new(), Position::NONE).into());
+            };
+            return Ok(Self::SharedValue {
                 guard,
                 shared_value,
-            };
+            });
         }
 
-        Self::RefMut(value)
+        Ok(Self::RefMut(value))
     }
 }
 

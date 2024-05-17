@@ -8,9 +8,12 @@ use crate::func::{get_builtin_op_assignment_fn, get_hasher};
 use crate::tokenizer::Token;
 use crate::types::dynamic::{AccessMode, Union};
 use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, VarDefInfo, ERR, INT};
-use std::hash::{Hash, Hasher};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+use std::{
+    convert::TryInto,
+    hash::{Hash, Hasher},
+};
 
 impl Engine {
     /// If the value is a string, intern it.
@@ -310,7 +313,7 @@ impl Engine {
 
                         self.track_operation(global, lhs.position())?;
 
-                        let target = &mut this_ptr.unwrap().into();
+                        let target = &mut this_ptr.unwrap().try_into()?;
 
                         self.eval_op_assignment(global, caches, op_info, lhs, target, rhs_val)?;
                     }
