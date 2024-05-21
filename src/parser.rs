@@ -2265,20 +2265,31 @@ impl Engine {
 
             // Parse the RHS
             let rhs = match op_token {
+                Token::DoubleQuestion
+                    if matches!(
+                        state.input.peek().unwrap().0,
+                        Token::Break | Token::Continue | Token::Return | Token::Throw
+                    ) =>
+                {
+                    let stmt = self.parse_stmt(state, settings)?;
+                    let block: StmtBlock = stmt.into();
+                    Expr::Stmt(block.into())
+                }
                 // [xxx..] | (xxx..) | {xxx..} | xxx.., | xxx..; | xxx.. =>
                 // [xxx..=] | (xxx..=) | {xxx..=} | xxx..=, | xxx..=; | xxx..= =>
-                Token::ExclusiveRange | Token::InclusiveRange => {
-                    let (next_op, next_pos) = state.input.peek().unwrap();
-
-                    match next_op {
+                Token::ExclusiveRange | Token::InclusiveRange
+                    if matches!(
+                        state.input.peek().unwrap().0,
                         Token::RightBracket
-                        | Token::RightParen
-                        | Token::RightBrace
-                        | Token::Comma
-                        | Token::SemiColon
-                        | Token::DoubleArrow => Expr::Unit(*next_pos),
-                        _ => self.parse_unary(state, settings)?,
-                    }
+                            | Token::RightParen
+                            | Token::RightBrace
+                            | Token::Comma
+                            | Token::SemiColon
+                            | Token::DoubleArrow
+                    ) =>
+                {
+                    let (_, next_pos) = state.input.peek().unwrap();
+                    Expr::Unit(*next_pos)
                 }
                 _ => self.parse_unary(state, settings)?,
             };

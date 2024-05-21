@@ -28,6 +28,20 @@ fn test_loop() {
         21
     );
 
+    assert_eq!(
+        engine
+            .eval::<INT>(
+                "
+                    for n in 0..10 {
+                        let x = if n <= 5 { n };
+                        x ?? break 42;
+                    }
+                "
+            )
+            .unwrap(),
+        42
+    );
+
     assert_eq!(*engine.compile("let x = 0; break;").unwrap_err().err_type(), ParseErrorType::LoopBreak);
 
     #[cfg(not(feature = "no_function"))]

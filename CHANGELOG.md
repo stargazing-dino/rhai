@@ -17,6 +17,7 @@ Bug fixes
 New features
 ------------
 
+* The `break`, `continue`, `return` and `throw` statements can now follow the `??` operator to short-circuit operations where the value is `()`.
 * A new symbol, `$func$`, is added to custom syntax to allow parsing of anonymous functions.
 
 
