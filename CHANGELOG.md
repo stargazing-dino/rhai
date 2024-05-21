@@ -12,6 +12,7 @@ Bug fixes
   macro. This is to allow for `rust_2018_idioms` lints (thanks [`@ltabis`](https://github.com/ltabis) [864](https://github.com/rhaiscript/rhai/issues/864)).
 * The `sync` feature now works properly in `no-std` builds (thanks [`@misssonder`](https://github.com/misssonder) [874](https://github.com/rhaiscript/rhai/pull/874)).
 * More data-race conditions are caught and returned as errors instead of panicking.
+* Missing `min` and `max` functions where both operands are floats or `Decimal` are added.
 
 New features
 ------------
