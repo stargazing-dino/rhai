@@ -32,6 +32,23 @@ fn test_stack_overflow_fn_calls() {
             .unwrap_err(),
         EvalAltResult::ErrorStackOverflow(..)
     ));
+
+    #[cfg(not(feature = "no_function"))]
+    #[cfg(not(feature = "no_object"))]
+    assert!(matches!(
+        *engine
+            .run(
+                "
+                    let obj1 = #{
+                        action: || this.action(),	
+                        update: |x| this.action()
+                    };
+                    obj1.update(1)
+                "
+            )
+            .unwrap_err(),
+        EvalAltResult::ErrorStackOverflow(..)
+    ));
 }
 
 #[test]

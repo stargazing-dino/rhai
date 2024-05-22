@@ -13,6 +13,7 @@ Bug fixes
 * The `sync` feature now works properly in `no-std` builds (thanks [`@misssonder`](https://github.com/misssonder) [874](https://github.com/rhaiscript/rhai/pull/874)).
 * More data-race conditions are caught and returned as errors instead of panicking.
 * Missing `min` and `max` functions where both operands are floats or `Decimal` are added.
+* Fixed stack overflow when calling closures recursively (thanks [`@MageWeiG`](https://github.com/MageWeiG) [880](https://github.com/rhaiscript/rhai/issues/880)).
 
 New features
 ------------
