@@ -356,6 +356,7 @@ impl Engine {
     /// ```
     /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
     /// # use rhai::{Engine, Dynamic, EvalAltResult, Position};
+    /// # use std::convert::TryInto;
     /// let mut engine = Engine::new();
     ///
     /// engine.on_invalid_array_index(|arr, index, _| match index
@@ -365,7 +366,7 @@ impl Engine {
     ///         arr.push((42_i64).into());
     ///         // Return a mutable reference to an element
     ///         let value_ref = arr.last_mut().unwrap();
-    ///         Ok(value_ref.into())
+    ///         value_ref.try_into()
     ///     }
     ///     100 => {
     ///         let value = Dynamic::from(100_i64);
@@ -433,6 +434,7 @@ impl Engine {
     /// ```
     /// # fn main() -> Result<(), Box<rhai::EvalAltResult>> {
     /// # use rhai::{Engine, Dynamic, EvalAltResult, Position};
+    /// # use std::convert::TryInto;
     /// let mut engine = Engine::new();
     ///
     /// engine.on_map_missing_property(|map, prop, _| match prop
@@ -442,7 +444,7 @@ impl Engine {
     ///         map.insert("y".into(), (42_i64).into());
     ///         // Return a mutable reference to an element
     ///         let value_ref = map.get_mut("y").unwrap();
-    ///         Ok(value_ref.into())
+    ///         value_ref.try_into()
     ///     }
     ///     "z" => {
     ///         // Return a temporary value (not a reference)

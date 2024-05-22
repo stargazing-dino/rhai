@@ -1,6 +1,6 @@
 #![cfg(not(feature = "no_index"))]
 use rhai::{Array, Dynamic, Engine, EvalAltResult, ParseErrorType, Position, INT};
-use std::iter::FromIterator;
+use std::{convert::TryInto, iter::FromIterator};
 
 #[test]
 fn test_arrays() {
@@ -509,7 +509,7 @@ fn test_array_invalid_index_callback() {
     engine.on_invalid_array_index(|arr, index, _| match index {
         -100 => {
             arr.push((42 as INT).into());
-            Ok(arr.last_mut().unwrap().into())
+            arr.last_mut().unwrap().try_into()
         }
         100 => Ok(Dynamic::from(100 as INT).into()),
         _ => Err(EvalAltResult::ErrorArrayBounds(arr.len(), index, Position::NONE).into()),

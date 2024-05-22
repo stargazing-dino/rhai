@@ -9,9 +9,9 @@ use crate::{
     calc_fn_hash, Dynamic, Engine, ExclusiveRange, FnArgsVec, InclusiveRange, OnceCell, Position,
     RhaiResult, RhaiResultOf, Scope, ERR,
 };
-use std::hash::Hash;
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
+use std::{convert::TryInto, hash::Hash};
 
 /// Function call hashes to index getters and setters.
 static INDEXER_HASHES: OnceCell<(u64, u64)> = OnceCell::new();
@@ -146,7 +146,7 @@ impl Engine {
                     }
                 };
 
-                Ok(arr.get_mut(arr_idx).map(Target::from).unwrap())
+                arr.get_mut(arr_idx).unwrap().try_into()
             }
 
             #[cfg(not(feature = "no_index"))]
@@ -192,7 +192,7 @@ impl Engine {
                 }
 
                 if let Some(value) = map.get_mut(index.as_str()) {
-                    Ok(Target::from(value))
+                    value.try_into()
                 } else if self.fail_on_invalid_map_property() {
                     Err(ERR::ErrorPropertyNotFound(index.to_string(), idx_pos).into())
                 } else {
@@ -508,7 +508,7 @@ impl Engine {
                 this_ptr.map_or_else(
                     || Err(ERR::ErrorUnboundThis(*var_pos).into()),
                     |this_ptr| {
-                        let target = &mut this_ptr.into();
+                        let target = &mut this_ptr.try_into()?;
                         let scope = Some(scope);
                         self.eval_dot_index_chain_raw(
                             global, caches, scope, None, lhs, expr, target, rhs, idx_values,
@@ -969,7 +969,7 @@ impl Engine {
                                 })?;
 
                             {
-                                let orig_val = &mut (&mut orig_val).into();
+                                let orig_val = &mut (&mut orig_val).try_into()?;
 
                                 self.eval_op_assignment(
                                     global, caches, op_info, root, orig_val, new_val,
@@ -1139,7 +1139,7 @@ impl Engine {
                                         _ => Err(err),
                                     })?;
 
-                                let val = &mut (&mut val).into();
+                                let val = &mut (&mut val).try_into()?;
 
                                 let (result, may_be_changed) = self.eval_dot_index_chain_raw(
                                     global, caches, s, _this_ptr, root, rhs, val, &x.rhs,

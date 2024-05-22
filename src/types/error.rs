@@ -162,6 +162,7 @@ impl fmt::Display for EvalAltResult {
             Self::ErrorIndexNotFound(s, ..) => write!(f, "Invalid index: {s}")?,
             Self::ErrorFunctionNotFound(s, ..) => write!(f, "Function not found: {s}")?,
             Self::ErrorModuleNotFound(s, ..) => write!(f, "Module not found: {s}")?,
+            Self::ErrorDataRace(s, ..) if s.is_empty() => write!(f, "Data race detected")?,
             Self::ErrorDataRace(s, ..) => write!(f, "Data race detected on variable '{s}'")?,
 
             Self::ErrorDotExpr(s, ..) if s.is_empty() => f.write_str("Malformed dot expression")?,

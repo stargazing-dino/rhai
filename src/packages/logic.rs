@@ -116,6 +116,14 @@ mod float_functions {
     use crate::INT;
 
     #[rhai_fn(name = "max")]
+    pub fn max_ff_32(x: f32, y: f32) -> f32 {
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "max")]
     pub fn max_if_32(x: INT, y: f32) -> f32 {
         let (x, y) = (x as f32, y);
         if x >= y {
@@ -128,6 +136,14 @@ mod float_functions {
     pub fn max_fi_32(x: f32, y: INT) -> f32 {
         let (x, y) = (x, y as f32);
         if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_ff_32(x: f32, y: f32) -> f32 {
+        if x <= y {
             x
         } else {
             y
@@ -152,6 +168,14 @@ mod float_functions {
         }
     }
     #[rhai_fn(name = "max")]
+    pub fn max_ff_64(x: f64, y: f64) -> f64 {
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "max")]
     pub fn max_if_64(x: INT, y: f64) -> f64 {
         let (x, y) = (x as f64, y);
         if x >= y {
@@ -164,6 +188,14 @@ mod float_functions {
     pub fn max_fi_64(x: f64, y: INT) -> f64 {
         let (x, y) = (x, y as f64);
         if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_ff_64(x: f64, y: f64) -> f64 {
+        if x <= y {
             x
         } else {
             y
@@ -420,6 +452,14 @@ mod decimal_functions {
     use rust_decimal::Decimal;
 
     #[rhai_fn(name = "max")]
+    pub fn max_dd(x: Decimal, y: Decimal) -> Decimal {
+        if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "max")]
     pub fn max_id(x: INT, y: Decimal) -> Decimal {
         let x = x.into();
         if x >= y {
@@ -432,6 +472,14 @@ mod decimal_functions {
     pub fn max_di(x: Decimal, y: INT) -> Decimal {
         let y = y.into();
         if x >= y {
+            x
+        } else {
+            y
+        }
+    }
+    #[rhai_fn(name = "min")]
+    pub fn min_dd(x: Decimal, y: Decimal) -> Decimal {
+        if x <= y {
             x
         } else {
             y

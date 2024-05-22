@@ -10,7 +10,7 @@ use test::Bencher;
 fn bench_iterations_1000(bench: &mut Bencher) {
     let script = "
             let x = 1_000;
-            
+
             while x > 0 {
                 x -= 1;
             }

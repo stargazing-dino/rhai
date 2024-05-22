@@ -7,7 +7,7 @@ use crate::types::dynamic::AccessMode;
 use crate::{Dynamic, Engine, RhaiResult, RhaiResultOf, Scope, SmartString, ERR};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
-use std::{fmt::Write, num::NonZeroUsize};
+use std::{convert::TryInto, fmt::Write, num::NonZeroUsize};
 
 impl Engine {
     /// Search for a module within an imports stack.
@@ -142,7 +142,7 @@ impl Engine {
 
         let val = scope.get_mut_by_index(index);
 
-        Ok(val.into())
+        val.try_into()
     }
     /// Search for a variable within the scope or within imports,
     /// depending on whether the variable name is namespace-qualified.
