@@ -754,6 +754,8 @@ impl Engine {
                         let scope = &mut Scope::new();
                         let environ = fn_ptr.environ.as_ref().map(<_>::as_ref);
 
+                        defer! { let orig_level = global.level; global.level += 1 }
+
                         self.call_script_fn(
                             global, caches, scope, None, environ, fn_def, args, true, pos,
                         )
@@ -831,6 +833,8 @@ impl Engine {
                         let scope = &mut Scope::new();
                         let this_ptr = Some(target.as_mut());
                         let environ = environ.as_deref();
+
+                        defer! { let orig_level = global.level; global.level += 1 }
 
                         self.call_script_fn(
                             global, caches, scope, this_ptr, environ, &fn_def, args, true, pos,
@@ -973,6 +977,8 @@ impl Engine {
                         let this_ptr = Some(target.as_mut());
                         let args = &mut call_args.iter_mut().collect::<FnArgsVec<_>>();
 
+                        defer! { let orig_level = global.level; global.level += 1 }
+
                         self.call_script_fn(
                             global, caches, scope, this_ptr, environ, &fn_def, args, true, pos,
                         )
@@ -1082,6 +1088,8 @@ impl Engine {
                         let args = &mut arg_values.iter_mut().collect::<FnArgsVec<_>>();
                         let scope = &mut Scope::new();
                         let environ = environ.as_deref();
+
+                        defer! { let orig_level = global.level; global.level += 1 }
 
                         return self.call_script_fn(
                             global, caches, scope, None, environ, &fn_def, args, true, pos,
