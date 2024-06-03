@@ -174,13 +174,13 @@ impl Engine {
         args.parse(&mut arg_values);
 
         self._call_fn(
+            options,
             scope,
-            &mut self.new_global_runtime_state(),
-            &mut Caches::new(),
             ast,
             name.as_ref(),
             arg_values.as_mut(),
-            options,
+            &mut self.new_global_runtime_state(),
+            &mut Caches::new(),
         )
         .and_then(|result| {
             result.try_cast_result().map_err(|r| {
@@ -206,28 +206,40 @@ impl Engine {
     #[inline(always)]
     pub(crate) fn _call_fn(
         &self,
+        options: CallFnOptions,
         scope: &mut Scope,
-        global: &mut GlobalRuntimeState,
-        caches: &mut Caches,
         ast: &AST,
         name: &str,
         arg_values: &mut [Dynamic],
-        options: CallFnOptions,
+        global: &mut GlobalRuntimeState,
+        caches: &mut Caches,
     ) -> RhaiResult {
         let statements = ast.statements();
 
+        let orig_source = mem::replace(&mut global.source, ast.source_raw().cloned());
+
         let orig_lib_len = global.lib.len();
+        global.lib.push(ast.shared_lib().clone());
 
         let orig_tag = options.tag.map(|v| mem::replace(&mut global.tag, v));
-        let mut this_ptr = options.this_ptr;
 
-        global.lib.push(ast.shared_lib().clone());
+        let mut this_ptr = options.this_ptr;
 
         #[cfg(not(feature = "no_module"))]
         let orig_embedded_module_resolver =
             std::mem::replace(&mut global.embedded_module_resolver, ast.resolver.clone());
 
         let rewind_scope = options.rewind_scope;
+
+        defer! { global => move |g| {
+            #[cfg(not(feature = "no_module"))]
+            {
+                g.embedded_module_resolver = orig_embedded_module_resolver;
+            }
+            if let Some(orig_tag) = orig_tag { g.tag = orig_tag; }
+            g.lib.truncate(orig_lib_len);
+            g.source = orig_source;
+        }}
 
         let global_result = if options.eval_ast && !statements.is_empty() {
             defer! {
@@ -277,17 +289,6 @@ impl Engine {
             let node = &crate::ast::Stmt::Noop(Position::NONE);
             self.dbg(global, caches, scope, this_ptr, node)?;
         }
-
-        #[cfg(not(feature = "no_module"))]
-        {
-            global.embedded_module_resolver = orig_embedded_module_resolver;
-        }
-
-        if let Some(value) = orig_tag {
-            global.tag = value;
-        }
-
-        global.lib.truncate(orig_lib_len);
 
         result.map_err(|err| match *err {
             ERR::ErrorInFunctionCall(fn_name, _, inner_err, _) if fn_name == name => inner_err,

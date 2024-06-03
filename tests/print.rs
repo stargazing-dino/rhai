@@ -1,4 +1,4 @@
-use rhai::{Engine, Scope, INT};
+use rhai::{Dynamic, Engine, Scope, INT};
 use std::sync::{Arc, RwLock};
 
 #[cfg(not(feature = "only_i32"))]
@@ -36,9 +36,10 @@ fn test_print_debug() {
     engine.run("print(40 + 2)").unwrap();
     let mut ast = engine.compile(r#"let x = "hello!"; debug(x)"#).unwrap();
     ast.set_source("world");
-    engine.run_ast(&ast).unwrap();
+    let r = engine.eval_ast::<Dynamic>(&ast).unwrap();
 
     // 'logbook' captures all the 'print' and 'debug' output
+    assert!(r.is_unit());
     assert_eq!(logbook.read().unwrap().len(), 2);
     assert_eq!(logbook.read().unwrap()[0], "entry: 42");
     assert_eq!(logbook.read().unwrap()[1], if cfg!(not(feature = "no_position")) { r#"DEBUG of world at 1:19: "hello!""# } else { r#"DEBUG of world at none: "hello!""# });
