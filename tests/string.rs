@@ -103,9 +103,9 @@ fn test_string_index() {
     // overflow
     assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[..] = "x"; y"#).unwrap(), "x");
     // overflow
-    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y.crop(..); y"#).unwrap(), "hello");
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; crop(y, ..); y"#).unwrap(), "hello");
     // overflow
-    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y.crop(..=); y"#).unwrap(), "hello");
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; crop(y, ..=); y"#).unwrap(), "hello");
 
     // mut slice index
     assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1] = 'i'; y"#).unwrap(), "hillo");
