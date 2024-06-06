@@ -896,7 +896,7 @@ mod string_functions {
         range: InclusiveRange,
     ) -> ImmutableString {
         let start = INT::max(*range.start(), 0);
-        let end = INT::max(*range.end(), start);
+        let end = INT::min(INT::max(*range.end(), start), INT::MAX - 1);
         sub_string(ctx, string, start, end - start + 1)
     }
     /// Copy a portion of the string and return it as a new string.
@@ -1042,7 +1042,7 @@ mod string_functions {
         range: InclusiveRange,
     ) {
         let start = INT::max(*range.start(), 0);
-        let end = INT::max(*range.end(), start);
+        let end = INT::min(INT::max(*range.end(), start), INT::MAX - 1);
         crop(ctx, string, start, end - start + 1);
     }
 

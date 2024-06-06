@@ -98,6 +98,14 @@ fn test_string_index() {
     assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[0..18]"#).unwrap(), "hello");
     // overflow negative index
     assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[2..-18]"#).unwrap(), "");
+    // overflow
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[..=] = "x"; y"#).unwrap(), "x");
+    // overflow
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[..] = "x"; y"#).unwrap(), "x");
+    // overflow
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; crop(y, ..); y"#).unwrap(), "hello");
+    // overflow
+    assert_eq!(engine.eval::<String>(r#"let y = "hello"; crop(y, ..=); y"#).unwrap(), "hello");
 
     // mut slice index
     assert_eq!(engine.eval::<String>(r#"let y = "hello"; y[1] = 'i'; y"#).unwrap(), "hillo");
