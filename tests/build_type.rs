@@ -1,5 +1,6 @@
 #![cfg(not(feature = "no_object"))]
 use rhai::{CustomType, Engine, EvalAltResult, Position, TypeBuilder, INT};
+use std::cmp::Ordering;
 
 #[test]
 fn test_build_type() {
@@ -218,4 +219,32 @@ fn test_build_type_macro() {
             hello: "world!yo!!!!!".into()
         }
     );
+}
+
+#[test]
+fn test_build_type_operators() {
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct XYZ(INT);
+
+    impl CustomType for XYZ {
+        fn build(mut tb: TypeBuilder<Self>) {
+            tb.with_fn("new_xyz", XYZ)
+                .with_fn("<", |a: XYZ, b: XYZ| Self::cmp(&a, &b) == Ordering::Less)
+                .with_fn(">", |a: XYZ, b: XYZ| Self::cmp(&a, &b) == Ordering::Greater)
+                .with_fn("<=", |a: XYZ, b: XYZ| Self::cmp(&a, &b) != Ordering::Greater)
+                .with_fn(">=", |a: XYZ, b: XYZ| Self::cmp(&a, &b) != Ordering::Less)
+                .with_fn("!=", |a: XYZ, b: XYZ| Self::cmp(&a, &b) != Ordering::Equal)
+                .with_fn("==", |a: XYZ, b: XYZ| Self::cmp(&a, &b) == Ordering::Equal);
+        }
+    }
+
+    let mut engine = Engine::new();
+    engine.build_type::<XYZ>();
+
+    assert!(!engine.eval::<bool>("let a = new_xyz(1); let b = new_xyz(2); a == b").unwrap());
+    assert!(engine.eval::<bool>("let a = new_xyz(1); let b = new_xyz(2); a != b").unwrap());
+    assert!(engine.eval::<bool>("let a = new_xyz(1); let b = new_xyz(2); a < b").unwrap());
+    assert!(engine.eval::<bool>("let a = new_xyz(1); let b = new_xyz(2); a <= b").unwrap());
+    assert!(!engine.eval::<bool>("let a = new_xyz(1); let b = new_xyz(2); a > b").unwrap());
+    assert!(!engine.eval::<bool>("let a = new_xyz(1); let b = new_xyz(2); a >= b").unwrap());
 }

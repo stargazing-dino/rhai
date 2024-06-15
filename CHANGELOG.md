@@ -16,12 +16,14 @@ Bug fixes
 * Fixed stack overflow when calling closures recursively (thanks [`@MageWeiG`](https://github.com/MageWeiG) [880](https://github.com/rhaiscript/rhai/issues/880)).
 * `Engine::call_fn` and `Engine::call_fn_with_options` now correctly use the `AST`'s `source` field.
 * (Fuzzing) Fixed crash when using `..=` in strings.
+* A recursive stack-overflow bug in `Dynamic::is_hashable` is fixed.
 
 New features
 ------------
 
 * The `break`, `continue`, `return` and `throw` statements can now follow the `??` operator to short-circuit operations where the value is `()`.
 * A new symbol, `$func$`, is added to custom syntax to allow parsing of anonymous functions.
+* The `filter`, `drain` and `retain` methods are added to object maps.
 
 
 Version 1.18.0

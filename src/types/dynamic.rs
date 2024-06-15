@@ -741,7 +741,6 @@ impl fmt::Debug for Dynamic {
                     dict: &mut HashSet<*const Dynamic>,
                 ) -> fmt::Result {
                     match value.0 {
-                        #[cfg(not(feature = "no_closure"))]
                         Union::Shared(ref cell, ..) => match crate::func::locked_read(cell) {
                             Some(v) => {
                                 if dict.insert(value) {
@@ -1267,8 +1266,27 @@ impl Dynamic {
             }
 
             #[cfg(not(feature = "no_closure"))]
-            Union::Shared(ref cell, ..) => {
-                crate::func::locked_read(cell).map_or(false, |v| v.is_hashable())
+            Union::Shared(..) => {
+                #[cfg(feature = "no_std")]
+                use hashbrown::HashSet;
+                #[cfg(not(feature = "no_std"))]
+                use std::collections::HashSet;
+
+                // Avoid infinite recursion for shared values in a reference loop.
+                fn checked_is_hashable(
+                    value: &Dynamic,
+                    dict: &mut HashSet<*const Dynamic>,
+                ) -> bool {
+                    match value.0 {
+                        Union::Shared(ref cell, ..) => match crate::func::locked_read(cell) {
+                            Some(v) => dict.insert(value) && checked_is_hashable(&v, dict),
+                            _ => false,
+                        },
+                        _ => value.is_hashable(),
+                    }
+                }
+
+                checked_is_hashable(self, &mut <_>::default())
             }
         }
     }

@@ -68,11 +68,10 @@ impl Engine {
         const X: bool,
         R: Variant + Clone,
         const F: bool,
-        FUNC: RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
     >(
         &mut self,
         name: impl AsRef<str> + Into<Identifier>,
-        func: FUNC,
+        func: impl RhaiNativeFunc<A, N, X, R, F> + SendSync + 'static,
     ) -> &mut Self {
         FuncRegistration::new(name.into()).register_into_engine(self, func);
 

@@ -2,7 +2,9 @@
 
 use crate::engine::OP_EQUALS;
 use crate::plugin::*;
-use crate::{def_package, Dynamic, ImmutableString, Map, NativeCallContext, RhaiResultOf, INT};
+use crate::{
+    def_package, Dynamic, FnPtr, ImmutableString, Map, NativeCallContext, RhaiResultOf, INT,
+};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 
@@ -293,6 +295,162 @@ mod map_functions {
 
         map.values().cloned().collect()
     }
+    /// Iterate through all the elements in the object map, applying a `filter` function to each
+    /// and return a new collection of all elements that return `true` as a new object map.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `key`: current key
+    /// * `value` _(optional)_: copy of element (bound to `this` if omitted)
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = #{a:1, b:2, c:3, d:4, e:5};
+    ///
+    /// let y = x.filter(|k| this >= 3);
+    ///
+    /// print(y);       // prints #{"c":3, "d":4, "e":5}
+    ///
+    /// let y = x.filter(|k, v| k != "d" && v < 5);
+    ///
+    /// print(y);       // prints #{"a":1, "b":2, "c":3}
+    /// ```
+    #[rhai_fn(return_raw)]
+    pub fn filter(ctx: NativeCallContext, map: &mut Map, filter: FnPtr) -> RhaiResultOf<Map> {
+        if map.is_empty() {
+            return Ok(Map::new());
+        }
+
+        let mut result = Map::new();
+
+        for (key, item) in map.iter_mut() {
+            if filter
+                .call_raw_with_extra_args("filter", &ctx, Some(item), [key.into()], [], Some(1))?
+                .as_bool()
+                .unwrap_or(false)
+            {
+                result.insert(key.clone(), item.clone());
+            }
+        }
+
+        Ok(result)
+    }
+    /// Remove all elements in the object map that return `true` when applied the `filter` function and
+    /// return them as a new object map.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `key`: current key
+    /// * `value` _(optional)_: copy of element (bound to `this` if omitted)
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = #{a:1, b:2, c:3, d:4, e:5};
+    ///
+    /// let y = x.drain(|k| this < 3);
+    ///
+    /// print(x);       // prints #{"c":3, "d":4, "e":5]
+    ///
+    /// print(y);       // prints #{"a":1, "b"2}
+    ///
+    /// let z = x.drain(|k, v| k == "c" || v >= 5);
+    ///
+    /// print(x);       // prints #{"d":4}
+    ///
+    /// print(z);       // prints #{"c":3, "e":5}
+    /// ```
+    #[rhai_fn(return_raw)]
+    pub fn drain(ctx: NativeCallContext, map: &mut Map, filter: FnPtr) -> RhaiResultOf<Map> {
+        if map.is_empty() {
+            return Ok(Map::new());
+        }
+
+        let mut drained = Map::new();
+        let mut retained = Map::new();
+
+        for (key, mut value) in mem::take(map).into_iter() {
+            if filter
+                .call_raw_with_extra_args(
+                    "drain",
+                    &ctx,
+                    Some(&mut value),
+                    [key.clone().into()],
+                    [],
+                    Some(1),
+                )?
+                .as_bool()
+                .unwrap_or(false)
+            {
+                drained.insert(key, value);
+            } else {
+                retained.insert(key, value);
+            }
+        }
+
+        *map = retained;
+
+        Ok(drained)
+    }
+    /// Remove all elements in the object map that do not return `true` when applied the `filter` function and
+    /// return them as a new object map.
+    ///
+    /// # Function Parameters
+    ///
+    /// * `key`: current key
+    /// * `value` _(optional)_: copy of element (bound to `this` if omitted)
+    ///
+    /// # Example
+    ///
+    /// ```rhai
+    /// let x = #{a:1, b:2, c:3, d:4, e:5};
+    ///
+    /// let y = x.retain(|k| this < 3);
+    ///
+    /// print(x);       // prints #{"a":1, "b"2}
+    ///
+    /// print(y);       // prints #{"c":3, "d":4, "e":5]
+    ///
+    /// let z = y.retain(|k, v| k == "c" || v >= 5);
+    ///
+    /// print(y);       // prints #{"c":3, "e":5}
+    ///
+    /// print(z);       // prints #{"d":4}
+    /// ```
+    #[rhai_fn(return_raw)]
+    pub fn retain(ctx: NativeCallContext, map: &mut Map, filter: FnPtr) -> RhaiResultOf<Map> {
+        if map.is_empty() {
+            return Ok(Map::new());
+        }
+
+        let mut drained = Map::new();
+        let mut retained = Map::new();
+
+        for (key, mut value) in mem::take(map).into_iter() {
+            if filter
+                .call_raw_with_extra_args(
+                    "retain",
+                    &ctx,
+                    Some(&mut value),
+                    [key.clone().into()],
+                    [],
+                    Some(1),
+                )?
+                .as_bool()
+                .unwrap_or(false)
+            {
+                retained.insert(key, value);
+            } else {
+                drained.insert(key, value);
+            }
+        }
+
+        *map = retained;
+
+        Ok(drained)
+    }
+
     /// Return the JSON representation of the object map.
     ///
     /// # Data types
