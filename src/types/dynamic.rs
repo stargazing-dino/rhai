@@ -735,7 +735,7 @@ impl fmt::Debug for Dynamic {
                 use std::collections::HashSet;
 
                 // Avoid infinite recursion for shared values in a reference loop.
-                fn debug_fmt_print(
+                fn checked_debug_fmt(
                     f: &mut fmt::Formatter<'_>,
                     value: &Dynamic,
                     dict: &mut HashSet<*const Dynamic>,
@@ -744,7 +744,7 @@ impl fmt::Debug for Dynamic {
                         Union::Shared(ref cell, ..) => match crate::func::locked_read(cell) {
                             Some(v) => {
                                 if dict.insert(value) {
-                                    debug_fmt_print(f, &v, dict)?;
+                                    checked_debug_fmt(f, &v, dict)?;
                                     f.write_str(" (shared)")
                                 } else {
                                     f.write_str("<shared>")
@@ -761,7 +761,7 @@ impl fmt::Debug for Dynamic {
                                 if i > 0 {
                                     f.write_str(", ")?;
                                 }
-                                debug_fmt_print(f, v, dict)?;
+                                checked_debug_fmt(f, v, dict)?;
                             }
                             f.write_str("]")
                         }
@@ -776,7 +776,7 @@ impl fmt::Debug for Dynamic {
                                 }
                                 fmt::Debug::fmt(k, f)?;
                                 f.write_str(": ")?;
-                                debug_fmt_print(f, v, dict)?;
+                                checked_debug_fmt(f, v, dict)?;
                             }
                             f.write_str("}")
                         }
@@ -792,7 +792,7 @@ impl fmt::Debug for Dynamic {
                             fmt::Debug::fmt(fnptr.fn_name(), f)?;
                             for curry in &fnptr.curry {
                                 f.write_str(", ")?;
-                                debug_fmt_print(f, curry, dict)?;
+                                checked_debug_fmt(f, curry, dict)?;
                             }
                             f.write_str(")")
                         }
@@ -800,7 +800,7 @@ impl fmt::Debug for Dynamic {
                     }
                 }
 
-                debug_fmt_print(f, self, &mut <_>::default())
+                checked_debug_fmt(f, self, &mut <_>::default())
             }
         }
     }
@@ -1266,6 +1266,10 @@ impl Dynamic {
             }
 
             #[cfg(not(feature = "no_closure"))]
+            Union::Shared(ref cell, ..) if cfg!(feature = "unchecked") => {
+                crate::func::locked_read(cell).map_or(false, |v| v.is_hashable())
+            }
+            #[cfg(not(feature = "no_closure"))]
             Union::Shared(..) => {
                 #[cfg(feature = "no_std")]
                 use hashbrown::HashSet;
@@ -1278,10 +1282,18 @@ impl Dynamic {
                     dict: &mut HashSet<*const Dynamic>,
                 ) -> bool {
                     match value.0 {
-                        Union::Shared(ref cell, ..) => match crate::func::locked_read(cell) {
-                            Some(v) => dict.insert(value) && checked_is_hashable(&v, dict),
-                            _ => false,
-                        },
+                        Union::Shared(ref cell, ..) => crate::func::locked_read(cell)
+                            .map_or(false, |v| {
+                                dict.insert(value) && checked_is_hashable(&v, dict)
+                            }),
+                        #[cfg(not(feature = "no_index"))]
+                        Union::Array(ref a, ..) => a.iter().all(|v| checked_is_hashable(v, dict)),
+                        #[cfg(not(feature = "no_object"))]
+                        Union::Map(ref m, ..) => m.values().all(|v| checked_is_hashable(v, dict)),
+                        Union::FnPtr(ref f, ..) => {
+                            f.environ.is_none()
+                                && f.curry().iter().all(|v| checked_is_hashable(v, dict))
+                        }
                         _ => value.is_hashable(),
                     }
                 }
