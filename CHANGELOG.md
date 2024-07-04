@@ -1,6 +1,9 @@
 Rhai Release Notes
 ==================
 
+Version 1.20.0
+==============
+
 Version 1.19.0
 ==============
 
@@ -8,15 +11,14 @@ Bug fixes
 ---------
 
 * Variable resolver now correctly resolves variables that are captured in a closure.
-* `NativeCallContext<'_>` (with a lifetime parameter) now parses correctly in the `#[export_module]`
-  macro. This is to allow for `rust_2018_idioms` lints (thanks [`@ltabis`](https://github.com/ltabis) [864](https://github.com/rhaiscript/rhai/issues/864)).
+* `NativeCallContext<'_>` (with a lifetime parameter) now parses correctly in the `#[export_module]` macro. This is to allow for `rust_2018_idioms` lints (thanks [`@ltabis`](https://github.com/ltabis) [864](https://github.com/rhaiscript/rhai/issues/864)).
 * The `sync` feature now works properly in `no-std` builds (thanks [`@misssonder`](https://github.com/misssonder) [874](https://github.com/rhaiscript/rhai/pull/874)).
 * More data-race conditions are caught and returned as errors instead of panicking.
 * Missing `min` and `max` functions where both operands are floats or `Decimal` are added.
 * Fixed stack overflow when calling closures recursively (thanks [`@MageWeiG`](https://github.com/MageWeiG) [880](https://github.com/rhaiscript/rhai/issues/880)).
 * `Engine::call_fn` and `Engine::call_fn_with_options` now correctly use the `AST`'s `source` field.
 * (Fuzzing) Fixed crash when using `..=` in strings.
-* A recursive stack-overflow bug in `Dynamic::is_hashable` is fixed.
+* (Fuzzing) A recursive stack-overflow bug in `Dynamic::is_hashable` is fixed.
 
 New features
 ------------
