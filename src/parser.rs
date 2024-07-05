@@ -3328,18 +3328,18 @@ impl Engine {
             {
                 let pos = eat_token(state.input, &Token::Break);
 
-                let expr = match state.input.peek().unwrap() {
-                    // `break` at <EOF>
-                    (Token::EOF, ..) => None,
-                    // `break` at end of block
-                    (Token::RightBrace, ..) => None,
-                    // `break;`
-                    (Token::SemiColon, ..) => None,
-                    // `break`  with expression
-                    _ => Some(self.parse_expr(state, settings.level_up()?)?.into()),
-                };
+                let current_pos = state.input.peek().unwrap().1;
 
-                Ok(Stmt::BreakLoop(expr, ASTFlags::BREAK, pos))
+                match self.parse_expr(state, settings.level_up()?) {
+                    Ok(expr) => Ok(Stmt::BreakLoop(Some(expr.into()), ASTFlags::BREAK, pos)),
+                    Err(err) => {
+                        if state.input.peek().unwrap().1 == current_pos {
+                            Ok(Stmt::BreakLoop(None, ASTFlags::BREAK, pos))
+                        } else {
+                            return Err(err);
+                        }
+                    }
+                }
             }
             Token::Continue | Token::Break if self.allow_looping() => {
                 Err(PERR::LoopBreak.into_err(token_pos))
@@ -3362,21 +3362,16 @@ impl Engine {
                     })
                     .unwrap();
 
-                match state.input.peek().unwrap() {
-                    // `return`/`throw` at <EOF>
-                    (Token::EOF, ..) => Ok(Stmt::Return(None, return_type, token_pos)),
-                    // `return`/`throw` at end of block
-                    (Token::RightBrace, ..)
-                        if !settings.has_flag(ParseSettingFlags::GLOBAL_LEVEL) =>
-                    {
-                        Ok(Stmt::Return(None, return_type, token_pos))
-                    }
-                    // `return;` or `throw;`
-                    (Token::SemiColon, ..) => Ok(Stmt::Return(None, return_type, token_pos)),
-                    // `return` or `throw` with expression
-                    _ => {
-                        let expr = self.parse_expr(state, settings.level_up()?)?;
-                        Ok(Stmt::Return(Some(expr.into()), return_type, token_pos))
+                let current_pos = state.input.peek().unwrap().1;
+
+                match self.parse_expr(state, settings.level_up()?) {
+                    Ok(expr) => Ok(Stmt::Return(Some(expr.into()), return_type, token_pos)),
+                    Err(err) => {
+                        if state.input.peek().unwrap().1 == current_pos {
+                            Ok(Stmt::Return(None, return_type, token_pos))
+                        } else {
+                            return Err(err);
+                        }
                     }
                 }
             }
