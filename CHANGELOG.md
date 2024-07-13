@@ -4,6 +4,17 @@ Rhai Release Notes
 Version 1.20.0
 ==============
 
+Bug fixes
+---------
+
+* (Fuzzing) An integer-overflow bug from an inclusive range in the bits iterator is fixed.
+
+Enhancements
+------------
+
+* The `break`, `return` and `throw` statements can now be simply used as `switch` case statement expressions. Previously it is required that the statement be wrapped in a block.
+
+
 Version 1.19.0
 ==============
 
