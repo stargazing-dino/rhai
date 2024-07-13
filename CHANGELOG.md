@@ -4,6 +4,11 @@ Rhai Release Notes
 Version 1.20.0
 ==============
 
+Bug fixes
+---------
+
+* (Fuzzing) An integer-overflow bug from an inclusive range in the bits iterator is fixed.
+
 Enhancements
 ------------
 

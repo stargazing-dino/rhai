@@ -525,7 +525,14 @@ mod iterator_functions {
     pub fn bits_from_inclusive_range(value: INT, range: InclusiveRange) -> RhaiResultOf<BitRange> {
         let from = INT::max(*range.start(), 0);
         let to = INT::max(*range.end(), from - 1);
-        BitRange::new(value, from, to - from + 1)
+
+        // It is OK to use `INT::MAX` as the length to avoid an addition overflow
+        // even though it is an off-by-one error because there cannot be so many bits anyway.
+        #[cfg(not(feature = "unchecked"))]
+        return BitRange::new(value, from, (to - from).checked_add(1).unwrap_or(INT::MAX));
+
+        #[cfg(feature = "unchecked")]
+        return BitRange::new(value, from, to - from + 1);
     }
     /// Return an iterator over a portion of bits in the number.
     ///
