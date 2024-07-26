@@ -1,11 +1,7 @@
 use quote::{quote, ToTokens};
 use syn::{parse::Parse, parse::ParseStream};
 
-#[cfg(no_std)]
-use core::mem;
-#[cfg(not(no_std))]
 use std::mem;
-
 use std::borrow::Cow;
 
 use crate::attrs::{AttrItem, ExportInfo, ExportScope, ExportedParams};
