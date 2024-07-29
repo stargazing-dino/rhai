@@ -792,7 +792,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                 PlusAssign => Some((
                     |_ctx, args| {
                         let (first, second) = args.split_first_mut().unwrap();
-                        let x = &mut *first.as_immutable_string_ref_mut().unwrap();
+                        let x = &mut *first.as_immutable_string_mut().unwrap();
                         let y = &*second[0].as_immutable_string_ref().unwrap();
 
                         #[cfg(not(feature = "unchecked"))]
@@ -810,7 +810,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                 MinusAssign => Some((
                     |_, args| {
                         let (first, second) = args.split_first_mut().unwrap();
-                        let x = &mut *first.as_immutable_string_ref_mut().unwrap();
+                        let x = &mut *first.as_immutable_string_mut().unwrap();
                         let y = &*second[0].as_immutable_string_ref().unwrap();
                         *x -= y;
                         Ok(Dynamic::UNIT)
@@ -843,7 +843,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                             )?;
                         }
 
-                        let array = &mut *args[0].as_array_ref_mut().unwrap();
+                        let array = &mut *args[0].as_array_mut().unwrap();
 
                         append(array, x);
 
@@ -864,7 +864,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                 PlusAssign => Some((
                     |_ctx, args| {
                         let blob2 = args[1].take().into_blob().unwrap();
-                        let blob1 = &mut *args[0].as_blob_ref_mut().unwrap();
+                        let blob1 = &mut *args[0].as_blob_mut().unwrap();
 
                         #[cfg(not(feature = "unchecked"))]
                         _ctx.unwrap()
@@ -954,7 +954,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                 |_ctx, args| {
                     let mut buf = [0_u8; 4];
                     let ch = &*args[1].as_char().unwrap().encode_utf8(&mut buf);
-                    let mut x = args[0].as_immutable_string_ref_mut().unwrap();
+                    let mut x = args[0].as_immutable_string_mut().unwrap();
 
                     #[cfg(not(feature = "unchecked"))]
                     _ctx.unwrap()
@@ -1015,7 +1015,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                 |_ctx, args| {
                     {
                         let x = args[1].take();
-                        let array = &mut *args[0].as_array_ref_mut().unwrap();
+                        let array = &mut *args[0].as_array_mut().unwrap();
                         push(array, x);
                     }
 
@@ -1045,7 +1045,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                 PlusAssign => Some((
                     |_ctx, args| {
                         let x = args[1].as_int().unwrap();
-                        let blob = &mut *args[0].as_blob_ref_mut().unwrap();
+                        let blob = &mut *args[0].as_blob_mut().unwrap();
 
                         #[cfg(not(feature = "unchecked"))]
                         _ctx.unwrap()
@@ -1071,7 +1071,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                 PlusAssign => Some((
                     |_ctx, args| {
                         let x = args[1].as_char().unwrap();
-                        let blob = &mut *args[0].as_blob_ref_mut().unwrap();
+                        let blob = &mut *args[0].as_blob_mut().unwrap();
 
                         #[cfg(not(feature = "unchecked"))]
                         _ctx.unwrap()
@@ -1097,7 +1097,7 @@ pub fn get_builtin_op_assignment_fn(op: &Token, x: &Dynamic, y: &Dynamic) -> Opt
                 PlusAssign => Some((
                     |_ctx, args| {
                         let (first, second) = args.split_first_mut().unwrap();
-                        let blob = &mut *first.as_blob_ref_mut().unwrap();
+                        let blob = &mut *first.as_blob_mut().unwrap();
                         let s = &*second[0].as_immutable_string_ref().unwrap();
 
                         if s.is_empty() {

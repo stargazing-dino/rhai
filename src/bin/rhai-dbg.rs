@@ -63,7 +63,7 @@ fn print_current_source(
         .global_runtime_state_mut()
         .debugger_mut()
         .state_mut()
-        .as_immutable_string_ref_mut()
+        .as_immutable_string_mut()
         .unwrap();
     let src = source.unwrap_or("");
     if src != current_source {

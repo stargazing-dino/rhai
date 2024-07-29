@@ -2545,7 +2545,7 @@ impl Dynamic {
     ///
     /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[inline]
-    pub fn as_immutable_string_ref_mut(
+    pub fn as_immutable_string_mut(
         &mut self,
     ) -> Result<impl DerefMut<Target = ImmutableString> + '_, &'static str> {
         let type_name = self.type_name();
@@ -2590,7 +2590,7 @@ impl Dynamic {
     /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_index"))]
     #[inline(always)]
-    pub fn as_array_ref_mut(&mut self) -> Result<impl DerefMut<Target = Array> + '_, &'static str> {
+    pub fn as_array_mut(&mut self) -> Result<impl DerefMut<Target = Array> + '_, &'static str> {
         let type_name = self.type_name();
         self.write_lock::<Array>().ok_or(type_name)
     }
@@ -2633,7 +2633,7 @@ impl Dynamic {
     /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_index"))]
     #[inline(always)]
-    pub fn as_blob_ref_mut(&mut self) -> Result<impl DerefMut<Target = Blob> + '_, &'static str> {
+    pub fn as_blob_mut(&mut self) -> Result<impl DerefMut<Target = Blob> + '_, &'static str> {
         let type_name = self.type_name();
         self.write_lock::<Blob>().ok_or(type_name)
     }
@@ -2676,7 +2676,7 @@ impl Dynamic {
     /// These normally shouldn't occur since most operations in Rhai are single-threaded.
     #[cfg(not(feature = "no_object"))]
     #[inline(always)]
-    pub fn as_map_ref_mut(&mut self) -> Result<impl DerefMut<Target = Map> + '_, &'static str> {
+    pub fn as_map_mut(&mut self) -> Result<impl DerefMut<Target = Map> + '_, &'static str> {
         let type_name = self.type_name();
         self.write_lock::<Map>().ok_or(type_name)
     }
