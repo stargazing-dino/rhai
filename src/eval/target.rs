@@ -404,6 +404,8 @@ impl<'a> Target<'a> {
                 let ve = if *exclusive {
                     let end = if *end > n { n } else { *end };
                     s.chars().skip(end)
+                } else if n == 0 {
+                    s.chars().skip(usize::MAX)
                 } else {
                     let end = if *end >= n { n - 1 } else { *end };
                     s.chars().skip(end + 1)
