@@ -1199,22 +1199,12 @@ pub trait InputStream {
 /// |`r"hello"`                 |`StringConstant("hello")`            |
 /// |`r"hello`_{EOF}_           |`LexError`                           |
 /// |`r#" "hello" "`_{EOF}_     |`LexError`                           |
-/// |`r#""hello""#`             |`StringConstant(""hello"")`          |
+/// |`r#""hello""#`             |`StringConstant("\"hello\"")`        |
 /// |`r##"hello #"# world"##`   |`StringConstant("hello #\"# world")` |
 /// |`r"R"`                     |`StringConstant("R")`                |
-/// |`r"\x52"`                  |`StringConstant("\x52")`             |
+/// |`r"\x52"`                  |`StringConstant("\\x52")`            |
 ///
-/// This function does not throw a `LexError` for the following conditions:
-///
-/// * Unterminated literal string at _{EOF}_
-///
-/// * Unterminated normal string with continuation at _{EOF}_
-///
-/// This is to facilitate using this function to parse a script line-by-line, where the end of the
-/// line (i.e. _{EOF}_) is not necessarily the end of the script.
-///
-/// Any time a [`StringConstant`][`Token::StringConstant`] is returned with
-/// `state.is_within_text_terminated_by` set to `Some(_)` is one of the above conditions.
+/// This function throws a `LexError` for an unterminated literal string at _{EOF}_.
 pub fn parse_raw_string_literal(
     stream: &mut (impl InputStream + ?Sized),
     state: &mut TokenizeState,
