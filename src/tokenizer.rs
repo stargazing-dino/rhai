@@ -1224,27 +1224,22 @@ pub fn parse_raw_string_literal(
     match stream.get_next() {
         Some('"') => pos.advance(),
         Some(c) => return Err((LERR::UnexpectedInput(c.to_string()), start)),
-        None => {
-            return Err((LERR::UnterminatedString, start));
-        }
+        None => return Err((LERR::UnterminatedString, start))
     }
 
-    let mut seen_hashes: Option<u8> = None;
     // Match everything until the same number of '#'s are seen, prepended by a '"'
+
+    // Counts the number of '#' characters seen after a quotation mark.
+    // Becomes Some(0) after a quote is seen, but resets to None if a hash doesn't follow.
+    let mut seen_hashes: Option<u8> = None;
     let mut result = SmartString::new_const();
+
 
     loop {
         let next_char = match stream.get_next() {
-            Some(ch) => {
-                pos.advance();
-                ch
-            }
-            None => {
-                pos.advance();
-                return Err((LERR::UnterminatedString, start));
-            }
+            Some(ch) => ch,
+            None => return Err((LERR::UnterminatedString, start))
         };
-        pos.advance();
 
         match (next_char, &mut seen_hashes) {
             // Begin attempt to close string
@@ -1282,9 +1277,7 @@ pub fn parse_raw_string_literal(
                 seen_hashes = None;
             }
             // Normal new character seen
-            (c, None) => {
-                result.push(c);
-            }
+            (c, None) => result.push(c)
         }
 
         if next_char == '\n' {
@@ -1324,7 +1317,7 @@ pub fn parse_raw_string_literal(
 /// |`` `hello``_{LF}{EOF}_           |`StringConstant("hello\n")` |``Some('`')``                       |
 /// |`` `hello ${``                   |`InterpolatedString("hello ")`<br/>next token is `{`|`None`      |
 /// |`` } hello` ``                   |`StringConstant(" hello")`  |`None`                              |
-/// |`} hello`_{EOF}_                 |`StringConstant(" hello")`  |``Some('`')``                       |                            |
+/// |`} hello`_{EOF}_                 |`StringConstant(" hello")`  |``Some('`')``                       |
 ///
 /// This function does not throw a `LexError` for the following conditions:
 ///
