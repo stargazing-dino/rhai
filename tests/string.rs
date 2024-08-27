@@ -17,6 +17,9 @@ fn test_string() {
     assert_eq!(engine.eval::<String>("     `\r\nTest string: \\u2764\nhello,\\nworld!`").unwrap(), "Test string: \\u2764\nhello,\\nworld!");
     assert_eq!(engine.eval::<String>(r#""Test string: \x58""#).unwrap(), "Test string: X");
     assert_eq!(engine.eval::<String>(r#""\"hello\"""#).unwrap(), r#""hello""#);
+    assert_eq!(engine.eval::<String>(r#"r"Test""#).unwrap(), "Test");
+    assert_eq!(engine.eval::<String>(r##"r"Test string: \\u2764\nhello,\nworld!""##).unwrap(), r"Test string: \\u2764\nhello,\nworld!");
+    assert_eq!(engine.eval::<String>(r###"r##"Test string: r#"\\u2764\nhello,\\nworld!"#"##"###).unwrap(), r##"Test string: r#"\\u2764\nhello,\\nworld!"#"##);
 
     assert_eq!(engine.eval::<String>(r#""foo" + "bar""#).unwrap(), "foobar");
 
