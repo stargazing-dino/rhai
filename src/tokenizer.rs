@@ -10,7 +10,7 @@ use std::prelude::v1::*;
 use std::{
     cell::RefCell,
     char, fmt,
-    iter::{FusedIterator, Peekable},
+    iter::{repeat, FusedIterator, Peekable},
     rc::Rc,
     str::{Chars, FromStr},
 };
@@ -1177,6 +1177,129 @@ pub trait InputStream {
     }
 }
 
+/// _(internals)_ Parse a raw string literal. Raw string literals do not process any escapes.
+/// Raw string literals do not process any escapes. They start with the character
+/// `U+0072` (`r`), followed by fewer than 256 of the character `U+0023` (`#`) and a
+/// `U+0022` (double-quote) character.
+///
+/// The _raw string body_ can contain any sequence of Unicode characters other than `U+000D` (CR).
+/// It is terminated only by another `U+0022` (double-quote) character, followed by the same number of `U+0023` (`#`) characters that preceded the opening `U+0022` (double-quote) character.
+///
+/// All Unicode characters contained in the raw string body represent themselves,
+/// the characters `U+0022` (double-quote) (except when followed by at least as
+/// many `U+0023` (`#`) characters as were used to start the raw string literal) or
+/// `U+005C` (`\`) do not have any special meaning.
+///
+/// Returns the parsed string.
+///
+/// # Returns
+///
+/// | Type                      | Return Value                        |
+/// |---------------------------|:-----------------------------------:|
+/// |`r"hello"`                 |`StringConstant("hello")`            |
+/// |`r"hello`_{EOF}_           |`LexError`                           |
+/// |`r#" "hello" "`_{EOF}_     |`LexError`                           |
+/// |`r#""hello""#`             |`StringConstant("\"hello\"")`        |
+/// |`r##"hello #"# world"##`   |`StringConstant("hello #\"# world")` |
+/// |`r"R"`                     |`StringConstant("R")`                |
+/// |`r"\x52"`                  |`StringConstant("\\x52")`            |
+///
+/// This function throws a `LexError` for an unterminated literal string at _{EOF}_.
+pub fn parse_raw_string_literal(
+    stream: &mut (impl InputStream + ?Sized),
+    state: &mut TokenizeState,
+    pos: &mut Position,
+) -> Result<(SmartString, Position), (LexError, Position)> {
+    let start = *pos;
+    let mut first_char = Position::NONE;
+
+    // Count the number of '#'s
+    let mut hash_count = 0;
+    while let Some('#') = stream.peek_next() {
+        stream.eat_next_and_advance(pos);
+        hash_count += 1;
+    }
+
+    // Match '"'
+    match stream.get_next() {
+        Some('"') => pos.advance(),
+        Some(c) => return Err((LERR::UnexpectedInput(c.to_string()), start)),
+        None => return Err((LERR::UnterminatedString, start))
+    }
+
+    // Match everything until the same number of '#'s are seen, prepended by a '"'
+
+    // Counts the number of '#' characters seen after a quotation mark.
+    // Becomes Some(0) after a quote is seen, but resets to None if a hash doesn't follow.
+    let mut seen_hashes: Option<u8> = None;
+    let mut result = SmartString::new_const();
+
+
+    loop {
+        let next_char = match stream.get_next() {
+            Some(ch) => ch,
+            None => return Err((LERR::UnterminatedString, start))
+        };
+
+        match (next_char, &mut seen_hashes) {
+            // Begin attempt to close string
+            ('"', None) => {
+                if hash_count == 0 {
+                    return Ok((result, first_char));
+                } else {
+                    seen_hashes = Some(0);
+                }
+            }
+            // Restart attempt to close string
+            ('"', Some(count)) => {
+                if hash_count == 0 {
+                    return Ok((result, first_char));
+                } else {
+                    // result.reserve(*count as usize+c.len());
+                    result.push('"');
+                    result.extend(repeat('#').take(*count as usize));
+                    seen_hashes = Some(0);
+                }
+            }
+            // Continue attempt to close string
+            ('#', Some(count)) => {
+                *count += 1;
+                if *count == hash_count {
+                    return Ok((result, first_char));
+                }
+            }
+            // Fail to close the string - add previous quote and hashes
+            (c, Some(count)) => {
+                // result.reserve(*count as usize +1+c.len());
+                result.push('"');
+                result.extend(repeat('#').take(*count as usize));
+                result.push(c);
+                seen_hashes = None;
+            }
+            // Normal new character seen
+            (c, None) => result.push(c)
+        }
+
+        if next_char == '\n' {
+            pos.new_line();
+        } else {
+            pos.advance();
+        }
+
+        // Check string length
+        #[cfg(not(feature = "unchecked"))]
+        if let Some(max) = state.max_string_len {
+            if result.len() > max.get() {
+                return Err((LexError::StringTooLong(max.get()), start));
+            }
+        }
+
+        if first_char.is_none() {
+            first_char = *pos;
+        }
+    }
+}
+
 /// _(internals)_ Parse a string literal ended by a specified termination character.
 /// Exported under the `internals` feature only.
 ///
@@ -1792,6 +1915,14 @@ fn get_next_token_inner(
                             (Token::StringConstant(result.into()), start_pos)
                         }
                     },
+                );
+            }
+
+            // r - raw string literal
+            ('r', '"' | '#') => {
+                return parse_raw_string_literal(stream, state, pos).map_or_else(
+                    |(err, err_pos)| (Token::LexError(err.into()), err_pos),
+                    |(result, ..)| (Token::StringConstant(result.into()), start_pos),
                 );
             }
 

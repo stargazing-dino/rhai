@@ -1,4 +1,4 @@
-use rhai::{Engine, EvalAltResult, ImmutableString, Scope, INT};
+use rhai::{Engine, EvalAltResult, ImmutableString, LexError, ParseErrorType, Position, Scope, INT};
 
 #[test]
 fn test_string() {
@@ -17,6 +17,29 @@ fn test_string() {
     assert_eq!(engine.eval::<String>("     `\r\nTest string: \\u2764\nhello,\\nworld!`").unwrap(), "Test string: \\u2764\nhello,\\nworld!");
     assert_eq!(engine.eval::<String>(r#""Test string: \x58""#).unwrap(), "Test string: X");
     assert_eq!(engine.eval::<String>(r#""\"hello\"""#).unwrap(), r#""hello""#);
+    assert_eq!(engine.eval::<String>(r#"r"Test""#).unwrap(), "Test");
+    assert_eq!(engine.eval::<String>(r#"r"Test string: \\u2764\nhello,\nworld!""#).unwrap(), r#"Test string: \\u2764\nhello,\nworld!"#);
+    assert_eq!(engine.eval::<String>(r###"r##"Test string: r#"\\u2764\nhello,\\nworld!"#"##"###).unwrap(), r##"Test string: r#"\\u2764\nhello,\\nworld!"#"##);
+    assert_eq!(engine.eval::<String>(r###"r##"Test string: "## + "\u2764""###).unwrap(), "Test string: ❤");
+    let bad_result = *engine.eval::<String>(r###"r#"Test string: \"##"###).unwrap_err();
+    if let EvalAltResult::ErrorParsing(parse_error, pos) = bad_result {
+        assert_eq!(parse_error, ParseErrorType::UnknownOperator("#".to_string()));
+        assert_eq!(pos, Position::new(1, 19));
+    } else {
+        panic!("Wrong error type: {}", bad_result);
+    }
+    let bad_result = *engine
+        .eval::<String>(
+            r###"r##"Test string:
+    \"#"###,
+        )
+        .unwrap_err();
+    if let EvalAltResult::ErrorParsing(parse_error, pos) = bad_result {
+        assert_eq!(parse_error, ParseErrorType::BadInput(LexError::UnterminatedString));
+        assert_eq!(pos, Position::new(1, 1));
+    } else {
+        panic!("Wrong error type: {}", bad_result);
+    }
 
     assert_eq!(engine.eval::<String>(r#""foo" + "bar""#).unwrap(), "foobar");
 
