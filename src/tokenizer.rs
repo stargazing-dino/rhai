@@ -1149,7 +1149,7 @@ pub struct TokenizeState {
     /// Include comments?
     pub include_comments: bool,
     /// Is the current tokenizer position within the text stream of an interpolated string?
-    pub is_within_text_terminated_by: Option<char>,
+    pub is_within_text_terminated_by: Option<SmartString>,
     /// Textual syntax of the current token, if any.
     ///
     /// Set to `Some` to begin tracking this information.
@@ -1177,95 +1177,124 @@ pub trait InputStream {
     }
 }
 
-/// _(internals)_ Parse a raw string literal. Raw string literals do not process any escapes.
-/// Raw string literals do not process any escapes. They start with the character
-/// `U+0072` (`r`), followed by fewer than 256 of the character `U+0023` (`#`) and a
-/// `U+0022` (double-quote) character.
+/// _(internals)_ Parse a raw string literal.
+/// Exported under the `internals` feature only.
 ///
-/// The _raw string body_ can contain any sequence of Unicode characters other than `U+000D` (CR).
-/// It is terminated only by another `U+0022` (double-quote) character, followed by the same number of `U+0023` (`#`) characters that preceded the opening `U+0022` (double-quote) character.
+/// Raw string literals do not process any escapes. They start with the character `r` (`U+0072`),
+/// followed by the character `#` (`U+0023`) repeated any number of times (or none), then finally a
+/// `"` (`U+0022`, double-quote).
 ///
-/// All Unicode characters contained in the raw string body represent themselves,
-/// the characters `U+0022` (double-quote) (except when followed by at least as
-/// many `U+0023` (`#`) characters as were used to start the raw string literal) or
-/// `U+005C` (`\`) do not have any special meaning.
+/// The raw string _body_ can contain any sequence of Unicode characters. It is terminated only by
+/// another `"` (`U+0022`, double-quote) character, followed by the same number (or none) of `#`
+/// (`U+0023`) characters.
+///
+/// All Unicode characters contained in the raw string body represent themselves, including the
+/// characters `"` (`U+0022`, double-quote), except when followed by at least as many `#` (`U+0023`)
+/// characters as were used to start the raw string literal, `\` (`U+005C`) etc. do not have any
+/// special meaning.
 ///
 /// Returns the parsed string.
 ///
 /// # Returns
 ///
-/// | Type                      | Return Value                        |
-/// |---------------------------|:-----------------------------------:|
-/// |`r"hello"`                 |`StringConstant("hello")`            |
-/// |`r"hello`_{EOF}_           |`LexError`                           |
-/// |`r#" "hello" "`_{EOF}_     |`LexError`                           |
-/// |`r#""hello""#`             |`StringConstant("\"hello\"")`        |
-/// |`r##"hello #"# world"##`   |`StringConstant("hello #\"# world")` |
-/// |`r"R"`                     |`StringConstant("R")`                |
-/// |`r"\x52"`                  |`StringConstant("\\x52")`            |
+/// | Type                      | Return Value                        |`state.is_within_text_terminated_by`             |
+/// |---------------------------|:-----------------------------------:|:-----------------------------------------------:|
+/// |`r"hello"`                 |`StringConstant("hello")`            |`None`                                           |
+/// |`r"hello`_{EOF}_           |`StringConstant("hello")`            |`Some("#")` _(one higher than number of `#`'s)_  |
+/// |`r###"hello`_{EOF}_        |`StringConstant("hello")`            |`Some("####")`_(one higher than number of `#`'s)_|
+/// |`r#" "hello" "`_{EOF}_     |`LexError`                           |`None`                                           |
+/// |`r#""hello""#`             |`StringConstant("\"hello\"")`        |`None`                                           |
+/// |`r##"hello #"# world"##`   |`StringConstant("hello #\"# world")` |`None`                                           |
+/// |`r"R"`                     |`StringConstant("R")`                |`None`                                           |
+/// |`r"\x52"`                  |`StringConstant("\\x52")`            |`None`                                           |
 ///
-/// This function throws a `LexError` for an unterminated literal string at _{EOF}_.
+/// This function does _not_ throw a `LexError` for an unterminated raw string at _{EOF}_
+///
+/// This is to facilitate using this function to parse a script line-by-line, where the end of the
+/// line (i.e. _{EOF}_) is not necessarily the end of the script.
+///
+/// Any time a [`StringConstant`][`Token::StringConstant`] is returned with
+/// `state.is_within_text_terminated_by` set to `Some(_)` is one of the above conditions.
 pub fn parse_raw_string_literal(
     stream: &mut (impl InputStream + ?Sized),
     state: &mut TokenizeState,
     pos: &mut Position,
+    hash_count: Option<usize>,
 ) -> Result<(SmartString, Position), (LexError, Position)> {
     let start = *pos;
     let mut first_char = Position::NONE;
 
-    // Count the number of '#'s
-    let mut hash_count = 0;
-    while let Some('#') = stream.peek_next() {
-        stream.eat_next_and_advance(pos);
-        hash_count += 1;
-    }
+    let hash_count = if let Some(count) = hash_count {
+        // The number of '#''s is already known
+        count
+    } else {
+        // Count the number of '#'s
+        let mut count = 0;
 
-    // Match '"'
-    match stream.get_next() {
-        Some('"') => pos.advance(),
-        Some(c) => return Err((LERR::UnexpectedInput(c.to_string()), start)),
-        None => return Err((LERR::UnterminatedString, start))
+        while let Some('#') = stream.peek_next() {
+            stream.eat_next_and_advance(pos);
+            count += 1;
+        }
+
+        // Match '"'
+        match stream.get_next() {
+            Some('"') => pos.advance(),
+            Some(c) => return Err((LERR::UnexpectedInput(c.to_string()), start)),
+            None => return Err((LERR::UnterminatedString, start)),
+        }
+
+        count
+    };
+
+    let mut collect: SmartString = repeat('#').take(hash_count).collect();
+    if let Some(ref mut last) = state.last_token {
+        last.clear();
+        last.push('r');
+        last.push_str(&collect);
+        last.push('"');
     }
+    collect.push('#'); // Add one more
+    state.is_within_text_terminated_by = Some(collect);
 
     // Match everything until the same number of '#'s are seen, prepended by a '"'
 
     // Counts the number of '#' characters seen after a quotation mark.
     // Becomes Some(0) after a quote is seen, but resets to None if a hash doesn't follow.
-    let mut seen_hashes: Option<u8> = None;
+    let mut seen_hashes: Option<usize> = None;
     let mut result = SmartString::new_const();
-
 
     loop {
         let next_char = match stream.get_next() {
             Some(ch) => ch,
-            None => return Err((LERR::UnterminatedString, start))
+            None => break, // Allow unterminated string
         };
 
         match (next_char, &mut seen_hashes) {
             // Begin attempt to close string
             ('"', None) => {
                 if hash_count == 0 {
-                    return Ok((result, first_char));
-                } else {
-                    seen_hashes = Some(0);
+                    state.is_within_text_terminated_by = None;
+                    break;
                 }
+                seen_hashes = Some(0);
             }
             // Restart attempt to close string
             ('"', Some(count)) => {
                 if hash_count == 0 {
-                    return Ok((result, first_char));
-                } else {
-                    // result.reserve(*count as usize+c.len());
-                    result.push('"');
-                    result.extend(repeat('#').take(*count as usize));
-                    seen_hashes = Some(0);
+                    state.is_within_text_terminated_by = None;
+                    break;
                 }
+                // result.reserve(*count as usize+c.len());
+                result.push('"');
+                result.extend(repeat('#').take(*count as usize));
+                seen_hashes = Some(0);
             }
             // Continue attempt to close string
             ('#', Some(count)) => {
                 *count += 1;
                 if *count == hash_count {
-                    return Ok((result, first_char));
+                    state.is_within_text_terminated_by = None;
+                    break;
                 }
             }
             // Fail to close the string - add previous quote and hashes
@@ -1277,7 +1306,7 @@ pub fn parse_raw_string_literal(
                 seen_hashes = None;
             }
             // Normal new character seen
-            (c, None) => result.push(c)
+            (c, None) => result.push(c),
         }
 
         if next_char == '\n' {
@@ -1298,6 +1327,8 @@ pub fn parse_raw_string_literal(
             first_char = *pos;
         }
     }
+
+    Ok((result, first_char))
 }
 
 /// _(internals)_ Parse a string literal ended by a specified termination character.
@@ -1348,7 +1379,7 @@ pub fn parse_string_literal(
     #[cfg(not(feature = "no_position"))]
     let mut skip_space_until = 0;
 
-    state.is_within_text_terminated_by = Some(termination_char);
+    state.is_within_text_terminated_by = Some(termination_char.to_string().into());
     if let Some(ref mut last) = state.last_token {
         last.clear();
         last.push(termination_char);
@@ -1688,17 +1719,28 @@ fn get_next_token_inner(
     }
 
     // Within text?
-    if let Some(ch) = state.is_within_text_terminated_by.take() {
-        return parse_string_literal(stream, state, pos, ch, true, false, true).map_or_else(
-            |(err, err_pos)| (Token::LexError(err.into()), err_pos),
-            |(result, interpolated, start_pos)| {
-                if interpolated {
-                    (Token::InterpolatedString(result.into()), start_pos)
-                } else {
-                    (Token::StringConstant(result.into()), start_pos)
-                }
-            },
-        );
+    match state.is_within_text_terminated_by.take() {
+        Some(ch) if ch.starts_with('#') => {
+            return parse_raw_string_literal(stream, state, pos, Some(ch.len() - 1)).map_or_else(
+                |(err, err_pos)| (Token::LexError(err.into()), err_pos),
+                |(result, start_pos)| (Token::StringConstant(result.into()), start_pos),
+            )
+        }
+        Some(ch) => {
+            let c = ch.chars().next().unwrap();
+
+            return parse_string_literal(stream, state, pos, c, true, false, true).map_or_else(
+                |(err, err_pos)| (Token::LexError(err.into()), err_pos),
+                |(result, interpolated, start_pos)| {
+                    if interpolated {
+                        (Token::InterpolatedString(result.into()), start_pos)
+                    } else {
+                        (Token::StringConstant(result.into()), start_pos)
+                    }
+                },
+            );
+        }
+        None => (),
     }
 
     let mut negated: Option<Position> = None;
@@ -1920,7 +1962,7 @@ fn get_next_token_inner(
 
             // r - raw string literal
             ('r', '"' | '#') => {
-                return parse_raw_string_literal(stream, state, pos).map_or_else(
+                return parse_raw_string_literal(stream, state, pos, None).map_or_else(
                     |(err, err_pos)| (Token::LexError(err.into()), err_pos),
                     |(result, ..)| (Token::StringConstant(result.into()), start_pos),
                 );
@@ -2616,7 +2658,7 @@ impl<'a> Iterator for TokenIterator<'a> {
 
             if control.is_within_text {
                 // Switch to text mode terminated by back-tick
-                self.state.is_within_text_terminated_by = Some('`');
+                self.state.is_within_text_terminated_by = Some("`".to_string().into());
                 // Reset it
                 control.is_within_text = false;
             }
