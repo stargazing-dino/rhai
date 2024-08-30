@@ -10,6 +10,11 @@ Bug fixes
 * (Fuzzing) An integer-overflow bug from an inclusive range in the bits iterator is fixed.
 * (Fuzzing) An integer-underflow bug from an inclusive range is fixed.
 
+New features
+------------
+
+* Added support for _raw strings_ with the syntax `##..#" ... "#..##`.
+
 Enhancements
 ------------
 

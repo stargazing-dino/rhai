@@ -337,9 +337,9 @@ pub use types::{BloomFilterU64, CustomTypeInfo, Span, StringsInterner};
 
 #[cfg(feature = "internals")]
 pub use tokenizer::{
-    get_next_token, is_valid_function_name, is_valid_identifier, parse_string_literal, InputStream,
-    MultiInputsStream, Token, TokenIterator, TokenizeState, TokenizerControl,
-    TokenizerControlBlock,
+    get_next_token, is_valid_function_name, is_valid_identifier, parse_raw_string_literal,
+    parse_string_literal, InputStream, MultiInputsStream, Token, TokenIterator, TokenizeState,
+    TokenizerControl, TokenizerControlBlock,
 };
 
 #[cfg(feature = "internals")]
