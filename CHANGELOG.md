@@ -13,7 +13,7 @@ Bug fixes
 New features
 ------------
 
-* Added support for _raw strings_ with the syntax `r##..#" ... "#..##`.
+* Added support for _raw strings_ with the syntax `##..#" ... "#..##`.
 
 Enhancements
 ------------
