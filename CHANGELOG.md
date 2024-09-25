@@ -9,6 +9,7 @@ Bug fixes
 
 * (Fuzzing) An integer-overflow bug from an inclusive range in the bits iterator is fixed.
 * (Fuzzing) An integer-underflow bug from an inclusive range is fixed.
+* Copy strings if the strings interner is busy instead of panicing.
 
 New features
 ------------
