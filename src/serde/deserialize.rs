@@ -270,7 +270,7 @@ impl<'de> Deserialize<'de> for ImmutableString {
     }
 }
 
-impl<'de> Deserialize<'de> for Scope<'de> {
+impl<'de> Deserialize<'de> for Scope<'_> {
     #[inline(always)]
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         #[derive(Debug, Clone, Hash, Deserialize)]
