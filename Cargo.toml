@@ -22,12 +22,12 @@ smallvec = { version = "1.7.0", default-features = false, features = ["union", "
 thin-vec = { version = "0.2.13", default-features = false }
 ahash = { version = "0.8.2", default-features = false, features = ["compile-time-rng"] }
 num-traits = { version = "0.2.0", default-features = false }
-once_cell = { version = "1.7.0", default-features = false, features = ["race"] }
+once_cell = { version = "1.19.0", default-features = false, features = ["critical-section"] }
 bitflags = { version = "2.0.0", default-features = false }
 smartstring = { version = "1.0.0", default-features = false }
 rhai_codegen = { version = "2.1.0", path = "codegen" }
 
-no-std-compat = { git = "https://gitlab.com/jD91mZM2/no-std-compat", version = "0.4.1", default-features = false, features = ["alloc", "compat_sync"], optional = true }
+no-std-compat = { git = "https://gitlab.com/jD91mZM2/no-std-compat", version = "0.4.1", default-features = false, features = ["alloc"], optional = true }
 libm = { version = "0.2.0", default-features = false, optional = true }
 hashbrown = { version = "0.14.0", optional = true }
 core-error = { version = "0.0.0", default-features = false, features = ["alloc"], optional = true }
@@ -54,7 +54,7 @@ std = ["once_cell/std", "ahash/std", "num-traits/std", "smartstring/std"]
 #! ### Enable Special Functionalities
 
 ## Require that all data types implement `Send + Sync` (for multi-threaded usage).
-sync = []
+sync = ["no-std-compat/compat_sync"]
 ## Add support for the [`Decimal`](https://crates.io/crates/rust_decimal) data type (acts as the system floating-point type under `no_float`).
 decimal = ["rust_decimal"]
 ## Enable serialization/deserialization of Rhai data types via [`serde`](https://crates.io/crates/serde).
