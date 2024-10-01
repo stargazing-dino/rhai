@@ -11,6 +11,7 @@ Bug fixes
 * (Fuzzing) An integer-underflow bug from an inclusive range is fixed.
 * Copy strings if the strings interner is busy instead of panicing (thanks [`@irevoire`](https://github.com/irevoire) [917](https://github.com/rhaiscript/rhai/pull/917)).
 * Deserialization of `Scope` now works correctly (thanks [`@AngelicosPhosphoros`](https://github.com/AngelicosPhosphoros) [918](https://github.com/rhaiscript/rhai/pull/918)).
+* Support for `thumbv6m` target is fixed (thanks [`chxry`](https://github.com/chxry) [919](https://github.com/rhaiscript/rhai/pull/919))
 
 New features
 ------------
