@@ -22,7 +22,7 @@ smallvec = { version = "1.7.0", default-features = false, features = ["union", "
 thin-vec = { version = "0.2.13", default-features = false }
 ahash = { version = "0.8.2", default-features = false, features = ["compile-time-rng"] }
 num-traits = { version = "0.2.0", default-features = false }
-once_cell = { version = "1.19.0", default-features = false, features = ["critical-section"] }
+once_cell = { version = "1.20.1", default-features = false, features = ["race", "portable-atomic", "alloc"] }
 bitflags = { version = "2.0.0", default-features = false }
 smartstring = { version = "1.0.0", default-features = false }
 rhai_codegen = { version = "2.1.0", path = "codegen" }
