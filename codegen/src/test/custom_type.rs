@@ -10,7 +10,6 @@ mod custom_type_tests {
             #[derive(Clone, CustomType)]
             pub struct Bar(
                 #[rhai_type(skip)]
-                #[cfg(not(feature = "no_float"))]
                 rhai::FLOAT,
                 INT,
                 #[rhai_type(name = "boo", readonly)]
@@ -49,7 +48,6 @@ mod custom_type_tests {
             #[derive(CustomType)]
             #[rhai_type(skip, name = "MyFoo", extra = Self::build_extra)]
             pub struct Foo {
-                #[cfg(not(feature = "no_float"))]
                 #[rhai_type(skip)]
                 _dummy: rhai::FLOAT,
                 #[rhai_type(get = get_bar)]
@@ -100,7 +98,6 @@ mod custom_type_tests {
             #[derive(Clone, CustomType)]
             pub struct Bar(
                 #[rhai_type(skip)]
-                #[cfg(not(feature = "no_float"))]
                 rhai::FLOAT,
                 INT,
                 /// boo comments.
@@ -143,7 +140,6 @@ mod custom_type_tests {
             #[derive(CustomType)]
             #[rhai_type(skip, name = "MyFoo", extra = Self::build_extra)]
             pub struct Foo {
-                #[cfg(not(feature = "no_float"))]
                 #[rhai_type(skip)]
                 _dummy: rhai::FLOAT,
                 #[rhai_type(get = get_bar)]
