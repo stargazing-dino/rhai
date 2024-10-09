@@ -9,17 +9,19 @@ Bug fixes
 
 * (Fuzzing) An integer-overflow bug from an inclusive range in the bits iterator is fixed.
 * (Fuzzing) An integer-underflow bug from an inclusive range is fixed.
-* Copy strings if the strings interner is busy instead of panicing.
+* Copy strings if the strings interner is busy instead of panicing (thanks [`@irevoire`](https://github.com/irevoire) [917](https://github.com/rhaiscript/rhai/pull/917)).
+* Deserialization of `Scope` now works correctly (thanks [`@AngelicosPhosphoros`](https://github.com/AngelicosPhosphoros) [918](https://github.com/rhaiscript/rhai/pull/918)).
+* Support for `thumbv6m` target is fixed (thanks [`chxry`](https://github.com/chxry) [919](https://github.com/rhaiscript/rhai/pull/919))
 
 New features
 ------------
 
-* Added support for _raw strings_ with the syntax `##..#" ... "#..##`.
+* Added support for _raw strings_ with the syntax `##..#" ... "#..##` (thanks [`@cellomath`](https://github.com/cellomath) [908](https://github.com/rhaiscript/rhai/pull/908) [910](https://github.com/rhaiscript/rhai/pull/910)).
 
 Enhancements
 ------------
 
-* New `as_immutable_string_ref`, `as_array_ref`, `as_blob_ref`, `as_map_ref` plus their `_mut` variants for `Dynamic`.
+* New `as_immutable_string_ref`, `as_array_ref`, `as_blob_ref`, `as_map_ref` plus their `_mut` variants for `Dynamic` (thanks [`@madonuko`](https://github.com/madonuko) [904](https://github.com/rhaiscript/rhai/pull/904)).
 * The `break`, `return` and `throw` statements can now be simply used as `switch` case statement expressions. Previously it is required that the statement be wrapped in a block.
 
 

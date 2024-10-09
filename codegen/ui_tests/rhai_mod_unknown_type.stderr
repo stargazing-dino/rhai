@@ -11,9 +11,7 @@ help: a struct with a similar name exists
    |
 12 |     pub fn test_fn(input: Point) -> bool {
    |                           ~~~~~
-help: consider importing one of these items
-   |
-11 +     use core::fmt::Pointer;
+help: consider importing this trait
    |
 11 +     use std::fmt::Pointer;
    |

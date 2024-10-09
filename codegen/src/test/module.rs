@@ -1470,7 +1470,6 @@ mod generate_tests {
     fn one_fn_with_cfg_module() {
         let input_tokens: TokenStream = quote! {
             pub mod one_fn {
-                #[cfg(not(feature = "no_float"))]
                 pub mod it_is {
                     pub fn increment(x: &mut FLOAT) {
                         *x += 1.0 as FLOAT;
@@ -1482,7 +1481,6 @@ mod generate_tests {
         let expected_tokens = quote! {
             #[allow(clippy::needless_pass_by_value, clippy::needless_pass_by_ref_mut)]
             pub mod one_fn {
-                #[cfg(not(feature = "no_float"))]
                 #[allow(clippy::needless_pass_by_value, clippy::needless_pass_by_ref_mut)]
                 pub mod it_is {
                     pub fn increment(x: &mut FLOAT) {
@@ -1541,10 +1539,8 @@ mod generate_tests {
                 #[inline(always)]
                 pub fn rhai_generate_into_module(_m: &mut Module, _flatten: bool) {
                     if _flatten {
-                        #[cfg(not(feature = "no_float"))]
                         self::it_is::rhai_generate_into_module(_m, _flatten);
                     } else {
-                        #[cfg(not(feature = "no_float"))]
                         _m.set_sub_module("it_is", self::it_is::rhai_module_generate());
                     }
                 }
