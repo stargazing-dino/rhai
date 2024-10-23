@@ -35,7 +35,7 @@ pub mod deprecated;
 
 use crate::func::{locked_read, locked_write};
 use crate::types::StringsInterner;
-use crate::{Dynamic, Engine, Identifier};
+use crate::{Dynamic, Engine, Identifier, Locked};
 
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
@@ -63,7 +63,7 @@ impl Engine {
                 guard.set_max(max);
             }
         } else {
-            self.interned_strings = Some(StringsInterner::new(max).into());
+            self.interned_strings = Some(Locked::new(StringsInterner::new(max)));
         }
         self
     }
