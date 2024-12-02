@@ -1,6 +1,15 @@
 Rhai Release Notes
 ==================
 
+Version 1.21.0
+==============
+
+Enhancements
+------------
+
+* If a string slice refers to the entire string, the slice is not cloned but returned as-is.
+
+
 Version 1.20.0
 ==============
 
