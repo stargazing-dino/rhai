@@ -1264,7 +1264,10 @@ pub fn parse_raw_string_literal(
 
         match (next_char, &mut seen_hashes) {
             // New line
-            ('\n', _) => pos.new_line(),
+            ('\n', _) => {
+                result.push('\n');
+                pos.new_line();
+            }
 
             // Begin attempt to close string
             ('"', None) => seen_hashes = Some(0),
