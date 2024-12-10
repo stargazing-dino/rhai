@@ -4,6 +4,11 @@ Rhai Release Notes
 Version 1.21.0
 ==============
 
+Bug fixes
+---------
+
+* Fixed bug in raw strings with newlines (thanks [`@benatkin`](https://github.com/benatkin) [940](https://github.com/rhaiscript/rhai/pull/940)).
+
 Enhancements
 ------------
 
