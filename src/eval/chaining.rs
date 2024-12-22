@@ -311,6 +311,7 @@ impl Engine {
 
             #[cfg(not(feature = "no_index"))]
             Dynamic(Union::Str(s, ..)) => {
+                // Numeric index - character
                 match idx.as_int() {
                     Ok(index) => {
                         let (ch, offset) = if index >= 0 {
@@ -362,11 +363,29 @@ impl Engine {
                             index: offset,
                         })
                     }
+
+                    // Range index on empty string - empty slice
+                    Err(typ)
+                        if (typ == std::any::type_name::<ExclusiveRange>()
+                            || typ == std::any::type_name::<InclusiveRange>())
+                            && s.is_empty() =>
+                    {
+                        let value = s.clone().into();
+                        Ok(Target::StringSlice {
+                            source: target,
+                            value,
+                            start: 0,
+                            end: 0,
+                            exclusive: true,
+                        })
+                    }
+
+                    // Range index - slice
                     Err(typ) if typ == std::any::type_name::<ExclusiveRange>() => {
                         // val_str[range]
-                        let idx = idx.read_lock::<ExclusiveRange>().unwrap();
-                        let range = &*idx;
+                        let range = idx.read_lock::<ExclusiveRange>().unwrap().clone();
                         let chars_count = s.chars().count();
+
                         let start = if range.start >= 0 {
                             range.start as usize
                         } else {
@@ -383,12 +402,16 @@ impl Engine {
                             .unwrap_or(0)
                         };
 
-                        let take = if end > start { end - start } else { 0 };
-                        let value = s.chars().skip(start).take(take).collect::<String>();
+                        let value = if start == 0 && end >= chars_count {
+                            s.clone().into()
+                        } else {
+                            let take = if end > start { end - start } else { 0 };
+                            s.chars().skip(start).take(take).collect::<String>().into()
+                        };
 
                         Ok(Target::StringSlice {
                             source: target,
-                            value: value.into(),
+                            value,
                             start,
                             end,
                             exclusive: true,
@@ -396,9 +419,9 @@ impl Engine {
                     }
                     Err(typ) if typ == std::any::type_name::<InclusiveRange>() => {
                         // val_str[range]
-                        let idx = idx.read_lock::<InclusiveRange>().unwrap();
-                        let range = &*idx;
+                        let range = idx.read_lock::<InclusiveRange>().unwrap().clone();
                         let chars_count = s.chars().count();
+
                         let start = if *range.start() >= 0 {
                             *range.start() as usize
                         } else {
@@ -415,17 +438,23 @@ impl Engine {
                             .unwrap_or(0)
                         };
 
-                        let take = if end > start { end - start + 1 } else { 0 };
-                        let value = s.chars().skip(start).take(take).collect::<String>();
+                        let value = if start == 0 && end >= chars_count - 1 {
+                            s.clone().into()
+                        } else {
+                            let take = if end > start { end - start + 1 } else { 0 };
+                            s.chars().skip(start).take(take).collect::<String>().into()
+                        };
 
                         Ok(Target::StringSlice {
                             source: target,
-                            value: value.into(),
+                            value,
                             start,
                             end,
                             exclusive: false,
                         })
                     }
+
+                    // Unsupported index type
                     Err(typ) => Err(self.make_type_mismatch_err::<crate::INT>(typ, idx_pos)),
                 }
             }

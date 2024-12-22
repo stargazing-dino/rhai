@@ -20,7 +20,15 @@ fn test_string() {
     assert_eq!(engine.eval::<String>(r##"#"Test"#"##).unwrap(), "Test");
     assert_eq!(engine.eval::<String>(r##"#"Test string: \\u2764\nhello,\nworld!"#"##).unwrap(), r#"Test string: \\u2764\nhello,\nworld!"#);
     assert_eq!(engine.eval::<String>(r###"##"Test string: #"\\u2764\nhello,\\nworld!"#"##"###).unwrap(), r##"Test string: #"\\u2764\nhello,\\nworld!"#"##);
-    assert_eq!(engine.eval::<String>(r###"##"Test string: "## + "\u2764""###).unwrap(), "Test string: ❤");
+    assert_eq!(
+        engine
+            .eval::<String>(
+                r###"##"Test
+string: "## + "\u2764""###
+            )
+            .unwrap(),
+        "Test\nstring: ❤"
+    );
     let bad_result = *engine.eval::<String>(r###"#"Test string: \"##"###).unwrap_err();
     if let EvalAltResult::ErrorParsing(parse_error, pos) = bad_result {
         assert_eq!(parse_error, ParseErrorType::UnknownOperator("#".to_string()));
