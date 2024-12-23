@@ -102,6 +102,7 @@ jobs:
       matrix:
         include:
           - {os: ubuntu-latest, flags: "--profile unix", experimental: false}
+          - {os: ubuntu-latest, flags: "--profile unix --features sync", experimental: false}
           - {os: windows-latest, flags: "--profile windows", experimental: true}
           #- {os: macos-latest, flags: "--profile macos", experimental: false}
     steps:
