@@ -8,6 +8,7 @@ Bug fixes
 ---------
 
 * Fixed bug in raw strings with newlines (thanks [`@benatkin`](https://github.com/benatkin) [940](https://github.com/rhaiscript/rhai/pull/940)).
+* `get_fn_metadata_list` function is marked `volatile`.
 
 Enhancements
 ------------

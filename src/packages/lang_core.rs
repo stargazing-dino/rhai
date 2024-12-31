@@ -196,18 +196,19 @@ mod reflection_functions {
     use crate::Array;
 
     /// Return an array of object maps containing metadata of all script-defined functions.
+    #[rhai_fn(name = "get_fn_metadata_list", volatile)]
     pub fn get_fn_metadata_list(ctx: NativeCallContext) -> Array {
         collect_fn_metadata(&ctx, |_, _, _, _, _| true)
     }
     /// Return an array of object maps containing metadata of all script-defined functions
     /// matching the specified name.
-    #[rhai_fn(name = "get_fn_metadata_list")]
+    #[rhai_fn(name = "get_fn_metadata_list", volatile)]
     pub fn get_fn_metadata(ctx: NativeCallContext, name: &str) -> Array {
         collect_fn_metadata(&ctx, |_, _, n, _, _| n == name)
     }
     /// Return an array of object maps containing metadata of all script-defined functions
     /// matching the specified name and arity (number of parameters).
-    #[rhai_fn(name = "get_fn_metadata_list")]
+    #[rhai_fn(name = "get_fn_metadata_list", volatile)]
     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     pub fn get_fn_metadata2(ctx: NativeCallContext, name: &str, params: INT) -> Array {
         if !(0..=crate::MAX_USIZE_INT).contains(&params) {
