@@ -29,6 +29,15 @@ string: "## + "\u2764""###
             .unwrap(),
         "Test\nstring: ❤"
     );
+    assert_eq!(
+        engine
+            .eval::<String>(
+                r###"##"Test"
+string: "## + "\u2764""###
+            )
+            .unwrap(),
+        "Test\"\nstring: ❤"
+    );
     let bad_result = *engine.eval::<String>(r###"#"Test string: \"##"###).unwrap_err();
     if let EvalAltResult::ErrorParsing(parse_error, pos) = bad_result {
         assert_eq!(parse_error, ParseErrorType::UnknownOperator("#".to_string()));
