@@ -69,7 +69,8 @@ impl FnNamespace {
     }
 }
 
-/// A type containing the metadata of a single registered function.
+/// _(internals)_ A type containing the metadata of a single registered function.
+/// Exported under the `internals` features only.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub struct FuncMetadata {
@@ -86,12 +87,15 @@ pub struct FuncMetadata {
     /// Parameter types (if applicable).
     pub param_types: FnArgsVec<TypeId>,
     /// Parameter names and types (if available).
+    /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     pub params_info: FnArgsVec<Identifier>,
     /// Return type name.
+    /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     pub return_type: Identifier,
     /// Comments.
+    /// Exported under the `metadata` feature only.
     #[cfg(feature = "metadata")]
     pub comments: crate::StaticVec<SmartString>,
 }
@@ -150,6 +154,25 @@ impl FuncMetadata {
 
         signature
     }
+}
+
+/// Information about a function, native or scripted.
+///
+/// Exported under the `internals` feature only.
+#[allow(dead_code)]
+pub struct FuncInfo<'a> {
+    /// Function metadata.
+    pub metadata: &'a FuncMetadata,
+    /// Function namespace.
+    ///
+    /// Not available under `no_module`.
+    #[cfg(not(feature = "no_module"))]
+    pub namespace: Identifier,
+    /// Metadata if the function is scripted.
+    ///
+    /// Not available under `no_function`.
+    #[cfg(not(feature = "no_function"))]
+    pub script: Option<crate::ScriptFnMetadata<'a>>,
 }
 
 /// _(internals)_ Calculate a [`u64`] hash key from a namespace-qualified function name and parameter types.
@@ -400,7 +423,7 @@ impl FuncRegistration {
     {
         #[cfg(feature = "metadata")]
         {
-            // Do not update parameter informations if `with_params_info` was called previously.
+            // Do not update parameter information if `with_params_info` was called previously.
             if self.metadata.params_info.is_empty() {
                 let mut param_type_names = FUNC::param_names()
                     .iter()
