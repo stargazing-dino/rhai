@@ -1263,12 +1263,6 @@ pub fn parse_raw_string_literal(
         pos.advance();
 
         match (next_char, &mut seen_hashes) {
-            // New line
-            ('\n', _) => {
-                result.push('\n');
-                pos.new_line();
-            }
-
             // Begin attempt to close string
             ('"', None) => seen_hashes = Some(0),
             // Restart attempt to close string
@@ -1294,7 +1288,11 @@ pub fn parse_raw_string_literal(
                 result.push(c);
                 seen_hashes = None;
             }
-
+            // New line
+            ('\n', _) => {
+                result.push('\n');
+                pos.new_line();
+            }
             // Normal new character seen
             (c, None) => result.push(c),
         }
