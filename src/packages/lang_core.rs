@@ -193,7 +193,8 @@ mod core_functions {
 #[cfg(not(feature = "no_object"))]
 #[export_module]
 mod reflection_functions {
-    use crate::{Array, FuncInfo, Map, ScriptFnMetadata};
+    use crate::module::FuncInfo;
+    use crate::{Array, Map, ScriptFnMetadata};
 
     #[cfg(not(feature = "no_function"))]
     #[cfg(not(feature = "no_index"))]
@@ -204,7 +205,7 @@ mod reflection_functions {
     ) -> Array {
         let engine = ctx.engine();
 
-        engine.collect_fn_metadata(
+        engine.collect_fn_metadata_impl(
             Some(&ctx),
             |FuncInfo {
                  metadata,

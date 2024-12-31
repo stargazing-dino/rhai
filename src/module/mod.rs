@@ -159,7 +159,6 @@ impl FuncMetadata {
 /// Information about a function, native or scripted.
 ///
 /// Exported under the `internals` feature only.
-#[cfg(feature = "internals")]
 pub struct FuncInfo<'a> {
     /// Function metadata.
     pub metadata: &'a FuncMetadata,
