@@ -1,6 +1,6 @@
 //! Type to hold a mutable reference to the target of an evaluation.
 
-use crate::{Dynamic, EvalAltResult, Position, RhaiError, RhaiResultOf};
+use crate::{Dynamic, Position, RhaiError, RhaiResultOf};
 #[cfg(feature = "no_std")]
 use std::prelude::v1::*;
 use std::{
@@ -428,7 +428,9 @@ impl<'a> TryFrom<&'a mut Dynamic> for Target<'a> {
             // Cloning is cheap for a shared value
             let shared_value = value.clone();
             let Some(guard) = value.write_lock::<Dynamic>() else {
-                return Err(EvalAltResult::ErrorDataRace(String::new(), Position::NONE).into());
+                return Err(
+                    crate::EvalAltResult::ErrorDataRace(String::new(), Position::NONE).into(),
+                );
             };
             return Ok(Self::SharedValue {
                 guard,

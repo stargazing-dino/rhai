@@ -789,6 +789,7 @@ impl Engine {
     /// 4) Functions in standard packages (optional)
     /// 5) Functions defined in modules `import`-ed by the current script (if any)
     /// 6) Functions in registered sub-modules
+    #[allow(dead_code)]
     pub(crate) fn collect_fn_metadata_impl<T>(
         &self,
         ctx: Option<&NativeCallContext>,
@@ -797,6 +798,7 @@ impl Engine {
     ) -> Vec<T> {
         let mut list = Vec::new();
 
+        #[cfg(not(feature = "no_function"))]
         if let Some(ctx) = ctx {
             ctx.iter_namespaces()
                 .flat_map(Module::iter_fn)
@@ -805,7 +807,6 @@ impl Engine {
                         metadata: f,
                         #[cfg(not(feature = "no_module"))]
                         namespace: Identifier::new_const(),
-                        #[cfg(not(feature = "no_function"))]
                         script: func.get_script_fn_def().map(|f| (&**f).into()),
                     })
                 })
@@ -816,13 +817,13 @@ impl Engine {
             .iter()
             .filter(|m| !m.is_internal() && (include_standard_packages || !m.is_standard_lib()))
             .flat_map(|m| m.iter_fn())
-            .filter_map(|(func, f)| {
+            .filter_map(|(_func, f)| {
                 mapper(crate::module::FuncInfo {
                     metadata: f,
                     #[cfg(not(feature = "no_module"))]
                     namespace: Identifier::new_const(),
                     #[cfg(not(feature = "no_function"))]
-                    script: func.get_script_fn_def().map(|f| (&**f).into()),
+                    script: _func.get_script_fn_def().map(|f| (&**f).into()),
                 })
             })
             .for_each(|v| list.push(v));
@@ -841,12 +842,12 @@ impl Engine {
             ) {
                 module
                     .iter_fn()
-                    .filter_map(|(func, f)| {
+                    .filter_map(|(_func, f)| {
                         mapper(crate::module::FuncInfo {
                             metadata: f,
                             namespace: namespace.into(),
                             #[cfg(not(feature = "no_function"))]
-                            script: func.get_script_fn_def().map(|f| (&**f).into()),
+                            script: _func.get_script_fn_def().map(|f| (&**f).into()),
                         })
                     })
                     .for_each(|v| list.push(v));
@@ -869,13 +870,12 @@ impl Engine {
         self.global_sub_modules
             .values()
             .flat_map(|m| m.iter_fn())
-            .filter_map(|(func, f)| {
+            .filter_map(|(_func, f)| {
                 mapper(crate::module::FuncInfo {
                     metadata: f,
-                    #[cfg(not(feature = "no_module"))]
                     namespace: Identifier::new_const(),
                     #[cfg(not(feature = "no_function"))]
-                    script: func.get_script_fn_def().map(|f| (&**f).into()),
+                    script: _func.get_script_fn_def().map(|f| (&**f).into()),
                 })
             })
             .for_each(|v| list.push(v));

@@ -85,7 +85,7 @@ pub struct ParseState<'a, 't, 'f> {
     pub global_imports: ThinVec<ImmutableString>,
     /// Unused dummy field.
     #[cfg(feature = "no_function")]
-    pub dummy: &'f (),
+    pub _dummy: &'f (),
 }
 
 impl fmt::Debug for ParseState<'_, '_, '_> {
@@ -129,7 +129,7 @@ impl<'a, 't, 'f> ParseState<'a, 't, 'f> {
             #[cfg(not(feature = "no_function"))]
             lib,
             #[cfg(feature = "no_function")]
-            dummy,
+            _dummy: dummy,
             expr_filter: |_| true,
             #[cfg(not(feature = "no_closure"))]
             external_vars: ThinVec::new(),

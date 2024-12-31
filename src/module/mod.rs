@@ -159,6 +159,7 @@ impl FuncMetadata {
 /// Information about a function, native or scripted.
 ///
 /// Exported under the `internals` feature only.
+#[allow(dead_code)]
 pub struct FuncInfo<'a> {
     /// Function metadata.
     pub metadata: &'a FuncMetadata,
