@@ -193,18 +193,100 @@ mod core_functions {
 #[cfg(not(feature = "no_object"))]
 #[export_module]
 mod reflection_functions {
-    use crate::Array;
+    use crate::{Array, FuncInfo, Map, ScriptFnMetadata};
+
+    #[cfg(not(feature = "no_function"))]
+    #[cfg(not(feature = "no_index"))]
+    #[cfg(not(feature = "no_object"))]
+    fn collect(
+        ctx: NativeCallContext,
+        filter: impl Fn(FnNamespace, FnAccess, &str, usize, &ScriptFnMetadata) -> bool,
+    ) -> Array {
+        let engine = ctx.engine();
+
+        engine.collect_fn_metadata(
+            Some(&ctx),
+            |FuncInfo {
+                 metadata,
+                 #[cfg(not(feature = "no_module"))]
+                 namespace,
+                 script,
+             }|
+             -> Option<Dynamic> {
+                let Some(ref func) = script else { return None };
+
+                if !filter(
+                    metadata.namespace,
+                    func.access,
+                    func.name,
+                    func.params.len(),
+                    func,
+                ) {
+                    return None;
+                }
+
+                let mut map = Map::new();
+
+                #[cfg(not(feature = "no_module"))]
+                if !namespace.is_empty() {
+                    map.insert(
+                        "namespace".into(),
+                        engine.get_interned_string(namespace).into(),
+                    );
+                }
+                map.insert("name".into(), engine.get_interned_string(func.name).into());
+                map.insert(
+                    "access".into(),
+                    engine
+                        .get_interned_string(match func.access {
+                            FnAccess::Public => "public",
+                            FnAccess::Private => "private",
+                        })
+                        .into(),
+                );
+                map.insert(
+                    "is_anonymous".into(),
+                    func.name.starts_with(crate::engine::FN_ANONYMOUS).into(),
+                );
+                if let Some(this_type) = func.this_type {
+                    map.insert("this_type".into(), this_type.into());
+                }
+                map.insert(
+                    "params".into(),
+                    func.params
+                        .iter()
+                        .map(|&p| engine.get_interned_string(p).into())
+                        .collect::<Array>()
+                        .into(),
+                );
+                #[cfg(feature = "metadata")]
+                if !func.comments.is_empty() {
+                    map.insert(
+                        "comments".into(),
+                        func.comments
+                            .iter()
+                            .map(|&s| engine.get_interned_string(s).into())
+                            .collect::<Array>()
+                            .into(),
+                    );
+                }
+
+                Some(Dynamic::from_map(map))
+            },
+            false,
+        )
+    }
 
     /// Return an array of object maps containing metadata of all script-defined functions.
     #[rhai_fn(name = "get_fn_metadata_list", volatile)]
     pub fn get_fn_metadata_list(ctx: NativeCallContext) -> Array {
-        collect_fn_metadata(&ctx, |_, _, _, _, _| true)
+        collect(ctx, |_, _, _, _, _| true)
     }
     /// Return an array of object maps containing metadata of all script-defined functions
     /// matching the specified name.
     #[rhai_fn(name = "get_fn_metadata_list", volatile)]
     pub fn get_fn_metadata(ctx: NativeCallContext, name: &str) -> Array {
-        collect_fn_metadata(&ctx, |_, _, n, _, _| n == name)
+        collect(ctx, |_, _, n, _, _| n == name)
     }
     /// Return an array of object maps containing metadata of all script-defined functions
     /// matching the specified name and arity (number of parameters).
@@ -215,164 +297,6 @@ mod reflection_functions {
             return Array::new();
         }
 
-        collect_fn_metadata(&ctx, |_, _, n, p, _| p == (params as usize) && n == name)
+        collect(ctx, |_, _, n, p, _| p == (params as usize) && n == name)
     }
-}
-
-#[cfg(not(feature = "no_function"))]
-#[cfg(not(feature = "no_index"))]
-#[cfg(not(feature = "no_object"))]
-fn collect_fn_metadata(
-    ctx: &NativeCallContext,
-    filter: impl Fn(FnNamespace, FnAccess, &str, usize, &crate::Shared<crate::ast::ScriptFuncDef>) -> bool
-        + Copy,
-) -> crate::Array {
-    #[cfg(not(feature = "no_module"))]
-    use crate::Identifier;
-    use crate::{ast::ScriptFuncDef, engine::FN_ANONYMOUS, Array, Map};
-
-    // Create a metadata record for a function.
-    fn make_metadata(
-        engine: &Engine,
-        #[cfg(not(feature = "no_module"))] namespace: Identifier,
-        func: &ScriptFuncDef,
-    ) -> Map {
-        let mut map = Map::new();
-
-        #[cfg(not(feature = "no_module"))]
-        if !namespace.is_empty() {
-            map.insert(
-                "namespace".into(),
-                engine.get_interned_string(namespace).into(),
-            );
-        }
-        map.insert(
-            "name".into(),
-            engine.get_interned_string(func.name.clone()).into(),
-        );
-        map.insert(
-            "access".into(),
-            engine
-                .get_interned_string(match func.access {
-                    FnAccess::Public => "public",
-                    FnAccess::Private => "private",
-                })
-                .into(),
-        );
-        map.insert(
-            "is_anonymous".into(),
-            func.name.starts_with(FN_ANONYMOUS).into(),
-        );
-        #[cfg(not(feature = "no_object"))]
-        if let Some(ref this_type) = func.this_type {
-            map.insert("this_type".into(), this_type.into());
-        }
-        map.insert(
-            "params".into(),
-            func.params
-                .iter()
-                .map(|p| engine.get_interned_string(p.clone()).into())
-                .collect::<Array>()
-                .into(),
-        );
-        #[cfg(feature = "metadata")]
-        if !func.comments.is_empty() {
-            map.insert(
-                "comments".into(),
-                func.comments
-                    .iter()
-                    .map(|s| engine.get_interned_string(s).into())
-                    .collect::<Array>()
-                    .into(),
-            );
-        }
-
-        map
-    }
-
-    let engine = ctx.engine();
-    let mut list = Array::new();
-
-    ctx.iter_namespaces()
-        .flat_map(Module::iter_script_fn)
-        .filter(|(s, a, n, p, f)| filter(*s, *a, n, *p, f))
-        .for_each(|(.., f)| {
-            list.push(
-                make_metadata(
-                    engine,
-                    #[cfg(not(feature = "no_module"))]
-                    Identifier::new_const(),
-                    f,
-                )
-                .into(),
-            );
-        });
-
-    ctx.engine()
-        .global_modules
-        .iter()
-        .flat_map(|m| m.iter_script_fn())
-        .filter(|(ns, a, n, p, f)| filter(*ns, *a, n, *p, f))
-        .for_each(|(.., f)| {
-            list.push(
-                make_metadata(
-                    engine,
-                    #[cfg(not(feature = "no_module"))]
-                    Identifier::new_const(),
-                    f,
-                )
-                .into(),
-            );
-        });
-
-    #[cfg(not(feature = "no_module"))]
-    ctx.engine()
-        .global_sub_modules
-        .values()
-        .flat_map(|m| m.iter_script_fn())
-        .filter(|(ns, a, n, p, f)| filter(*ns, *a, n, *p, f))
-        .for_each(|(.., f)| {
-            list.push(
-                make_metadata(
-                    engine,
-                    #[cfg(not(feature = "no_module"))]
-                    Identifier::new_const(),
-                    f,
-                )
-                .into(),
-            );
-        });
-
-    #[cfg(not(feature = "no_module"))]
-    {
-        use crate::engine::NAMESPACE_SEPARATOR;
-        use crate::{Shared, SmartString};
-
-        // Recursively scan modules for script-defined functions.
-        fn scan_module(
-            engine: &Engine,
-            list: &mut Array,
-            namespace: &str,
-            module: &Module,
-            filter: impl Fn(FnNamespace, FnAccess, &str, usize, &Shared<ScriptFuncDef>) -> bool + Copy,
-        ) {
-            module
-                .iter_script_fn()
-                .filter(|(s, a, n, p, f)| filter(*s, *a, n, *p, f))
-                .for_each(|(.., f)| list.push(make_metadata(engine, namespace.into(), f).into()));
-            for (name, m) in module.iter_sub_modules() {
-                use std::fmt::Write;
-
-                let mut ns = SmartString::new_const();
-                write!(&mut ns, "{namespace}{NAMESPACE_SEPARATOR}{name}").unwrap();
-                scan_module(engine, list, &ns, m, filter);
-            }
-        }
-
-        for (ns, m) in ctx.global_runtime_state().iter_imports_raw() {
-            scan_module(engine, &mut list, ns, m, filter);
-        }
-    }
-
-    list
 }

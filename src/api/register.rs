@@ -752,4 +752,112 @@ impl Engine {
 
         signatures
     }
+
+    /// Collect the [`FuncInfo`][crate::FuncInfo] of all functions, native or script-defined,
+    /// mapping them into any type.
+    /// Exported under the `internals` feature only.
+    ///
+    /// Return [`None`] from the `mapper` to skip a function.
+    ///
+    /// Functions from the following sources are included, in order:
+    /// 1) Functions defined in the current script (if any)
+    /// 2) Functions registered into the global namespace
+    /// 3) Functions in registered packages
+    /// 4) Functions in standard packages (optional)
+    /// 5) Functions defined in modules `import`-ed by the current script (if any)
+    /// 6) Functions in registered sub-modules
+    #[cfg(feature = "internals")]
+    pub fn collect_fn_metadata<T>(
+        &self,
+        ctx: Option<&NativeCallContext>,
+        mapper: impl Fn(crate::FuncInfo) -> Option<T> + Copy,
+        include_standard_packages: bool,
+    ) -> Vec<T> {
+        let mut list = Vec::new();
+
+        if let Some(ctx) = ctx {
+            ctx.iter_namespaces()
+                .flat_map(Module::iter_fn)
+                .filter_map(|(func, f)| {
+                    mapper(crate::FuncInfo {
+                        metadata: f,
+                        #[cfg(not(feature = "no_module"))]
+                        namespace: Identifier::new_const(),
+                        #[cfg(not(feature = "no_function"))]
+                        script: func.get_script_fn_def().map(|f| (&**f).into()),
+                    })
+                })
+                .for_each(|v| list.push(v));
+        }
+
+        self.global_modules
+            .iter()
+            .filter(|m| !m.is_internal() && (include_standard_packages || !m.is_standard_lib()))
+            .flat_map(|m| m.iter_fn())
+            .filter_map(|(func, f)| {
+                mapper(crate::FuncInfo {
+                    metadata: f,
+                    #[cfg(not(feature = "no_module"))]
+                    namespace: Identifier::new_const(),
+                    #[cfg(not(feature = "no_function"))]
+                    script: func.get_script_fn_def().map(|f| (&**f).into()),
+                })
+            })
+            .for_each(|v| list.push(v));
+
+        #[cfg(not(feature = "no_module"))]
+        if let Some(ctx) = ctx {
+            use crate::engine::NAMESPACE_SEPARATOR;
+            use crate::SmartString;
+
+            // Recursively scan modules for script-defined functions.
+            fn scan_module<T>(
+                list: &mut Vec<T>,
+                namespace: &str,
+                module: &Module,
+                mapper: impl Fn(crate::FuncInfo) -> Option<T> + Copy,
+            ) {
+                module
+                    .iter_fn()
+                    .filter_map(|(func, f)| {
+                        mapper(crate::FuncInfo {
+                            metadata: f,
+                            namespace: namespace.into(),
+                            #[cfg(not(feature = "no_function"))]
+                            script: func.get_script_fn_def().map(|f| (&**f).into()),
+                        })
+                    })
+                    .for_each(|v| list.push(v));
+
+                for (name, m) in module.iter_sub_modules() {
+                    use std::fmt::Write;
+
+                    let mut ns = SmartString::new_const();
+                    write!(&mut ns, "{namespace}{NAMESPACE_SEPARATOR}{name}").unwrap();
+                    scan_module(list, &ns, m, mapper);
+                }
+            }
+
+            for (ns, m) in ctx.global_runtime_state().iter_imports_raw() {
+                scan_module(&mut list, ns, m, mapper);
+            }
+        }
+
+        #[cfg(not(feature = "no_module"))]
+        self.global_sub_modules
+            .values()
+            .flat_map(|m| m.iter_fn())
+            .filter_map(|(func, f)| {
+                mapper(crate::FuncInfo {
+                    metadata: f,
+                    #[cfg(not(feature = "no_module"))]
+                    namespace: Identifier::new_const(),
+                    #[cfg(not(feature = "no_function"))]
+                    script: func.get_script_fn_def().map(|f| (&**f).into()),
+                })
+            })
+            .for_each(|v| list.push(v));
+
+        list
+    }
 }

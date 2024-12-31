@@ -329,6 +329,9 @@ pub use optimizer::OptimizationLevel;
 pub use types::dynamic::{AccessMode, DynamicReadLock, DynamicWriteLock, Variant};
 
 #[cfg(feature = "internals")]
+pub use module::{FuncInfo, FuncMetadata};
+
+#[cfg(feature = "internals")]
 #[cfg(not(feature = "no_float"))]
 pub use types::FloatWrapper;
 
