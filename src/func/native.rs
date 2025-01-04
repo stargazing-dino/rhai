@@ -30,10 +30,10 @@ impl<T> SendSync for T {}
 
 /// Immutable reference-counted container.
 #[cfg(not(feature = "sync"))]
-pub use std::rc::Rc as Shared;
+pub use alloc::rc::Rc as Shared;
 /// Immutable reference-counted container.
 #[cfg(feature = "sync")]
-pub use std::sync::Arc as Shared;
+pub use alloc::sync::Arc as Shared;
 
 /// Synchronized shared object.
 #[cfg(not(feature = "sync"))]
