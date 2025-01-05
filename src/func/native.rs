@@ -30,9 +30,16 @@ impl<T> SendSync for T {}
 
 /// Immutable reference-counted container.
 #[cfg(not(feature = "sync"))]
+// TODO: Further audit no_std compatibility
+// When building with no_std + sync features, explicit imports from alloc
+// are needed despite using no_std_compat. This fixed compilation errors
+// around missing trait implementations for some users.
 pub use alloc::rc::Rc as Shared;
 /// Immutable reference-counted container.
 #[cfg(feature = "sync")]
+// TODO: Further audit no_std compatibility
+// While no_std_compat should map std::sync::Arc to alloc::sync::Arc,
+// there appear to be cases where this mapping fails.
 pub use alloc::sync::Arc as Shared;
 
 /// Synchronized shared object.
