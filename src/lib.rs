@@ -93,7 +93,6 @@
 #![allow(clippy::no_effect_underscore_binding)] // Underscored variables may be used by code within feature guards
 #![allow(clippy::semicolon_if_nothing_returned)] // One-liner `match` cases are sometimes formatted as multi-line blocks
 
-#[cfg(feature = "no_std")]
 extern crate alloc;
 
 #[cfg(feature = "no_std")]
